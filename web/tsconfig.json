@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "lib": ["ES2020", "DOM", "WebWorker"],
+    "jsx": "react-jsx",
+    "jsxImportSource": "preact",
+    "paths": {
+      "@pi-oxide/web-js": ["../crates/web-js/js/index.ts"],
+      "@pi-oxide/extension-js": ["../crates/extension-js/js/index.ts"],
+      "@pi-oxide/dom-semantic-tree": ["../crates/dom-semantic-tree/js/index.ts"]
+    }
+  },
+  "include": ["src", "tests"]
+}

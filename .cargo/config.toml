@@ -1,0 +1,6 @@
+[target.wasm32-unknown-unknown]
+rustflags = '--cfg getrandom_backend="wasm_js"'
+
+[env]
+CC = "/opt/homebrew/opt/llvm/bin/clang"
+CFLAGS = "--sysroot=/opt/homebrew/Cellar/wasi-libc/32/share/wasi-sysroot"

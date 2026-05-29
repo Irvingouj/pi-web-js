@@ -1,0 +1,4526 @@
+[
+  {
+    "namespace": "web",
+    "name": "fetch",
+    "action": "fetch",
+    "description": "Perform an HTTP fetch request.",
+    "params": [
+      {
+        "name": "url",
+        "js_type": "string",
+        "required": true,
+        "description": "URL to fetch"
+      },
+      {
+        "name": "opts",
+        "js_type": "object | null",
+        "required": false,
+        "description": "Options: method, body, headers, timeout"
+      }
+    ],
+    "returns": {
+      "js_type": "object",
+      "description": "{ status, ok, body, headers }"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web",
+    "name": "sleep",
+    "action": "sleep",
+    "description": "Pause execution for a duration.",
+    "params": [
+      {
+        "name": "ms",
+        "js_type": "number",
+        "required": false,
+        "description": "Milliseconds to sleep (default 1000)"
+      }
+    ],
+    "returns": {
+      "js_type": "null",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web",
+    "name": "mock_async",
+    "action": "mock_async",
+    "description": "Yield for testing, resumes with provided value.",
+    "params": [
+      {
+        "name": "label",
+        "js_type": "string | null",
+        "required": false,
+        "description": "Test label"
+      }
+    ],
+    "returns": {
+      "js_type": "string",
+      "description": "Test label echoed back"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web",
+    "name": "log",
+    "action": "web_log",
+    "description": "Log a message to the browser console.",
+    "params": [
+      {
+        "name": "message",
+        "js_type": "any",
+        "required": true,
+        "description": "Value to log"
+      }
+    ],
+    "returns": {
+      "js_type": "null",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.url",
+    "name": "parse",
+    "action": "url_parse",
+    "description": "Parse a URL string into components.",
+    "params": [
+      {
+        "name": "url",
+        "js_type": "string",
+        "required": true,
+        "description": "URL string to parse"
+      }
+    ],
+    "returns": {
+      "js_type": "object",
+      "description": "Parsed URL components: scheme, host, port, path, query, fragment"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.url",
+    "name": "encode",
+    "action": "url_encode",
+    "description": "Encode an object into a query string.",
+    "params": [
+      {
+        "name": "params",
+        "js_type": "object",
+        "required": true,
+        "description": "Key-value pairs to encode"
+      }
+    ],
+    "returns": {
+      "js_type": "string",
+      "description": "URL-encoded query string"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.tab",
+    "name": "query",
+    "action": "tab_query",
+    "description": "Query Chrome tabs matching given criteria.",
+    "params": [
+      {
+        "name": "query_info",
+        "js_type": "object",
+        "required": false,
+        "description": "Query filter: active, currentWindow, url, etc."
+      }
+    ],
+    "returns": {
+      "js_type": "object",
+      "description": "Array of matching tab objects"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.tab",
+    "name": "create",
+    "action": "tab_create",
+    "description": "Create a new tab.",
+    "params": [
+      {
+        "name": "create_properties",
+        "js_type": "object",
+        "required": false,
+        "description": "URL, windowId, active, etc."
+      }
+    ],
+    "returns": {
+      "js_type": "object",
+      "description": "Created tab object"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.tab",
+    "name": "activate",
+    "action": "tab_activate",
+    "description": "Activate (focus) a tab.",
+    "params": [
+      {
+        "name": "tab_id",
+        "js_type": "number",
+        "required": true,
+        "description": "Tab ID to activate"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "Whether activation succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.tab",
+    "name": "close",
+    "action": "tab_close",
+    "description": "Close a tab.",
+    "params": [
+      {
+        "name": "tab_id",
+        "js_type": "number",
+        "required": true,
+        "description": "Tab ID to close"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "Whether close succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.tab",
+    "name": "execute_script",
+    "action": "tab_execute_script",
+    "description": "Execute JavaScript in a target tab.",
+    "params": [
+      {
+        "name": "tab_id",
+        "js_type": "number",
+        "required": true,
+        "description": "Target tab ID"
+      },
+      {
+        "name": "script",
+        "js_type": "string | object",
+        "required": true,
+        "description": "Script code or injection details"
+      }
+    ],
+    "returns": {
+      "js_type": "object",
+      "description": "Injection results"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.tab",
+    "name": "click",
+    "action": "tab_click",
+    "description": "Click an element by refId in the target tab.",
+    "params": [
+      {
+        "name": "tab_id",
+        "js_type": "number",
+        "required": true,
+        "description": "Target tab ID"
+      },
+      {
+        "name": "ref_id",
+        "js_type": "number",
+        "required": true,
+        "description": "Element refId from snapshot"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "Whether the click succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.tab",
+    "name": "fill",
+    "action": "tab_fill",
+    "description": "Fill an input element by refId in the target tab.",
+    "params": [
+      {
+        "name": "tab_id",
+        "js_type": "number",
+        "required": true,
+        "description": "Target tab ID"
+      },
+      {
+        "name": "ref_id",
+        "js_type": "number",
+        "required": true,
+        "description": "Element refId from snapshot"
+      },
+      {
+        "name": "value",
+        "js_type": "string",
+        "required": true,
+        "description": "Text to fill"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "Whether fill succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.tab",
+    "name": "snapshot",
+    "action": "tab_snapshot",
+    "description": "Take a DOM snapshot of the target tab and return readable text. Defaults to active tab.",
+    "params": [
+      {
+        "name": "tab_id",
+        "js_type": "number",
+        "required": false,
+        "description": "Target tab ID (defaults to active tab)"
+      }
+    ],
+    "returns": {
+      "js_type": "string",
+      "description": "Human-readable accessibility tree with refIds"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.tab",
+    "name": "snapshot_text",
+    "action": "tab_snapshot_text",
+    "description": "Take a DOM snapshot and return readable text (explicit alias). Defaults to active tab.",
+    "params": [
+      {
+        "name": "tab_id",
+        "js_type": "number",
+        "required": false,
+        "description": "Target tab ID (defaults to active tab)"
+      }
+    ],
+    "returns": {
+      "js_type": "string",
+      "description": "Human-readable accessibility tree with refIds"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.tab",
+    "name": "snapshot_data",
+    "action": "tab_snapshot_data",
+    "description": "Take a DOM snapshot and return structured data. Defaults to active tab.",
+    "params": [
+      {
+        "name": "tab_id",
+        "js_type": "number",
+        "required": false,
+        "description": "Target tab ID (defaults to active tab)"
+      }
+    ],
+    "returns": {
+      "js_type": "object",
+      "description": "Structured snapshot with nodes, url, title, viewport"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.tab",
+    "name": "scroll_to",
+    "action": "tab_scroll_to",
+    "description": "Scroll to an element by refId in the target tab.",
+    "params": [
+      {
+        "name": "tab_id",
+        "js_type": "number",
+        "required": true,
+        "description": "Target tab ID"
+      },
+      {
+        "name": "ref_id",
+        "js_type": "number",
+        "required": true,
+        "description": "Element refId from snapshot"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "Whether scroll succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.tab",
+    "name": "evaluate",
+    "action": "tab_evaluate",
+    "description": "Evaluate JavaScript in a target tab and return the result.",
+    "params": [
+      {
+        "name": "tab_id",
+        "js_type": "number",
+        "required": true,
+        "description": "Target tab ID"
+      },
+      {
+        "name": "script",
+        "js_type": "string",
+        "required": true,
+        "description": "JavaScript code to evaluate"
+      }
+    ],
+    "returns": {
+      "js_type": "any",
+      "description": "Evaluation result"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.tab",
+    "name": "back",
+    "action": "tab_back",
+    "description": "Navigate back in a target tab.",
+    "params": [
+      {
+        "name": "tab_id",
+        "js_type": "number",
+        "required": true,
+        "description": "Target tab ID"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "Whether navigation succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.tab",
+    "name": "wait_for_load",
+    "action": "tab_wait_for_load",
+    "description": "Wait for a tab to finish loading.",
+    "params": [
+      {
+        "name": "tab_id",
+        "js_type": "number",
+        "required": true,
+        "description": "Target tab ID"
+      },
+      {
+        "name": "timeout",
+        "js_type": "number",
+        "required": false,
+        "description": "Timeout in milliseconds (default 30000)"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "Whether the tab loaded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.tab",
+    "name": "type",
+    "action": "tab_type",
+    "description": "Type text into an input element by refId in the target tab (appends).",
+    "params": [
+      {
+        "name": "tab_id",
+        "js_type": "number",
+        "required": true,
+        "description": "Target tab ID"
+      },
+      {
+        "name": "ref_id",
+        "js_type": "number",
+        "required": true,
+        "description": "Element refId from snapshot"
+      },
+      {
+        "name": "text",
+        "js_type": "string",
+        "required": true,
+        "description": "Text to type"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "Whether type succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.tab",
+    "name": "press",
+    "action": "tab_press",
+    "description": "Dispatch a keyboard key press in the target tab.",
+    "params": [
+      {
+        "name": "tab_id",
+        "js_type": "number",
+        "required": true,
+        "description": "Target tab ID"
+      },
+      {
+        "name": "key",
+        "js_type": "string",
+        "required": true,
+        "description": "Key to press (e.g. 'Enter', 'Escape')"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "Whether press succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.tab",
+    "name": "select",
+    "action": "tab_select",
+    "description": "Select an option in a dropdown by refId in the target tab.",
+    "params": [
+      {
+        "name": "tab_id",
+        "js_type": "number",
+        "required": true,
+        "description": "Target tab ID"
+      },
+      {
+        "name": "ref_id",
+        "js_type": "number",
+        "required": true,
+        "description": "Element refId from snapshot"
+      },
+      {
+        "name": "value",
+        "js_type": "string",
+        "required": true,
+        "description": "Option value to select"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "Whether select succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.tab",
+    "name": "check",
+    "action": "tab_check",
+    "description": "Toggle a checkbox by refId in the target tab.",
+    "params": [
+      {
+        "name": "tab_id",
+        "js_type": "number",
+        "required": true,
+        "description": "Target tab ID"
+      },
+      {
+        "name": "ref_id",
+        "js_type": "number",
+        "required": true,
+        "description": "Element refId from snapshot"
+      },
+      {
+        "name": "checked",
+        "js_type": "boolean",
+        "required": false,
+        "description": "Desired checked state (default true)"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "Whether check succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.tab",
+    "name": "hover",
+    "action": "tab_hover",
+    "description": "Hover over an element by refId in the target tab.",
+    "params": [
+      {
+        "name": "tab_id",
+        "js_type": "number",
+        "required": true,
+        "description": "Target tab ID"
+      },
+      {
+        "name": "ref_id",
+        "js_type": "number",
+        "required": true,
+        "description": "Element refId from snapshot"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "Whether hover succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.tab",
+    "name": "unhover",
+    "action": "tab_unhover",
+    "description": "Unhover (mouseleave) an element by refId in the target tab.",
+    "params": [
+      {
+        "name": "tab_id",
+        "js_type": "number",
+        "required": true,
+        "description": "Target tab ID"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "Whether unhover succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.tab",
+    "name": "scroll",
+    "action": "tab_scroll",
+    "description": "Scroll the target tab page.",
+    "params": [
+      {
+        "name": "tab_id",
+        "js_type": "number",
+        "required": true,
+        "description": "Target tab ID"
+      },
+      {
+        "name": "direction",
+        "js_type": "string",
+        "required": false,
+        "description": "Scroll direction: up or down (default down)"
+      },
+      {
+        "name": "amount",
+        "js_type": "number",
+        "required": false,
+        "description": "Scroll amount in pixels (default 300)"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "Whether scroll succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.tab",
+    "name": "dblclick",
+    "action": "tab_dblclick",
+    "description": "Double-click an element by refId in the target tab.",
+    "params": [
+      {
+        "name": "tab_id",
+        "js_type": "number",
+        "required": true,
+        "description": "Target tab ID"
+      },
+      {
+        "name": "ref_id",
+        "js_type": "number",
+        "required": true,
+        "description": "Element refId from snapshot"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "Whether dblclick succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.tab",
+    "name": "fetch",
+    "action": "tab_fetch",
+    "description": "Perform an HTTP fetch inside a target tab origin.",
+    "params": [
+      {
+        "name": "tab_id",
+        "js_type": "number",
+        "required": true,
+        "description": "Target tab ID"
+      },
+      {
+        "name": "url",
+        "js_type": "string",
+        "required": true,
+        "description": "URL to fetch"
+      },
+      {
+        "name": "opts",
+        "js_type": "object | null",
+        "required": false,
+        "description": "Options: method, body, headers, timeout"
+      }
+    ],
+    "returns": {
+      "js_type": "object",
+      "description": "{ status, ok, body, headers }"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.storage",
+    "name": "get",
+    "action": "storage_get",
+    "description": "Get a value from web storage.",
+    "params": [
+      {
+        "name": "key",
+        "js_type": "string",
+        "required": true,
+        "description": "Storage key"
+      }
+    ],
+    "returns": {
+      "js_type": "string | null",
+      "description": "Stored value or null"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.storage",
+    "name": "set",
+    "action": "storage_set",
+    "description": "Set a value in web storage.",
+    "params": [
+      {
+        "name": "key",
+        "js_type": "string",
+        "required": true,
+        "description": "Storage key"
+      },
+      {
+        "name": "value",
+        "js_type": "string",
+        "required": true,
+        "description": "Value to store"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "Whether set succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.storage",
+    "name": "delete",
+    "action": "storage_delete",
+    "description": "Remove a key from web storage.",
+    "params": [
+      {
+        "name": "key",
+        "js_type": "string",
+        "required": true,
+        "description": "Storage key to remove"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "Whether deletion succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.storage",
+    "name": "list",
+    "action": "storage_list",
+    "description": "List all keys in web storage.",
+    "params": [],
+    "returns": {
+      "js_type": "object",
+      "description": "Array of key strings"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.cookies",
+    "name": "get",
+    "action": "cookies_get",
+    "description": "Get a cookie by name and URL.",
+    "params": [
+      {
+        "name": "details",
+        "js_type": "object",
+        "required": true,
+        "description": "Cookie query: name, url, storeId"
+      }
+    ],
+    "returns": {
+      "js_type": "object | null",
+      "description": "Cookie object or null if not found"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.cookies",
+    "name": "set",
+    "action": "cookies_set",
+    "description": "Set a cookie.",
+    "params": [
+      {
+        "name": "details",
+        "js_type": "object",
+        "required": true,
+        "description": "Cookie to set: name, value, url, etc."
+      }
+    ],
+    "returns": {
+      "js_type": "object",
+      "description": "Set cookie object"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.cookies",
+    "name": "delete",
+    "action": "cookies_delete",
+    "description": "Delete a cookie.",
+    "params": [
+      {
+        "name": "details",
+        "js_type": "object",
+        "required": true,
+        "description": "Cookie to delete: name, url"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "Whether deletion succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.cookies",
+    "name": "list",
+    "action": "cookies_list",
+    "description": "List cookies matching a filter.",
+    "params": [
+      {
+        "name": "filter",
+        "js_type": "object",
+        "required": false,
+        "description": "Filter: url, name, domain, etc."
+      }
+    ],
+    "returns": {
+      "js_type": "object",
+      "description": "Array of cookie objects"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.history",
+    "name": "search",
+    "action": "history_search",
+    "description": "Search browser history.",
+    "params": [
+      {
+        "name": "query",
+        "js_type": "object",
+        "required": true,
+        "description": "Search query: text, startTime, endTime, maxResults"
+      }
+    ],
+    "returns": {
+      "js_type": "object",
+      "description": "Array of history items"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.history",
+    "name": "delete",
+    "action": "history_delete",
+    "description": "Delete a URL from browser history.",
+    "params": [
+      {
+        "name": "url",
+        "js_type": "string",
+        "required": true,
+        "description": "URL to remove from history"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "Whether deletion succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.bookmarks",
+    "name": "search",
+    "action": "bookmarks_search",
+    "description": "Search bookmarks.",
+    "params": [
+      {
+        "name": "query",
+        "js_type": "string | object",
+        "required": true,
+        "description": "Search string or query object"
+      }
+    ],
+    "returns": {
+      "js_type": "object",
+      "description": "Array of bookmark nodes"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.bookmarks",
+    "name": "create",
+    "action": "bookmarks_create",
+    "description": "Create a bookmark or folder.",
+    "params": [
+      {
+        "name": "bookmark",
+        "js_type": "object",
+        "required": true,
+        "description": "Bookmark properties: parentId, title, url"
+      }
+    ],
+    "returns": {
+      "js_type": "object",
+      "description": "Created bookmark node"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.bookmarks",
+    "name": "delete",
+    "action": "bookmarks_delete",
+    "description": "Delete a bookmark.",
+    "params": [
+      {
+        "name": "id",
+        "js_type": "string",
+        "required": true,
+        "description": "Bookmark node ID to delete"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "Whether deletion succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.notifications",
+    "name": "create",
+    "action": "notifications_create",
+    "description": "Create a browser notification.",
+    "params": [
+      {
+        "name": "id",
+        "js_type": "string | null",
+        "required": false,
+        "description": "Notification ID (null for auto-generated)"
+      },
+      {
+        "name": "options",
+        "js_type": "object",
+        "required": true,
+        "description": "Notification options: type, title, message, iconUrl"
+      }
+    ],
+    "returns": {
+      "js_type": "string",
+      "description": "Notification ID"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.notifications",
+    "name": "clear",
+    "action": "notifications_clear",
+    "description": "Clear a browser notification.",
+    "params": [
+      {
+        "name": "id",
+        "js_type": "string",
+        "required": true,
+        "description": "Notification ID to clear"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "Whether notification was cleared"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.clipboard",
+    "name": "read",
+    "action": "clipboard_read",
+    "description": "Read text from the system clipboard.",
+    "params": [],
+    "returns": {
+      "js_type": "string | null",
+      "description": "Clipboard text or null"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.clipboard",
+    "name": "write",
+    "action": "clipboard_write",
+    "description": "Write text to the system clipboard.",
+    "params": [
+      {
+        "name": "text",
+        "js_type": "string",
+        "required": true,
+        "description": "Text to write"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "Whether write succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "fs",
+    "name": "exists",
+    "action": "fs_exists",
+    "description": "Check whether a path exists in the virtual filesystem.",
+    "params": [
+      {
+        "name": "path",
+        "js_type": "string",
+        "required": true,
+        "description": "Absolute VFS path"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "true if the path exists"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "fs",
+    "name": "stat",
+    "action": "fs_stat",
+    "description": "Get metadata for a path.",
+    "params": [
+      {
+        "name": "path",
+        "js_type": "string",
+        "required": true,
+        "description": "Absolute VFS path"
+      }
+    ],
+    "returns": {
+      "js_type": "object | null",
+      "description": "Metadata object or null if not found"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "fs",
+    "name": "list",
+    "action": "fs_list",
+    "description": "List entries in a directory.",
+    "params": [
+      {
+        "name": "path",
+        "js_type": "string",
+        "required": true,
+        "description": "Absolute VFS directory path"
+      }
+    ],
+    "returns": {
+      "js_type": "object",
+      "description": "Array of DirEntry objects"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "fs",
+    "name": "mkdir",
+    "action": "fs_mkdir",
+    "description": "Create a directory (and parents if needed).",
+    "params": [
+      {
+        "name": "path",
+        "js_type": "string",
+        "required": true,
+        "description": "Absolute VFS directory path"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "true on success"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "fs",
+    "name": "delete",
+    "action": "fs_delete",
+    "description": "Delete a file or directory (recursive for directories).",
+    "params": [
+      {
+        "name": "path",
+        "js_type": "string",
+        "required": true,
+        "description": "Absolute VFS path to delete"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "true on success"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "fs",
+    "name": "copy",
+    "action": "fs_copy",
+    "description": "Copy a file from one path to another.",
+    "params": [
+      {
+        "name": "from",
+        "js_type": "string",
+        "required": true,
+        "description": "Source absolute VFS path"
+      },
+      {
+        "name": "to",
+        "js_type": "string",
+        "required": true,
+        "description": "Destination absolute VFS path"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "true on success"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "fs",
+    "name": "move",
+    "action": "fs_move",
+    "description": "Move (rename) a file from one path to another.",
+    "params": [
+      {
+        "name": "from",
+        "js_type": "string",
+        "required": true,
+        "description": "Source absolute VFS path"
+      },
+      {
+        "name": "to",
+        "js_type": "string",
+        "required": true,
+        "description": "Destination absolute VFS path"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "true on success"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "fs",
+    "name": "read",
+    "action": "fs_read",
+    "description": "Read raw bytes from a file. Returns base64-encoded string over the async wire.",
+    "params": [
+      {
+        "name": "path",
+        "js_type": "string",
+        "required": true,
+        "description": "Absolute VFS file path"
+      }
+    ],
+    "returns": {
+      "js_type": "string",
+      "description": "Base64-encoded file contents"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "fs",
+    "name": "read_text",
+    "action": "fs_read_text",
+    "description": "Read a file as UTF-8 text.",
+    "params": [
+      {
+        "name": "path",
+        "js_type": "string",
+        "required": true,
+        "description": "Absolute VFS file path"
+      }
+    ],
+    "returns": {
+      "js_type": "string | null",
+      "description": "File contents or null"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "fs",
+    "name": "read_base64",
+    "action": "fs_read_base64",
+    "description": "Read a file and return its contents as base64.",
+    "params": [
+      {
+        "name": "path",
+        "js_type": "string",
+        "required": true,
+        "description": "Absolute VFS file path"
+      }
+    ],
+    "returns": {
+      "js_type": "string | null",
+      "description": "Base64-encoded contents or null"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "fs",
+    "name": "read_range",
+    "action": "fs_read_range",
+    "description": "Read a byte range from a file.",
+    "params": [
+      {
+        "name": "path",
+        "js_type": "string",
+        "required": true,
+        "description": "Absolute VFS file path"
+      },
+      {
+        "name": "offset",
+        "js_type": "number",
+        "required": true,
+        "description": "Byte offset to start reading"
+      },
+      {
+        "name": "len",
+        "js_type": "number",
+        "required": true,
+        "description": "Number of bytes to read"
+      }
+    ],
+    "returns": {
+      "js_type": "string",
+      "description": "Base64-encoded range contents"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "fs",
+    "name": "write",
+    "action": "fs_write",
+    "description": "Write raw bytes to a file (overwrites existing). Data is base64-encoded over the wire.",
+    "params": [
+      {
+        "name": "path",
+        "js_type": "string",
+        "required": true,
+        "description": "Absolute VFS file path"
+      },
+      {
+        "name": "data",
+        "js_type": "string",
+        "required": true,
+        "description": "Raw byte string to write"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "true on success"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "fs",
+    "name": "write_text",
+    "action": "fs_write_text",
+    "description": "Write UTF-8 text to a file (overwrites existing).",
+    "params": [
+      {
+        "name": "path",
+        "js_type": "string",
+        "required": true,
+        "description": "Absolute VFS file path"
+      },
+      {
+        "name": "text",
+        "js_type": "string",
+        "required": true,
+        "description": "Text to write"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "true on success"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "fs",
+    "name": "write_base64",
+    "action": "fs_write_base64",
+    "description": "Write base64-decoded bytes to a file (overwrites existing).",
+    "params": [
+      {
+        "name": "path",
+        "js_type": "string",
+        "required": true,
+        "description": "Absolute VFS file path"
+      },
+      {
+        "name": "b64",
+        "js_type": "string",
+        "required": true,
+        "description": "Base64-encoded data"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "true on success"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "fs",
+    "name": "append",
+    "action": "fs_append",
+    "description": "Append raw bytes to a file. Data is base64-encoded over the wire.",
+    "params": [
+      {
+        "name": "path",
+        "js_type": "string",
+        "required": true,
+        "description": "Absolute VFS file path"
+      },
+      {
+        "name": "data",
+        "js_type": "string",
+        "required": true,
+        "description": "Raw byte string to append"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "true on success"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "fs",
+    "name": "append_text",
+    "action": "fs_append_text",
+    "description": "Append UTF-8 text to a file.",
+    "params": [
+      {
+        "name": "path",
+        "js_type": "string",
+        "required": true,
+        "description": "Absolute VFS file path"
+      },
+      {
+        "name": "text",
+        "js_type": "string",
+        "required": true,
+        "description": "Text to append"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "true on success"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "fs",
+    "name": "append_base64",
+    "action": "fs_append_base64",
+    "description": "Append base64-decoded bytes to a file.",
+    "params": [
+      {
+        "name": "path",
+        "js_type": "string",
+        "required": true,
+        "description": "Absolute VFS file path"
+      },
+      {
+        "name": "b64",
+        "js_type": "string",
+        "required": true,
+        "description": "Base64-encoded data"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "true on success"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "fs",
+    "name": "update",
+    "action": "fs_update",
+    "description": "Write raw bytes at a specific offset in a file. Data is base64-encoded over the wire.",
+    "params": [
+      {
+        "name": "path",
+        "js_type": "string",
+        "required": true,
+        "description": "Absolute VFS file path"
+      },
+      {
+        "name": "offset",
+        "js_type": "number",
+        "required": true,
+        "description": "Byte offset"
+      },
+      {
+        "name": "data",
+        "js_type": "string",
+        "required": true,
+        "description": "Raw byte string to write"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "true on success"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "fs",
+    "name": "hash",
+    "action": "fs_hash",
+    "description": "Compute a hash of a file's contents.",
+    "params": [
+      {
+        "name": "path",
+        "js_type": "string",
+        "required": true,
+        "description": "Absolute VFS file path"
+      },
+      {
+        "name": "algo",
+        "js_type": "string",
+        "required": true,
+        "description": "Hash algorithm (sha256 or sha1)"
+      }
+    ],
+    "returns": {
+      "js_type": "string | null",
+      "description": "Hex-encoded hash or null"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "fs",
+    "name": "readFile",
+    "action": null,
+    "description": "Node.js compatible readFile.",
+    "params": [
+      {
+        "name": "path",
+        "js_type": "string",
+        "required": true,
+        "description": "Absolute VFS file path"
+      },
+      {
+        "name": "options",
+        "js_type": "object | null",
+        "required": false,
+        "description": "Options or encoding"
+      },
+      {
+        "name": "callback",
+        "js_type": "function",
+        "required": true,
+        "description": "Callback(err, data)"
+      }
+    ],
+    "returns": {
+      "js_type": "undefined",
+      "description": "None"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "fs",
+    "name": "readFileSync",
+    "action": null,
+    "description": "Node.js compatible readFileSync.",
+    "params": [
+      {
+        "name": "path",
+        "js_type": "string",
+        "required": true,
+        "description": "Absolute VFS file path"
+      },
+      {
+        "name": "options",
+        "js_type": "object | null",
+        "required": false,
+        "description": "Options or encoding"
+      }
+    ],
+    "returns": {
+      "js_type": "string | object",
+      "description": "File contents"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "fs",
+    "name": "writeFile",
+    "action": null,
+    "description": "Node.js compatible writeFile.",
+    "params": [
+      {
+        "name": "path",
+        "js_type": "string",
+        "required": true,
+        "description": "Absolute VFS file path"
+      },
+      {
+        "name": "data",
+        "js_type": "string | object",
+        "required": true,
+        "description": "Data to write"
+      },
+      {
+        "name": "options",
+        "js_type": "object | null",
+        "required": false,
+        "description": "Options or encoding"
+      },
+      {
+        "name": "callback",
+        "js_type": "function",
+        "required": true,
+        "description": "Callback(err)"
+      }
+    ],
+    "returns": {
+      "js_type": "undefined",
+      "description": "None"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "fs",
+    "name": "writeFileSync",
+    "action": null,
+    "description": "Node.js compatible writeFileSync.",
+    "params": [
+      {
+        "name": "path",
+        "js_type": "string",
+        "required": true,
+        "description": "Absolute VFS file path"
+      },
+      {
+        "name": "data",
+        "js_type": "string | object",
+        "required": true,
+        "description": "Data to write"
+      },
+      {
+        "name": "options",
+        "js_type": "object | null",
+        "required": false,
+        "description": "Options or encoding"
+      }
+    ],
+    "returns": {
+      "js_type": "undefined",
+      "description": "None"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "fs",
+    "name": "appendFile",
+    "action": null,
+    "description": "Node.js compatible appendFile.",
+    "params": [
+      {
+        "name": "path",
+        "js_type": "string",
+        "required": true,
+        "description": "Absolute VFS file path"
+      },
+      {
+        "name": "data",
+        "js_type": "string | object",
+        "required": true,
+        "description": "Data to append"
+      },
+      {
+        "name": "options",
+        "js_type": "object | null",
+        "required": false,
+        "description": "Options or encoding"
+      },
+      {
+        "name": "callback",
+        "js_type": "function",
+        "required": true,
+        "description": "Callback(err)"
+      }
+    ],
+    "returns": {
+      "js_type": "undefined",
+      "description": "None"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "fs",
+    "name": "appendFileSync",
+    "action": null,
+    "description": "Node.js compatible appendFileSync.",
+    "params": [
+      {
+        "name": "path",
+        "js_type": "string",
+        "required": true,
+        "description": "Absolute VFS file path"
+      },
+      {
+        "name": "data",
+        "js_type": "string | object",
+        "required": true,
+        "description": "Data to append"
+      },
+      {
+        "name": "options",
+        "js_type": "object | null",
+        "required": false,
+        "description": "Options or encoding"
+      }
+    ],
+    "returns": {
+      "js_type": "undefined",
+      "description": "None"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "fs",
+    "name": "existsSync",
+    "action": null,
+    "description": "Node.js compatible existsSync.",
+    "params": [
+      {
+        "name": "path",
+        "js_type": "string",
+        "required": true,
+        "description": "Absolute VFS path"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "true if the path exists"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "fs",
+    "name": "readdirSync",
+    "action": null,
+    "description": "Node.js compatible readdirSync.",
+    "params": [
+      {
+        "name": "path",
+        "js_type": "string",
+        "required": true,
+        "description": "Absolute VFS directory path"
+      },
+      {
+        "name": "options",
+        "js_type": "object | null",
+        "required": false,
+        "description": "Options"
+      }
+    ],
+    "returns": {
+      "js_type": "object",
+      "description": "Array of entry names"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "fs",
+    "name": "mkdirSync",
+    "action": null,
+    "description": "Node.js compatible mkdirSync.",
+    "params": [
+      {
+        "name": "path",
+        "js_type": "string",
+        "required": true,
+        "description": "Absolute VFS directory path"
+      },
+      {
+        "name": "options",
+        "js_type": "object | null",
+        "required": false,
+        "description": "Options"
+      }
+    ],
+    "returns": {
+      "js_type": "undefined",
+      "description": "None"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "fs",
+    "name": "unlinkSync",
+    "action": null,
+    "description": "Node.js compatible unlinkSync.",
+    "params": [
+      {
+        "name": "path",
+        "js_type": "string",
+        "required": true,
+        "description": "Absolute VFS file path"
+      }
+    ],
+    "returns": {
+      "js_type": "undefined",
+      "description": "None"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "fs",
+    "name": "rmdirSync",
+    "action": null,
+    "description": "Node.js compatible rmdirSync.",
+    "params": [
+      {
+        "name": "path",
+        "js_type": "string",
+        "required": true,
+        "description": "Absolute VFS directory path"
+      }
+    ],
+    "returns": {
+      "js_type": "undefined",
+      "description": "None"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "fs",
+    "name": "copyFileSync",
+    "action": null,
+    "description": "Node.js compatible copyFileSync.",
+    "params": [
+      {
+        "name": "src",
+        "js_type": "string",
+        "required": true,
+        "description": "Source absolute VFS path"
+      },
+      {
+        "name": "dest",
+        "js_type": "string",
+        "required": true,
+        "description": "Destination absolute VFS path"
+      }
+    ],
+    "returns": {
+      "js_type": "undefined",
+      "description": "None"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "fs",
+    "name": "renameSync",
+    "action": null,
+    "description": "Node.js compatible renameSync.",
+    "params": [
+      {
+        "name": "oldPath",
+        "js_type": "string",
+        "required": true,
+        "description": "Old absolute VFS path"
+      },
+      {
+        "name": "newPath",
+        "js_type": "string",
+        "required": true,
+        "description": "New absolute VFS path"
+      }
+    ],
+    "returns": {
+      "js_type": "undefined",
+      "description": "None"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "fs",
+    "name": "statSync",
+    "action": null,
+    "description": "Node.js compatible statSync.",
+    "params": [
+      {
+        "name": "path",
+        "js_type": "string",
+        "required": true,
+        "description": "Absolute VFS path"
+      }
+    ],
+    "returns": {
+      "js_type": "object",
+      "description": "Stats object"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "fs",
+    "name": "promises",
+    "action": null,
+    "description": "Node.js promises-compatible object.",
+    "params": [],
+    "returns": {
+      "js_type": "object",
+      "description": "Promise-based fs API"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "global",
+    "name": "fetch",
+    "action": null,
+    "description": "Global fetch — alias for web.fetch.",
+    "params": [
+      {
+        "name": "url",
+        "js_type": "string",
+        "required": true,
+        "description": "URL to fetch"
+      },
+      {
+        "name": "opts",
+        "js_type": "object | null",
+        "required": false,
+        "description": "Options: method, body, headers, timeout"
+      }
+    ],
+    "returns": {
+      "js_type": "object",
+      "description": "{ status, ok, body, headers }"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "global",
+    "name": "setTimeout",
+    "action": null,
+    "description": "Schedule a function to run after a delay.",
+    "params": [
+      {
+        "name": "fn",
+        "js_type": "function",
+        "required": true,
+        "description": "Callback function"
+      },
+      {
+        "name": "ms",
+        "js_type": "number",
+        "required": false,
+        "description": "Delay in milliseconds (default 0)"
+      }
+    ],
+    "returns": {
+      "js_type": "number",
+      "description": "Timeout ID"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "global",
+    "name": "setInterval",
+    "action": null,
+    "description": "Schedule a function to run repeatedly.",
+    "params": [
+      {
+        "name": "fn",
+        "js_type": "function",
+        "required": true,
+        "description": "Callback function"
+      },
+      {
+        "name": "ms",
+        "js_type": "number",
+        "required": false,
+        "description": "Interval in milliseconds (default 0)"
+      }
+    ],
+    "returns": {
+      "js_type": "number",
+      "description": "Interval ID"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "global",
+    "name": "clearTimeout",
+    "action": null,
+    "description": "Cancel a scheduled timeout.",
+    "params": [
+      {
+        "name": "id",
+        "js_type": "number",
+        "required": true,
+        "description": "Timeout ID"
+      }
+    ],
+    "returns": {
+      "js_type": "undefined",
+      "description": "None"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "global",
+    "name": "clearInterval",
+    "action": null,
+    "description": "Cancel a scheduled interval.",
+    "params": [
+      {
+        "name": "id",
+        "js_type": "number",
+        "required": true,
+        "description": "Interval ID"
+      }
+    ],
+    "returns": {
+      "js_type": "undefined",
+      "description": "None"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "global",
+    "name": "URL",
+    "action": null,
+    "description": "URL class — parses a URL string into components.",
+    "params": [
+      {
+        "name": "url",
+        "js_type": "string",
+        "required": true,
+        "description": "URL string"
+      },
+      {
+        "name": "base",
+        "js_type": "string | null",
+        "required": false,
+        "description": "Base URL for relative URLs"
+      }
+    ],
+    "returns": {
+      "js_type": "object",
+      "description": "URL object with href, protocol, host, pathname, search, hash"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "global",
+    "name": "URLSearchParams",
+    "action": null,
+    "description": "URLSearchParams — manage query string parameters.",
+    "params": [
+      {
+        "name": "init",
+        "js_type": "string | object | null",
+        "required": false,
+        "description": "Query string or object of key-value pairs"
+      }
+    ],
+    "returns": {
+      "js_type": "object",
+      "description": "URLSearchParams instance with append, get, set, delete, toString"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "global",
+    "name": "localStorage",
+    "action": null,
+    "description": "localStorage — wraps web.storage for LLM familiarity.",
+    "params": [],
+    "returns": {
+      "js_type": "object",
+      "description": "Storage object with getItem, setItem, removeItem, clear, key, length"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "global",
+    "name": "sessionStorage",
+    "action": null,
+    "description": "sessionStorage — alias for localStorage (same backend).",
+    "params": [],
+    "returns": {
+      "js_type": "object",
+      "description": "Storage object with getItem, setItem, removeItem, clear, key, length"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "global",
+    "name": "document",
+    "action": null,
+    "description": "document — minimal stub with querySelector, querySelectorAll, title, URL.",
+    "params": [],
+    "returns": {
+      "js_type": "object",
+      "description": "Document proxy object"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "global",
+    "name": "window",
+    "action": null,
+    "description": "window — minimal stub with location, document, fetch, localStorage, navigator, setTimeout.",
+    "params": [],
+    "returns": {
+      "js_type": "object",
+      "description": "Window proxy object"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "global",
+    "name": "navigator",
+    "action": null,
+    "description": "navigator — minimal stub with clipboard.",
+    "params": [],
+    "returns": {
+      "js_type": "object",
+      "description": "Navigator proxy object with clipboard"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "chrome.runtime",
+    "name": "sendMessage",
+    "action": "chrome_runtime_sendMessage",
+    "description": "Send a message to the extension background script or another extension.",
+    "params": [
+      {
+        "name": "message",
+        "js_type": "any",
+        "required": true,
+        "description": "Message payload"
+      },
+      {
+        "name": "options",
+        "js_type": "object | null",
+        "required": false,
+        "description": "Options: to, includeTlsChannelId"
+      }
+    ],
+    "returns": {
+      "js_type": "any",
+      "description": "Response from the recipient"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.tabs",
+    "name": "query",
+    "action": "chrome_tabs_query",
+    "description": "Query Chrome tabs matching given criteria.",
+    "params": [
+      {
+        "name": "query_info",
+        "js_type": "object",
+        "required": true,
+        "description": "Query filter: active, currentWindow, url, etc."
+      }
+    ],
+    "returns": {
+      "js_type": "object",
+      "description": "Array of matching tab objects"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.tabs",
+    "name": "create",
+    "action": "chrome_tabs_create",
+    "description": "Create a new Chrome tab.",
+    "params": [
+      {
+        "name": "create_properties",
+        "js_type": "object",
+        "required": false,
+        "description": "URL, windowId, active, etc."
+      }
+    ],
+    "returns": {
+      "js_type": "object",
+      "description": "Created tab object"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.tabs",
+    "name": "update",
+    "action": "chrome_tabs_update",
+    "description": "Update properties of a tab.",
+    "params": [
+      {
+        "name": "tab_id",
+        "js_type": "number | null",
+        "required": false,
+        "description": "Tab ID (null for active tab)"
+      },
+      {
+        "name": "update_properties",
+        "js_type": "object",
+        "required": true,
+        "description": "Properties: url, active, muted, etc."
+      }
+    ],
+    "returns": {
+      "js_type": "object",
+      "description": "Updated tab object"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.tabs",
+    "name": "remove",
+    "action": "chrome_tabs_remove",
+    "description": "Close one or more tabs.",
+    "params": [
+      {
+        "name": "tab_ids",
+        "js_type": "number | object",
+        "required": true,
+        "description": "Tab ID or array of tab IDs"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "Whether removal succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.tabs",
+    "name": "get",
+    "action": "chrome_tabs_get",
+    "description": "Get a tab by ID.",
+    "params": [
+      {
+        "name": "tab_id",
+        "js_type": "number",
+        "required": true,
+        "description": "Tab ID"
+      }
+    ],
+    "returns": {
+      "js_type": "object",
+      "description": "Tab object"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.tabs",
+    "name": "reload",
+    "action": "chrome_tabs_reload",
+    "description": "Reload a tab.",
+    "params": [
+      {
+        "name": "tab_id",
+        "js_type": "number | null",
+        "required": false,
+        "description": "Tab ID (null for active tab)"
+      },
+      {
+        "name": "reload_properties",
+        "js_type": "object | null",
+        "required": false,
+        "description": "bypassCache"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "Whether reload succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.tabs",
+    "name": "sendMessage",
+    "action": "chrome_tabs_sendMessage",
+    "description": "Send a message to a specific tab.",
+    "params": [
+      {
+        "name": "tab_id",
+        "js_type": "number",
+        "required": true,
+        "description": "Target tab ID"
+      },
+      {
+        "name": "message",
+        "js_type": "any",
+        "required": true,
+        "description": "Message payload"
+      },
+      {
+        "name": "options",
+        "js_type": "object | null",
+        "required": false,
+        "description": "Options: frameId"
+      }
+    ],
+    "returns": {
+      "js_type": "any",
+      "description": "Response from the tab"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.alarms",
+    "name": "create",
+    "action": "chrome_alarms_create",
+    "description": "Create an alarm.",
+    "params": [
+      {
+        "name": "name",
+        "js_type": "string | null",
+        "required": false,
+        "description": "Alarm name"
+      },
+      {
+        "name": "alarm_info",
+        "js_type": "object",
+        "required": true,
+        "description": "When: delayInMinutes, periodInMinutes"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "Whether creation succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.alarms",
+    "name": "clear",
+    "action": "chrome_alarms_clear",
+    "description": "Clear an alarm.",
+    "params": [
+      {
+        "name": "name",
+        "js_type": "string | null",
+        "required": false,
+        "description": "Alarm name (null clears all)"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "Whether any alarm was cleared"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.storage.local",
+    "name": "get",
+    "action": "chrome_storage_local_get",
+    "description": "Get items from storage.",
+    "params": [
+      {
+        "name": "keys",
+        "js_type": "string | object | null",
+        "required": false,
+        "description": "Keys to retrieve"
+      }
+    ],
+    "returns": {
+      "js_type": "object",
+      "description": "Retrieved items"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.storage.local",
+    "name": "set",
+    "action": "chrome_storage_local_set",
+    "description": "Set items in storage.",
+    "params": [
+      {
+        "name": "items",
+        "js_type": "object",
+        "required": true,
+        "description": "Items to store"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "Whether set succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.storage.local",
+    "name": "remove",
+    "action": "chrome_storage_local_remove",
+    "description": "Remove items from storage.",
+    "params": [
+      {
+        "name": "keys",
+        "js_type": "string | object",
+        "required": true,
+        "description": "Keys to remove"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "Whether removal succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.storage.local",
+    "name": "clear",
+    "action": "chrome_storage_local_clear",
+    "description": "Clear all storage.",
+    "params": [],
+    "returns": {
+      "js_type": "boolean",
+      "description": "Whether clear succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.storage",
+    "name": "sync",
+    "action": null,
+    "description": "Alias for local.",
+    "params": [],
+    "returns": {
+      "js_type": "object",
+      "description": "Storage object with get, set, remove, clear"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "chrome.action",
+    "name": "setBadgeText",
+    "action": "chrome_action_setBadgeText",
+    "description": "Set the badge text on the extension action icon.",
+    "params": [
+      {
+        "name": "details",
+        "js_type": "object",
+        "required": true,
+        "description": "text, tabId"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "Whether set succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.action",
+    "name": "setBadgeBackgroundColor",
+    "action": "chrome_action_setBadgeBackgroundColor",
+    "description": "Set the badge background color.",
+    "params": [
+      {
+        "name": "details",
+        "js_type": "object",
+        "required": true,
+        "description": "color, tabId"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "Whether set succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.action",
+    "name": "setTitle",
+    "action": "chrome_action_setTitle",
+    "description": "Set the title of the extension action.",
+    "params": [
+      {
+        "name": "details",
+        "js_type": "object",
+        "required": true,
+        "description": "title, tabId"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "Whether set succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.action",
+    "name": "setIcon",
+    "action": "chrome_action_setIcon",
+    "description": "Set the icon of the extension action.",
+    "params": [
+      {
+        "name": "details",
+        "js_type": "object",
+        "required": true,
+        "description": "imageData, path, tabId"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "Whether set succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.contextMenus",
+    "name": "create",
+    "action": "chrome_contextMenus_create",
+    "description": "Create a context menu item.",
+    "params": [
+      {
+        "name": "create_properties",
+        "js_type": "object",
+        "required": true,
+        "description": "id, title, contexts, onclick"
+      }
+    ],
+    "returns": {
+      "js_type": "string | number",
+      "description": "Created item ID"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.contextMenus",
+    "name": "remove",
+    "action": "chrome_contextMenus_remove",
+    "description": "Remove a context menu item.",
+    "params": [
+      {
+        "name": "menuItemId",
+        "js_type": "string | number",
+        "required": true,
+        "description": "Item ID to remove"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "Whether removal succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.windows",
+    "name": "getAll",
+    "action": "chrome_windows_getAll",
+    "description": "Get all browser windows.",
+    "params": [
+      {
+        "name": "get_info",
+        "js_type": "object | null",
+        "required": false,
+        "description": "populate, windowTypes"
+      }
+    ],
+    "returns": {
+      "js_type": "object",
+      "description": "Array of window objects"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.windows",
+    "name": "create",
+    "action": "chrome_windows_create",
+    "description": "Create a new browser window.",
+    "params": [
+      {
+        "name": "create_data",
+        "js_type": "object | null",
+        "required": false,
+        "description": "url, type, focused, etc."
+      }
+    ],
+    "returns": {
+      "js_type": "object",
+      "description": "Created window object"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.windows",
+    "name": "update",
+    "action": "chrome_windows_update",
+    "description": "Update a browser window.",
+    "params": [
+      {
+        "name": "window_id",
+        "js_type": "number",
+        "required": true,
+        "description": "Window ID"
+      },
+      {
+        "name": "update_info",
+        "js_type": "object",
+        "required": true,
+        "description": "focused, state, etc."
+      }
+    ],
+    "returns": {
+      "js_type": "object",
+      "description": "Updated window object"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.windows",
+    "name": "remove",
+    "action": "chrome_windows_remove",
+    "description": "Close a browser window.",
+    "params": [
+      {
+        "name": "window_id",
+        "js_type": "number",
+        "required": true,
+        "description": "Window ID to close"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "Whether close succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.sidePanel",
+    "name": "setOptions",
+    "action": "chrome_sidePanel_setOptions",
+    "description": "Configure the side panel behavior.",
+    "params": [
+      {
+        "name": "options",
+        "js_type": "object",
+        "required": true,
+        "description": "enabled, path"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "Whether options were set"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.cookies",
+    "name": "get",
+    "action": "chrome_cookies_get",
+    "description": "Get a cookie by details.",
+    "params": [
+      {
+        "name": "details",
+        "js_type": "object",
+        "required": true,
+        "description": "name, url, storeId"
+      }
+    ],
+    "returns": {
+      "js_type": "object | null",
+      "description": "Cookie object or null"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.cookies",
+    "name": "set",
+    "action": "chrome_cookies_set",
+    "description": "Set a cookie.",
+    "params": [
+      {
+        "name": "details",
+        "js_type": "object",
+        "required": true,
+        "description": "name, value, url, etc."
+      }
+    ],
+    "returns": {
+      "js_type": "object",
+      "description": "Set cookie object"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.cookies",
+    "name": "remove",
+    "action": "chrome_cookies_remove",
+    "description": "Remove a cookie.",
+    "params": [
+      {
+        "name": "details",
+        "js_type": "object",
+        "required": true,
+        "description": "name, url"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "Whether removal succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.cookies",
+    "name": "getAll",
+    "action": "chrome_cookies_getAll",
+    "description": "Get all cookies matching a filter.",
+    "params": [
+      {
+        "name": "details",
+        "js_type": "object",
+        "required": false,
+        "description": "url, name, domain, etc."
+      }
+    ],
+    "returns": {
+      "js_type": "object",
+      "description": "Array of cookie objects"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.bookmarks",
+    "name": "search",
+    "action": "chrome_bookmarks_search",
+    "description": "Search bookmarks.",
+    "params": [
+      {
+        "name": "query",
+        "js_type": "string | object",
+        "required": true,
+        "description": "Search string or query object"
+      }
+    ],
+    "returns": {
+      "js_type": "object",
+      "description": "Array of bookmark nodes"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.bookmarks",
+    "name": "create",
+    "action": "chrome_bookmarks_create",
+    "description": "Create a bookmark.",
+    "params": [
+      {
+        "name": "bookmark",
+        "js_type": "object",
+        "required": true,
+        "description": "parentId, title, url, index"
+      }
+    ],
+    "returns": {
+      "js_type": "object",
+      "description": "Created bookmark node"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.bookmarks",
+    "name": "remove",
+    "action": "chrome_bookmarks_remove",
+    "description": "Remove a bookmark.",
+    "params": [
+      {
+        "name": "id",
+        "js_type": "string",
+        "required": true,
+        "description": "Bookmark node ID"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "Whether removal succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.history",
+    "name": "search",
+    "action": "chrome_history_search",
+    "description": "Search browser history.",
+    "params": [
+      {
+        "name": "query",
+        "js_type": "object",
+        "required": true,
+        "description": "text, startTime, endTime, maxResults"
+      }
+    ],
+    "returns": {
+      "js_type": "object",
+      "description": "Array of history items"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.history",
+    "name": "deleteUrl",
+    "action": "chrome_history_deleteUrl",
+    "description": "Delete a URL from history.",
+    "params": [
+      {
+        "name": "url",
+        "js_type": "string",
+        "required": true,
+        "description": "URL to remove"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "Whether removal succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.notifications",
+    "name": "create",
+    "action": "chrome_notifications_create",
+    "description": "Create a notification.",
+    "params": [
+      {
+        "name": "id",
+        "js_type": "string | null",
+        "required": false,
+        "description": "Notification ID"
+      },
+      {
+        "name": "options",
+        "js_type": "object",
+        "required": true,
+        "description": "type, title, message, iconUrl"
+      }
+    ],
+    "returns": {
+      "js_type": "string",
+      "description": "Notification ID"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.notifications",
+    "name": "clear",
+    "action": "chrome_notifications_clear",
+    "description": "Clear a notification.",
+    "params": [
+      {
+        "name": "id",
+        "js_type": "string",
+        "required": true,
+        "description": "Notification ID to clear"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "Whether notification was cleared"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.scripting",
+    "name": "executeScript",
+    "action": "chrome_scripting_executeScript",
+    "description": "Inject JavaScript into a page.",
+    "params": [
+      {
+        "name": "target",
+        "js_type": "object",
+        "required": true,
+        "description": "tabId, frameIds, allFrames"
+      },
+      {
+        "name": "func",
+        "js_type": "string | object | null",
+        "required": false,
+        "description": "Function or script to inject"
+      }
+    ],
+    "returns": {
+      "js_type": "object",
+      "description": "Array of injection results"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "dom",
+    "name": "snapshot",
+    "action": "dom_snapshot",
+    "description": "Take a semantic DOM snapshot of the current page.",
+    "params": [
+      {
+        "name": "opts",
+        "js_type": "object | null",
+        "required": false,
+        "description": "Options: max_depth, include_hidden, etc."
+      }
+    ],
+    "returns": {
+      "js_type": "object",
+      "description": "Semantic DOM tree snapshot"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "dom",
+    "name": "format",
+    "action": "dom_format",
+    "description": "Format a DOM snapshot into a text representation.",
+    "params": [
+      {
+        "name": "snapshot",
+        "js_type": "object",
+        "required": true,
+        "description": "DOM snapshot object"
+      },
+      {
+        "name": "format",
+        "js_type": "string | null",
+        "required": false,
+        "description": "Output format: compact-text, markdown, etc."
+      }
+    ],
+    "returns": {
+      "js_type": "string",
+      "description": "Formatted text representation"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "snapshot",
+    "action": "page_snapshot_text",
+    "description": "Take a DOM snapshot and return readable text.",
+    "params": [
+      {
+        "name": "opts",
+        "js_type": "object | null",
+        "required": false,
+        "description": "Options: max_nodes, interactive_only, etc."
+      }
+    ],
+    "returns": {
+      "js_type": "string",
+      "description": "Readable accessibility tree with refIds"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "snapshot_data",
+    "action": "page_snapshot_data",
+    "description": "Take a DOM snapshot and return structured data.",
+    "params": [
+      {
+        "name": "opts",
+        "js_type": "object | null",
+        "required": false,
+        "description": "Options: max_nodes, interactive_only, etc."
+      }
+    ],
+    "returns": {
+      "js_type": "object",
+      "description": "Structured snapshot with nodes, url, title, viewport"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "snapshot_text",
+    "action": "page_snapshot_text",
+    "description": "Alias for page.snapshot — returns readable text.",
+    "params": [
+      {
+        "name": "opts",
+        "js_type": "object | null",
+        "required": false,
+        "description": "Options: max_nodes, interactive_only, etc."
+      }
+    ],
+    "returns": {
+      "js_type": "string",
+      "description": "Readable accessibility tree with refIds"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "click",
+    "action": "page_click",
+    "description": "Click an element by refId or CSS selector in the current page.",
+    "params": [
+      {
+        "name": "ref_id",
+        "js_type": "string",
+        "required": true,
+        "description": "Element refId from snapshot or CSS selector"
+      }
+    ],
+    "returns": {
+      "js_type": "null",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "dblclick",
+    "action": "page_dblclick",
+    "description": "Double-click an element by refId.",
+    "params": [
+      {
+        "name": "ref_id",
+        "js_type": "string",
+        "required": true,
+        "description": "Element refId from snapshot"
+      }
+    ],
+    "returns": {
+      "js_type": "null",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "fill",
+    "action": "page_fill",
+    "description": "Fill an input element by refId with a value.",
+    "params": [
+      {
+        "name": "ref_id",
+        "js_type": "string",
+        "required": true,
+        "description": "Element refId from snapshot"
+      },
+      {
+        "name": "value",
+        "js_type": "string",
+        "required": true,
+        "description": "Text to fill"
+      }
+    ],
+    "returns": {
+      "js_type": "null",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "type",
+    "action": "page_type",
+    "description": "Append text to an input element by refId.",
+    "params": [
+      {
+        "name": "ref_id",
+        "js_type": "string",
+        "required": true,
+        "description": "Element refId from snapshot"
+      },
+      {
+        "name": "text",
+        "js_type": "string",
+        "required": true,
+        "description": "Text to append"
+      }
+    ],
+    "returns": {
+      "js_type": "null",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "press",
+    "action": "page_press",
+    "description": "Press a keyboard key.",
+    "params": [
+      {
+        "name": "key",
+        "js_type": "string",
+        "required": true,
+        "description": "Key name: Enter, Escape, ArrowDown, etc."
+      }
+    ],
+    "returns": {
+      "js_type": "null",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "select",
+    "action": "page_select",
+    "description": "Select an option in a dropdown by refId and value.",
+    "params": [
+      {
+        "name": "ref_id",
+        "js_type": "string",
+        "required": true,
+        "description": "Element refId from snapshot"
+      },
+      {
+        "name": "value",
+        "js_type": "string",
+        "required": true,
+        "description": "Option value to select"
+      }
+    ],
+    "returns": {
+      "js_type": "null",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "check",
+    "action": "page_check",
+    "description": "Check or uncheck a checkbox by refId.",
+    "params": [
+      {
+        "name": "ref_id",
+        "js_type": "string",
+        "required": true,
+        "description": "Element refId from snapshot"
+      },
+      {
+        "name": "checked",
+        "js_type": "boolean",
+        "required": false,
+        "description": "Checked state (default true)"
+      }
+    ],
+    "returns": {
+      "js_type": "null",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "hover",
+    "action": "page_hover",
+    "description": "Hover over an element by refId.",
+    "params": [
+      {
+        "name": "ref_id",
+        "js_type": "string",
+        "required": true,
+        "description": "Element refId from snapshot"
+      }
+    ],
+    "returns": {
+      "js_type": "null",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "unhover",
+    "action": "page_unhover",
+    "description": "Move mouse away from any hovered element.",
+    "params": [],
+    "returns": {
+      "js_type": "null",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "scroll",
+    "action": "page_scroll",
+    "description": "Scroll the page by direction and amount.",
+    "params": [
+      {
+        "name": "direction",
+        "js_type": "string",
+        "required": false,
+        "description": "up, down, left, right (default down)"
+      },
+      {
+        "name": "amount",
+        "js_type": "number",
+        "required": false,
+        "description": "Pixels to scroll (default 300)"
+      }
+    ],
+    "returns": {
+      "js_type": "null",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "scroll_to",
+    "action": "page_scroll_to",
+    "description": "Scroll to an element by refId.",
+    "params": [
+      {
+        "name": "ref_id",
+        "js_type": "string",
+        "required": true,
+        "description": "Element refId from snapshot"
+      }
+    ],
+    "returns": {
+      "js_type": "null",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "url",
+    "action": "page_url",
+    "description": "Get the current page URL.",
+    "params": [],
+    "returns": {
+      "js_type": "string",
+      "description": "Current URL"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "title",
+    "action": "page_title",
+    "description": "Get the current page title.",
+    "params": [],
+    "returns": {
+      "js_type": "string",
+      "description": "Current page title"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "screenshot",
+    "action": "page_screenshot",
+    "description": "Take a screenshot of the current page.",
+    "params": [],
+    "returns": {
+      "js_type": "string",
+      "description": "Base64-encoded screenshot image"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "goto",
+    "action": "page_goto",
+    "description": "Navigate to a URL.",
+    "params": [
+      {
+        "name": "url",
+        "js_type": "string",
+        "required": true,
+        "description": "URL to navigate to"
+      }
+    ],
+    "returns": {
+      "js_type": "null",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "back",
+    "action": "page_back",
+    "description": "Navigate back in history.",
+    "params": [],
+    "returns": {
+      "js_type": "null",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "forward",
+    "action": "page_forward",
+    "description": "Navigate forward in history.",
+    "params": [],
+    "returns": {
+      "js_type": "null",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "reload",
+    "action": "page_reload",
+    "description": "Reload the current page.",
+    "params": [],
+    "returns": {
+      "js_type": "null",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "wait",
+    "action": "page_wait",
+    "description": "Wait for a duration.",
+    "params": [
+      {
+        "name": "ms",
+        "js_type": "number",
+        "required": false,
+        "description": "Milliseconds to wait (default 1000)"
+      }
+    ],
+    "returns": {
+      "js_type": "null",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "tabs",
+    "action": "page_tabs",
+    "description": "Get all tabs in the current window (extension mode).",
+    "params": [],
+    "returns": {
+      "js_type": "object",
+      "description": "Array of tab objects"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "switch",
+    "action": "page_switch",
+    "description": "Switch to a tab by ID.",
+    "params": [
+      {
+        "name": "tab_id",
+        "js_type": "number",
+        "required": true,
+        "description": "Tab ID to switch to"
+      }
+    ],
+    "returns": {
+      "js_type": "null",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "new_tab",
+    "action": "page_new_tab",
+    "description": "Open a new tab (optionally with a URL).",
+    "params": [
+      {
+        "name": "url",
+        "js_type": "string | null",
+        "required": false,
+        "description": "URL to open in the new tab"
+      }
+    ],
+    "returns": {
+      "js_type": "object",
+      "description": "Created tab object"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "close",
+    "action": "page_close",
+    "description": "Close a tab by ID.",
+    "params": [
+      {
+        "name": "tab_id",
+        "js_type": "number",
+        "required": true,
+        "description": "Tab ID to close"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "Whether close succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "active_tab",
+    "action": "page_active_tab",
+    "description": "Get the currently active tab ID.",
+    "params": [],
+    "returns": {
+      "js_type": "number | null",
+      "description": "Active tab ID or null"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "find",
+    "action": "page_find",
+    "description": "Find elements matching a CSS selector.",
+    "params": [
+      {
+        "name": "selector",
+        "js_type": "string",
+        "required": true,
+        "description": "CSS selector"
+      }
+    ],
+    "returns": {
+      "js_type": "object",
+      "description": "Array of element objects { tag, refId, text }"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "wait_for",
+    "action": "page_wait_for",
+    "description": "Wait for an element matching a CSS selector to appear.",
+    "params": [
+      {
+        "name": "selector",
+        "js_type": "string",
+        "required": true,
+        "description": "CSS selector"
+      },
+      {
+        "name": "timeout",
+        "js_type": "number",
+        "required": false,
+        "description": "Timeout in milliseconds (default 30000)"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "True if element found, false if timeout"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "extract",
+    "action": "page_extract",
+    "description": "Extract structured data from the page.",
+    "params": [
+      {
+        "name": "fields",
+        "js_type": "object",
+        "required": true,
+        "description": "Array of field names: title, url, headings, links, etc."
+      }
+    ],
+    "returns": {
+      "js_type": "object",
+      "description": "Extracted data object"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "append",
+    "action": "page_append",
+    "description": "Append text to an input element by refId.",
+    "params": [
+      {
+        "name": "ref_id",
+        "js_type": "string",
+        "required": true,
+        "description": "Element refId from snapshot"
+      },
+      {
+        "name": "text",
+        "js_type": "string",
+        "required": true,
+        "description": "Text to append"
+      }
+    ],
+    "returns": {
+      "js_type": "null",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "go",
+    "action": null,
+    "description": "Navigate to a URL (alias for page.goto).",
+    "params": [
+      {
+        "name": "url",
+        "js_type": "string",
+        "required": true,
+        "description": "URL to navigate to"
+      }
+    ],
+    "returns": {
+      "js_type": "null",
+      "description": "None"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "page",
+    "name": "open",
+    "action": null,
+    "description": "Open a new tab (alias for page.new_tab).",
+    "params": [
+      {
+        "name": "url",
+        "js_type": "string | null",
+        "required": false,
+        "description": "URL to open in the new tab"
+      }
+    ],
+    "returns": {
+      "js_type": "object",
+      "description": "Created tab object"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "page",
+    "name": "fetch",
+    "action": null,
+    "description": "Fetch a URL using the active tab origin (wrapper for tab.fetch).",
+    "params": [
+      {
+        "name": "url",
+        "js_type": "string",
+        "required": true,
+        "description": "URL to fetch"
+      },
+      {
+        "name": "opts",
+        "js_type": "object | null",
+        "required": false,
+        "description": "Options: method, body, headers, timeout"
+      }
+    ],
+    "returns": {
+      "js_type": "object",
+      "description": "{ status, ok, body, headers }"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "path",
+    "name": "join",
+    "action": null,
+    "description": "Join path segments into an absolute VFS path.",
+    "params": [
+      {
+        "name": "parts",
+        "js_type": "string",
+        "required": true,
+        "description": "Path segments to join"
+      }
+    ],
+    "returns": {
+      "js_type": "string",
+      "description": "Joined absolute path"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "path",
+    "name": "basename",
+    "action": null,
+    "description": "Get the last component of a path.",
+    "params": [
+      {
+        "name": "path",
+        "js_type": "string",
+        "required": true,
+        "description": "Absolute VFS path"
+      }
+    ],
+    "returns": {
+      "js_type": "string",
+      "description": "File or directory name"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "path",
+    "name": "dirname",
+    "action": null,
+    "description": "Get the directory portion of a path.",
+    "params": [
+      {
+        "name": "path",
+        "js_type": "string",
+        "required": true,
+        "description": "Absolute VFS path"
+      }
+    ],
+    "returns": {
+      "js_type": "string",
+      "description": "Parent directory path"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "path",
+    "name": "extname",
+    "action": null,
+    "description": "Get the file extension including the leading dot.",
+    "params": [
+      {
+        "name": "path",
+        "js_type": "string",
+        "required": true,
+        "description": "Absolute VFS path"
+      }
+    ],
+    "returns": {
+      "js_type": "string",
+      "description": "Extension or empty string"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "path",
+    "name": "normalize",
+    "action": null,
+    "description": "Resolve . and .. segments in a path.",
+    "params": [
+      {
+        "name": "path",
+        "js_type": "string",
+        "required": true,
+        "description": "Absolute VFS path"
+      }
+    ],
+    "returns": {
+      "js_type": "string",
+      "description": "Normalized absolute path"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "path",
+    "name": "isAbsolute",
+    "action": null,
+    "description": "Check whether a path is absolute (starts with /).",
+    "params": [
+      {
+        "name": "path",
+        "js_type": "string",
+        "required": true,
+        "description": "Path to check"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "true if absolute"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "path",
+    "name": "resolve",
+    "action": null,
+    "description": "Resolve path segments.",
+    "params": [
+      {
+        "name": "parts",
+        "js_type": "string",
+        "required": true,
+        "description": "Path segments to resolve"
+      }
+    ],
+    "returns": {
+      "js_type": "string",
+      "description": "Resolved absolute path"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "path",
+    "name": "relative",
+    "action": null,
+    "description": "Compute relative path.",
+    "params": [
+      {
+        "name": "from",
+        "js_type": "string",
+        "required": true,
+        "description": "From path"
+      },
+      {
+        "name": "to",
+        "js_type": "string",
+        "required": true,
+        "description": "To path"
+      }
+    ],
+    "returns": {
+      "js_type": "string",
+      "description": "Relative path"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "runtime",
+    "name": "inspect",
+    "action": "runtime_inspect",
+    "description": "Inspect all global variables in the JS state.",
+    "params": [],
+    "returns": {
+      "js_type": "object",
+      "description": "Array of global variable descriptors: name, type, keys, value"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "runtime",
+    "name": "fetch",
+    "action": "fetch",
+    "description": "Alias for web.fetch.",
+    "params": [
+      {
+        "name": "url",
+        "js_type": "string",
+        "required": true,
+        "description": "URL"
+      },
+      {
+        "name": "opts",
+        "js_type": "object | null",
+        "required": false,
+        "description": "Options"
+      }
+    ],
+    "returns": {
+      "js_type": "object",
+      "description": "{ status, ok, body, headers }"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "runtime",
+    "name": "sleep",
+    "action": "sleep",
+    "description": "Alias for web.sleep.",
+    "params": [
+      {
+        "name": "ms",
+        "js_type": "number",
+        "required": false,
+        "description": "Milliseconds"
+      }
+    ],
+    "returns": {
+      "js_type": "null",
+      "description": "None"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "runtime",
+    "name": "storage",
+    "action": null,
+    "description": "Alias for web.storage.",
+    "params": [],
+    "returns": {
+      "js_type": "object",
+      "description": "Storage API object"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "runtime",
+    "name": "clipboard",
+    "action": null,
+    "description": "Alias for web.clipboard.",
+    "params": [],
+    "returns": {
+      "js_type": "object",
+      "description": "Clipboard API object"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "runtime",
+    "name": "notifications",
+    "action": null,
+    "description": "Alias for web.notifications.",
+    "params": [],
+    "returns": {
+      "js_type": "object",
+      "description": "Notifications API object"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "sidepanel",
+    "name": "snapshot",
+    "action": "sidepanel_snapshot_text",
+    "description": "Take a DOM snapshot of the sidepanel and return readable text.",
+    "params": [
+      {
+        "name": "opts",
+        "js_type": "object | null",
+        "required": false,
+        "description": "Options: max_nodes, interactive_only, etc."
+      }
+    ],
+    "returns": {
+      "js_type": "string",
+      "description": "Readable accessibility tree with refIds"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "sidepanel",
+    "name": "snapshot_data",
+    "action": "sidepanel_snapshot_data",
+    "description": "Take a DOM snapshot of the sidepanel and return structured data.",
+    "params": [
+      {
+        "name": "opts",
+        "js_type": "object | null",
+        "required": false,
+        "description": "Options: max_nodes, interactive_only, etc."
+      }
+    ],
+    "returns": {
+      "js_type": "object",
+      "description": "Structured snapshot with nodes, url, title, viewport"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "sidepanel",
+    "name": "click",
+    "action": "sidepanel_click",
+    "description": "Click an element by refId in the sidepanel.",
+    "params": [
+      {
+        "name": "ref_id",
+        "js_type": "string",
+        "required": true,
+        "description": "Element refId from snapshot"
+      }
+    ],
+    "returns": {
+      "js_type": "null",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "sidepanel",
+    "name": "dblclick",
+    "action": "sidepanel_dblclick",
+    "description": "Double-click an element by refId in the sidepanel.",
+    "params": [
+      {
+        "name": "ref_id",
+        "js_type": "string",
+        "required": true,
+        "description": "Element refId from snapshot"
+      }
+    ],
+    "returns": {
+      "js_type": "null",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "sidepanel",
+    "name": "fill",
+    "action": "sidepanel_fill",
+    "description": "Fill an input element by refId with a value in the sidepanel.",
+    "params": [
+      {
+        "name": "ref_id",
+        "js_type": "string",
+        "required": true,
+        "description": "Element refId from snapshot"
+      },
+      {
+        "name": "value",
+        "js_type": "string",
+        "required": true,
+        "description": "Text to fill"
+      }
+    ],
+    "returns": {
+      "js_type": "null",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "sidepanel",
+    "name": "type",
+    "action": "sidepanel_type",
+    "description": "Append text to an input element by refId in the sidepanel.",
+    "params": [
+      {
+        "name": "ref_id",
+        "js_type": "string",
+        "required": true,
+        "description": "Element refId from snapshot"
+      },
+      {
+        "name": "text",
+        "js_type": "string",
+        "required": true,
+        "description": "Text to append"
+      }
+    ],
+    "returns": {
+      "js_type": "null",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "sidepanel",
+    "name": "press",
+    "action": "sidepanel_press",
+    "description": "Press a keyboard key in the sidepanel.",
+    "params": [
+      {
+        "name": "key",
+        "js_type": "string",
+        "required": true,
+        "description": "Key name: Enter, Escape, ArrowDown, etc."
+      }
+    ],
+    "returns": {
+      "js_type": "null",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "sidepanel",
+    "name": "select",
+    "action": "sidepanel_select",
+    "description": "Select an option in a dropdown by refId and value in the sidepanel.",
+    "params": [
+      {
+        "name": "ref_id",
+        "js_type": "string",
+        "required": true,
+        "description": "Element refId from snapshot"
+      },
+      {
+        "name": "value",
+        "js_type": "string",
+        "required": true,
+        "description": "Option value to select"
+      }
+    ],
+    "returns": {
+      "js_type": "null",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "sidepanel",
+    "name": "check",
+    "action": "sidepanel_check",
+    "description": "Check or uncheck a checkbox by refId in the sidepanel.",
+    "params": [
+      {
+        "name": "ref_id",
+        "js_type": "string",
+        "required": true,
+        "description": "Element refId from snapshot"
+      },
+      {
+        "name": "checked",
+        "js_type": "boolean",
+        "required": false,
+        "description": "Checked state (default true)"
+      }
+    ],
+    "returns": {
+      "js_type": "null",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "sidepanel",
+    "name": "hover",
+    "action": "sidepanel_hover",
+    "description": "Hover over an element by refId in the sidepanel.",
+    "params": [
+      {
+        "name": "ref_id",
+        "js_type": "string",
+        "required": true,
+        "description": "Element refId from snapshot"
+      }
+    ],
+    "returns": {
+      "js_type": "null",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "sidepanel",
+    "name": "unhover",
+    "action": "sidepanel_unhover",
+    "description": "Move mouse away from any hovered element in the sidepanel.",
+    "params": [],
+    "returns": {
+      "js_type": "null",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "sidepanel",
+    "name": "scroll",
+    "action": "sidepanel_scroll",
+    "description": "Scroll the sidepanel by direction and amount.",
+    "params": [
+      {
+        "name": "direction",
+        "js_type": "string",
+        "required": false,
+        "description": "up, down, left, right (default down)"
+      },
+      {
+        "name": "amount",
+        "js_type": "number",
+        "required": false,
+        "description": "Pixels to scroll (default 300)"
+      }
+    ],
+    "returns": {
+      "js_type": "null",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "sidepanel",
+    "name": "scroll_to",
+    "action": "sidepanel_scroll_to",
+    "description": "Scroll to an element by refId in the sidepanel.",
+    "params": [
+      {
+        "name": "ref_id",
+        "js_type": "string",
+        "required": true,
+        "description": "Element refId from snapshot"
+      }
+    ],
+    "returns": {
+      "js_type": "null",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "sidepanel",
+    "name": "url",
+    "action": "sidepanel_url",
+    "description": "Get the sidepanel URL.",
+    "params": [],
+    "returns": {
+      "js_type": "string",
+      "description": "Current sidepanel URL"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "sidepanel",
+    "name": "title",
+    "action": "sidepanel_title",
+    "description": "Get the sidepanel document title.",
+    "params": [],
+    "returns": {
+      "js_type": "string",
+      "description": "Current sidepanel title"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "sidepanel",
+    "name": "wait",
+    "action": "sidepanel_wait",
+    "description": "Wait for a duration.",
+    "params": [
+      {
+        "name": "ms",
+        "js_type": "number",
+        "required": false,
+        "description": "Milliseconds to wait (default 1000)"
+      }
+    ],
+    "returns": {
+      "js_type": "null",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "sidepanel",
+    "name": "append",
+    "action": "sidepanel_append",
+    "description": "Append text to an input element by refId in the sidepanel.",
+    "params": [
+      {
+        "name": "ref_id",
+        "js_type": "string",
+        "required": true,
+        "description": "Element refId from snapshot"
+      },
+      {
+        "name": "text",
+        "js_type": "string",
+        "required": true,
+        "description": "Text to append"
+      }
+    ],
+    "returns": {
+      "js_type": "null",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "host",
+    "name": "call",
+    "action": "host_call",
+    "description": "Call a registered host handler by name.",
+    "params": [
+      {
+        "name": "action",
+        "js_type": "string",
+        "required": true,
+        "description": "Handler action name"
+      },
+      {
+        "name": "params",
+        "js_type": "object | null",
+        "required": false,
+        "description": "Parameters to pass to handler"
+      }
+    ],
+    "returns": {
+      "js_type": "any",
+      "description": "Handler response"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "tab",
+    "name": "current",
+    "action": null,
+    "description": "Get the active tab ID.",
+    "params": [],
+    "returns": {
+      "js_type": "number | null",
+      "description": "Tab ID or null"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "tab",
+    "name": "url",
+    "action": null,
+    "description": "Get the URL of a tab (defaults to current tab).",
+    "params": [
+      {
+        "name": "tab_id",
+        "js_type": "number | null",
+        "required": false,
+        "description": "Tab ID"
+      }
+    ],
+    "returns": {
+      "js_type": "string | null",
+      "description": "URL or null"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "tab",
+    "name": "title",
+    "action": null,
+    "description": "Get the title of a tab (defaults to current tab).",
+    "params": [
+      {
+        "name": "tab_id",
+        "js_type": "number | null",
+        "required": false,
+        "description": "Tab ID"
+      }
+    ],
+    "returns": {
+      "js_type": "string | null",
+      "description": "Title or null"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "tab",
+    "name": "open",
+    "action": null,
+    "description": "Create a new tab and return its ID.",
+    "params": [
+      {
+        "name": "url",
+        "js_type": "string | null",
+        "required": false,
+        "description": "URL to open"
+      }
+    ],
+    "returns": {
+      "js_type": "number | null",
+      "description": "New tab ID or null"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "tab",
+    "name": "focus",
+    "action": null,
+    "description": "Activate (focus) a tab (defaults to current tab).",
+    "params": [
+      {
+        "name": "tab_id",
+        "js_type": "number | null",
+        "required": false,
+        "description": "Tab ID"
+      }
+    ],
+    "returns": {
+      "js_type": "number | null",
+      "description": "Focused tab ID or null"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "tab",
+    "name": "reload",
+    "action": null,
+    "description": "Reload a tab (defaults to current tab).",
+    "params": [
+      {
+        "name": "tab_id",
+        "js_type": "number | null",
+        "required": false,
+        "description": "Tab ID"
+      }
+    ],
+    "returns": {
+      "js_type": "number | null",
+      "description": "Reloaded tab ID or null"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "tab",
+    "name": "query",
+    "action": null,
+    "description": "Alias for web.tab.query.",
+    "params": [
+      {
+        "name": "query_info",
+        "js_type": "object",
+        "required": false,
+        "description": "Query filter"
+      }
+    ],
+    "returns": {
+      "js_type": "object",
+      "description": "Array of matching tabs"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "tab",
+    "name": "create",
+    "action": null,
+    "description": "Alias for web.tab.create.",
+    "params": [
+      {
+        "name": "create_properties",
+        "js_type": "object",
+        "required": false,
+        "description": "Tab properties"
+      }
+    ],
+    "returns": {
+      "js_type": "object",
+      "description": "Created tab object"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "tab",
+    "name": "activate",
+    "action": null,
+    "description": "Alias for web.tab.activate.",
+    "params": [
+      {
+        "name": "tab_id",
+        "js_type": "number",
+        "required": true,
+        "description": "Tab ID"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "Whether activation succeeded"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "tab",
+    "name": "close",
+    "action": null,
+    "description": "Alias for web.tab.close.",
+    "params": [
+      {
+        "name": "tab_id",
+        "js_type": "number",
+        "required": true,
+        "description": "Tab ID"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "Whether close succeeded"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "tab",
+    "name": "execute_script",
+    "action": null,
+    "description": "Alias for web.tab.execute_script.",
+    "params": [
+      {
+        "name": "tab_id",
+        "js_type": "number",
+        "required": true,
+        "description": "Tab ID"
+      },
+      {
+        "name": "script",
+        "js_type": "string | object",
+        "required": true,
+        "description": "Script to inject"
+      }
+    ],
+    "returns": {
+      "js_type": "object",
+      "description": "Injection results"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "tab",
+    "name": "click",
+    "action": null,
+    "description": "Alias for web.tab.click.",
+    "params": [
+      {
+        "name": "tab_id",
+        "js_type": "number",
+        "required": true,
+        "description": "Tab ID"
+      },
+      {
+        "name": "ref_id",
+        "js_type": "number",
+        "required": true,
+        "description": "Element refId"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "Whether click succeeded"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "tab",
+    "name": "fill",
+    "action": null,
+    "description": "Alias for web.tab.fill.",
+    "params": [
+      {
+        "name": "tab_id",
+        "js_type": "number",
+        "required": true,
+        "description": "Tab ID"
+      },
+      {
+        "name": "ref_id",
+        "js_type": "number",
+        "required": true,
+        "description": "Element refId"
+      },
+      {
+        "name": "value",
+        "js_type": "string",
+        "required": true,
+        "description": "Text to fill"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "Whether fill succeeded"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "tab",
+    "name": "snapshot",
+    "action": null,
+    "description": "Alias for web.tab.snapshot. Returns human-readable text. Defaults to active tab.",
+    "params": [
+      {
+        "name": "tab_id",
+        "js_type": "number",
+        "required": false,
+        "description": "Tab ID (defaults to active tab)"
+      }
+    ],
+    "returns": {
+      "js_type": "string",
+      "description": "Human-readable accessibility tree with refIds"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "tab",
+    "name": "snapshot_text",
+    "action": null,
+    "description": "Alias for web.tab.snapshot_text. Defaults to active tab.",
+    "params": [
+      {
+        "name": "tab_id",
+        "js_type": "number",
+        "required": false,
+        "description": "Tab ID (defaults to active tab)"
+      }
+    ],
+    "returns": {
+      "js_type": "string",
+      "description": "Human-readable accessibility tree with refIds"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "tab",
+    "name": "snapshot_data",
+    "action": null,
+    "description": "Alias for web.tab.snapshot_data. Defaults to active tab.",
+    "params": [
+      {
+        "name": "tab_id",
+        "js_type": "number",
+        "required": false,
+        "description": "Tab ID (defaults to active tab)"
+      }
+    ],
+    "returns": {
+      "js_type": "object",
+      "description": "Structured snapshot with nodes, url, title, viewport"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "tab",
+    "name": "scroll_to",
+    "action": null,
+    "description": "Alias for web.tab.scroll_to.",
+    "params": [
+      {
+        "name": "tab_id",
+        "js_type": "number",
+        "required": true,
+        "description": "Tab ID"
+      },
+      {
+        "name": "ref_id",
+        "js_type": "number",
+        "required": true,
+        "description": "Element refId"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "Whether scroll succeeded"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "tab",
+    "name": "evaluate",
+    "action": null,
+    "description": "Alias for web.tab.evaluate.",
+    "params": [
+      {
+        "name": "tab_id",
+        "js_type": "number",
+        "required": true,
+        "description": "Tab ID"
+      },
+      {
+        "name": "script",
+        "js_type": "string",
+        "required": true,
+        "description": "JavaScript to evaluate"
+      }
+    ],
+    "returns": {
+      "js_type": "any",
+      "description": "Evaluation result"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "tab",
+    "name": "back",
+    "action": null,
+    "description": "Alias for web.tab.back.",
+    "params": [
+      {
+        "name": "tab_id",
+        "js_type": "number",
+        "required": true,
+        "description": "Tab ID"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "Whether navigation succeeded"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "tab",
+    "name": "wait_for_load",
+    "action": null,
+    "description": "Alias for web.tab.wait_for_load.",
+    "params": [
+      {
+        "name": "tab_id",
+        "js_type": "number",
+        "required": true,
+        "description": "Tab ID"
+      }
+    ],
+    "returns": {
+      "js_type": "boolean",
+      "description": "Whether tab loaded"
+    },
+    "source": "js_prelude"
+  },
+  {
+    "namespace": "tab",
+    "name": "fetch",
+    "action": null,
+    "description": "Alias for web.tab.fetch.",
+    "params": [
+      {
+        "name": "tab_id",
+        "js_type": "number",
+        "required": true,
+        "description": "Tab ID"
+      },
+      {
+        "name": "url",
+        "js_type": "string",
+        "required": true,
+        "description": "URL"
+      },
+      {
+        "name": "opts",
+        "js_type": "object | null",
+        "required": false,
+        "description": "Options"
+      }
+    ],
+    "returns": {
+      "js_type": "object",
+      "description": "{ status, ok, body, headers }"
+    },
+    "source": "js_prelude"
+  }
+]

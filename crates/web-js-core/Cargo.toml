@@ -1,0 +1,21 @@
+[package]
+name = "web-js-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+rquickjs = { workspace = true }
+serde.workspace = true
+serde_json.workspace = true
+ts-rs = { workspace = true }
+thiserror = { workspace = true }
+url = { workspace = true }
+dom-semantic-tree = { workspace = true }
+getrandom = { workspace = true }
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"

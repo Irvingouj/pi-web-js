@@ -1,0 +1,18 @@
+[package]
+name = "web-js-base"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+web-js-core = { path = "../web-js-core" }
+wasm-bindgen = { workspace = true }
+serde.workspace = true
+serde_json.workspace = true
+tsify = { workspace = true }
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"

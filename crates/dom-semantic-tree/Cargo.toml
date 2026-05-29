@@ -1,0 +1,44 @@
+[package]
+name = "dom-semantic-tree"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+wasm-bindgen = { workspace = true }
+serde-wasm-bindgen = { workspace = true }
+tsify = { workspace = true }
+ts-rs = { workspace = true }
+js-sys = { workspace = true }
+
+[dependencies.web-sys]
+version = "0.3"
+features = [
+  "console",
+  "Document",
+  "Element",
+  "HtmlElement",
+  "HtmlInputElement",
+  "HtmlTextAreaElement",
+  "HtmlSelectElement",
+  "HtmlButtonElement",
+  "HtmlAnchorElement",
+  "HtmlImageElement",
+  "HtmlLabelElement",
+  "HtmlOptionElement",
+  "Node",
+  "NodeList",
+  "Window",
+  "DomRect",
+  "CssStyleDeclaration",
+  "HtmlCollection",
+  "CharacterData",
+]
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"

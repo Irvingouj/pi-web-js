@@ -1,0 +1,33 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/web-js-core",
+    "crates/web-js-base",
+    "crates/web-js",
+    "crates/extension-js",
+    "crates/dom-semantic-tree",
+    "crates/web-fs",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Irving Ou"]
+license = "LicenseRef-PiccoloNotebook-Fair-BYOK-1.0"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+getrandom = { version = "0.3", features = ["wasm_js"] }
+url = "2"
+dom-semantic-tree = { path = "crates/dom-semantic-tree" }
+web-fs = { path = "crates/web-fs" }
+rquickjs = { version = "0.11", features = ["rust-alloc", "disable-assertions"] }
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+tsify = "0.5"
+ts-rs = "12"
+serde-wasm-bindgen = "0.6"
+data-encoding = "2.6"
+thiserror = "1"
