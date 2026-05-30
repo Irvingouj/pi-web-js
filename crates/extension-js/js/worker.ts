@@ -83,11 +83,10 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
     case "runCell": {
       try {
         const result = await session.runCellAsync(msg.code, msg.stdin || "");
-        // Ensure we send a plain serializable object through postMessage
-        const plain = JSON.parse(JSON.stringify(result));
-        self.postMessage({ type: "result", id: msg.id, data: plain });
+        self.postMessage({ type: "result", id: msg.id, data: result });
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
+        console.error("[worker] runCell error:", message);
         self.postMessage({ type: "error", id: msg.id, error: message });
       }
       break;

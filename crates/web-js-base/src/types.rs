@@ -113,7 +113,7 @@ pub enum WasmRunResult {
         commands: Vec<serde_json::Value>,
         fuel_exhausted: bool,
         execution_count: u32,
-        pending_command: WasmAsyncCommand,
+        pending_commands: Vec<WasmAsyncCommand>,
     },
     Ok {
         stdout: Vec<String>,
@@ -170,7 +170,7 @@ impl From<web_js_core::AsyncCommand> for WasmAsyncCommand {
     fn from(c: web_js_core::AsyncCommand) -> Self {
         WasmAsyncCommand {
             call_id: c.call_id,
-            action: c.action.into(),
+            action: c.action,
             params: c.params,
         }
     }
@@ -205,10 +205,7 @@ impl From<web_js_core::RunResult> for WasmRunResult {
                 commands: r.commands,
                 fuel_exhausted: r.fuel_exhausted,
                 execution_count: r.execution_count,
-                pending_command: r
-                    .pending_command
-                    .expect("AsyncPending without pending_command")
-                    .into(),
+                pending_commands: r.pending_commands.into_iter().map(Into::into).collect(),
             },
             web_js_core::CellStatus::Done => {
                 if let Some(error) = r.error {

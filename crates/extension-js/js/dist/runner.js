@@ -2470,6 +2470,20 @@ function normalizeChromeError(err) {
     };
 }
 // ─── Chrome API dispatcher ─────────────────────────────────────
+function toPlainObject(value) {
+    if (value === null || typeof value !== "object")
+        return value;
+    if (Array.isArray(value))
+        return value.map(toPlainObject);
+    const plain = {};
+    for (const key of Object.keys(value)) {
+        const v = value[key];
+        if (typeof v !== "function") {
+            plain[key] = toPlainObject(v);
+        }
+    }
+    return plain;
+}
 async function handleChromeApi(command) {
     const chrome = window.chrome;
     if (!chrome?.runtime?.id) {
@@ -2514,8 +2528,8 @@ async function handleChromeApi(command) {
                 break;
             }
             case "chrome_tabs_remove": {
-                const tabId = firstRec.tabId || firstRec.id || first;
-                await chrome.tabs.remove(tabId);
+                const tabIds = firstRec.tabIds || firstRec.tabId || firstRec.id || first;
+                await chrome.tabs.remove(tabIds);
                 result = null;
                 break;
             }
@@ -2680,6 +2694,7 @@ async function handleChromeApi(command) {
                     },
                 };
         }
+        result = toPlainObject(result);
         return { ok: true, value: result };
     }
     catch (err) {

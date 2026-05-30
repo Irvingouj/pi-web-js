@@ -77,8 +77,7 @@ pub struct GlobalsSnapshot {
 #[ts(export_to = "web/src/types/generated.ts")]
 pub struct AsyncCommand {
     pub call_id: u32,
-    #[ts(type = "string")]
-    pub action: crate::action::Action,
+    pub action: String,
     #[ts(type = "unknown")]
     pub params: serde_json::Value,
 }
@@ -116,7 +115,7 @@ pub struct RunResult {
     pub fuel_exhausted: bool,
     pub execution_count: u32,
     pub status: CellStatus,
-    pub pending_command: Option<AsyncCommand>,
+    pub pending_commands: Vec<AsyncCommand>,
 }
 
 impl RunResult {
@@ -130,7 +129,7 @@ impl RunResult {
             fuel_exhausted: false,
             execution_count,
             status: CellStatus::Done,
-            pending_command: None,
+            pending_commands: vec![],
         }
     }
 
@@ -151,13 +150,13 @@ impl RunResult {
             fuel_exhausted,
             execution_count,
             status: CellStatus::Done,
-            pending_command: None,
+            pending_commands: vec![],
         }
     }
 
     pub(crate) fn async_pending(
         stdout: Vec<String>,
-        command: AsyncCommand,
+        commands: Vec<AsyncCommand>,
         execution_count: u32,
     ) -> Self {
         Self {
@@ -169,7 +168,7 @@ impl RunResult {
             fuel_exhausted: false,
             execution_count,
             status: CellStatus::AsyncPending,
-            pending_command: Some(command),
+            pending_commands: commands,
         }
     }
 }

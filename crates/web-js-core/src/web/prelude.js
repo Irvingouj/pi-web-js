@@ -1,15 +1,17 @@
+var __makeAsyncCache = {};
 function makeAsync(action) {
-  return function(...args) {
+  if (__makeAsyncCache[action]) return __makeAsyncCache[action];
+  var fn = function(...args) {
     return new Promise((resolve, reject) => {
       let params;
       if (args.length === 0) params = {};
       else if (args.length === 1) params = args[0];
       else params = args;
-      print('[makeAsync] calling __webJsTriggerAsync for action:', action);
       __webJsTriggerAsync(action, params, resolve, reject);
-      print('[makeAsync] __webJsTriggerAsync returned for action:', action);
     });
   };
+  __makeAsyncCache[action] = fn;
+  return fn;
 }
 function makeNamespace(spec) {
   const ns = {};
@@ -126,6 +128,14 @@ fs.append_base64 = function(path, b64) { return makeAsync('fs_append_base64')({p
 fs.update = function(path, offset, data) { return makeAsync('fs_update')({path: path, offset: offset, data: data}); };
 fs.hash = function(path, algo) { return makeAsync('fs_hash')({path: path, algorithm: algo}); };
 
+// CamelCase aliases (matching the API contract naming convention)
+fs.readText = fs.read_text;
+fs.readBase64 = fs.read_base64;
+fs.readRange = fs.read_range;
+fs.writeText = fs.write_text;
+fs.writeBase64 = fs.write_base64;
+fs.appendText = fs.append_text;
+
 // Node.js fs compatibility layer
 fs.readFile = function(path, options, callback) {
   if (typeof options === 'function') { callback = options; options = undefined; }
@@ -136,9 +146,7 @@ fs.readFile = function(path, options, callback) {
   }
   return promise;
 };
-fs.readFileSync = function(path, options) {
-  return fs.readFile(path, options);
-};
+fs.readFileSync = function(path, options) { throw new Error('fs.readFileSync is not supported in web-js; use await fs.readFile(path, options) instead'); };
 fs.writeFile = function(path, data, options, callback) {
   if (typeof options === 'function') { callback = options; options = undefined; }
   const promise = fs.write_text(path, data);
@@ -147,9 +155,7 @@ fs.writeFile = function(path, data, options, callback) {
   }
   return promise;
 };
-fs.writeFileSync = function(path, data, options) {
-  return fs.writeFile(path, data, options);
-};
+fs.writeFileSync = function(path, data, options) { throw new Error('fs.writeFileSync is not supported in web-js; use await fs.writeFile(path, data) instead'); };
 fs.appendFile = function(path, data, options, callback) {
   if (typeof options === 'function') { callback = options; options = undefined; }
   const promise = fs.append_text(path, data);
@@ -158,33 +164,15 @@ fs.appendFile = function(path, data, options, callback) {
   }
   return promise;
 };
-fs.appendFileSync = function(path, data, options) {
-  return fs.appendFile(path, data, options);
-};
-fs.existsSync = function(path) {
-  return fs.exists(path);
-};
-fs.readdirSync = function(path, options) {
-  return fs.list(path);
-};
-fs.mkdirSync = function(path, options) {
-  return fs.mkdir(path);
-};
-fs.unlinkSync = function(path) {
-  return fs.delete(path);
-};
-fs.rmdirSync = function(path) {
-  return fs.delete(path);
-};
-fs.copyFileSync = function(src, dest) {
-  return fs.copy(src, dest);
-};
-fs.renameSync = function(oldPath, newPath) {
-  return fs.move(oldPath, newPath);
-};
-fs.statSync = function(path) {
-  return fs.stat(path);
-};
+fs.appendFileSync = function(path, data, options) { throw new Error('fs.appendFileSync is not supported in web-js; use await fs.appendFile(path, data) instead'); };
+fs.existsSync = function(path) { throw new Error('fs.existsSync is not supported in web-js; use await fs.exists(path) instead'); };
+fs.readdirSync = function(path, options) { throw new Error('fs.readdirSync is not supported in web-js; use await fs.list(path) instead'); };
+fs.mkdirSync = function(path, options) { throw new Error('fs.mkdirSync is not supported in web-js; use await fs.mkdir(path) instead'); };
+fs.unlinkSync = function(path) { throw new Error('fs.unlinkSync is not supported in web-js; use await fs.delete(path) instead'); };
+fs.rmdirSync = function(path) { throw new Error('fs.rmdirSync is not supported in web-js; use await fs.delete(path) instead'); };
+fs.copyFileSync = function(src, dest) { throw new Error('fs.copyFileSync is not supported in web-js; use await fs.copy(src, dest) instead'); };
+fs.renameSync = function(oldPath, newPath) { throw new Error('fs.renameSync is not supported in web-js; use await fs.move(oldPath, newPath) instead'); };
+fs.statSync = function(path) { throw new Error('fs.statSync is not supported in web-js; use await fs.stat(path) instead'); };
 fs.promises = {
   readFile: fs.readFile,
   writeFile: fs.writeFile,
@@ -328,33 +316,36 @@ chrome.scripting = makeNamespace({
 chrome.storage = {};
 chrome.storage.local = {
   get: function(keys) {
-    if (typeof keys === 'string') return web.storage.get(keys).then(v => ({[keys]: v}));
-    if (Array.isArray(keys)) {
-      const ps = keys.map(k => web.storage.get(k).then(v => ({[k]: v})));
-      return Promise.all(ps).then(results => Object.assign({}, ...results));
+    if (typeof keys === 'object' && keys !== null && !Array.isArray(keys)) {
+      return makeAsync('storage_get_many')({keys: Object.keys(keys), defaults: keys});
     }
-    return web.storage.list().then(allKeys => {
-      const ps = allKeys.map(k => web.storage.get(k).then(v => ({[k]: v})));
-      return Promise.all(ps).then(results => Object.assign({}, ...results));
-    });
+    if (typeof keys === 'string') {
+      return makeAsync('storage_get_many')({keys: [keys]});
+    }
+    if (Array.isArray(keys)) {
+      return makeAsync('storage_get_many')({keys: keys});
+    }
+    return makeAsync('storage_get_all')({});
   },
   set: function(items) {
     if (typeof items === 'object' && items !== null) {
-      const ps = Object.keys(items).map(k => web.storage.set(k, items[k]));
-      return Promise.all(ps).then(() => undefined);
+      return makeAsync('storage_set_many')({items: items});
     }
-    return Promise.resolve();
+    return Promise.resolve(null);
   },
   remove: function(keys) {
-    if (typeof keys === 'string') return web.storage.delete(keys);
-    if (Array.isArray(keys)) return Promise.all(keys.map(k => web.storage.delete(k))).then(() => undefined);
-    return Promise.resolve();
+    if (typeof keys === 'string') {
+      return makeAsync('storage_delete_many')({keys: [keys]});
+    } else if (Array.isArray(keys)) {
+      return makeAsync('storage_delete_many')({keys: keys});
+    }
+    return Promise.resolve(null);
   },
   clear: function() {
-    return web.storage.list().then(allKeys => Promise.all(allKeys.map(k => web.storage.delete(k))).then(() => undefined));
+    return makeAsync('storage_clear')({});
   }
 };
-chrome.storage.sync = chrome.storage.local;
+chrome.storage.sync = Object.assign({}, chrome.storage.local);
 
 // dom namespace
 var dom = {};
@@ -537,39 +528,51 @@ runtime.inspect = function() { return __webJsRuntimeInspect(); };
 
 // Top-level aliases (JS prelude matching web-lua's prelude.lua)
 // tab.* high-level aliases
-var tab = {};
-for (const key in web.tab) tab[key] = web.tab[key];
-tab.current = async function() {
-  const tabs = await chrome.tabs.query({active: true, currentWindow: true});
-  return tabs && tabs[0] ? tabs[0].id : null;
+var __tab = {};
+for (const key in web.tab) __tab[key] = web.tab[key];
+__tab.current = function() {
+  return chrome.tabs.query({active: true, currentWindow: true}).then(function(tabs) {
+    return tabs && tabs[0] ? tabs[0].id : null;
+  });
 };
-tab.open = async function(url) {
-  const t = await chrome.tabs.create({url: url || ''});
-  return t && t.id;
+__tab.open = function(url) {
+  return chrome.tabs.create({url: url || ''}).then(function(t) {
+    return t && t.id;
+  });
 };
-tab.focus = async function(tabId) {
-  const id = tabId || await tab.current();
-  if (id) await chrome.tabs.update(id, {active: true});
-  return id;
+__tab.focus = function(tabId) {
+  return __tab.current().then(function(currentId) {
+    var id = tabId || currentId;
+    if (id) return chrome.tabs.update(id, {active: true}).then(function() { return id; });
+    return id;
+  });
 };
-tab.url = async function(tabId) {
-  const id = tabId || await tab.current();
-  if (!id) return null;
-  const t = await chrome.tabs.get(id);
-  return t && t.url;
+__tab.url = function(tabId) {
+  return __tab.current().then(function(currentId) {
+    var id = tabId || currentId;
+    if (!id) return null;
+    return chrome.tabs.get(id).then(function(t) {
+      return t && t.url;
+    });
+  });
 };
-tab.title = async function(tabId) {
-  const id = tabId || await tab.current();
-  if (!id) return null;
-  const t = await chrome.tabs.get(id);
-  return t && t.title;
+__tab.title = function(tabId) {
+  return __tab.current().then(function(currentId) {
+    var id = tabId || currentId;
+    if (!id) return null;
+    return chrome.tabs.get(id).then(function(t) {
+      return t && t.title;
+    });
+  });
 };
-tab.reload = async function(tabId) {
-  const id = tabId || await tab.current();
-  if (id) await chrome.tabs.reload(id);
-  return id;
+__tab.reload = function(tabId) {
+  return __tab.current().then(function(currentId) {
+    var id = tabId || currentId;
+    if (id) return chrome.tabs.reload(id).then(function() { return id; });
+    return id;
+  });
 };
-tab.sleep = web.sleep;
+__tab.sleep = web.sleep;
 
 // runtime.* aliases
 var runtime_fetch = web.fetch;
@@ -582,13 +585,17 @@ var runtime_notifications = web.notifications;
 page.go = page.goto;
 page.open = page.new_tab;
 page.enter = function() { return page.press('Enter'); };
-page.wait_for_load = async function(timeout) {
-  const id = await tab.current();
-  return await web.tab.wait_for_load(id, timeout);
+page.wait_for_load = function(timeout) {
+  return makeAsync('chrome_tabs_query')({active: true, currentWindow: true}).then(function(tabs) {
+    var id = tabs && tabs[0] ? tabs[0].id : null;
+    return makeAsync('tab_wait_for_load')([id, timeout]);
+  });
 };
-page.fetch = async function(url) {
-  const id = await tab.current();
-  return await web.tab.fetch(id, url);
+page.fetch = function(url) {
+  return makeAsync('chrome_tabs_query')({active: true, currentWindow: true}).then(function(tabs) {
+    var id = tabs && tabs[0] ? tabs[0].id : null;
+    return makeAsync('tab_fetch')([id, url]);
+  });
 };
 
 // Global Web APIs — LLM-optimized

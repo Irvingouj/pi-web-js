@@ -62,6 +62,10 @@ export class WebSession {
     this.raw.reset();
   }
 
+  hasGlobal(name: string): boolean {
+    return this.raw.has_global(name);
+  }
+
   inspectGlobals(): WasmGlobalsSnapshot {
     return this.raw.inspect_globals();
   }

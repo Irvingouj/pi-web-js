@@ -39,6 +39,8 @@ print("type: " + typeof tabs)
 
   test("chrome.tabs.create opens a new tab", async () => {
     const { context, popup } = await launchExtensionContext();
+    const consoleMessages: string[] = [];
+    popup.on("console", (msg) => consoleMessages.push(msg.text()));
     try {
       await waitForKernelReady(popup, 30_000);
       await popup
@@ -58,6 +60,19 @@ print("created: " + typeof tab.id)
       await runCell(popup, 0);
       await waitForCellStatus(popup, 0, "success", 20_000);
       await expectCellOutputContains(popup, 0, "created: number");
+    } catch (e) {
+      const status = await popup.evaluate(() => {
+        const cells = document.querySelectorAll('[data-testid="cell-status"]');
+        return (cells[0] as HTMLElement)?.textContent || 'no-status';
+      });
+      const stdout = await popup.evaluate(() => {
+        const cells = document.querySelectorAll('[data-testid="cell-output"]');
+        return (cells[0] as HTMLElement)?.textContent || '';
+      });
+      console.log("DEBUG status:", status);
+      console.log("DEBUG stdout:", stdout);
+      console.log("DEBUG console:", consoleMessages.join("\n"));
+      throw e;
     } finally {
       await context.close();
     }
@@ -250,9 +265,9 @@ print("result: " + result)
         `
 const newTab = await web.tab.create({url: "https://example.com"})
 await web.tab.wait_for_load(newTab.id)
-const snap = await web.tab.snapshot(newTab.id)
-print("has_nodes: " + (snap.data.nodes != null))
-print("has_url: " + (snap.data.url != null))
+const snap = await web.tab.snapshot_data(newTab.id)
+print("has_nodes: " + (snap.nodes != null))
+print("has_url: " + (snap.url != null))
       `,
       );
       await runCell(popup, 0);

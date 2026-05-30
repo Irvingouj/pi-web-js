@@ -46,7 +46,7 @@ export interface WasmAsyncResponse {
  * Result of running a single cell, including async-loop state.
  * Either still pending (waiting for async resolution) or done.
  */
-export type WasmRunResult = { status: "pending"; stdout: string[]; stderr: string[]; commands: unknown[]; fuel_exhausted: boolean; execution_count: number; pending_command: WasmAsyncCommand } | { status: "ok"; stdout: string[]; stderr: string[]; result: string | null; execution_count: number } | { status: "err"; stdout: string[]; stderr: string[]; error: WasmCellError; execution_count: number };
+export type WasmRunResult = { status: "pending"; stdout: string[]; stderr: string[]; commands: unknown[]; fuel_exhausted: boolean; execution_count: number; pending_commands: WasmAsyncCommand[] } | { status: "ok"; stdout: string[]; stderr: string[]; result: string | null; execution_count: number } | { status: "err"; stdout: string[]; stderr: string[]; error: WasmCellError; execution_count: number };
 
 /**
  * Snapshot of all JS globals.
@@ -156,6 +156,10 @@ export class WebSession {
     free(): void;
     [Symbol.dispose](): void;
     /**
+     * Check if a global variable exists (not undefined).
+     */
+    has_global(name: string): boolean;
+    /**
      * Inspect all global variables in the current JS state.
      */
     inspect_globals(): WasmGlobalsSnapshot;
@@ -205,9 +209,8 @@ export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembl
 
 export interface InitOutput {
     readonly memory: WebAssembly.Memory;
-    readonly generateApiDocs: (a: number, b: number) => [number, number];
-    readonly main: () => void;
     readonly __wbg_websession_free: (a: number, b: number) => void;
+    readonly websession_has_global: (a: number, b: number, c: number) => number;
     readonly websession_inspect_globals: (a: number) => any;
     readonly websession_load_library: (a: number, b: number, c: number) => any;
     readonly websession_new: () => number;
@@ -215,13 +218,15 @@ export interface InitOutput {
     readonly websession_runCellAsync: (a: number, b: number, c: number, d: number, e: number) => any;
     readonly websession_set_fuel_limit: (a: number, b: number) => void;
     readonly websession_stopWith: (a: number) => void;
+    readonly generateApiDocs: (a: number, b: number) => [number, number];
+    readonly main: () => void;
     readonly collect_document: (a: any) => any;
     readonly collect_element: (a: any, b: any) => any;
     readonly format_snapshot_js: (a: any, b: number) => [number, number];
-    readonly wasm_bindgen__convert__closures_____invoke__hdc7ad51cb0146dbd: (a: number, b: number, c: any) => [number, number];
-    readonly wasm_bindgen__convert__closures_____invoke__h0704705a564dfdbc: (a: number, b: number, c: any, d: any) => void;
-    readonly wasm_bindgen__convert__closures_____invoke__h00e436cdb3940a19: (a: number, b: number, c: any, d: any) => void;
-    readonly wasm_bindgen__convert__closures_____invoke__h77e44281bf5e7541: (a: number, b: number) => number;
+    readonly wasm_bindgen__convert__closures_____invoke__hbaf3bd60d2f803db: (a: number, b: number, c: any) => [number, number];
+    readonly wasm_bindgen__convert__closures_____invoke__h7e74b1390ad87235: (a: number, b: number, c: any, d: any) => void;
+    readonly wasm_bindgen__convert__closures_____invoke__hf458ead16698aa30: (a: number, b: number, c: any, d: any) => void;
+    readonly wasm_bindgen__convert__closures_____invoke__hd488ef5680429ef6: (a: number, b: number) => number;
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
     readonly __wbindgen_exn_store: (a: number) => void;

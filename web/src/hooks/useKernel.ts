@@ -71,5 +71,10 @@ export function useKernel(
     setStatus("ready");
   }, []);
 
-  return { status, runCell, stopExecution, restartKernel };
+  const kernel = { status, runCell, stopExecution, restartKernel, session: globalSession };
+  if (typeof window !== 'undefined') {
+    (window as any).__kernel = kernel;
+  }
+
+  return kernel;
 }

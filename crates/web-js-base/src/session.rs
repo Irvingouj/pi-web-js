@@ -3,6 +3,7 @@ use std::cell::Cell;
 use crate::types::*;
 use web_js_core::JsSession;
 
+
 // ─── BaseSession ────────────────────────────────────────────────
 
 /// BaseSession wraps JsSession for use by upper-layer crates
@@ -33,8 +34,8 @@ impl BaseSession {
     }
 
     /// Resume a yielded cell with an async response JSON string.
-    pub fn resume_cell(&mut self, response_json: &str) -> WasmRunResult {
-        self.inner.resume_cell(response_json).into()
+    pub fn resume_cell(&mut self, call_id: u32, response_json: &str) -> WasmRunResult {
+        self.inner.resume_cell(call_id, response_json).into()
     }
 
     /// Reset the session, clearing all JS state.
@@ -56,18 +57,6 @@ impl BaseSession {
     /// Inspect all global variables in the current JS state.
     pub fn inspect_globals(&mut self) -> WasmGlobalsSnapshot {
         self.inner.inspect_globals().into()
-    }
-
-    /// Restore a pending async command that was yielded but not yet resolved.
-    /// Used when the host handles some async calls itself and wants to pass
-    /// the rest back to JS.
-    pub fn restore_pending_command(&mut self, cmd: WasmAsyncCommand) {
-        let core_cmd = web_js_core::AsyncCommand {
-            call_id: cmd.call_id,
-            action: web_js_core::action::Action::from(cmd.action.as_str()),
-            params: cmd.params,
-        };
-        self.inner.restore_pending_command(core_cmd);
     }
 }
 
@@ -94,11 +83,22 @@ where
 {
     let mut result = base.run_cell(code, stdin);
 
-    while let WasmRunResult::Pending {
-        ref pending_command,
-        ..
-    } = result
-    {
+    loop {
+        let batch: Vec<WasmAsyncCommand> = match &result {
+            WasmRunResult::Pending {
+                ref pending_commands,
+                ..
+            } => pending_commands.clone(),
+            _ => break,
+        };
+
+        if batch.is_empty() {
+            break;
+        }
+
+        let _call_ids: Vec<u32> = batch.iter().map(|c| c.call_id).collect();
+
+        // Check abort before executing batch
         if let Some(flag) = aborted {
             if flag.get() {
                 let err_json = serde_json::to_string(&WasmAsyncResponse {
@@ -110,47 +110,66 @@ where
                     }),
                 })
                 .unwrap_or_default();
-                result = base.resume_cell(&err_json);
-                continue;
+                for cmd in &batch {
+                    result = base.resume_cell(cmd.call_id, &err_json);
+                }
+                break;
             }
         }
-
-        let cmd = pending_command.clone();
-        base.restore_pending_command(cmd.clone());
 
         let prev_stdout = match &result {
             WasmRunResult::Pending { stdout, .. } => stdout.clone(),
             _ => Vec::new(),
         };
 
-        let response = match handle_command(cmd).await {
-            Ok(r) => r,
-            Err(e) => {
-                let err_json = serde_json::to_string(&WasmAsyncResponse {
+        // Execute all commands in the batch concurrently
+        let call_ids: Vec<u32> = batch.iter().map(|c| c.call_id).collect();
+        let futures: Vec<Fut> = batch.into_iter().map(|cmd| handle_command(cmd)).collect();
+        let responses: Vec<Result<WasmAsyncResponse, WasmAsyncError>> =
+            futures_util::future::join_all(futures).await;
+
+        // Resume QuickJS serially — one resume_cell at a time
+        for (call_id, response_result) in call_ids.into_iter().zip(responses.into_iter()) {
+            // Check abort between resumes
+            if let Some(flag) = aborted {
+                if flag.get() {
+                    let err_json = serde_json::to_string(&WasmAsyncResponse {
+                        ok: false,
+                        value: None,
+                        error: Some(WasmAsyncError {
+                            message: "Runner aborted".into(),
+                            code: "E_ABORTED".into(),
+                        }),
+                    })
+                    .unwrap_or_default();
+                    result = base.resume_cell(call_id, &err_json);
+                    continue;
+                }
+            }
+
+            let response = match response_result {
+                Ok(r) => r,
+                Err(e) => WasmAsyncResponse {
                     ok: false,
                     value: None,
                     error: Some(e),
-                })
-                .unwrap_or_default();
-                result = base.resume_cell(&err_json);
-                // Preserve stdout from previous result if resume_cell returns error
-                if let WasmRunResult::Err { ref mut stdout, .. } = result {
-                    let mut merged = prev_stdout;
-                    merged.append(&mut stdout.clone());
-                    *stdout = merged;
-                }
-                continue;
-            }
-        };
+                },
+            };
+            let json = serde_json::to_string(&response).unwrap_or_default();
+            result = base.resume_cell(call_id, &json);
 
-        let json = serde_json::to_string(&response).unwrap_or_default();
-        result = base.resume_cell(&json);
-        // Preserve stdout from previous result if resume_cell returns error
-        if let WasmRunResult::Err { ref mut stdout, .. } = result {
-            let mut merged = prev_stdout;
-            merged.append(&mut stdout.clone());
-            *stdout = merged;
+            // Merge stdout from error results
+            if let WasmRunResult::Err {
+                ref mut stdout, ..
+            } = result
+            {
+                let mut merged = prev_stdout.clone();
+                merged.append(&mut stdout.clone());
+                *stdout = merged;
+            }
         }
+
+        // Loop will check result again — if Pending with new commands, they'll be batched
     }
 
     result

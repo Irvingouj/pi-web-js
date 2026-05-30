@@ -189,57 +189,39 @@ print("appended: " + txt);`,
     await expectCellOutputContains(page, 0, "appended: hello world");
   });
 
-  test("9: fs.readFile with utf8 returns text", async ({ page }) => {
+  test("9: fs.read_text returns file content", async ({ page }) => {
     await setCellCode(
       page,
       0,
-      `await fs.writeFile("/readFile_test.txt", "readFile hello");
-let ok = true;
-let txt;
-try {
-  txt = fs.readFile("/readFile_test.txt", "utf8");
-} catch (e) {
-  ok = false;
-  txt = e;
-}
-print("ok: " + ok);
+      `await fs.write_text("/readFile_test.txt", "readFile hello");
+const txt = await fs.read_text("/readFile_test.txt");
 print("txt: " + txt);`,
     );
     await runCell(page, 0);
     await waitForCellStatus(page, 0, "success");
-    await expectCellOutputContains(page, 0, "ok: true");
     await expectCellOutputContains(page, 0, "txt: readFile hello");
   });
 
-  test("10: fs.writeFile writes text", async ({ page }) => {
+  test("10: fs.write_text writes and reads back", async ({ page }) => {
     await setCellCode(
       page,
       0,
-      `fs.writeFile("/writeFile_test.txt", "writeFile data");
-let ok = true;
-let txt;
-try {
-  txt = fs.readFile("/writeFile_test.txt", "utf8");
-} catch (e) {
-  ok = false;
-  txt = e;
-}
-print("ok: " + ok);
+      `await fs.write_text("/writeFile_test.txt", "writeFile data");
+const txt = await fs.read_text("/writeFile_test.txt");
 print("txt: " + txt);`,
     );
     await runCell(page, 0);
     await waitForCellStatus(page, 0, "success");
-    await expectCellOutputContains(page, 0, "ok: true");
     await expectCellOutputContains(page, 0, "txt: writeFile data");
   });
 
-  test("11: fs.existsSync returns boolean", async ({ page }) => {
+  test("11: fs.exists returns boolean", async ({ page }) => {
     await setCellCode(
       page,
       0,
-      `await fs.writeFile("/existsSync_test.txt", "x");
-const before = fs.existsSync("/existsSync_test.txt");
-const after = fs.existsSync("/existsSync_missing.txt");
+      `await fs.write_text("/existsSync_test.txt", "x");
+const before = await fs.exists("/existsSync_test.txt");
+const after = await fs.exists("/existsSync_missing.txt");
 print("before: " + before);
 print("after: " + after);`,
     );
@@ -249,45 +231,32 @@ print("after: " + after);`,
     await expectCellOutputContains(page, 0, "after: false");
   });
 
-  test("12: fs.readdirSync returns directory entries", async ({ page }) => {
+  test("12: fs.list returns directory entries", async ({ page }) => {
     await setCellCode(
       page,
       0,
-      `fs.mkdirSync("/readdirSync_dir");
-await fs.writeFile("/readdirSync_dir/a.txt", "a");
-await fs.writeFile("/readdirSync_dir/b.txt", "b");
-let ok = true;
-let entries;
-try {
-  entries = fs.readdirSync("/readdirSync_dir");
-} catch (e) {
-  ok = false;
-  entries = e;
-}
-print("ok: " + ok);
-if (Array.isArray(entries)) {
-  print("count: " + entries.length);
-  for (const e of entries) {
-    print("name: " + e);
-  }
-} else {
-  print("entries: " + entries);
+      `await fs.mkdir("/readdirSync_dir");
+await fs.write_text("/readdirSync_dir/a.txt", "a");
+await fs.write_text("/readdirSync_dir/b.txt", "b");
+const entries = await fs.list("/readdirSync_dir");
+print("count: " + entries.length);
+for (const e of entries) {
+  print("name: " + e.name);
 }`,
     );
     await runCell(page, 0);
     await waitForCellStatus(page, 0, "success");
-    await expectCellOutputContains(page, 0, "ok: true");
     await expectCellOutputContains(page, 0, "count: 2");
     await expectCellOutputContains(page, 0, "name: a.txt");
     await expectCellOutputContains(page, 0, "name: b.txt");
   });
 
-  test("13: fs.mkdirSync creates directory", async ({ page }) => {
+  test("13: fs.mkdir creates directory", async ({ page }) => {
     await setCellCode(
       page,
       0,
-      `fs.mkdirSync("/mkdirSync_dir");
-const exists = fs.existsSync("/mkdirSync_dir");
+      `await fs.mkdir("/mkdirSync_dir");
+const exists = await fs.exists("/mkdirSync_dir");
 print("exists: " + exists);`,
     );
     await runCell(page, 0);
@@ -295,14 +264,14 @@ print("exists: " + exists);`,
     await expectCellOutputContains(page, 0, "exists: true");
   });
 
-  test("14: fs.unlinkSync deletes file", async ({ page }) => {
+  test("14: fs.delete removes file", async ({ page }) => {
     await setCellCode(
       page,
       0,
-      `await fs.writeFile("/unlinkSync_test.txt", "delete me");
-const before = fs.existsSync("/unlinkSync_test.txt");
-fs.unlinkSync("/unlinkSync_test.txt");
-const after = fs.existsSync("/unlinkSync_test.txt");
+      `await fs.write_text("/unlinkSync_test.txt", "delete me");
+const before = await fs.exists("/unlinkSync_test.txt");
+await fs.delete("/unlinkSync_test.txt");
+const after = await fs.exists("/unlinkSync_test.txt");
 print("before: " + before);
 print("after: " + after);`,
     );
@@ -316,21 +285,12 @@ print("after: " + after);`,
     await setCellCode(
       page,
       0,
-      `await fs.writeFile("/promises_read.txt", "promises hello");
-let ok = true;
-let txt;
-try {
-  txt = await fs.promises.readFile("/promises_read.txt", "utf8");
-} catch (e) {
-  ok = false;
-  txt = e;
-}
-print("ok: " + ok);
+      `await fs.write_text("/promises_read.txt", "promises hello");
+const txt = await fs.read_text("/promises_read.txt");
 print("txt: " + txt);`,
     );
     await runCell(page, 0);
     await waitForCellStatus(page, 0, "success");
-    await expectCellOutputContains(page, 0, "ok: true");
     await expectCellOutputContains(page, 0, "txt: promises hello");
   });
 });

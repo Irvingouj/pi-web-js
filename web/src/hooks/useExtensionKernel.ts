@@ -45,6 +45,7 @@ export function useExtensionKernel(
     ensureSession()
       .then((session) => session.runCellAsync(code, stdin || ""))
       .then((result) => {
+        console.log("[useExtensionKernel] result:", JSON.stringify(result));
         onResultRef.current(cellId, result);
         setStatus("ready");
       })

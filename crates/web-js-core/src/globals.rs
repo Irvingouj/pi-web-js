@@ -1,4 +1,3 @@
-use crate::action::Action;
 use crate::state::HostState;
 use crate::utils::{exception_to_string, format_js_value, js_value_to_json};
 use rquickjs::{
@@ -107,10 +106,10 @@ pub(crate) fn register_host_globals<'js>(
 
             let command = crate::types::AsyncCommand {
                 call_id,
-                action: Action::from(action_str.as_str()),
+                action: action_str,
                 params,
             };
-            hs.pending_async_command = Some(command);
+            hs.pending_async_commands.push(command);
 
             // Store resolve/reject in global __webJsPending[call_id]
             let pending = ctx.globals().get::<_, Object>("__webJsPending")?;

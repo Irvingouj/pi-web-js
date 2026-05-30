@@ -292,7 +292,24 @@ pub async fn execute_storage_delete(params: StorageDeleteParams) -> WasmAsyncRes
     }
 }
 
-pub async fn execute_host_call(action: &str, params: serde_json::Value) -> WasmAsyncResponse {
+pub async fn execute_host_call(_action: &str, params: serde_json::Value) -> WasmAsyncResponse {
+    // The actual handler name is in params.action (e.g. "greet"),
+    // not in the action argument (which is "call" from Action::Host("call")).
+    let handler_name = match params.get("action").and_then(|v| v.as_str()) {
+        Some(name) => name,
+        None => {
+            return WasmAsyncResponse {
+                ok: false,
+                value: None,
+                error: Some(WasmAsyncError {
+                    message: "host.call requires an action name".into(),
+                    code: "E_HOST_NO_ACTION".into(),
+                }),
+            };
+        }
+    };
+    let handler_params = params.get("params").cloned().unwrap_or(serde_json::Value::Object(serde_json::Map::new()));
+
     let window = match web_sys::window() {
         Some(w) => w,
         None => {
@@ -302,33 +319,61 @@ pub async fn execute_host_call(action: &str, params: serde_json::Value) -> WasmA
                 error: Some(WasmAsyncError {
                     message: "No window available".into(),
                     code: "E_HOST".into(),
-                }),
+                })
             }
         }
     };
 
-    let handlers = match js_sys::Reflect::get(&window, &"__hostHandlers".into()) {
+    let handlers_val = match js_sys::Reflect::get(&window, &"__hostHandlers".into()) {
         Ok(h) if !h.is_undefined() && !h.is_null() => h,
         _ => {
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
                 error: Some(WasmAsyncError {
-                    message: format!("No handler registered for '{}'", action),
+                    message: format!("No handler registered for '{}'", handler_name),
+                    code: "E_HOST_NO_HANDLER".into(),
+                }),
+            }
+        }
+    };
+    let handlers: js_sys::Object = match handlers_val.dyn_into() {
+        Ok(o) => o,
+        Err(_) => {
+            return WasmAsyncResponse {
+                ok: false,
+                value: None,
+                error: Some(WasmAsyncError {
+                    message: format!("No handler registered for '{}'", handler_name),
                     code: "E_HOST_NO_HANDLER".into(),
                 }),
             }
         }
     };
 
-    let handler = match js_sys::Reflect::get(&handlers, &action.into()) {
+    // Whitelist check: only allow own enumerable properties of __hostHandlers.
+    let keys = js_sys::Object::keys(&handlers);
+    let is_whitelisted = (0..keys.length())
+        .any(|i| keys.get(i).as_string().as_deref() == Some(handler_name));
+    if !is_whitelisted {
+        return WasmAsyncResponse {
+            ok: false,
+            value: None,
+            error: Some(WasmAsyncError {
+                message: format!("Action '{}' is not whitelisted", handler_name),
+                code: "E_NOT_WHITELISTED".into(),
+            }),
+        };
+    }
+
+    let handler = match js_sys::Reflect::get(&handlers, &handler_name.into()) {
         Ok(h) if h.is_function() => h.dyn_into::<js_sys::Function>().unwrap(),
         _ => {
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
                 error: Some(WasmAsyncError {
-                    message: format!("No handler registered for '{}'", action),
+                    message: format!("No handler registered for '{}'", handler_name),
                     code: "E_HOST_NO_HANDLER".into(),
                 }),
             }
@@ -337,7 +382,7 @@ pub async fn execute_host_call(action: &str, params: serde_json::Value) -> WasmA
 
     // Serialize params to a JSON string, then parse to a JS object.
     // This avoids serde_wasm_bindgen's default map-to-JS-Map behavior.
-    let params_json = match serde_json::to_string(&params) {
+    let params_json = match serde_json::to_string(&handler_params) {
         Ok(s) => s,
         Err(e) => {
             return WasmAsyncResponse {
@@ -367,11 +412,15 @@ pub async fn execute_host_call(action: &str, params: serde_json::Value) -> WasmA
     let result = match handler.call1(&handlers, &params_js) {
         Ok(r) => r,
         Err(e) => {
+            let msg = js_sys::Reflect::get(&e, &"message".into())
+                .ok()
+                .and_then(|v| v.as_string())
+                .unwrap_or_else(|| "unknown handler error".to_string());
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
                 error: Some(WasmAsyncError {
-                    message: format!("Handler threw: {:?}", e),
+                    message: msg,
                     code: "E_HOST".into(),
                 }),
             }
@@ -383,11 +432,15 @@ pub async fn execute_host_call(action: &str, params: serde_json::Value) -> WasmA
         match JsFuture::from(result.dyn_into::<js_sys::Promise>().unwrap()).await {
             Ok(v) => v,
             Err(e) => {
+                let msg = js_sys::Reflect::get(&e, &"message".into())
+                    .ok()
+                    .and_then(|v| v.as_string())
+                    .unwrap_or_else(|| "unknown promise rejection".to_string());
                 return WasmAsyncResponse {
                     ok: false,
                     value: None,
                     error: Some(WasmAsyncError {
-                        message: format!("Handler promise rejected: {:?}", e),
+                        message: msg,
                         code: "E_HOST".into(),
                     }),
                 }

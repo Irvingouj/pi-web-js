@@ -268,6 +268,102 @@ export async function executeMainThreadCommand(
         };
       }
     }
+    case "storage_set_many": {
+      try {
+        const obj = asRecord(params);
+        const items = obj.items || params;
+        const itemRec = asRecord(items);
+        for (const key of Object.keys(itemRec)) {
+          const value = itemRec[key];
+          localStorage.setItem(
+            "__csl__:" + key,
+            value === null || value === undefined ? "null" : String(value),
+          );
+        }
+        return { ok: true, value: null };
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        return {
+          ok: false,
+          error: { message, code: "ESTORAGE", category: "storage" },
+        };
+      }
+    }
+    case "storage_get_many": {
+      try {
+        const obj = asRecord(params);
+        const keys = Array.isArray(obj.keys) ? obj.keys : [];
+        const defaults = asRecord(obj.defaults);
+        const results: Record<string, string | null> = {};
+        for (const key of keys) {
+          const val = localStorage.getItem("__csl__:" + String(key));
+          results[String(key)] = val !== null ? val : (defaults[String(key)] ?? null);
+        }
+        return { ok: true, value: results };
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        return {
+          ok: false,
+          error: { message, code: "ESTORAGE", category: "storage" },
+        };
+      }
+    }
+    case "storage_get_all": {
+      try {
+        const results: Record<string, string | null> = {};
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith("__csl__:")) {
+            const shortKey = key.slice("__csl__:".length);
+            results[shortKey] = localStorage.getItem(key);
+          }
+        }
+        return { ok: true, value: results };
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        return {
+          ok: false,
+          error: { message, code: "ESTORAGE", category: "storage" },
+        };
+      }
+    }
+    case "storage_delete_many": {
+      try {
+        const obj = asRecord(params);
+        const keys = Array.isArray(obj.keys) ? obj.keys : [];
+        for (const key of keys) {
+          localStorage.removeItem("__csl__:" + String(key));
+        }
+        return { ok: true, value: null };
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        return {
+          ok: false,
+          error: { message, code: "ESTORAGE", category: "storage" },
+        };
+      }
+    }
+    case "storage_clear": {
+      try {
+        const keysToRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith("__csl__:")) {
+            keysToRemove.push(key);
+          }
+        }
+        for (const key of keysToRemove) {
+          localStorage.removeItem(key);
+        }
+        return { ok: true, value: null };
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        return {
+          ok: false,
+          error: { message, code: "ESTORAGE", category: "storage" },
+        };
+      }
+    }
     case "clipboard_read": {
       try {
         const text = await navigator.clipboard.readText();
@@ -1297,17 +1393,17 @@ export async function executeMainThreadCommand(
         1,
         obj.script ?? obj.code ?? obj.js ?? "",
       );
+      const scriptStr = String(script);
       return executeInTab(
         tabId,
-        (code: unknown) => {
-          const codeStr = String(code);
-          if (typeof code !== "string") {
-            throw new Error("tab.evaluate requires a string argument");
+        function(code: string) {
+          try {
+            return eval(code);
+          } catch (e) {
+            return { error: String(e) };
           }
-          // Use new Function to avoid capturing local scope (marginally safer than eval)
-          return new Function(codeStr)();
         },
-        [String(script)],
+        [scriptStr],
       );
     }
     case "tab_back": {
@@ -2097,18 +2193,18 @@ async function executeInTab(
       },
     };
   }
+  const targetTab = typeof tabId === "number" ? tabId : activeTabId;
+  if (targetTab === null) {
+    return {
+      ok: false,
+      error: {
+        message: "No active tab available",
+        code: "E_NO_TAB",
+        category: "resource",
+      },
+    };
+  }
   try {
-    const targetTab = typeof tabId === "number" ? tabId : activeTabId;
-    if (targetTab === null) {
-      return {
-        ok: false,
-        error: {
-          message: "No active tab available",
-          code: "E_NO_TAB",
-          category: "resource",
-        },
-      };
-    }
     const results = await chrome.scripting.executeScript({
       target: { tabId: targetTab },
       func,
@@ -2649,6 +2745,19 @@ function normalizeChromeError(err: unknown): { ok: false; error: AsyncError } {
 
 // ─── Chrome API dispatcher ─────────────────────────────────────
 
+function toPlainObject(value: unknown): unknown {
+  if (value === null || typeof value !== "object") return value;
+  if (Array.isArray(value)) return value.map(toPlainObject);
+  const plain: Record<string, unknown> = {};
+  for (const key of Object.keys(value as Record<string, unknown>)) {
+    const v = (value as Record<string, unknown>)[key];
+    if (typeof v !== "function") {
+      plain[key] = toPlainObject(v);
+    }
+  }
+  return plain;
+}
+
 async function handleChromeApi(command: Command): Promise<AsyncResponse> {
   const chrome = window.chrome;
   if (!chrome?.runtime?.id) {
@@ -2697,8 +2806,8 @@ async function handleChromeApi(command: Command): Promise<AsyncResponse> {
         break;
       }
       case "chrome_tabs_remove": {
-        const tabId = firstRec.tabId || firstRec.id || first;
-        await chrome.tabs.remove(tabId as number);
+        const tabIds = firstRec.tabIds || firstRec.tabId || firstRec.id || first;
+        await chrome.tabs.remove(tabIds as unknown as number);
         result = null;
         break;
       }
@@ -2870,6 +2979,7 @@ async function handleChromeApi(command: Command): Promise<AsyncResponse> {
           },
         };
     }
+    result = toPlainObject(result);
     return { ok: true, value: result };
   } catch (err: unknown) {
     return normalizeChromeError(err);

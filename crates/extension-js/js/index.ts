@@ -142,6 +142,7 @@ export class ExtensionSession {
         const pending = this.pendingCalls.get(callId);
         if (pending) {
           this.pendingCalls.delete(callId);
+          console.log("[ExtensionSession] result data:", JSON.stringify(msg.data));
           pending.resolve(msg.data);
         }
         break;

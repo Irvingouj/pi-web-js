@@ -127,7 +127,7 @@ export type RunResult = {
     fuel_exhausted: boolean;
     execution_count: number;
     status: CellStatus;
-    pending_command: AsyncCommand | null;
+    pending_commands: AsyncCommand[];
 };
 export type SleepParams = {
     duration: bigint;

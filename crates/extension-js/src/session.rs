@@ -75,25 +75,12 @@ impl ExtensionSession {
             &code,
             &stdin,
             |cmd| async move {
-                let action = cmd.action.clone();
                 match ExtensionSession::handle_command(&cmd).await {
-                    Ok(r) => {
-                        log_debug(&format!(
-                            "[ExtensionSession] async response: action={}",
-                            action
-                        ));
-                        Ok(r)
-                    }
-                    Err(e) => {
-                        log_error(&format!(
-                            "[ExtensionSession] async relay error: action={}, err={}",
-                            action, e
-                        ));
-                        Err(WasmAsyncError {
-                            message: e,
-                            code: "E_RELAY_ERROR".into(),
-                        })
-                    }
+                    Ok(r) => Ok(r),
+                    Err(e) => Err(WasmAsyncError {
+                        message: e,
+                        code: "E_RELAY_ERROR".into(),
+                    }),
                 }
             },
             None,

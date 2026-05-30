@@ -15,7 +15,9 @@
     "sidePanel",
     "scripting",
     "clipboardRead",
-    "clipboardWrite"
+    "clipboardWrite",
+    "storage",
+    "windows"
   ],
   "host_permissions": ["<all_urls>"],
   "background": {
