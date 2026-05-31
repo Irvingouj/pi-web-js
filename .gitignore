@@ -1,0 +1,58 @@
+# Rust
+target/
+Cargo.toml.orig
+*.rs.bk
+
+# Node / npm
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build output
+web/dist/
+web/playwright-report/
+web/test-results/
+*/dist/
+
+# Generated WASM bindings (pkg/ directories)
+crates/*/pkg/
+crates/*/pkg-debug/
+crates/*/pkg-temp/
+
+# Generated WASM bindings copied to js/ directories by bundle-wasm.js
+crates/web-js/js/web_js.js
+crates/web-js/js/web_js_bg.wasm
+crates/web-js/js/web_js.d.ts
+crates/web-js/js/web_js_bg.wasm.d.ts
+crates/web-js/js/api.json
+crates/web-js/js/API.md
+
+crates/extension-js/js/extension_js.js
+crates/extension-js/js/extension_js.d.ts
+crates/extension-js/js/api.json
+crates/extension-js/js/API.md
+
+crates/dom-semantic-tree/js/dom_semantic_tree.js
+crates/dom-semantic-tree/js/dom_semantic_tree.d.ts
+
+# Generated extension assets copied to web/public/ by copy-ext-assets.js
+web/public/content-script.js
+web/public/dom_semantic_tree.js
+web/public/background.js
+web/public/manifest.json
+
+# Stale copied WASM artifacts
+web/src/wasm/
+
+# Playwright
+.last-run.json
+
+# OS / Editor
+.DS_Store
+*.swp
+*.swo
+*~
+
+# Tool configuration
+.opencode/
