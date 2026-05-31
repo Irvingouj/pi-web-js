@@ -1,4 +1,5 @@
 import { FunctionalComponent } from 'preact';
+import { useRef } from 'preact/hooks';
 import type { Cell as CellType, CellKind } from '../notebook';
 import type { KernelStatus } from '../hooks/useKernel';
 import CodeMirrorEditor from './CodeMirrorEditor';
@@ -46,7 +47,15 @@ const Cell: FunctionalComponent<Props> = ({
     onChangeSource(cell.id, source);
   };
 
+  const lastRunRef = useRef(0);
   const handleRun = () => {
+    const now = Date.now();
+    if (now - lastRunRef.current < 500) {
+      console.log(`[Cell.handleRun] debounced cell ${cell.id}`);
+      return;
+    }
+    lastRunRef.current = now;
+    console.log(`[Cell.handleRun] running cell ${cell.id}`);
     onRun(cell.id);
   };
 

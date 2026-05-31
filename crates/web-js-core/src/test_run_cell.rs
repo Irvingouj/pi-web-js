@@ -589,4 +589,22 @@ mod tests {
         assert_eq!(result.pending_commands.len(), 1);
         assert_eq!(result.pending_commands[0].action, "chrome_tabs_create");
     }
+
+    #[test]
+    fn test_contract_file_loads() {
+        let mut session = JsSession::new();
+        let contract_path = std::path::PathBuf::from(
+            env!("CARGO_MANIFEST_DIR")
+        ).join("../../web/tests/e2e/all-apis-extension-contract.js");
+        let contract_code = std::fs::read_to_string(&contract_path)
+            .unwrap_or_else(|e| panic!("Failed to read contract file: {}", e));
+        let result = session.run_cell(&contract_code, "");
+        println!("Contract file load result: {:?}", result);
+        println!("Contract file stdout: {:?}", result.stdout);
+        println!("Contract file stderr: {:?}", result.stderr);
+        println!("Contract file status: {:?}", result.status);
+        println!("Contract file pending commands: {:?}", result.pending_commands.len());
+        assert_eq!(result.status, CellStatus::Done);
+        assert!(result.error.is_none());
+    }
 }

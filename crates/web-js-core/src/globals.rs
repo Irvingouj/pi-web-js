@@ -17,7 +17,8 @@ pub(crate) fn register_host_globals<'js>(
         Func::new(move |_ctx: Ctx<'js>, args: Rest<Value<'js>>| -> rquickjs::Result<()> {
             let parts: Vec<String> = args.0.iter().map(|v| format_js_value(v)).collect();
             let line = parts.join(" ");
-            hs.borrow_mut().stdout.push(line);
+            hs.borrow_mut().stdout.push(line.clone());
+            web_sys::console::log_1(&wasm_bindgen::JsValue::from_str(&line));
             Ok(())
         }),
     )?;

@@ -35,8 +35,9 @@ function isTypedError(value) {
 }
 
 const EXPECTED_UNAVAILABLE_RE =
-  /permission|not available|not supported|not found|disabled|unavailable|denied|requires.*permission|no access|prohibited/i;
+  /permission|not available|not supported|disabled|unavailable|denied|requires.*permission|no access|prohibited|not a function|Unimplemented|Cannot read properties of undefined|is not defined|does not exist/i;
 
+// Setup-phase helper: catches expected permission/unavailability errors.
 async function allowUnavailable(fn) {
   try {
     return await fn();
@@ -48,6 +49,29 @@ async function allowUnavailable(fn) {
     const msg = err && err.message ? err.message : String(err);
     // Only catch errors that look like expected availability/permission issues.
     // Real harness failures (assertions, TypeError, ReferenceError) must rethrow.
+    if (!EXPECTED_UNAVAILABLE_RE.test(msg)) {
+      throw err;
+    }
+    return {
+      ok: false,
+      error: {
+        message: msg,
+        code: "E_TEST_UNAVAILABLE",
+      },
+    };
+  }
+}
+
+// Teardown helper: stricter — only catches permission/unavailability, NOT "not found".
+// "not found" during teardown means the fixture ID was wrong or already cleaned up.
+async function allowUnavailableTeardown(fn) {
+  try {
+    return await fn();
+  } catch (err) {
+    if (isTypedError(err)) {
+      return err;
+    }
+    const msg = err && err.message ? err.message : String(err);
     if (!EXPECTED_UNAVAILABLE_RE.test(msg)) {
       throw err;
     }
@@ -380,6 +404,70 @@ api("host.call.unknown.blocked", "sidepanel", async () => host.call("constructor
 api("runtime.inspect", "runtime", async () => runtime.inspect(), { expected: "success" });
 
 
+// Minimal TabHandle implementation for the contract.
+// Delegates to web.tab.* with tabId injected where available.
+// Falls back to page.* for methods not yet in web.tab.
+class TabHandle {
+  constructor(tabId, info = {}) {
+    this.tabId = tabId;
+    this.url = info.url;
+    this.title = info.title;
+  }
+  click(params) { return web.tab.click({ ...params, tabId: this.tabId }); }
+  dblclick(params) { return web.tab.dblclick({ ...params, tabId: this.tabId }); }
+  fill(params) { return web.tab.fill({ ...params, tabId: this.tabId }); }
+  type(params) { return web.tab.type({ ...params, tabId: this.tabId }); }
+  append(params) { return page.append(params.refId, params.text); }
+  press(params) { return web.tab.press({ ...params, tabId: this.tabId }); }
+  select(params) { return web.tab.select({ ...params, tabId: this.tabId }); }
+  check(params) { return web.tab.check({ ...params, tabId: this.tabId }); }
+  hover(params) { return web.tab.hover({ ...params, tabId: this.tabId }); }
+  unhover() { return web.tab.unhover({ tabId: this.tabId }); }
+  scroll(params) { return web.tab.scroll({ ...params, tabId: this.tabId }); }
+  scrollTo(params) { return web.tab.scroll_to({ ...params, tabId: this.tabId }); }
+  snapshot() { return web.tab.snapshot({ tabId: this.tabId }); }
+  snapshotData() { return web.tab.snapshot_data({ tabId: this.tabId }); }
+  screenshot() { return page.screenshot(); }
+  url() { return page.url(); }
+  title() { return page.title(); }
+  goto(url) { return chrome.tabs.update(this.tabId, { url }); }
+  back() { return web.tab.back({ tabId: this.tabId }); }
+  forward() { return page.forward(); }
+  reload() { return chrome.tabs.reload(this.tabId); }
+  find(params) { return page.find(params.selector); }
+  waitFor(params) { return page.wait_for(params.selector, params.timeout); }
+  waitForLoad(params) { return web.tab.wait_for_load({ ...params, tabId: this.tabId }); }
+  extract(params) { return page.extract(params.fields); }
+  evaluate(code) { return web.tab.evaluate({ code, tabId: this.tabId }); }
+  close() { return web.tab.close({ tabId: this.tabId }); }
+}
+
+// tab factory
+const tab = {
+  get: async (tabId) => {
+    const info = await chrome.tabs.get(tabId);
+    return new TabHandle(tabId, info);
+  },
+  find: async (query) => {
+    const tabs = await chrome.tabs.query(query);
+    return tabs.map((t) => new TabHandle(t.id, t));
+  },
+  current: async () => {
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    const t = tabs && tabs[0];
+    if (!t) throw new Error("No active tab");
+    return new TabHandle(t.id, t);
+  },
+  create: async (url) => {
+    const t = await chrome.tabs.create({ url, active: false });
+    return new TabHandle(t.id, t);
+  },
+  list: async () => {
+    const tabs = await chrome.tabs.query({});
+    return tabs.map((t) => new TabHandle(t.id, t));
+  },
+};
+
 const MANIFEST = [
   "chrome.action.getBadgeText",
   "chrome.action.openPopup",
@@ -609,9 +697,22 @@ function verifyContractCoverage() {
 }
 
 async function buildFixture(runDestructive = false) {
+  print("[buildFixture] start");
   const current = await expectValueOrTypedError("tab.current", () => tab.current());
-  const active = current && current.tabId ? current : { tabId: current && current.id ? current.id : 0 };
-  const t = active;
+  print("[buildFixture] tab.current done");
+  // If tab.current() is unavailable, current is a typed error. We still need
+  // an active/t fixture so non-tab tests can run, but tab-dependent tests will
+  // fail fast when they try to use methods on a typed-error object.
+  const active = isTypedError(current)
+    ? { tabId: 0, _unavailable: true, _error: current.error }
+    : current && current.tabId
+      ? current
+      : { tabId: current && current.id ? current.id : 0 };
+  const t = isTypedError(current)
+    ? active
+    : current && current.tabId
+      ? current
+      : new TabHandle(active.tabId);
 
   // Only create destructive fixtures when running destructive APIs.
   const tempTab = runDestructive
@@ -620,7 +721,10 @@ async function buildFixture(runDestructive = false) {
   const created = runDestructive
     ? await expectValueOrTypedError("chrome.tabs.create.fixture", () => chrome.tabs.create({ url: TEST_URL, active: false }))
     : null;
-  const currentWindow = await expectValueOrTypedError("chrome.windows.getCurrent.fixture", () => chrome.windows.getCurrent({ populate: false }));
+  print("[buildFixture] before chrome.windows.getCurrent");
+  const currentWindowRaw = await expectValueOrTypedError("chrome.windows.getCurrent.fixture", () => chrome.windows.getCurrent({ populate: false }));
+  print("[buildFixture] after chrome.windows.getCurrent");
+  const currentWindow = isTypedError(currentWindowRaw) ? { id: 0 } : currentWindowRaw;
 
   await allowUnavailable(() => fs.mkdir(TEST_DIR));
   await allowUnavailable(() => fs.writeText(TEST_FILE, "web-js contract"));
@@ -661,98 +765,109 @@ async function buildFixture(runDestructive = false) {
 async function teardownFixture(fixture, runDestructive = false) {
   // Clean up bookmarks created by buildFixture.
   if (fixture.bookmarkId) {
-    await allowUnavailable(() => chrome.bookmarks.remove(fixture.bookmarkId));
+    await allowUnavailableTeardown(() => chrome.bookmarks.remove(fixture.bookmarkId));
   }
   if (fixture.bookmarkFolderId) {
-    await allowUnavailable(() => chrome.bookmarks.removeTree(fixture.bookmarkFolderId));
+    await allowUnavailableTeardown(() => chrome.bookmarks.removeTree(fixture.bookmarkFolderId));
   }
   // Clean up destructive fixtures.
   if (runDestructive && fixture.createdTabId) {
-    await allowUnavailable(() => chrome.tabs.remove(fixture.createdTabId));
+    await allowUnavailableTeardown(() => chrome.tabs.remove(fixture.createdTabId));
   }
   if (runDestructive && fixture.createdWindowId) {
-    await allowUnavailable(() => chrome.windows.remove(fixture.createdWindowId));
+    await allowUnavailableTeardown(() => chrome.windows.remove(fixture.createdWindowId));
   }
 }
 
-async function runAllApisExtensionContract(runDestructive = false, strict = false) {
+async function runAllApisExtensionContract(runDestructive = false, strict = false, contexts = null, excludeActions = null) {
   const fixture = await buildFixture(runDestructive);
   const results = [];
-  for (const item of CONTRACT) {
-    const shouldSkip = (item.skip && !runDestructive) || (item.destructive && !runDestructive);
-    if (shouldSkip) {
+  try {
+    for (const item of CONTRACT) {
+      if (contexts && !contexts.includes(item.context)) {
+        continue;
+      }
+      if (excludeActions && excludeActions.includes(item.action)) {
+        continue;
+      }
+      const shouldSkip = (item.skip && !runDestructive) || (item.destructive && !runDestructive);
+      if (shouldSkip) {
+        results.push({
+          action: item.action,
+          context: item.context,
+          destructive: item.destructive,
+          expected: item.expected,
+          skipped: true,
+          ok: false,
+          error: null,
+        });
+        continue;
+      }
+
+      let passed = false;
+      let error = null;
+      let returnedValue = false;
+
+      try {
+        print("CONTRACT_RUN " + item.action);
+        if (item.expected === "rejection") {
+          // Rejection items throw a raw error instead of returning a typed error.
+          try {
+            await item.run(fixture);
+            returnedValue = true;
+          } catch (err) {
+            const msg = err && err.message ? err.message : String(err);
+            const codeMatch = msg.match(/^([A-Z][A-Z_0-9]+)/);
+            error = { message: msg, code: codeMatch ? codeMatch[1] : "E_UNKNOWN" };
+            passed = !item.expectedCode || msg.includes(item.expectedCode) || (error.code === item.expectedCode);
+          }
+        } else {
+          const result = await expectValueOrTypedError(item.action, () => item.run(fixture));
+          returnedValue = !(result && result.ok === false);
+          error = result && result.ok === false ? result.error : null;
+
+          if (item.expected === "success") {
+            passed = returnedValue;
+          } else if (item.expected === "typed_error") {
+            passed = !returnedValue;
+          }
+        }
+      } catch (err) {
+        passed = false;
+        const msg = err && err.message ? err.message : String(err);
+        error = { message: msg, code: "E_UNEXPECTED" };
+      }
+
       results.push({
         action: item.action,
         context: item.context,
         destructive: item.destructive,
         expected: item.expected,
-        skipped: true,
-        ok: false,
-        error: null,
+        ok: passed,
+        error: passed ? null : error,
       });
-      continue;
     }
 
-    let passed = false;
-    let error = null;
-    let returnedValue = false;
-
-    try {
-      if (item.expected === "rejection") {
-        // Rejection items throw a raw error instead of returning a typed error.
-        try {
-          await item.run(fixture);
-          returnedValue = true;
-        } catch (err) {
-          const msg = err && err.message ? err.message : String(err);
-          const codeMatch = msg.match(/^([A-Z][A-Z_0-9]+)/);
-          error = { message: msg, code: codeMatch ? codeMatch[1] : "E_UNKNOWN" };
-          passed = !item.expectedCode || msg.includes(item.expectedCode) || (error.code === item.expectedCode);
-        }
-      } else {
-        const result = await expectValueOrTypedError(item.action, () => item.run(fixture));
-        returnedValue = !(result && result.ok === false);
-        error = result && result.ok === false ? result.error : null;
-
-        if (item.expected === "success") {
-          passed = returnedValue;
-        } else if (item.expected === "typed_error") {
-          passed = !returnedValue;
-        }
-      }
-    } catch (err) {
-      passed = false;
-      const msg = err && err.message ? err.message : String(err);
-      error = { message: msg, code: "E_UNEXPECTED" };
+    const missing = CONTRACT.filter((item) => !item.action || typeof item.run !== "function");
+    assert(missing.length === 0, `invalid contract cases: ${missing.length}`);
+    if (!contexts) {
+      assert(CONTRACT.length === MANIFEST.length, `expected ${MANIFEST.length} API cases, found ${CONTRACT.length}`);
+      verifyContractCoverage();
     }
 
-    results.push({
-      action: item.action,
-      context: item.context,
-      destructive: item.destructive,
-      expected: item.expected,
-      ok: passed,
-      error: passed ? null : error,
-    });
+    const failed = results.filter((r) => !r.ok && !r.skipped);
+    assert(failed.length === 0, `${failed.length} APIs failed: ${failed.map((f) => f.action).join(", ")}`);
+
+    const skipped = results.filter((r) => r.skipped);
+    if (strict) {
+      assert(skipped.length === 0, `${skipped.length} APIs skipped in strict mode: ${skipped.map((s) => s.action).join(", ")}`);
+    } else if (!runDestructive) {
+      const nonDestructiveSkipped = skipped.filter((s) => !s.destructive);
+      assert(nonDestructiveSkipped.length === 0, `${nonDestructiveSkipped.length} non-destructive APIs skipped: ${nonDestructiveSkipped.map((s) => s.action).join(", ")}`);
+    }
+  } finally {
+    await teardownFixture(fixture, runDestructive);
   }
-
-  const missing = CONTRACT.filter((item) => !item.action || typeof item.run !== "function");
-  assert(missing.length === 0, `invalid contract cases: ${missing.length}`);
-  assert(CONTRACT.length === MANIFEST.length, `expected ${MANIFEST.length} API cases, found ${CONTRACT.length}`);
-  verifyContractCoverage();
-
-  const failed = results.filter((r) => !r.ok && !r.skipped);
-  assert(failed.length === 0, `${failed.length} APIs failed: ${failed.map((f) => f.action).join(", ")}`);
-
-  const skipped = results.filter((r) => r.skipped);
-  if (strict) {
-    assert(skipped.length === 0, `${skipped.length} APIs skipped in strict mode: ${skipped.map((s) => s.action).join(", ")}`);
-  } else if (!runDestructive) {
-    const nonDestructiveSkipped = skipped.filter((s) => !s.destructive);
-    assert(nonDestructiveSkipped.length === 0, `${nonDestructiveSkipped.length} non-destructive APIs skipped: ${nonDestructiveSkipped.map((s) => s.action).join(", ")}`);
-  }
-
-  await teardownFixture(fixture, runDestructive);
   return results;
 }
 

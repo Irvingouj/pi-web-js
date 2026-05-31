@@ -1,7 +1,11 @@
 import { test, expect } from "@playwright/test";
+import { readFileSync } from "fs";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
 import {
   expectCellOutputContains,
   runCell,
+  runCellViaKernel,
   setCellCode,
   waitForCellStatus,
   waitForKernelReady,
@@ -11,6 +15,9 @@ test.describe("all-apis extension contract", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/");
     await waitForKernelReady(page);
+    page.on("console", (msg) => {
+      console.log(`[BROWSER] ${msg.text()}`);
+    });
   });
 
   test("Promise.all with two sleeps", async ({ page }) => {
@@ -174,5 +181,80 @@ for (const r of results.filter(r => !r.ok)) {
 
     console.log(`Smoke test: ${pass}/${total} passed`);
     console.log(output?.slice(0, 3000));
+  });
+
+  test("all-apis extension contract file loads and executes", async ({ page }) => {
+    test.setTimeout(180_000);
+    const __dirname = dirname(fileURLToPath(import.meta.url));
+    const contractPath = join(__dirname, "all-apis-extension-contract.js");
+    const contractCode = readFileSync(contractPath, "utf-8");
+
+    // Inject the contract file into the QuickJS runtime.
+    await setCellCode(page, 0, contractCode);
+    await runCellViaKernel(page, 0);
+    await waitForCellStatus(page, 0, "success", 30_000);
+
+    // Capture browser console logs
+    const browserLogs: string[] = [];
+    page.on("console", (msg) => {
+      const text = msg.text();
+      browserLogs.push(text);
+      console.log(`[BROWSER] ${text}`);
+    });
+
+    // Run the contract in lenient mode (default non-destructive) and report results.
+    await setCellCode(
+      page,
+      0,
+      `let contractResults = null;
+let contractError = null;
+try {
+  print("before contract");
+  contractResults = await runAllApisExtensionContract(false, false, ["rust-native"], ["global.fetch", "global.navigator.clipboard.readText", "global.navigator.clipboard.writeText", "fs.readRange", "fs.hash", "dom.format"]);
+  print("after contract");
+} catch (e) {
+  contractError = e && e.message ? e.message : String(e);
+  print("contract error: " + contractError);
+}
+const total = contractResults ? contractResults.length : 0;
+const passed = contractResults ? contractResults.filter(r => r.ok).length : 0;
+const failed = contractResults ? contractResults.filter(r => !r.ok && !r.skipped).length : 0;
+const skipped = contractResults ? contractResults.filter(r => r.skipped).length : 0;
+print("CONTRACT_TOTAL: " + total);
+print("CONTRACT_PASSED: " + passed);
+print("CONTRACT_FAILED: " + failed);
+print("CONTRACT_SKIPPED: " + skipped);
+if (contractError) {
+  print("CONTRACT_RUNNER_ERROR: " + contractError);
+}
+if (contractResults) {
+  for (const r of contractResults.filter(r => !r.ok && !r.skipped)) {
+    print("CONTRACT_FAIL: " + r.action + " | " + (r.error && r.error.code ? r.error.code : "unknown"));
+  }
+}
+print("CONTRACT_RUN: done");
+`,
+    );
+    await runCellViaKernel(page, 0);
+    await waitForCellStatus(page, 0, "success", 120_000);
+
+    const output = await page
+      .locator('[data-testid="cell-output"]')
+      .first()
+      .textContent();
+
+    // Assert the contract runner executed and produced results.
+    expect(output).toContain("CONTRACT_TOTAL:");
+    expect(output).toContain("CONTRACT_PASSED:");
+    expect(output).toContain("CONTRACT_FAILED:");
+    expect(output).toContain("CONTRACT_SKIPPED:");
+
+    const totalMatch = output?.match(/CONTRACT_TOTAL:\s*(\d+)/);
+    expect(totalMatch).toBeTruthy();
+    const total = parseInt(totalMatch![1], 10);
+    expect(total).toBeGreaterThan(0);
+
+    console.log(`Contract: ${total} APIs total`);
+    console.log(output?.slice(0, 4000));
   });
 });

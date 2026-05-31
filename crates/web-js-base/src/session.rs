@@ -81,7 +81,9 @@ where
     F: FnMut(WasmAsyncCommand) -> Fut,
     Fut: std::future::Future<Output = Result<WasmAsyncResponse, WasmAsyncError>>,
 {
+    tracing::info!("[run_cell_async_loop] start, code_len={}", code.len());
     let mut result = base.run_cell(code, stdin);
+    tracing::info!("[run_cell_async_loop] run_cell result: {}", match &result { WasmRunResult::Pending { .. } => "Pending", WasmRunResult::Ok { .. } => "Ok", WasmRunResult::Err { .. } => "Err" });
 
     loop {
         let batch: Vec<WasmAsyncCommand> = match &result {
@@ -93,10 +95,28 @@ where
         };
 
         if batch.is_empty() {
-            break;
+            tracing::error!("[run_cell_async_loop] batch empty, returning stuck error");
+            // Cell is pending but no commands were yielded — it's stuck.
+            return match result {
+                WasmRunResult::Pending {
+                    stdout,
+                    stderr,
+                    execution_count,
+                    ..
+                } => WasmRunResult::Err {
+                    stdout,
+                    stderr,
+                    error: WasmCellError::Internal {
+                        message: "Cell is pending but no async commands were yielded — likely a stuck promise".into(),
+                    },
+                    execution_count,
+                },
+                _ => unreachable!(),
+            };
         }
 
-        let _call_ids: Vec<u32> = batch.iter().map(|c| c.call_id).collect();
+        let actions_str = batch.iter().map(|c| c.action.as_str()).collect::<Vec<_>>().join(", ");
+        tracing::info!("[run_cell_async_loop] batch size: {}, actions: {}", batch.len(), actions_str);
 
         // Check abort before executing batch
         if let Some(flag) = aborted {
@@ -124,12 +144,22 @@ where
 
         // Execute all commands in the batch concurrently
         let call_ids: Vec<u32> = batch.iter().map(|c| c.call_id).collect();
+        let actions: Vec<String> = batch.iter().map(|c| c.action.clone()).collect();
+        tracing::info!("[run_cell_async_loop] awaiting handle_command batch");
         let futures: Vec<Fut> = batch.into_iter().map(|cmd| handle_command(cmd)).collect();
         let responses: Vec<Result<WasmAsyncResponse, WasmAsyncError>> =
             futures_util::future::join_all(futures).await;
+        tracing::info!("[run_cell_async_loop] handle_command batch done, responses={}", responses.len());
 
         // Resume QuickJS serially — one resume_cell at a time
-        for (call_id, response_result) in call_ids.into_iter().zip(responses.into_iter()) {
+        let mut accumulated_pending: Vec<WasmAsyncCommand> = Vec::new();
+        let mut last_stdout = Vec::new();
+        let mut last_stderr = Vec::new();
+        let mut last_execution_count = 0;
+
+        for (idx, (call_id, response_result)) in call_ids.into_iter().zip(responses.into_iter()).enumerate() {
+            let action = actions.get(idx).cloned().unwrap_or_else(|| "unknown".to_string());
+            tracing::info!("[run_cell_async_loop] resume_cell call_id={} action={}", call_id, action);
             // Check abort between resumes
             if let Some(flag) = aborted {
                 if flag.get() {
@@ -143,6 +173,20 @@ where
                     })
                     .unwrap_or_default();
                     result = base.resume_cell(call_id, &err_json);
+                    if let WasmRunResult::Pending { pending_commands, stdout, stderr, execution_count, .. } = &result {
+                        accumulated_pending.extend(pending_commands.clone());
+                        last_stdout = stdout.clone();
+                        last_stderr = stderr.clone();
+                        last_execution_count = *execution_count;
+                    } else if let WasmRunResult::Ok { stdout, stderr, execution_count, .. } = &result {
+                        last_stdout = stdout.clone();
+                        last_stderr = stderr.clone();
+                        last_execution_count = *execution_count;
+                    } else if let WasmRunResult::Err { stdout, stderr, execution_count, .. } = &result {
+                        last_stdout = stdout.clone();
+                        last_stderr = stderr.clone();
+                        last_execution_count = *execution_count;
+                    }
                     continue;
                 }
             }
@@ -156,21 +200,49 @@ where
                 },
             };
             let json = serde_json::to_string(&response).unwrap_or_default();
+            tracing::info!("[run_cell_async_loop] resume_cell call_id={} json={}", call_id, json);
             result = base.resume_cell(call_id, &json);
+            tracing::info!("[run_cell_async_loop] resume_cell call_id={} result={}", call_id, match &result { WasmRunResult::Pending { .. } => "Pending", WasmRunResult::Ok { .. } => "Ok", WasmRunResult::Err { .. } => "Err" });
 
-            // Merge stdout from error results
-            if let WasmRunResult::Err {
-                ref mut stdout, ..
-            } = result
-            {
-                let mut merged = prev_stdout.clone();
-                merged.append(&mut stdout.clone());
-                *stdout = merged;
+            match &result {
+                WasmRunResult::Pending { pending_commands, stdout, stderr, execution_count, .. } => {
+                    accumulated_pending.extend(pending_commands.clone());
+                    last_stdout = stdout.clone();
+                    last_stderr = stderr.clone();
+                    last_execution_count = *execution_count;
+                }
+                WasmRunResult::Ok { stdout, stderr, execution_count, .. } => {
+                    last_stdout = stdout.clone();
+                    last_stderr = stderr.clone();
+                    last_execution_count = *execution_count;
+                }
+                WasmRunResult::Err { stdout, stderr, execution_count, .. } => {
+                    last_stdout = stdout.clone();
+                    last_stderr = stderr.clone();
+                    last_execution_count = *execution_count;
+                }
             }
         }
 
+        tracing::info!("[run_cell_async_loop] accumulated_pending size: {}", accumulated_pending.len());
+        // If any resume produced pending commands and the final result is not
+        // an error, force result to Pending so the loop will batch and execute
+        // them in the next iteration.
+        if !accumulated_pending.is_empty() && !matches!(result, WasmRunResult::Err { .. }) {
+            result = WasmRunResult::Pending {
+                stdout: last_stdout,
+                stderr: last_stderr,
+                execution_count: last_execution_count,
+                pending_commands: accumulated_pending,
+                commands: vec![],
+                fuel_exhausted: false,
+            };
+        }
+
+        tracing::info!("[run_cell_async_loop] end of loop iteration, result={}", match &result { WasmRunResult::Pending { .. } => "Pending", WasmRunResult::Ok { .. } => "Ok", WasmRunResult::Err { .. } => "Err" });
         // Loop will check result again — if Pending with new commands, they'll be batched
     }
 
+    tracing::info!("[run_cell_async_loop] returning result={}", match &result { WasmRunResult::Pending { .. } => "Pending", WasmRunResult::Ok { .. } => "Ok", WasmRunResult::Err { .. } => "Err" });
     result
 }

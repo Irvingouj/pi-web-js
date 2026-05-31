@@ -62,7 +62,23 @@ export async function setCellCode(page: Page, index: number, code: string) {
  * Run a cell by clicking its run button.
  */
 export async function runCell(page: Page, index: number) {
+  console.log(`[helpers.runCell] clicking cell ${index}`);
   await getCellRunButton(page, index).click();
+  console.log(`[helpers.runCell] clicked cell ${index}`);
+}
+
+export async function runCellViaKernel(page: Page, index: number) {
+  await page.evaluate((idx) => {
+    const cells = document.querySelectorAll('[data-testid="cell"]');
+    const cell = cells[idx];
+    const cellId = cell?.getAttribute('data-cell-id');
+    const editorWrapper = cell?.querySelector('.cm-editor-wrapper') as any;
+    const view = editorWrapper?.__codemirror;
+    const code = view?.state?.doc?.toString() || '';
+    if (cellId && (window as any).__kernel) {
+      (window as any).__kernel.runCell(cellId, code, '');
+    }
+  }, index);
 }
 
 /**
@@ -121,6 +137,8 @@ export async function waitForKernelReady(page: Page, timeout = 15_000) {
 export async function restartKernel(page: Page) {
   await page.locator('[data-testid="restart-kernel-button"]').click();
   await waitForKernelReady(page);
+  // Wait for Cell.tsx's 500ms debounce window to pass before any subsequent runCell calls.
+  await page.waitForTimeout(500);
 }
 
 /**

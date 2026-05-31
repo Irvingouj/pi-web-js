@@ -270,9 +270,17 @@ chrome.contextMenus = makeNamespace({
 // chrome.windows
 chrome.windows = makeNamespace({
   getAll: 'chrome_windows_getAll',
+  getCurrent: 'chrome_windows_getCurrent',
   create: 'chrome_windows_create',
   update: 'chrome_windows_update',
   remove: 'chrome_windows_remove',
+});
+
+// chrome.sessions
+chrome.sessions = makeNamespace({
+  getRecentlyClosed: 'chrome_sessions_getRecentlyClosed',
+  getDevices: 'chrome_sessions_getDevices',
+  restore: 'chrome_sessions_restore',
 });
 
 // chrome.sidePanel

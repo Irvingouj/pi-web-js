@@ -209,6 +209,8 @@ export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembl
 
 export interface InitOutput {
     readonly memory: WebAssembly.Memory;
+    readonly generateApiDocs: (a: number, b: number) => [number, number];
+    readonly main: () => void;
     readonly __wbg_websession_free: (a: number, b: number) => void;
     readonly websession_has_global: (a: number, b: number, c: number) => number;
     readonly websession_inspect_globals: (a: number) => any;
@@ -218,15 +220,13 @@ export interface InitOutput {
     readonly websession_runCellAsync: (a: number, b: number, c: number, d: number, e: number) => any;
     readonly websession_set_fuel_limit: (a: number, b: number) => void;
     readonly websession_stopWith: (a: number) => void;
-    readonly generateApiDocs: (a: number, b: number) => [number, number];
-    readonly main: () => void;
     readonly collect_document: (a: any) => any;
     readonly collect_element: (a: any, b: any) => any;
     readonly format_snapshot_js: (a: any, b: number) => [number, number];
-    readonly wasm_bindgen__convert__closures_____invoke__hbaf3bd60d2f803db: (a: number, b: number, c: any) => [number, number];
-    readonly wasm_bindgen__convert__closures_____invoke__h7e74b1390ad87235: (a: number, b: number, c: any, d: any) => void;
-    readonly wasm_bindgen__convert__closures_____invoke__hf458ead16698aa30: (a: number, b: number, c: any, d: any) => void;
-    readonly wasm_bindgen__convert__closures_____invoke__hd488ef5680429ef6: (a: number, b: number) => number;
+    readonly wasm_bindgen__convert__closures_____invoke__h71ec8c89f008b7b2: (a: number, b: number, c: any) => [number, number];
+    readonly wasm_bindgen__convert__closures_____invoke__ha49b4777309bc5ce: (a: number, b: number, c: any, d: any) => void;
+    readonly wasm_bindgen__convert__closures_____invoke__ha903147e832d744b: (a: number, b: number, c: any, d: any) => void;
+    readonly wasm_bindgen__convert__closures_____invoke__hf3e9fd1570f0f5dc: (a: number, b: number) => number;
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
     readonly __wbindgen_exn_store: (a: number) => void;

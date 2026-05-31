@@ -228,6 +228,7 @@ const CodeMirrorEditor: FunctionalComponent<Props> = ({
     });
 
     viewRef.current = view;
+    (containerRef.current as any).__codemirror = view;
 
     if (autoFocus) {
       view.focus();

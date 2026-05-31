@@ -194,6 +194,8 @@ export function format_snapshot_js(snapshot: TreeSnapshot, format?: SnapshotForm
 
 export function generateApiDocs(format: string): string;
 
+export function main(): void;
+
 /**
  * 0=debug, 1=info, 2=warn, 3=error, 4=none
  */
@@ -213,19 +215,20 @@ export interface InitOutput {
     readonly extensionsession_stopWith: (a: number) => void;
     readonly setLogLevel: (a: number) => void;
     readonly generateApiDocs: (a: number, b: number) => [number, number];
+    readonly main: () => void;
     readonly collect_document: (a: any) => any;
     readonly collect_element: (a: any, b: any) => any;
     readonly format_snapshot_js: (a: any, b: number) => [number, number];
-    readonly wasm_bindgen__convert__closures_____invoke__hbaf3bd60d2f803db: (a: number, b: number, c: any) => [number, number];
-    readonly wasm_bindgen__convert__closures_____invoke__hf458ead16698aa30: (a: number, b: number, c: any, d: any) => void;
-    readonly wasm_bindgen__convert__closures_____invoke__hd488ef5680429ef6: (a: number, b: number) => number;
+    readonly wasm_bindgen__convert__closures_____invoke__h71ec8c89f008b7b2: (a: number, b: number, c: any) => [number, number];
+    readonly wasm_bindgen__convert__closures_____invoke__ha903147e832d744b: (a: number, b: number, c: any, d: any) => void;
+    readonly wasm_bindgen__convert__closures_____invoke__hf3e9fd1570f0f5dc: (a: number, b: number) => number;
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
     readonly __wbindgen_exn_store: (a: number) => void;
     readonly __externref_table_alloc: () => number;
     readonly __wbindgen_externrefs: WebAssembly.Table;
-    readonly __wbindgen_destroy_closure: (a: number, b: number) => void;
     readonly __wbindgen_free: (a: number, b: number, c: number) => void;
+    readonly __wbindgen_destroy_closure: (a: number, b: number) => void;
     readonly __externref_table_dealloc: (a: number) => void;
     readonly __wbindgen_start: () => void;
 }

@@ -69,6 +69,7 @@ impl SessionBuilder {
             fuel_limit: self.fuel_limit,
             host_state,
             fuel_counter: Arc::new(AtomicU64::new(0)),
+            needs_reset: false,
         };
 
         // Load JS libraries (uses run_cell, so after session creation)
@@ -93,6 +94,7 @@ pub struct JsSession {
     fuel_limit: u64,
     host_state: Rc<RefCell<HostState>>,
     fuel_counter: Arc<AtomicU64>,
+    needs_reset: bool,
 }
 
 enum PromiseState<'js> {
@@ -115,6 +117,8 @@ fn check_promise_state<'js>(ctx: Ctx<'js>, promise: &Value<'js>) -> PromiseState
                 // result() throws the rejection reason as an exception
                 let _ = p.result::<Value>();
                 let exc = ctx.catch();
+                let exc_msg = exception_to_string(&exc);
+                tracing::error!("[check_promise_state] Promise rejected: {}", exc_msg);
                 PromiseState::Rejected(exc)
             }
         }
@@ -241,7 +245,12 @@ impl JsSession {
     }
 
     /// Reset the session, clearing all JS state.
+    /// If called during execution, the reset is deferred until the next run_cell.
     pub fn reset(&mut self) {
+        self.needs_reset = true;
+    }
+
+    fn perform_reset(&mut self) {
         let rt = Runtime::new().expect("Failed to create QuickJS runtime");
         rt.set_max_stack_size(0);
         let context = Context::full(&rt).expect("Failed to create QuickJS context");
@@ -259,10 +268,16 @@ impl JsSession {
         self.execution_count = 0;
         self.host_state = host_state;
         self.fuel_counter = Arc::new(AtomicU64::new(0));
+        self.needs_reset = false;
+        tracing::info!("[JsSession] perform_reset done");
     }
 
     /// Run a cell of code.
     pub fn run_cell(&mut self, code: &str, stdin: &str) -> RunResult {
+        if self.needs_reset {
+            self.perform_reset();
+        }
+
         // Reset host state for this run
         let stdin_lines: Vec<String> = stdin.lines().map(|l| l.to_string()).collect();
         {
@@ -297,32 +312,48 @@ impl JsSession {
         let host_state = self.host_state.clone();
 
         let result = self.context.with(|ctx| {
+            tracing::info!("[run_cell] ctx eval start, code_len={}", code.len());
             // Clear stale pending async from previous runs
             let _ = ctx.eval::<Value, _>("if (typeof __webJsPending !== 'undefined') { Object.keys(__webJsPending).forEach(k => delete __webJsPending[k]); } if (typeof __webJsTopPromise !== 'undefined') { delete __webJsTopPromise; }");
+            tracing::info!("[run_cell] cleared stale pending async");
 
             let mut eval_opts = EvalOptions::default();
             eval_opts.global = true;
             eval_opts.strict = false;
             eval_opts.promise = true;
+            tracing::info!("[run_cell] calling eval_with_options, global=true strict=false promise=true");
             let eval_result = ctx.eval_with_options::<Value, _>(code, eval_opts);
+            tracing::info!("[run_cell] eval_with_options returned: is_ok={}", eval_result.is_ok());
 
             let result_val = match eval_result {
                 Ok(val) => val,
                 Err(e) => {
                     let hs = host_state.borrow();
-                    let cell_err = if let rquickjs::Error::Exception = &e {
-                        let msg = {
+                    let (msg, line) = if let rquickjs::Error::Exception = &e {
+                        let exc_msg = {
                             let exc = ctx.catch();
-                            exception_to_string(&exc)
+                            let m = exception_to_string(&exc);
+                            tracing::error!("[run_cell] eval exception: {}", m);
+                            m
                         };
-                        if msg.contains("interrupted") || msg.contains("InternalError") {
-                            CellError::FuelExhausted
-                        } else {
-                            classify_js_error(&msg)
-                        }
+                        let l = extract_line_number(&exc_msg);
+                        tracing::error!("[run_cell] eval exception line: {:?}", l);
+                        (exc_msg, l)
                     } else {
-                        let msg = e.to_string();
-                        classify_js_error(&msg)
+                        let m = e.to_string();
+                        let l = extract_line_number(&m);
+                        tracing::error!("[run_cell] eval error (non-exception): {}", m);
+                        (m, l)
+                    };
+                    let cell_err = if msg.contains("interrupted") {
+                        CellError::FuelExhausted
+                    } else {
+                        let err = classify_js_error(&msg);
+                        match err {
+                            CellError::Runtime { message: _, line: _ } => CellError::Runtime { message: clean_error_message(&msg), line },
+                            CellError::Compile { message: _, line: _ } => CellError::Compile { message: clean_error_message(&msg), line },
+                            other => other,
+                        }
                     };
                     return RunResult::with_partial_output(
                         hs.stdout.clone(),
@@ -337,14 +368,22 @@ impl JsSession {
 
             // Store the top-level result for Promise state checking in resume_cell
             let _ = ctx.globals().set("__webJsTopPromise", result_val.clone());
+            tracing::info!("[run_cell] stored __webJsTopPromise");
 
             // Run job queue to process Promise microtasks
-            while ctx.execute_pending_job() {}
+            tracing::info!("[run_cell] before execute_pending_job");
+            let mut job_count = 0;
+            while ctx.execute_pending_job() {
+                job_count += 1;
+            }
+            tracing::info!("[run_cell] after execute_pending_job, jobs_executed={}", job_count);
 
             // Check for host async first
             let pending: Vec<AsyncCommand> = host_state.borrow_mut().pending_async_commands.drain(..).collect();
+            tracing::info!("[run_cell] pending async count: {}", pending.len());
             if !pending.is_empty() {
                 let hs = host_state.borrow();
+                tracing::info!("[run_cell] returning async_pending");
                 return RunResult::async_pending(hs.stdout.clone(), pending, exec_count);
             }
 
@@ -359,6 +398,7 @@ impl JsSession {
                     PromiseState::Rejected(err) => {
                         let msg = exception_to_string(&err);
                         let line = extract_line_number(&msg);
+                        tracing::error!("[run_cell] top-level Promise rejected: {} line={:?}", msg, line);
                         let hs = host_state.borrow();
                         return RunResult::with_partial_output(
                             hs.stdout.clone(),
@@ -409,6 +449,7 @@ impl JsSession {
                 None
             };
 
+            tracing::info!("[run_cell] returning Done, result_str={:?}", result_str);
             RunResult {
                 stdout: hs.stdout.clone(),
                 stderr: hs.stderr.clone(),
@@ -424,7 +465,7 @@ impl JsSession {
 
         // Clear interrupt handler after execution
         self.runtime.set_interrupt_handler(None);
-
+        tracing::info!("[run_cell] done");
         result
     }
 
@@ -489,11 +530,16 @@ impl JsSession {
                 let hs = host_state.borrow();
                 let msg = if let rquickjs::Error::Exception = &e {
                     let exc = ctx.catch();
-                    exception_to_string(&exc)
+                    let m = exception_to_string(&exc);
+                    tracing::error!("[resume_cell] eval exception for call_id={}: {}", call_id, m);
+                    m
                 } else {
-                    e.to_string()
+                    let m = e.to_string();
+                    tracing::error!("[resume_cell] eval error (non-exception) for call_id={}: {}", call_id, m);
+                    m
                 };
                 let line = extract_line_number(&msg);
+                tracing::error!("[resume_cell] eval error line for call_id={}: {:?}", call_id, line);
                 return RunResult::with_partial_output(
                     hs.stdout.clone(),
                     hs.stderr.clone(),
@@ -528,6 +574,7 @@ impl JsSession {
                         PromiseState::Rejected(err) => {
                             let msg = exception_to_string(&err);
                             let line = extract_line_number(&msg);
+                            tracing::error!("[resume_cell] top-level Promise rejected after resume: {} line={:?}", msg, line);
                             let hs = host_state.borrow();
                             return RunResult::with_partial_output(
                                 hs.stdout.clone(),

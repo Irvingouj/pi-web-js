@@ -1,8 +1,8 @@
 use crate::types::CellError;
 use rquickjs::{Ctx, Value};
 
-/// Extract a line number from an error message.
-/// Handles "at line N" and "line N" patterns.
+/// Extract a line number from an error message or stack trace.
+/// Handles "at line N", "line N", and "filename:line:col" patterns.
 pub(crate) fn extract_line_number(msg: &str) -> Option<u32> {
     let msg = msg.trim();
 
@@ -18,6 +18,22 @@ pub(crate) fn extract_line_number(msg: &str) -> Option<u32> {
         let rest = &msg[idx + 5..];
         let num_str: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
         return num_str.parse().ok();
+    }
+
+    // Try stack trace formats like "eval_script:1:1" or "<anonymous>:10:5"
+    for line in msg.lines().rev() {
+        if let Some(last_colon) = line.rfind(':') {
+            let after_last = &line[last_colon + 1..];
+            if after_last.parse::<u32>().is_ok() {
+                // Look for "filename:line:col" pattern (second colon before last)
+                if let Some(prev_colon) = line[..last_colon].rfind(':') {
+                    let between = &line[prev_colon + 1..last_colon];
+                    if let Ok(num) = between.parse::<u32>() {
+                        return Some(num);
+                    }
+                }
+            }
+        }
     }
 
     None
@@ -93,25 +109,43 @@ pub(crate) fn format_js_value<'js>(value: &Value<'js>) -> String {
 }
 
 /// Extract an error message from a JS exception value.
+/// Tries name+message, then toString(), then fallback to value display.
+/// Filters out null bytes and control chars that appear in WASM backtraces.
 pub(crate) fn exception_to_string<'js>(value: &Value<'js>) -> String {
-    if let Some(obj) = value.as_object() {
-        if let Ok(name) = obj.get::<_, rquickjs::String>("name") {
-            if let Ok(s) = name.to_string() {
-                if let Ok(msg) = obj.get::<_, rquickjs::String>("message") {
-                    if let Ok(m) = msg.to_string() {
-                        return format!("{}: {}", s, m);
+    let Some(obj) = value.as_object() else {
+        return format_js_value(value);
+    };
+
+    let name = obj.get::<_, rquickjs::String>("name")
+        .ok()
+        .and_then(|s| s.to_string().ok())
+        .map(|s| s.replace('\0', "").trim().to_string())
+        .filter(|s| !s.is_empty());
+    let message = obj.get::<_, rquickjs::String>("message")
+        .ok()
+        .and_then(|s| s.to_string().ok())
+        .map(|s| s.replace('\0', "").trim().to_string())
+        .filter(|s| !s.is_empty());
+
+    match (name, message) {
+        (Some(n), Some(m)) => format!("{}: {}", n, m),
+        (None, Some(m)) => m,
+        (Some(n), None) => {
+            // Try toString() before falling back to the name alone
+            if let Ok(to_string) = obj.get::<_, rquickjs::Function>("toString") {
+                if let Ok(val) = to_string.call::<_, rquickjs::String>(()) {
+                    if let Ok(s) = val.to_string() {
+                        let s = s.replace('\0', "").trim().to_string();
+                        if !s.is_empty() && s != "[object Object]" {
+                            return s;
+                        }
                     }
                 }
-                return s;
             }
+            n
         }
-        if let Ok(msg) = obj.get::<_, rquickjs::String>("message") {
-            if let Ok(s) = msg.to_string() {
-                return s;
-            }
-        }
+        (None, None) => format_js_value(value),
     }
-    format_js_value(value)
 }
 
 /// Convert a rquickjs error message into a structured `CellError`.

@@ -18,6 +18,7 @@ dom-semantic-tree = { workspace = true }
 getrandom = { workspace = true }
 web-sys = { version = "0.3", features = ["console"] }
 wasm-bindgen = { workspace = true }
+tracing = { workspace = true }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"

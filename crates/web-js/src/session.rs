@@ -272,7 +272,8 @@ fn find_element_by_label(document: &web_sys::Document, query: &str) -> Option<we
 
 impl WebSession {
     async fn handle_command(cmd: &WasmAsyncCommand) -> Result<WasmAsyncResponse, String> {
-        match cmd.action.as_str() {
+        tracing::info!("[handle_command] action={} call_id={}", cmd.action, cmd.call_id);
+        let result = match cmd.action.as_str() {
             // ─── Async helpers ──────────────────────────────────
             "mock_async" => Ok(WasmAsyncResponse {
                 ok: true,
@@ -1049,6 +1050,11 @@ impl WebSession {
 
             // ─── Extension-only / unknown ──────────────────────
             _ => Err(format!("{} is not available in web-js context", cmd.action)),
+        };
+        match &result {
+            Ok(resp) => tracing::info!("[handle_command] action={} ok={}", cmd.action, resp.ok),
+            Err(e) => tracing::info!("[handle_command] action={} error={}", cmd.action, e),
         }
+        result
     }
 }

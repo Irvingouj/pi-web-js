@@ -114,6 +114,10 @@ while (i < 3) {
   test("7: restart kernel clears state", async ({ page }) => {
     await waitForKernelReady(page);
 
+    page.on("console", (msg) => {
+      console.log(`[BROWSER] ${msg.text()}`);
+    });
+
     // Set x = 10
     await setCellCode(page, 0, "x = 10");
     await runCell(page, 0);

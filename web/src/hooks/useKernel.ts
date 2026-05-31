@@ -41,6 +41,13 @@ export function useKernel(
   onErrorRef.current = onError;
 
   const runCell = useCallback((cellId: string, code: string, stdin: string) => {
+    const w = typeof window !== "undefined" ? (window as any) : null;
+    if (w?.__kernelRunning) {
+      return;
+    }
+    if (w) {
+      w.__kernelRunning = true;
+    }
     setStatus("running");
     ensureSession()
       .then((session) => session.runCellAsync(code, stdin || ""))
@@ -51,10 +58,19 @@ export function useKernel(
       .catch((err) => {
         onErrorRef.current(err.message || String(err));
         setStatus("ready");
+      })
+      .finally(() => {
+        if (w) {
+          w.__kernelRunning = false;
+        }
       });
   }, []);
 
   const stopExecution = useCallback(() => {
+    const w = typeof window !== "undefined" ? (window as any) : null;
+    if (w) {
+      w.__kernelRunning = false;
+    }
     if (globalSession && globalRunner) {
       globalSession.stopWith(globalRunner);
       globalSession = null;
