@@ -13,7 +13,7 @@ yarn-error.log*
 web/dist/
 web/playwright-report/
 web/test-results/
-*/dist/
+**/dist/
 
 # Generated WASM bindings (pkg/ directories)
 crates/*/pkg/
@@ -32,6 +32,7 @@ crates/extension-js/js/extension_js.js
 crates/extension-js/js/extension_js.d.ts
 crates/extension-js/js/api.json
 crates/extension-js/js/API.md
+crates/extension-js/js/pkg/
 
 crates/dom-semantic-tree/js/dom_semantic_tree.js
 crates/dom-semantic-tree/js/dom_semantic_tree.d.ts
@@ -44,6 +45,7 @@ web/public/manifest.json
 
 # Stale copied WASM artifacts
 web/src/wasm/
+crates/js/
 
 # Playwright
 .last-run.json
