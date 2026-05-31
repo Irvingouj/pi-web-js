@@ -1,4 +1,4 @@
-import { WebSession } from './crates/web-js/js/web_js.js';
+import { WebSession } from '../crates/web-js/js/web_js.js';
 
 async function main() {
     const session = new WebSession();
