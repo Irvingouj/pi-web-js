@@ -1,5 +1,10 @@
 {
-  "devDependencies": {
-    "@types/chrome": "^0.1.42"
-  }
+	"dependencies": {
+		"zod": "^3.23.8"
+	},
+	"devDependencies": {
+		"@types/chrome": "^0.1.42",
+		"jsdom": "^29.1.1",
+		"vitest": "^1.6.0"
+	}
 }
