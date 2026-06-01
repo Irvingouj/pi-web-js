@@ -25,6 +25,9 @@ import type {
 	StorageSetParams,
 } from "./generated.js";
 
+const bigintLike = () =>
+	z.union([z.bigint(), z.number().finite()]).transform((v) => BigInt(v));
+
 // ─── Storage schemas ───────────────────────────────────────────
 
 export const StorageGetParamsSchema = z.object({
@@ -42,10 +45,17 @@ export const StorageDeleteParamsSchema = z.object({
 
 export const StorageListParamsSchema = z.object({});
 
-export const StorageSetManyParamsSchema = z.record(z.unknown());
-export const StorageGetManyParamsSchema = z.record(z.unknown());
+export const StorageSetManyParamsSchema = z.object({
+	items: z.record(z.unknown()),
+});
+export const StorageGetManyParamsSchema = z.object({
+	keys: z.array(z.string()),
+	defaults: z.record(z.unknown()).optional(),
+});
 export const StorageGetAllParamsSchema = z.object({});
-export const StorageDeleteManyParamsSchema = z.record(z.unknown());
+export const StorageDeleteManyParamsSchema = z.object({
+	keys: z.array(z.string()),
+});
 export const StorageClearParamsSchema = z.object({});
 
 // ─── Clipboard schemas ─────────────────────────────────────────
@@ -64,11 +74,11 @@ export const FetchParamsSchema = z.object({
 	method: z.string().default("GET"),
 	headers: z.record(z.string()).default({}),
 	body: z.string().nullable().default(null),
-	timeout: z.bigint().default(30000n),
+	timeout: bigintLike().default(30000n),
 });
 
 export const SleepParamsSchema = z.object({
-	duration: z.bigint(),
+	duration: bigintLike(),
 });
 
 // ─── Page action schemas ───────────────────────────────────────
@@ -85,7 +95,7 @@ export const PageForwardParamsSchema = z.object({});
 export const PageReloadParamsSchema = z.object({});
 
 export const PageWaitParamsSchema = z.object({
-	duration: z.bigint().default(1000n),
+	duration: bigintLike().default(1000n),
 });
 
 export const PageClickParamsSchema = z.record(z.unknown());
@@ -116,7 +126,7 @@ export const PageFindParamsSchema = z.object({
 
 export const PageWaitForParamsSchema = z.object({
 	selector: z.string(),
-	timeout: z.bigint().default(30000n),
+	timeout: bigintLike().default(30000n),
 });
 
 export const PageExtractParamsSchema = z.object({
@@ -200,27 +210,27 @@ export const SidepanelAppendParamsSchema = z.record(z.unknown());
 export const SidepanelUrlParamsSchema = z.object({});
 export const SidepanelTitleParamsSchema = z.object({});
 export const SidepanelWaitParamsSchema = z.object({
-	duration: z.bigint().default(1000n),
+	duration: bigintLike().default(1000n),
 });
 
 export const SidepanelSnapshotParamsSchema = z.object({
 	interactive_only: z.boolean().default(false),
-	max_nodes: z.bigint().default(500n),
+	max_nodes: bigintLike().default(500n),
 });
 export const SidepanelSnapshotTextParamsSchema = z.object({
 	interactive_only: z.boolean().default(false),
-	max_nodes: z.bigint().default(500n),
+	max_nodes: bigintLike().default(500n),
 });
 export const SidepanelSnapshotDataParamsSchema = z.object({
 	interactive_only: z.boolean().default(false),
-	max_nodes: z.bigint().default(500n),
+	max_nodes: bigintLike().default(500n),
 });
 
 // ─── DOM schemas ───────────────────────────────────────────────
 
 export const DomSnapshotParamsSchema = z.object({
 	interactive_only: z.boolean().default(false),
-	max_nodes: z.bigint().default(500n),
+	max_nodes: bigintLike().default(500n),
 });
 
 export const DomFormatParamsSchema = z.object({
@@ -252,13 +262,13 @@ export const FsWriteParamsSchema = z.object({
 
 export const FsReadRangeParamsSchema = z.object({
 	path: z.string(),
-	offset: z.bigint(),
+	offset: bigintLike(),
 	len: z.number(),
 });
 
 export const FsUpdateParamsSchema = z.object({
 	path: z.string(),
-	offset: z.bigint(),
+	offset: bigintLike(),
 	data: z.string(),
 });
 

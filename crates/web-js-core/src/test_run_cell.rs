@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use crate::JsSession;
     use crate::types::CellStatus;
+    use crate::JsSession;
 
     #[test]
     fn test_run_cell_print() {
@@ -222,20 +222,26 @@ mod tests {
     fn test_sequential_async_with_print() {
         let mut session = JsSession::new();
 
-        session.run_cell(r#"
+        session.run_cell(
+            r#"
             function myAsync(x) {
                 return new Promise((resolve, reject) => {
                     __webJsTriggerAsync("test_action", {value: x}, resolve, reject);
                 });
             }
-        "#, "");
+        "#,
+            "",
+        );
 
-        let result = session.run_cell(r#"
+        let result = session.run_cell(
+            r#"
             await myAsync(1)
             print("after first")
             await myAsync(2)
             print("after second")
-        "#, "");
+        "#,
+            "",
+        );
         assert_eq!(result.status, CellStatus::AsyncPending);
         assert_eq!(result.pending_commands.len(), 1);
         assert_eq!(result.stdout, Vec::<String>::new());
@@ -425,16 +431,22 @@ mod tests {
     fn test_promise_race() {
         let mut session = JsSession::new();
 
-        session.run_cell(r#"
+        session.run_cell(
+            r#"
             function myAsync(x) {
                 return new Promise((resolve, reject) => {
                     __webJsTriggerAsync("test_action", {value: x}, resolve, reject);
                 });
             }
             var __raceResult;
-        "#, "");
+        "#,
+            "",
+        );
 
-        let result = session.run_cell("__raceResult = await Promise.race([myAsync('fast'), myAsync('slow')])", "");
+        let result = session.run_cell(
+            "__raceResult = await Promise.race([myAsync('fast'), myAsync('slow')])",
+            "",
+        );
         assert_eq!(result.status, CellStatus::AsyncPending);
         assert_eq!(result.pending_commands.len(), 2);
 
@@ -472,13 +484,16 @@ mod tests {
     fn test_fire_and_forget_pending() {
         let mut session = JsSession::new();
 
-        session.run_cell(r#"
+        session.run_cell(
+            r#"
             function myAsync(x) {
                 return new Promise((resolve, reject) => {
                     __webJsTriggerAsync("test_action", {value: x}, resolve, reject);
                 });
             }
-        "#, "");
+        "#,
+            "",
+        );
 
         // Start an async call but DON'T await it, return a synchronous value
         let result = session.run_cell("var p = myAsync(99); 'sync_result'", "");
@@ -521,12 +536,18 @@ mod tests {
         // x should be undefined after reset
         let result = session.run_cell("print('hello')", "");
         println!("After reset, print('hello') result: {:?}", result);
-        assert!(result.error.is_none(), "print('hello') should work after reset");
+        assert!(
+            result.error.is_none(),
+            "print('hello') should work after reset"
+        );
         assert_eq!(result.stdout, vec!["hello"]);
 
         let result = session.run_cell("print(x)", "");
         println!("After reset, print(x) result: {:?}", result);
-        assert!(result.error.is_some(), "Expected error because x is undefined after reset");
+        assert!(
+            result.error.is_some(),
+            "Expected error because x is undefined after reset"
+        );
     }
 
     #[test]
@@ -578,6 +599,57 @@ mod tests {
     }
 
     #[test]
+    fn test_syntax_error_does_not_poison_next_cell() {
+        let mut session = JsSession::new();
+        let first = session.run_cell("if (", "");
+        println!("first syntax result: {:?}", first);
+        assert!(first.error.is_some());
+
+        let second = session.run_cell("1 + 1", "");
+        println!("second result: {:?}", second);
+        assert!(second.error.is_none());
+        assert_eq!(second.result, Some("2".to_string()));
+    }
+
+    #[test]
+    fn test_async_error_message_escaping_does_not_poison_next_cell() {
+        let mut session = JsSession::new();
+
+        let setup = session.run_cell(
+            r#"
+            function myAsync() {
+                return new Promise((resolve, reject) => {
+                    __webJsTriggerAsync("test_action", {}, resolve, reject);
+                });
+            }
+        "#,
+            "",
+        );
+        assert!(setup.error.is_none());
+
+        let result = session.run_cell("await myAsync()", "");
+        assert_eq!(result.status, CellStatus::AsyncPending);
+
+        let response = crate::types::AsyncResponse {
+            ok: false,
+            value: None,
+            error: Some(crate::types::AsyncError {
+                message: "quoted \" newline\n slash \\ separator \u{2028}".to_string(),
+                code: "E_TEST".to_string(),
+            }),
+        };
+        let resumed = session.resume_cell(
+            result.pending_commands[0].call_id,
+            &serde_json::to_string(&response).unwrap(),
+        );
+        assert!(resumed.error.is_some());
+
+        let next = session.run_cell("1 + 1", "");
+        assert!(next.error.is_none());
+        assert_eq!(next.result, Some("2".to_string()));
+    }
+
+    #[test]
     fn test_chrome_tabs_create_pending() {
         let mut session = JsSession::new();
         let result = session.run_cell(
@@ -593,9 +665,8 @@ mod tests {
     #[test]
     fn test_contract_file_loads() {
         let mut session = JsSession::new();
-        let contract_path = std::path::PathBuf::from(
-            env!("CARGO_MANIFEST_DIR")
-        ).join("../../web/tests/e2e/all-apis-extension-contract.js");
+        let contract_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../web/tests/e2e/all-apis-extension-contract.js");
         let contract_code = std::fs::read_to_string(&contract_path)
             .unwrap_or_else(|e| panic!("Failed to read contract file: {}", e));
         let result = session.run_cell(&contract_code, "");
@@ -603,7 +674,10 @@ mod tests {
         println!("Contract file stdout: {:?}", result.stdout);
         println!("Contract file stderr: {:?}", result.stderr);
         println!("Contract file status: {:?}", result.status);
-        println!("Contract file pending commands: {:?}", result.pending_commands.len());
+        println!(
+            "Contract file pending commands: {:?}",
+            result.pending_commands.len()
+        );
         assert_eq!(result.status, CellStatus::Done);
         assert!(result.error.is_none());
     }

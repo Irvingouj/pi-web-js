@@ -93,7 +93,11 @@ impl ExtensionSession {
 
 impl ExtensionSession {
     async fn handle_command(cmd: &WasmAsyncCommand) -> Result<WasmAsyncResponse, String> {
-        tracing::info!("[ExtensionSession] handle_command action={} call_id={}", cmd.action, cmd.call_id);
+        tracing::info!(
+            "[ExtensionSession] handle_command action={} call_id={}",
+            cmd.action,
+            cmd.call_id
+        );
         // Serialize command to a JSON string, then parse to a JS object.
         // This avoids serde_wasm_bindgen's default map-to-JS-Map behavior,
         // ensuring serde_json::Value::Object becomes a plain JS Object.
@@ -116,7 +120,11 @@ impl ExtensionSession {
         let resp: WasmAsyncResponse = serde_json::from_str(&resp_json_str)
             .map_err(|e| format!("Failed to deserialize response: {:?}", e))?;
 
-        tracing::info!("[ExtensionSession] handle_command action={} ok={}", cmd.action, resp.ok);
+        tracing::info!(
+            "[ExtensionSession] handle_command action={} ok={}",
+            cmd.action,
+            resp.ok
+        );
         Ok(resp)
     }
 }

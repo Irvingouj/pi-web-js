@@ -201,7 +201,7 @@ export function createShowcaseNotebook(): Notebook {
           "- Add new cells with **+ Code** or **+ Markdown**\n" +
           "- Click **↻ Restart** to reset the JS state\n" +
           "- Use **↓ Save** to download your notebook as JSON\n\n" +
-          "Built with [Boa](https://github.com/boa-dev/boa) (JS engine in Rust → WebAssembly)",
+          "Built with QuickJS (JS engine in Rust → WebAssembly)",
         "markdown",
       ),
     ],

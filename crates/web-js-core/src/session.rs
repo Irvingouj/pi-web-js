@@ -4,12 +4,13 @@ use crate::types::{
     AsyncCommand, AsyncResponse, CellError, CellStatus, GlobalVariable, GlobalsSnapshot, RunResult,
 };
 use crate::utils::{
-    classify_js_error, clean_error_message, exception_to_string, extract_line_number, format_js_value,
+    classify_js_error, clean_error_message, exception_to_string, extract_line_number,
+    format_js_value,
 };
-use rquickjs::{Context, Ctx, Filter, Runtime, Value};
-use rquickjs::promise::PromiseState as QjsPromiseState;
 use rquickjs::context::EvalOptions;
-use std::cell::RefCell;
+use rquickjs::promise::PromiseState as QjsPromiseState;
+use rquickjs::{Context, Ctx, Filter, Runtime, Value};
+use std::cell::{Cell as StdCell, RefCell};
 use std::rc::Rc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -56,8 +57,7 @@ impl SessionBuilder {
         let host_state = Rc::new(RefCell::new(HostState::default()));
 
         context.with(|ctx| {
-            register_host_globals(ctx.clone(), host_state.clone())
-                .expect("register globals");
+            register_host_globals(ctx.clone(), host_state.clone()).expect("register globals");
             crate::web::register_web_module(ctx.clone(), host_state.clone())
                 .expect("register web module");
         });
@@ -107,12 +107,10 @@ fn check_promise_state<'js>(ctx: Ctx<'js>, promise: &Value<'js>) -> PromiseState
     if let Some(p) = promise.as_promise() {
         match p.state() {
             QjsPromiseState::Pending => PromiseState::Pending,
-            QjsPromiseState::Resolved => {
-                match p.result::<Value>() {
-                    Some(Ok(val)) => PromiseState::Fulfilled(val),
-                    _ => PromiseState::Pending,
-                }
-            }
+            QjsPromiseState::Resolved => match p.result::<Value>() {
+                Some(Ok(val)) => PromiseState::Fulfilled(val),
+                _ => PromiseState::Pending,
+            },
             QjsPromiseState::Rejected => {
                 // result() throws the rejection reason as an exception
                 let _ = p.result::<Value>();
@@ -212,10 +210,8 @@ impl JsSession {
 
                 let (val_str, keys_opt) = if type_name == "object" && !value.is_null() {
                     if let Some(obj) = value.as_object() {
-                        let obj_keys: Vec<String> = obj
-                            .keys::<String>()
-                            .filter_map(|k| k.ok())
-                            .collect();
+                        let obj_keys: Vec<String> =
+                            obj.keys::<String>().filter_map(|k| k.ok()).collect();
                         (None, Some(obj_keys))
                     } else {
                         (None, None)
@@ -257,8 +253,7 @@ impl JsSession {
         let host_state = Rc::new(RefCell::new(HostState::default()));
 
         context.with(|ctx| {
-            register_host_globals(ctx.clone(), host_state.clone())
-                .expect("register globals");
+            register_host_globals(ctx.clone(), host_state.clone()).expect("register globals");
             crate::web::register_web_module(ctx.clone(), host_state.clone())
                 .expect("register web module");
         });
@@ -314,7 +309,9 @@ impl JsSession {
         let result = self.context.with(|ctx| {
             tracing::info!("[run_cell] ctx eval start, code_len={}", code.len());
             // Clear stale pending async from previous runs
-            let _ = ctx.eval::<Value, _>("if (typeof __webJsPending !== 'undefined') { Object.keys(__webJsPending).forEach(k => delete __webJsPending[k]); } if (typeof __webJsTopPromise !== 'undefined') { delete __webJsTopPromise; }");
+            if ctx.eval::<Value, _>("if (typeof __webJsPending !== 'undefined') { Object.keys(__webJsPending).forEach(k => delete __webJsPending[k]); } if (typeof __webJsTopPromise !== 'undefined') { delete __webJsTopPromise; }").is_err() {
+                let _ = ctx.catch();
+            }
             tracing::info!("[run_cell] cleared stale pending async");
 
             let mut eval_opts = EvalOptions::default();
@@ -390,7 +387,6 @@ impl JsSession {
             // Unwrap Promise result if needed
             let mut final_val = result_val;
             if final_val.is_promise() {
-                let ctx2 = ctx.clone();
                 match check_promise_state(ctx, &final_val) {
                     PromiseState::Fulfilled(val) => {
                         final_val = val;
@@ -487,6 +483,8 @@ impl JsSession {
         };
 
         let host_state = self.host_state.clone();
+        let reset_after_internal_resume_error = Rc::new(StdCell::new(false));
+        let reset_after_internal_resume_error_for_ctx = reset_after_internal_resume_error.clone();
 
         // Set up interrupt handler for fuel limit
         let fuel_counter = self.fuel_counter.clone();
@@ -520,13 +518,15 @@ impl JsSession {
                     .as_ref()
                     .map(|e| e.message.clone())
                     .unwrap_or_else(|| "unknown async error".into());
-                let msg_escaped = msg.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', "\\n").replace('\r', "\\r").replace('\t', "\\t");
+                let msg_literal = serde_json::to_string(&msg)
+                    .unwrap_or_else(|_| "\"unknown async error\"".to_string());
                 format!(
-                    r#"__webJsPending[{}].reject(new Error("{}")); delete __webJsPending[{}];"#,
-                    call_id, msg_escaped, call_id
+                    r#"__webJsPending[{}].reject(new Error({})); delete __webJsPending[{}];"#,
+                    call_id, msg_literal, call_id
                 )
             };
             if let Err(e) = ctx.eval_with_options::<Value, _>(js.as_str(), resume_opts) {
+                reset_after_internal_resume_error_for_ctx.set(true);
                 let hs = host_state.borrow();
                 let msg = if let rquickjs::Error::Exception = &e {
                     let exc = ctx.catch();
@@ -615,6 +615,9 @@ impl JsSession {
 
         // Clear interrupt handler after execution
         self.runtime.set_interrupt_handler(None);
+        if reset_after_internal_resume_error.get() {
+            self.needs_reset = true;
+        }
 
         result
     }

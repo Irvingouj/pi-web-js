@@ -67,16 +67,44 @@ impl WebSession {
 
     fn register_browser_globals(&mut self) {
         self.base.inner.with_context(|ctx| {
-            let _ = ctx.globals().set("__webJsLocalStorageGet", Func::new(browser_local_storage_get));
-            let _ = ctx.globals().set("__webJsLocalStorageSet", Func::new(browser_local_storage_set));
-            let _ = ctx.globals().set("__webJsLocalStorageRemove", Func::new(browser_local_storage_remove));
-            let _ = ctx.globals().set("__webJsLocalStorageClear", Func::new(browser_local_storage_clear));
-            let _ = ctx.globals().set("__webJsLocalStorageKey", Func::new(browser_local_storage_key));
-            let _ = ctx.globals().set("__webJsLocalStorageLength", Func::new(browser_local_storage_length));
-            let _ = ctx.globals().set("__webJsQuerySelector", Func::new(browser_query_selector));
-            let _ = ctx.globals().set("__webJsQuerySelectorAll", Func::new(browser_query_selector_all));
-            let _ = ctx.globals().set("__webJsDocumentTitle", Func::new(browser_document_title));
-            let _ = ctx.globals().set("__webJsWindowLocationHref", Func::new(browser_window_location_href));
+            let _ = ctx.globals().set(
+                "__webJsLocalStorageGet",
+                Func::new(browser_local_storage_get),
+            );
+            let _ = ctx.globals().set(
+                "__webJsLocalStorageSet",
+                Func::new(browser_local_storage_set),
+            );
+            let _ = ctx.globals().set(
+                "__webJsLocalStorageRemove",
+                Func::new(browser_local_storage_remove),
+            );
+            let _ = ctx.globals().set(
+                "__webJsLocalStorageClear",
+                Func::new(browser_local_storage_clear),
+            );
+            let _ = ctx.globals().set(
+                "__webJsLocalStorageKey",
+                Func::new(browser_local_storage_key),
+            );
+            let _ = ctx.globals().set(
+                "__webJsLocalStorageLength",
+                Func::new(browser_local_storage_length),
+            );
+            let _ = ctx
+                .globals()
+                .set("__webJsQuerySelector", Func::new(browser_query_selector));
+            let _ = ctx.globals().set(
+                "__webJsQuerySelectorAll",
+                Func::new(browser_query_selector_all),
+            );
+            let _ = ctx
+                .globals()
+                .set("__webJsDocumentTitle", Func::new(browser_document_title));
+            let _ = ctx.globals().set(
+                "__webJsWindowLocationHref",
+                Func::new(browser_window_location_href),
+            );
         });
     }
 
@@ -136,64 +164,154 @@ impl WebSession {
     }
 }
 
-fn browser_local_storage_get<'js>(ctx: Ctx<'js>, args: Rest<Value<'js>>) -> rquickjs::Result<Value<'js>> {
-    let key = args.0.get(0).and_then(|v| v.as_string()).and_then(|s| s.to_string().ok()).unwrap_or_default();
-    let value = web_sys::window().and_then(|w| w.local_storage().ok()).and_then(|s| s).and_then(|s| s.get_item(&key).ok()).flatten();
+fn browser_local_storage_get<'js>(
+    ctx: Ctx<'js>,
+    args: Rest<Value<'js>>,
+) -> rquickjs::Result<Value<'js>> {
+    let key = args
+        .0
+        .get(0)
+        .and_then(|v| v.as_string())
+        .and_then(|s| s.to_string().ok())
+        .unwrap_or_default();
+    let value = web_sys::window()
+        .and_then(|w| w.local_storage().ok())
+        .and_then(|s| s)
+        .and_then(|s| s.get_item(&key).ok())
+        .flatten();
     match value {
         Some(v) => Ok(rquickjs::String::from_str(ctx, &v)?.into_value()),
         None => Ok(rquickjs::Null.into_value(ctx)),
     }
 }
 
-fn browser_local_storage_set<'js>(ctx: Ctx<'js>, args: Rest<Value<'js>>) -> rquickjs::Result<Value<'js>> {
-    let key = args.0.get(0).and_then(|v| v.as_string()).and_then(|s| s.to_string().ok()).unwrap_or_default();
-    let value = args.0.get(1).and_then(|v| v.as_string()).and_then(|s| s.to_string().ok()).unwrap_or_default();
-    let _ = web_sys::window().and_then(|w| w.local_storage().ok()).and_then(|s| s).and_then(|s| s.set_item(&key, &value).ok());
+fn browser_local_storage_set<'js>(
+    ctx: Ctx<'js>,
+    args: Rest<Value<'js>>,
+) -> rquickjs::Result<Value<'js>> {
+    let key = args
+        .0
+        .get(0)
+        .and_then(|v| v.as_string())
+        .and_then(|s| s.to_string().ok())
+        .unwrap_or_default();
+    let value = args
+        .0
+        .get(1)
+        .and_then(|v| v.as_string())
+        .and_then(|s| s.to_string().ok())
+        .unwrap_or_default();
+    let _ = web_sys::window()
+        .and_then(|w| w.local_storage().ok())
+        .and_then(|s| s)
+        .and_then(|s| s.set_item(&key, &value).ok());
     Ok(rquickjs::Null.into_value(ctx))
 }
 
-fn browser_local_storage_remove<'js>(ctx: Ctx<'js>, args: Rest<Value<'js>>) -> rquickjs::Result<Value<'js>> {
-    let key = args.0.get(0).and_then(|v| v.as_string()).and_then(|s| s.to_string().ok()).unwrap_or_default();
-    let _ = web_sys::window().and_then(|w| w.local_storage().ok()).and_then(|s| s).and_then(|s| s.remove_item(&key).ok());
+fn browser_local_storage_remove<'js>(
+    ctx: Ctx<'js>,
+    args: Rest<Value<'js>>,
+) -> rquickjs::Result<Value<'js>> {
+    let key = args
+        .0
+        .get(0)
+        .and_then(|v| v.as_string())
+        .and_then(|s| s.to_string().ok())
+        .unwrap_or_default();
+    let _ = web_sys::window()
+        .and_then(|w| w.local_storage().ok())
+        .and_then(|s| s)
+        .and_then(|s| s.remove_item(&key).ok());
     Ok(rquickjs::Null.into_value(ctx))
 }
 
-fn browser_local_storage_clear<'js>(ctx: Ctx<'js>, _args: Rest<Value<'js>>) -> rquickjs::Result<Value<'js>> {
-    let _ = web_sys::window().and_then(|w| w.local_storage().ok()).and_then(|s| s).and_then(|s| s.clear().ok());
+fn browser_local_storage_clear<'js>(
+    ctx: Ctx<'js>,
+    _args: Rest<Value<'js>>,
+) -> rquickjs::Result<Value<'js>> {
+    let _ = web_sys::window()
+        .and_then(|w| w.local_storage().ok())
+        .and_then(|s| s)
+        .and_then(|s| s.clear().ok());
     Ok(rquickjs::Null.into_value(ctx))
 }
 
-fn browser_local_storage_key<'js>(ctx: Ctx<'js>, args: Rest<Value<'js>>) -> rquickjs::Result<Value<'js>> {
+fn browser_local_storage_key<'js>(
+    ctx: Ctx<'js>,
+    args: Rest<Value<'js>>,
+) -> rquickjs::Result<Value<'js>> {
     let index = args.0.get(0).and_then(|v| v.as_int()).unwrap_or(0);
-    let value = web_sys::window().and_then(|w| w.local_storage().ok()).and_then(|s| s).and_then(|s| s.key(index as u32).ok()).flatten();
+    let value = web_sys::window()
+        .and_then(|w| w.local_storage().ok())
+        .and_then(|s| s)
+        .and_then(|s| s.key(index as u32).ok())
+        .flatten();
     match value {
         Some(v) => Ok(rquickjs::String::from_str(ctx, &v)?.into_value()),
         None => Ok(rquickjs::Null.into_value(ctx)),
     }
 }
 
-fn browser_local_storage_length<'js>(ctx: Ctx<'js>, _args: Rest<Value<'js>>) -> rquickjs::Result<Value<'js>> {
-    let len = web_sys::window().and_then(|w| w.local_storage().ok()).and_then(|s| s).map(|s| s.length().unwrap_or(0)).unwrap_or(0);
+fn browser_local_storage_length<'js>(
+    ctx: Ctx<'js>,
+    _args: Rest<Value<'js>>,
+) -> rquickjs::Result<Value<'js>> {
+    let len = web_sys::window()
+        .and_then(|w| w.local_storage().ok())
+        .and_then(|s| s)
+        .map(|s| s.length().unwrap_or(0))
+        .unwrap_or(0);
     Ok(rquickjs::Value::new_int(ctx, len as i32))
 }
 
-fn browser_query_selector<'js>(ctx: Ctx<'js>, args: Rest<Value<'js>>) -> rquickjs::Result<Value<'js>> {
-    let selector = args.0.get(0).and_then(|v| v.as_string()).and_then(|s| s.to_string().ok()).unwrap_or_default();
-    let element = web_sys::window().and_then(|w| w.document()).and_then(|d| d.query_selector(&selector).ok()).flatten();
+fn browser_query_selector<'js>(
+    ctx: Ctx<'js>,
+    args: Rest<Value<'js>>,
+) -> rquickjs::Result<Value<'js>> {
+    let selector = args
+        .0
+        .get(0)
+        .and_then(|v| v.as_string())
+        .and_then(|s| s.to_string().ok())
+        .unwrap_or_default();
+    let element = web_sys::window()
+        .and_then(|w| w.document())
+        .and_then(|d| d.query_selector(&selector).ok())
+        .flatten();
     if let Some(el) = element {
         let obj = Object::new(ctx)?;
         let _ = obj.set("tagName", el.tag_name());
-        let _ = obj.set("value", el.dyn_ref::<web_sys::HtmlInputElement>().map(|i| i.value()).unwrap_or_default());
+        let _ = obj.set(
+            "value",
+            el.dyn_ref::<web_sys::HtmlInputElement>()
+                .map(|i| i.value())
+                .unwrap_or_default(),
+        );
         let _ = obj.set("refId", el.get_attribute("data-ref-id").unwrap_or_default());
-        let _ = obj.set("text", el.text_content().unwrap_or_default().chars().take(100).collect::<String>());
+        let _ = obj.set(
+            "text",
+            el.text_content()
+                .unwrap_or_default()
+                .chars()
+                .take(100)
+                .collect::<String>(),
+        );
         Ok(obj.into_value())
     } else {
         Ok(rquickjs::Null.into_value(ctx))
     }
 }
 
-fn browser_query_selector_all<'js>(ctx: Ctx<'js>, args: Rest<Value<'js>>) -> rquickjs::Result<Value<'js>> {
-    let selector = args.0.get(0).and_then(|v| v.as_string()).and_then(|s| s.to_string().ok()).unwrap_or_default();
+fn browser_query_selector_all<'js>(
+    ctx: Ctx<'js>,
+    args: Rest<Value<'js>>,
+) -> rquickjs::Result<Value<'js>> {
+    let selector = args
+        .0
+        .get(0)
+        .and_then(|v| v.as_string())
+        .and_then(|s| s.to_string().ok())
+        .unwrap_or_default();
     let document = match web_sys::window().and_then(|w| w.document()) {
         Some(d) => d,
         None => {
@@ -218,9 +336,21 @@ fn browser_query_selector_all<'js>(ctx: Ctx<'js>, args: Rest<Value<'js>>) -> rqu
             if let Some(el) = el.dyn_ref::<web_sys::Element>() {
                 let obj = Object::new(ctx.clone())?;
                 let _ = obj.set("tagName", el.tag_name());
-                let _ = obj.set("value", el.dyn_ref::<web_sys::HtmlInputElement>().map(|i| i.value()).unwrap_or_default());
+                let _ = obj.set(
+                    "value",
+                    el.dyn_ref::<web_sys::HtmlInputElement>()
+                        .map(|i| i.value())
+                        .unwrap_or_default(),
+                );
                 let _ = obj.set("refId", el.get_attribute("data-ref-id").unwrap_or_default());
-                let _ = obj.set("text", el.text_content().unwrap_or_default().chars().take(100).collect::<String>());
+                let _ = obj.set(
+                    "text",
+                    el.text_content()
+                        .unwrap_or_default()
+                        .chars()
+                        .take(100)
+                        .collect::<String>(),
+                );
                 let _ = arr.set(i.to_string(), obj);
             }
         }
@@ -228,13 +358,24 @@ fn browser_query_selector_all<'js>(ctx: Ctx<'js>, args: Rest<Value<'js>>) -> rqu
     Ok(arr.into_value())
 }
 
-fn browser_document_title<'js>(ctx: Ctx<'js>, _args: Rest<Value<'js>>) -> rquickjs::Result<Value<'js>> {
-    let title = web_sys::window().and_then(|w| w.document()).map(|d| d.title()).unwrap_or_default();
+fn browser_document_title<'js>(
+    ctx: Ctx<'js>,
+    _args: Rest<Value<'js>>,
+) -> rquickjs::Result<Value<'js>> {
+    let title = web_sys::window()
+        .and_then(|w| w.document())
+        .map(|d| d.title())
+        .unwrap_or_default();
     Ok(rquickjs::String::from_str(ctx, &title)?.into_value())
 }
 
-fn browser_window_location_href<'js>(ctx: Ctx<'js>, _args: Rest<Value<'js>>) -> rquickjs::Result<Value<'js>> {
-    let href = web_sys::window().and_then(|w| w.location().href().ok()).unwrap_or_default();
+fn browser_window_location_href<'js>(
+    ctx: Ctx<'js>,
+    _args: Rest<Value<'js>>,
+) -> rquickjs::Result<Value<'js>> {
+    let href = web_sys::window()
+        .and_then(|w| w.location().href().ok())
+        .unwrap_or_default();
     Ok(rquickjs::String::from_str(ctx, &href)?.into_value())
 }
 
@@ -272,7 +413,11 @@ fn find_element_by_label(document: &web_sys::Document, query: &str) -> Option<we
 
 impl WebSession {
     async fn handle_command(cmd: &WasmAsyncCommand) -> Result<WasmAsyncResponse, String> {
-        tracing::info!("[handle_command] action={} call_id={}", cmd.action, cmd.call_id);
+        tracing::info!(
+            "[handle_command] action={} call_id={}",
+            cmd.action,
+            cmd.call_id
+        );
         let result = match cmd.action.as_str() {
             // ─── Async helpers ──────────────────────────────────
             "mock_async" => Ok(WasmAsyncResponse {
@@ -1044,9 +1189,7 @@ impl WebSession {
             }
 
             // ─── Host call ─────────────────────────────────────
-            "host_call" => {
-                Ok(execute_host_call("call", cmd.params.clone()).await)
-            }
+            "host_call" => Ok(execute_host_call("call", cmd.params.clone()).await),
 
             // ─── Extension-only / unknown ──────────────────────
             _ => Err(format!("{} is not available in web-js context", cmd.action)),

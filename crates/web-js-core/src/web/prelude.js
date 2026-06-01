@@ -53,9 +53,6 @@ web.tab = makeNamespace({
   execute_script: 'tab_execute_script',
   click: 'tab_click',
   fill: 'tab_fill',
-  snapshot: 'tab_snapshot',
-  snapshot_text: 'tab_snapshot_text',
-  snapshot_data: 'tab_snapshot_data',
   scroll_to: 'tab_scroll_to',
   evaluate: 'tab_evaluate',
   back: 'tab_back',
@@ -70,6 +67,11 @@ web.tab = makeNamespace({
   dblclick: 'tab_dblclick',
   fetch: 'tab_fetch',
 });
+
+// snapshot APIs take tab_id as first positional arg, need object wrapping
+web.tab.snapshot = function(tabId) { return makeAsync('tab_snapshot')({tabId: tabId}); };
+web.tab.snapshot_text = function(tabId) { return makeAsync('tab_snapshot_text')({tabId: tabId}); };
+web.tab.snapshot_data = function(tabId) { return makeAsync('tab_snapshot_data')({tabId: tabId}); };
 
 // web.storage (wrapped for positional arg ergonomics)
 web.storage = {};
@@ -87,12 +89,12 @@ web.cookies.list = function(filter) { return makeAsync('cookies_list')(filter ||
 
 // web.history (wrapped for positional arg ergonomics)
 web.history = {};
-web.history.search = function(query) { return makeAsync('history_search')({text: query}); };
+web.history.search = function(query) { return makeAsync('history_search')(query || {}); };
 web.history.delete = function(url) { return makeAsync('history_delete')({url: url}); };
 
 // web.bookmarks (wrapped for positional arg ergonomics)
 web.bookmarks = {};
-web.bookmarks.search = function(query) { return makeAsync('bookmarks_search')({query: query}); };
+web.bookmarks.search = function(query) { return makeAsync('bookmarks_search')(query || {}); };
 web.bookmarks.create = function(bookmark) { return makeAsync('bookmarks_create')(bookmark); };
 web.bookmarks.delete = function(id) { return makeAsync('bookmarks_delete')({id: id}); };
 
@@ -118,7 +120,7 @@ fs.move = function(from, to) { return makeAsync('fs_move')({from: from, to: to})
 fs.read = function(path) { return makeAsync('fs_read')({path: path}); };
 fs.read_text = function(path) { return makeAsync('fs_read_text')({path: path}); };
 fs.read_base64 = function(path) { return makeAsync('fs_read_base64')({path: path}); };
-fs.read_range = function(path, offset, len) { return makeAsync('fs_read_range')({path: path, offset: offset, length: len}); };
+fs.read_range = function(path, offset, len) { return makeAsync('fs_read_range')({path: path, offset: offset, len: len}); };
 fs.write = function(path, data) { return makeAsync('fs_write')({path: path, data: data}); };
 fs.write_text = function(path, text) { return makeAsync('fs_write_text')({path: path, data: text}); };
 fs.write_base64 = function(path, b64) { return makeAsync('fs_write_base64')({path: path, data: b64}); };
@@ -126,7 +128,7 @@ fs.append = function(path, data) { return makeAsync('fs_append')({path: path, da
 fs.append_text = function(path, text) { return makeAsync('fs_append_text')({path: path, data: text}); };
 fs.append_base64 = function(path, b64) { return makeAsync('fs_append_base64')({path: path, data: b64}); };
 fs.update = function(path, offset, data) { return makeAsync('fs_update')({path: path, offset: offset, data: data}); };
-fs.hash = function(path, algo) { return makeAsync('fs_hash')({path: path, algorithm: algo}); };
+fs.hash = function(path, algo) { return makeAsync('fs_hash')({path: path, algo: algo}); };
 
 // CamelCase aliases (matching the API contract naming convention)
 fs.readText = fs.read_text;
@@ -429,7 +431,7 @@ page.goto = function(url) { return makeAsync('page_goto')({url: url}); };
 page.back = function() { return makeAsync('page_back')({}); };
 page.forward = function() { return makeAsync('page_forward')({}); };
 page.reload = function() { return makeAsync('page_reload')({}); };
-page.wait = function(ms) { return makeAsync('page_wait')({ms: ms !== undefined ? ms : 1000}); };
+page.wait = function(ms) { return makeAsync('page_wait')({duration: ms !== undefined ? ms : 1000}); };
 page.tabs = function() { return makeAsync('page_tabs')({}); };
 page.switch = function(tab_id) { return makeAsync('page_switch')({tabId: tab_id}); };
 page.new_tab = function(url) { return makeAsync('page_new_tab')({url: url}); };
@@ -523,7 +525,7 @@ sidepanel.scroll = function(direction, amount) { return makeAsync('sidepanel_scr
 sidepanel.scroll_to = function(ref_id) { return makeAsync('sidepanel_scroll_to')({refId: ref_id}); };
 sidepanel.url = function() { return makeAsync('sidepanel_url')({}); };
 sidepanel.title = function() { return makeAsync('sidepanel_title')({}); };
-sidepanel.wait = function(ms) { return makeAsync('sidepanel_wait')({ms: ms !== undefined ? ms : 1000}); };
+sidepanel.wait = function(ms) { return makeAsync('sidepanel_wait')({duration: ms !== undefined ? ms : 1000}); };
 sidepanel.append = function(ref_id, text) { return makeAsync('sidepanel_append')({refId: ref_id, text: text}); };
 
 // host namespace
@@ -762,4 +764,28 @@ var window = {
   setInterval: setInterval,
   clearTimeout: clearTimeout,
   clearInterval: clearInterval
+};
+
+// crypto namespace
+var crypto = {};
+crypto.sha256 = function(message) {
+  if (typeof message !== 'string') message = String(message);
+  return __webJsSha256(message);
+};
+crypto.md5 = function(message) {
+  if (typeof message !== 'string') message = String(message);
+  return __webJsMd5(message);
+};
+crypto.hmac_sha256 = function(key, message) {
+  if (typeof key !== 'string') key = String(key);
+  if (typeof message !== 'string') message = String(message);
+  return __webJsHmacSha256(key, message);
+};
+crypto.hex_encode = function(message) {
+  if (typeof message !== 'string') message = String(message);
+  return __webJsHexEncode(message);
+};
+crypto.hex_decode = function(hex) {
+  if (typeof hex !== 'string') hex = String(hex);
+  return __webJsHexDecode(hex);
 };

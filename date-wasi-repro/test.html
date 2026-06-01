@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Date.toISOString() WASM Repro</title>
+    <style>
+        body { font-family: monospace; padding: 20px; max-width: 800px; }
+        pre { background: #f5f5f5; padding: 10px; overflow-x: auto; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; }
+        .error { background: #fee; border-color: #c00; }
+        .ok { background: #efe; border-color: #0c0; }
+        h2 { margin-top: 0; }
+    </style>
+</head>
+<body>
+    <h1>Date.toISOString() WASM/WASI Reproduction</h1>
+    <p>This page runs QuickJS inside a WebAssembly module built with the same toolchain as web-js.</p>
+    
+    <div id="loading">Loading WASM module...</div>
+    
+    <div id="results" style="display:none;">
+        <div class="section">
+            <h2>Test 1: Structured JSON Probe</h2>
+            <pre id="probe-json"></pre>
+        </div>
+        
+        <div class="section">
+            <h2>Test 2: Native Comparison (Raw Values)</h2>
+            <pre id="native-compare"></pre>
+        </div>
+        
+        <div class="section">
+            <h2>Browser Native (for comparison)</h2>
+            <pre id="browser-native"></pre>
+        </div>
+        
+        <div class="section" id="verdict">
+            <h2>Verdict</h2>
+            <pre id="verdict-text"></pre>
+        </div>
+    </div>
+
+    <script type="module">
+        // Inline env stubs (same as web-js bundle-wasm.js)
+        const envAllocations = new Map();
+        const env = {
+            abort: () => { throw new Error('abort() called'); },
+            printf: (...args) => { console.log(...args); return 0; },
+            putchar: (c) => { console.log(String.fromCharCode(c)); return c; },
+            strchr: (ptr, c) => {
+                const mem = new Uint8Array(wasm.memory.buffer);
+                const ch = c & 0xFF;
+                while (mem[ptr]) { if (mem[ptr] === ch) return ptr; ptr++; }
+                return 0;
+            },
+            fprintf: () => { return 0; },
+            free: (ptr) => {
+                if (ptr === 0) return;
+                const size = envAllocations.get(ptr);
+                if (size !== undefined) {
+                    wasm.__wbindgen_free(ptr, size, 1);
+                    envAllocations.delete(ptr);
+                }
+            },
+            realloc: (ptr, newSize) => {
+                if (ptr === 0) return env.malloc(newSize);
+                const oldSize = envAllocations.get(ptr);
+                if (oldSize !== undefined) {
+                    const newPtr = wasm.__wbindgen_realloc(ptr, oldSize, newSize, 1);
+                    envAllocations.delete(ptr);
+                    envAllocations.set(newPtr, newSize);
+                    return newPtr;
+                }
+                const newPtr = env.malloc(newSize);
+                const mem = new Uint8Array(wasm.memory.buffer);
+                mem.copyWithin(newPtr, ptr, ptr + newSize);
+                return newPtr;
+            },
+            vsnprintf: (buf, size, fmt, ap) => {
+                const str = String.fromCharCode(0);
+                const bytes = new TextEncoder().encode(str);
+                const written = Math.min(size - 1, bytes.length);
+                const mem = new Uint8Array(wasm.memory.buffer);
+                mem.set(bytes.slice(0, written), buf);
+                mem[buf + written] = 0;
+                return written;
+            },
+            clock_gettime: (clk, tp) => {
+                const now = Date.now();
+                const secs = Math.floor(now / 1000);
+                const nsec = (now % 1000) * 1000000;
+                const mem = new DataView(wasm.memory.buffer);
+                mem.setInt32(tp, secs, true);
+                mem.setInt32(tp + 4, nsec, true);
+                return 0;
+            },
+            gettimeofday: (tv, tz) => {
+                const now = Date.now();
+                const secs = Math.floor(now / 1000);
+                const usec = (now % 1000) * 1000;
+                const mem = new DataView(wasm.memory.buffer);
+                mem.setInt32(tv, secs, true);
+                mem.setInt32(tv + 4, usec, true);
+                return 0;
+            },
+            pthread_once: () => 0,
+            pthread_mutex_init: () => 0,
+            pthread_mutex_lock: () => 0,
+            pthread_mutex_unlock: () => 0,
+            pthread_condattr_init: () => 0,
+            pthread_condattr_setclock: () => 0,
+            pthread_cond_init: () => 0,
+            pthread_condattr_destroy: () => 0,
+            pthread_cond_destroy: () => 0,
+            pthread_cond_signal: () => 0,
+            pthread_cond_wait: () => 0,
+            pthread_cond_timedwait: () => 0,
+            snprintf: (buf, size, fmt, ...args) => {
+                const str = String.fromCharCode(0);
+                const bytes = new TextEncoder().encode(str);
+                const written = Math.min(size - 1, bytes.length);
+                const mem = new Uint8Array(wasm.memory.buffer);
+                mem.set(bytes.slice(0, written), buf);
+                mem[buf + written] = 0;
+                return written;
+            },
+            isnan: (x) => (Number.isNaN(x) ? 1 : 0),
+            isfinite: (x) => (Number.isFinite(x) ? 1 : 0),
+            strcmp: (a, b) => {
+                const mem = new Uint8Array(wasm.memory.buffer);
+                while (mem[a] && mem[b] && mem[a] === mem[b]) { a++; b++; }
+                return mem[a] - mem[b];
+            },
+            calloc: (nmemb, size) => {
+                const total = nmemb * size;
+                const ptr = wasm.__wbindgen_malloc(total, 1);
+                new Uint8Array(wasm.memory.buffer, ptr, total).fill(0);
+                envAllocations.set(ptr, total);
+                return ptr;
+            },
+            malloc: (size) => {
+                const ptr = wasm.__wbindgen_malloc(size, 1);
+                envAllocations.set(ptr, size);
+                return ptr;
+            },
+            scalbn: (x, n) => x * Math.pow(2, n),
+            lrint: (x) => Math.round(x),
+            isinf: (x) => (!Number.isFinite(x) && !Number.isNaN(x) ? 1 : 0),
+            frexp: (x, ep) => {
+                const mem = new DataView(wasm.memory.buffer);
+                if (x === 0) { mem.setInt32(ep, 0, true); return 0; }
+                const exp = Math.floor(Math.log2(Math.abs(x))) + 1;
+                const mant = x / Math.pow(2, exp);
+                mem.setInt32(ep, exp, true);
+                return mant;
+            },
+            strrchr: (ptr, c) => {
+                const mem = new Uint8Array(wasm.memory.buffer);
+                const ch = c & 0xFF;
+                let last = 0;
+                let i = ptr;
+                while (mem[i]) { if (mem[i] === ch) last = i; i++; }
+                return last;
+            },
+            vfprintf: () => 0,
+            strtod: (ptr, endptr) => {
+                const mem = new Uint8Array(wasm.memory.buffer);
+                let s = '';
+                let i = ptr;
+                while (mem[i] && mem[i] !== 0) { s += String.fromCharCode(mem[i]); i++; }
+                const val = parseFloat(s);
+                if (endptr) {
+                    const view = new DataView(wasm.memory.buffer);
+                    view.setInt32(endptr, i, true);
+                }
+                return val;
+            },
+            localtime_r: (timep, result) => {
+                const view = new DataView(wasm.memory.buffer);
+                const t = view.getInt32(timep, true);
+                const d = new Date(t * 1000);
+                view.setInt32(result, d.getSeconds(), true);
+                view.setInt32(result + 4, d.getMinutes(), true);
+                view.setInt32(result + 8, d.getHours(), true);
+                view.setInt32(result + 12, d.getDate(), true);
+                view.setInt32(result + 16, d.getMonth(), true);
+                view.setInt32(result + 20, d.getFullYear() - 1900, true);
+                view.setInt32(result + 24, d.getDay(), true);
+                view.setInt32(result + 28, 0, true);
+                view.setInt32(result + 32, 0, true);
+                view.setInt32(result + 36, 0, true);
+                return result;
+            },
+            memchr: (ptr, c, n) => {
+                const mem = new Uint8Array(wasm.memory.buffer);
+                const ch = c & 0xFF;
+                for (let i = 0; i < n; i++) { if (mem[ptr + i] === ch) return ptr + i; }
+                return 0;
+            },
+            acosh: (x) => Math.acosh(x),
+            asinh: (x) => Math.asinh(x),
+            atanh: (x) => Math.atanh(x),
+            modf: (x, iptr) => {
+                const mem = new DataView(wasm.memory.buffer);
+                const intPart = Math.trunc(x);
+                mem.setFloat64(iptr, intPart, true);
+                return x - intPart;
+            },
+            signbit: (x) => (Object.is(x, -0) || x < 0 ? 1 : 0),
+        };
+
+        import init, { run_date_probe, run_native_comparison } from './pkg/date_wasi_repro.js';
+        
+        let wasm;
+        
+        async function main() {
+            wasm = await init();
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('results').style.display = 'block';
+            
+            // Run WASM tests
+            const probeResult = run_date_probe();
+            document.getElementById('probe-json').textContent = probeResult;
+            
+            const nativeResult = run_native_comparison();
+            document.getElementById('native-compare').textContent = nativeResult;
+            
+            // Browser native comparison
+            const d = new Date(0);
+            const iso = d.toISOString();
+            const browserInfo = [
+                `Browser: ${navigator.userAgent}`,
+                ``,
+                `new Date(0).toISOString(): "${iso}"`,
+                `Length: ${iso.length}`,
+                `Char codes: ${Array.from(iso).map(c => c.charCodeAt(0)).join(',')}`,
+                ``,
+                `Expected: "1970-01-01T00:00:00.000Z"`,
+                `Expected length: 24`,
+                `Expected codes: 49,57,55,48,45,48,49,45,48,49,84,48,48,58,48,48,58,48,48,46,48,48,48,90`
+            ].join('\n');
+            document.getElementById('browser-native').textContent = browserInfo;
+            
+            // Verdict - parse manually since JSON may contain NUL bytes
+            const isoLengthMatch = probeResult.match(/"isoLength":\s*(\d+)/);
+            const isoCodesMatch = probeResult.match(/"isoCodes":\s*\[([^\]]*)\]/);
+            const isoLength = isoLengthMatch ? parseInt(isoLengthMatch[1]) : null;
+            const isoCodes = isoCodesMatch ? isoCodesMatch[1].split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n)) : [];
+            
+            const verdict = [];
+            verdict.push(`WASM toISOString length: ${isoLength}`);
+            verdict.push(`WASM toISOString codes: ${isoCodes.join(',')}`);
+            verdict.push('');
+            
+            if (isoLength === 24 && isoCodes.length === 24) {
+                verdict.push("✅ WASM Date.toISOString() behaves correctly");
+                verdict.push("This suggests the issue is NOT in the core QuickJS WASM build.");
+            } else if (isoLength === 3 && isoCodes.every(c => c === 0)) {
+                verdict.push("❌ WASM Date.toISOString() returns NUL bytes");
+                verdict.push("BUG REPRODUCED: snprintf stub writes NUL instead of formatted string");
+                verdict.push("");
+                verdict.push("Root cause:");
+                verdict.push("bundle-wasm.js snprintf stub: const str = String.fromCharCode(0)");
+                verdict.push("This stub always writes NUL, breaking all sprintf-based formatting.");
+                verdict.push("");
+                verdict.push("Evidence:");
+                verdict.push("- getTime/getUTC* are correct (Date math OK)");
+                verdict.push("- manual string '1970-01-01T00:00:00.000Z' works (string bridge OK)");
+                verdict.push("- Only sprintf-based formatting is broken");
+            } else {
+                verdict.push("⚠️ Unexpected output - manual inspection needed");
+            }
+            
+            document.getElementById('verdict-text').textContent = verdict.join('\n');
+        }
+        
+        main().catch(err => {
+            document.getElementById('loading').textContent = 'Error: ' + err.message;
+            document.getElementById('loading').className = 'error';
+        });
+    </script>
+</body>
+</html>

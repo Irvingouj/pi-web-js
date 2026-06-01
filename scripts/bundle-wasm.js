@@ -136,10 +136,120 @@ const env = {
     pthread_cond_wait: () => 0,
     pthread_cond_timedwait: () => 0,
     snprintf: (buf, size, fmt, ...args) => {
-        const str = String.fromCharCode(0);
-        const bytes = new TextEncoder().encode(str);
-        const written = Math.min(size - 1, bytes.length);
+        // Read format string from WASM memory
         const mem = new Uint8Array(wasm.memory.buffer);
+        let fmtStr = '';
+        let i = fmt;
+        while (mem[i] && mem[i] !== 0) { fmtStr += String.fromCharCode(mem[i]); i++; }
+        
+        // Simple sprintf implementation for common formats
+        // Supports: %d, %04d, %02d, %03d, %s, %f, %.3f, %c, %%, %zu, %ld
+        let argIdx = 0;
+        let result = '';
+        let fmtIdx = 0;
+        
+        while (fmtIdx < fmtStr.length) {
+            if (fmtStr[fmtIdx] !== '%') {
+                result += fmtStr[fmtIdx];
+                fmtIdx++;
+                continue;
+            }
+            
+            fmtIdx++; // skip '%'
+            if (fmtIdx >= fmtStr.length) break;
+            
+            // Parse width/precision
+            let width = 0;
+            let precision = -1;
+            let padZero = false;
+            let leftAlign = false;
+            
+            if (fmtStr[fmtIdx] === '-') {
+                leftAlign = true;
+                fmtIdx++;
+            }
+            if (fmtStr[fmtIdx] === '0') {
+                padZero = true;
+                fmtIdx++;
+            }
+            while (fmtIdx < fmtStr.length && fmtStr[fmtIdx] >= '0' && fmtStr[fmtIdx] <= '9') {
+                width = width * 10 + (fmtStr[fmtIdx].charCodeAt(0) - 48);
+                fmtIdx++;
+            }
+            if (fmtIdx < fmtStr.length && fmtStr[fmtIdx] === '.') {
+                fmtIdx++;
+                precision = 0;
+                while (fmtIdx < fmtStr.length && fmtStr[fmtIdx] >= '0' && fmtStr[fmtIdx] <= '9') {
+                    precision = precision * 10 + (fmtStr[fmtIdx].charCodeAt(0) - 48);
+                    fmtIdx++;
+                }
+            }
+            
+            // Read length modifier
+            let isLong = false;
+            let isSizeT = false;
+            if (fmtIdx < fmtStr.length && fmtStr[fmtIdx] === 'l') {
+                isLong = true;
+                fmtIdx++;
+                if (fmtIdx < fmtStr.length && fmtStr[fmtIdx] === 'l') fmtIdx++;
+            } else if (fmtIdx < fmtStr.length && fmtStr[fmtIdx] === 'z') {
+                isSizeT = true;
+                fmtIdx++;
+            }
+            
+            if (fmtIdx >= fmtStr.length) break;
+            const specifier = fmtStr[fmtIdx];
+            fmtIdx++;
+            
+            let value = '';
+            if (specifier === 'd' || specifier === 'i') {
+                const arg = args[argIdx++];
+                value = String(arg | 0);
+            } else if (specifier === 'u') {
+                const arg = args[argIdx++];
+                value = String(arg >>> 0);
+            } else if (specifier === 'f' || specifier === 'F') {
+                const arg = args[argIdx++];
+                if (precision >= 0) {
+                    value = arg.toFixed(precision);
+                } else {
+                    value = String(arg);
+                }
+            } else if (specifier === 's') {
+                const ptr = args[argIdx++];
+                if (ptr === 0) {
+                    value = '(null)';
+                } else {
+                    value = '';
+                    let j = ptr;
+                    while (mem[j] && mem[j] !== 0) {
+                        value += String.fromCharCode(mem[j]);
+                        j++;
+                    }
+                }
+            } else if (specifier === 'c') {
+                const arg = args[argIdx++];
+                value = String.fromCharCode(arg & 0xFF);
+            } else if (specifier === '%') {
+                value = '%';
+            } else if (specifier === 'p') {
+                const arg = args[argIdx++];
+                value = '0x' + (arg >>> 0).toString(16);
+            } else {
+                value = '%' + specifier;
+            }
+            
+            // Apply width padding
+            if (width > 0 && value.length < width) {
+                const pad = (padZero ? '0' : ' ').repeat(width - value.length);
+                value = leftAlign ? value + pad : pad + value;
+            }
+            
+            result += value;
+        }
+        
+        const bytes = new TextEncoder().encode(result);
+        const written = Math.min(size - 1, bytes.length);
         mem.set(bytes.slice(0, written), buf);
         mem[buf + written] = 0;
         return written;

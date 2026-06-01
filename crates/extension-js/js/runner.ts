@@ -1436,9 +1436,7 @@ registerTool({
 	params: schemas.StorageSetManyParamsSchema,
 	returns: z.null(),
 	handler: async (params) => {
-		const rec = asRecord(params);
-		const items = rec.items || params;
-		const itemRec = asRecord(items);
+		const itemRec = asRecord(params.items);
 		for (const key of Object.keys(itemRec)) {
 			const value = itemRec[key];
 			localStorage.setItem(
@@ -1468,9 +1466,8 @@ registerTool({
 	params: schemas.StorageGetManyParamsSchema,
 	returns: z.record(z.string().nullable()),
 	handler: async (params) => {
-		const obj = asRecord(params);
-		const keys = Array.isArray(obj.keys) ? obj.keys : [];
-		const defaults = asRecord(obj.defaults);
+		const keys = params.keys;
+		const defaults = asRecord(params.defaults ?? {});
 		const results: Record<string, string | null> = {};
 		for (const key of keys) {
 			const val = localStorage.getItem("__csl__:" + String(key));
@@ -1528,8 +1525,7 @@ registerTool({
 	params: schemas.StorageDeleteManyParamsSchema,
 	returns: z.null(),
 	handler: async (params) => {
-		const obj = asRecord(params);
-		const keys = Array.isArray(obj.keys) ? obj.keys : [];
+		const keys = params.keys;
 		for (const key of keys) {
 			localStorage.removeItem("__csl__:" + String(key));
 		}
@@ -1701,6 +1697,34 @@ registerTool({
 		},
 	],
 	returnDoc: "null",
+	errorCode: "E_UNKNOWN",
+});
+
+registerTool({
+	action: "mock_async",
+	namespace: "util",
+	description: "Mock async call for testing",
+	params: z.union([z.string(), z.object({ label: z.string().optional() }).passthrough()]),
+	returns: z.string(),
+	handler: async (params) => {
+		// prelude.js passes the argument directly:
+		// web.mock_async('label') -> params = 'label' (string)
+		// web.mock_async({label: 'x'}) -> params = {label: 'x'} (object)
+		if (typeof params === 'string') return params;
+		if (params && typeof params === 'object' && 'label' in params) {
+			return (params as Record<string, unknown>).label as string ?? "mock_async";
+		}
+		return "mock_async";
+	},
+	paramTypes: [
+		{
+			name: "label",
+			type: "string",
+			required: false,
+			description: "Test label",
+		},
+	],
+	returnDoc: "Label string",
 	errorCode: "E_UNKNOWN",
 });
 

@@ -36,12 +36,33 @@ pub(crate) fn extract_line_number(msg: &str) -> Option<u32> {
         }
     }
 
+    // QuickJS stack traces sometimes contain "(line N)"
+    for line in msg.lines() {
+        if let Some(idx) = line.find("(line ") {
+            let rest = &line[idx + 6..];
+            let num_str: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
+            if let Ok(num) = num_str.parse() {
+                return Some(num);
+            }
+        }
+    }
+
     None
 }
 
 /// Clean up error messages to be more user-friendly.
 pub(crate) fn clean_error_message(msg: &str) -> String {
-    msg.trim().to_string()
+    let trimmed = msg.trim();
+    // If the message is just an error name with no details, add a hint
+    if trimmed == "SyntaxError"
+        || trimmed == "ReferenceError"
+        || trimmed == "TypeError"
+        || trimmed == "RangeError"
+    {
+        format!("{}: <no details available>", trimmed)
+    } else {
+        trimmed.to_string()
+    }
 }
 
 /// Convert a rquickjs `Value` to a `serde_json::Value` by round-tripping through JSON.stringify.
@@ -49,11 +70,9 @@ pub(crate) fn js_value_to_json<'js>(
     ctx: Ctx<'js>,
     value: &Value<'js>,
 ) -> Result<serde_json::Value, CellError> {
-    let opt_str = ctx
-        .json_stringify(value)
-        .map_err(|e| CellError::Internal {
-            message: format!("JSON stringify error: {}", e),
-        })?;
+    let opt_str = ctx.json_stringify(value).map_err(|e| CellError::Internal {
+        message: format!("JSON stringify error: {}", e),
+    })?;
     match opt_str {
         Some(s) => {
             let rust_str = s.to_string().map_err(|e| CellError::Internal {
@@ -87,7 +106,10 @@ pub(crate) fn format_js_value<'js>(value: &Value<'js>) -> String {
     } else if value.is_null() {
         "null".to_string()
     } else if value.is_bool() {
-        value.as_bool().map(|b| b.to_string()).unwrap_or_else(|| "[boolean]".to_string())
+        value
+            .as_bool()
+            .map(|b| b.to_string())
+            .unwrap_or_else(|| "[boolean]".to_string())
     } else if value.is_number() {
         value
             .as_number()
@@ -116,12 +138,15 @@ pub(crate) fn exception_to_string<'js>(value: &Value<'js>) -> String {
         return format_js_value(value);
     };
 
-    let name = obj.get::<_, rquickjs::String>("name")
+    let name = obj
+        .get::<_, rquickjs::String>("name")
         .ok()
         .and_then(|s| s.to_string().ok())
         .map(|s| s.replace('\0', "").trim().to_string())
         .filter(|s| !s.is_empty());
-    let message = obj.get::<_, rquickjs::String>("message")
+
+    let message = obj
+        .get::<_, rquickjs::String>("message")
         .ok()
         .and_then(|s| s.to_string().ok())
         .map(|s| s.replace('\0', "").trim().to_string())
@@ -129,21 +154,21 @@ pub(crate) fn exception_to_string<'js>(value: &Value<'js>) -> String {
 
     match (name, message) {
         (Some(n), Some(m)) => format!("{}: {}", n, m),
-        (None, Some(m)) => m,
         (Some(n), None) => {
-            // Try toString() before falling back to the name alone
+            // Try toString() as a last resort before falling back to bare name
             if let Ok(to_string) = obj.get::<_, rquickjs::Function>("toString") {
                 if let Ok(val) = to_string.call::<_, rquickjs::String>(()) {
                     if let Ok(s) = val.to_string() {
                         let s = s.replace('\0', "").trim().to_string();
-                        if !s.is_empty() && s != "[object Object]" {
+                        if !s.is_empty() && s != "[object Object]" && s != n {
                             return s;
                         }
                     }
                 }
             }
-            n
+            format!("{}: <no message>", n)
         }
+        (None, Some(m)) => m,
         (None, None) => format_js_value(value),
     }
 }
@@ -152,10 +177,13 @@ pub(crate) fn exception_to_string<'js>(value: &Value<'js>) -> String {
 pub(crate) fn classify_js_error(msg: &str) -> CellError {
     let line = extract_line_number(msg);
 
-    let is_compile = msg.contains("SyntaxError")
-        || msg.contains("parse error")
+    // Extract the error name from the prefix before the first colon
+    let name = msg.split(':').next().unwrap_or(msg).trim();
+
+    let is_compile = name == "SyntaxError"
+        || msg.starts_with("parse error")
         || msg.contains("unexpected token")
-        || msg.contains("Expected");
+        || msg.starts_with("Expected");
 
     if is_compile {
         CellError::Compile {

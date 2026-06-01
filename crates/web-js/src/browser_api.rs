@@ -308,7 +308,10 @@ pub async fn execute_host_call(_action: &str, params: serde_json::Value) -> Wasm
             };
         }
     };
-    let handler_params = params.get("params").cloned().unwrap_or(serde_json::Value::Object(serde_json::Map::new()));
+    let handler_params = params
+        .get("params")
+        .cloned()
+        .unwrap_or(serde_json::Value::Object(serde_json::Map::new()));
 
     let window = match web_sys::window() {
         Some(w) => w,
@@ -319,7 +322,7 @@ pub async fn execute_host_call(_action: &str, params: serde_json::Value) -> Wasm
                 error: Some(WasmAsyncError {
                     message: "No window available".into(),
                     code: "E_HOST".into(),
-                })
+                }),
             }
         }
     };
@@ -353,8 +356,8 @@ pub async fn execute_host_call(_action: &str, params: serde_json::Value) -> Wasm
 
     // Whitelist check: only allow own enumerable properties of __hostHandlers.
     let keys = js_sys::Object::keys(&handlers);
-    let is_whitelisted = (0..keys.length())
-        .any(|i| keys.get(i).as_string().as_deref() == Some(handler_name));
+    let is_whitelisted =
+        (0..keys.length()).any(|i| keys.get(i).as_string().as_deref() == Some(handler_name));
     if !is_whitelisted {
         return WasmAsyncResponse {
             ok: false,
@@ -423,7 +426,7 @@ pub async fn execute_host_call(_action: &str, params: serde_json::Value) -> Wasm
                     message: msg,
                     code: "E_HOST".into(),
                 }),
-            }
+            };
         }
     };
 
@@ -443,7 +446,7 @@ pub async fn execute_host_call(_action: &str, params: serde_json::Value) -> Wasm
                         message: msg,
                         code: "E_HOST".into(),
                     }),
-                }
+                };
             }
         }
     } else {
