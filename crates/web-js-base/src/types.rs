@@ -27,7 +27,6 @@ pub struct WasmAsyncError {
 #[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct WasmAsyncResponse {
     pub ok: bool,
-    #[tsify(type = "unknown")]
     pub value: Option<serde_json::Value>,
     pub error: Option<WasmAsyncError>,
 }
@@ -68,7 +67,7 @@ pub struct WasmGlobalsSnapshot {
 pub struct WasmAsyncCommand {
     pub call_id: u32,
     pub action: String,
-    #[tsify(type = "unknown")]
+    #[tsify(type = "CommandParams")]
     pub params: serde_json::Value,
 }
 
@@ -109,7 +108,7 @@ pub enum WasmRunResult {
     Pending {
         stdout: Vec<String>,
         stderr: Vec<String>,
-        #[tsify(type = "unknown[]")]
+        #[tsify(type = "CommandParams[]")]
         commands: Vec<serde_json::Value>,
         fuel_exhausted: bool,
         execution_count: u32,

@@ -78,7 +78,7 @@ pub struct GlobalsSnapshot {
 pub struct AsyncCommand {
     pub call_id: u32,
     pub action: String,
-    #[ts(type = "unknown")]
+    #[ts(type = "CommandParams")]
     pub params: serde_json::Value,
 }
 
@@ -110,7 +110,7 @@ pub struct RunResult {
     pub stderr: Vec<String>,
     pub result: Option<String>,
     pub error: Option<CellError>,
-    #[ts(type = "unknown[]")]
+    #[ts(type = "CommandParams[]")]
     pub commands: Vec<serde_json::Value>,
     pub fuel_exhausted: bool,
     pub execution_count: u32,

@@ -2,7 +2,54 @@
 // Manually maintained — keep in sync with web-js-core/src/command_params.rs
 // and web-js-base/src/types.rs.
 
-export type AsyncCommand = { call_id: number; action: string; params: unknown };
+import type { TreeSnapshot } from "@pi-oxide/dom-semantic-tree";
+
+export type CommandParams =
+  | FetchParams
+  | SleepParams
+  | PageClickParams
+  | PageDblClickParams
+  | PageFillParams
+  | PageTypeParams
+  | PagePressParams
+  | PageSelectParams
+  | PageCheckParams
+  | PageHoverParams
+  | PageScrollParams
+  | PageScrollToParams
+  | PageGotoParams
+  | PageFindParams
+  | PageWaitForParams
+  | PageExtractParams
+  | PageAppendParams
+  | PageWaitParams
+  | StorageGetParams
+  | StorageSetParams
+  | StorageDeleteParams
+  | DomSnapshotParams
+  | DomFormatParams
+  | TabClickParams
+  | TabFillParams
+  | TabEvaluateParams
+  | TabBackParams
+  | TabWaitForLoadParams
+  | TabScrollToParams
+  | TabTypeParams
+  | TabPressParams
+  | TabSelectParams
+  | TabCheckParams
+  | TabHoverParams
+  | TabUnhoverParams
+  | TabScrollParams
+  | TabDblClickParams
+  | FsWriteParams
+  | FsPathParams
+  | FsCopyParams
+  | FsUpdateParams
+  | FsHashParams
+  | FsReadRangeParams;
+
+export type AsyncCommand = { call_id: number; action: string; params: CommandParams };
 
 export type CellError =
 	| { kind: "compile"; message: string; line: number | null }
@@ -17,7 +64,7 @@ export type DomSnapshotParams = {
 	max_nodes: bigint;
 };
 
-export type DomFormatParams = { snapshot: unknown; format?: string };
+export type DomFormatParams = { snapshot: TreeSnapshot; format?: string };
 
 export type FetchParams = {
 	url: string;
@@ -76,7 +123,7 @@ export type RunResult = {
 	stderr: string[];
 	result: string | null;
 	error: CellError | null;
-	commands: unknown[];
+	commands: CommandParams[];
 	fuel_exhausted: boolean;
 	execution_count: number;
 	status: CellStatus;
