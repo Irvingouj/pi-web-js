@@ -49,7 +49,7 @@ const extFs = (() => {
   async function sha256Bytes(data: Uint8Array): Promise<string> {
     const hash = await crypto.subtle.digest(
       "SHA-256",
-      data as unknown as BufferSource,
+			data as BufferSource,
     );
     return Array.from(new Uint8Array(hash))
       .map((b) => b.toString(16).padStart(2, "0"))
@@ -59,7 +59,7 @@ const extFs = (() => {
   async function sha1Bytes(data: Uint8Array): Promise<string> {
     const hash = await crypto.subtle.digest(
       "SHA-1",
-      data as unknown as BufferSource,
+			data as BufferSource,
     );
     return Array.from(new Uint8Array(hash))
       .map((b) => b.toString(16).padStart(2, "0"))
@@ -1134,7 +1134,7 @@ function toPlainObject(value: unknown): unknown {
 // ─── Chrome passthrough dispatch table ─────────────────────────
 
 type ChromeApiCaller = (
-  api: Record<string, unknown>,
+	api: unknown,
   firstRec: Record<string, unknown>,
   first: unknown,
   second: unknown,
@@ -1146,20 +1146,27 @@ const chromePassthroughHandlers = new Map<string, ChromeApiCaller>([
     async (api, firstRec, first, second) => {
       const tabId = firstRec.tabId || first;
       const updateProps = firstRec.update || second || {};
-      return (api as unknown as typeof chrome.tabs).update(
-        typeof tabId === "number" ? tabId : (null as unknown as number),
+				if (typeof tabId === "number") {
+					return (api as typeof chrome.tabs).update(
+						tabId,
+						updateProps as chrome.tabs.UpdateProperties,
+					);
+				}
+				return (api as typeof chrome.tabs).update(
         updateProps as chrome.tabs.UpdateProperties,
       );
     },
   ],
   [
     "chrome_tabs_remove",
-    async (api, firstRec) => {
+		async (api, firstRec, first) => {
       const tabIds =
-        firstRec.tabIds || firstRec.tabId || firstRec.id || firstRec;
-      await (api as unknown as typeof chrome.tabs).remove(
-        tabIds as unknown as number,
-      );
+				firstRec.tabIds || firstRec.tabId || firstRec.id || first;
+					if (typeof tabIds === "number") {
+						await (api as typeof chrome.tabs).remove(tabIds);
+					} else {
+						await (api as typeof chrome.tabs).remove(tabIds as number[]);
+					}
       return null;
     },
   ],
@@ -1167,7 +1174,7 @@ const chromePassthroughHandlers = new Map<string, ChromeApiCaller>([
     "chrome_tabs_get",
     async (api, firstRec, first) => {
       const tabId = firstRec.tabId || firstRec.id || first;
-      return (api as unknown as typeof chrome.tabs).get(tabId as number);
+			return (api as typeof chrome.tabs).get(tabId as number);
     },
   ],
   [
@@ -1175,10 +1182,16 @@ const chromePassthroughHandlers = new Map<string, ChromeApiCaller>([
     async (api, firstRec, first, second) => {
       const tabId = firstRec.tabId || first;
       const reloadProps = firstRec.reload || second || {};
-      await (api as unknown as typeof chrome.tabs).reload(
-        typeof tabId === "number" ? tabId : (undefined as unknown as number),
+				if (typeof tabId === "number") {
+					await (api as typeof chrome.tabs).reload(
+						tabId,
         reloadProps as chrome.tabs.ReloadProperties,
       );
+				} else {
+					await (api as typeof chrome.tabs).reload(
+						reloadProps as chrome.tabs.ReloadProperties,
+					);
+				}
       return null;
     },
   ],
@@ -1187,7 +1200,7 @@ const chromePassthroughHandlers = new Map<string, ChromeApiCaller>([
     async (api, firstRec, first, second) => {
       const tabId = firstRec.tabId || first;
       const message = firstRec.message || second || {};
-      return (api as unknown as typeof chrome.tabs).sendMessage(
+			return (api as typeof chrome.tabs).sendMessage(
         tabId as number,
         message,
       );
@@ -1199,7 +1212,7 @@ const chromePassthroughHandlers = new Map<string, ChromeApiCaller>([
       const name =
         firstRec.name || (typeof first === "string" ? first : "") || "";
       const alarmInfo = firstRec.alarmInfo || second || firstRec || {};
-      await (api as unknown as typeof chrome.alarms).create(
+			await (api as typeof chrome.alarms).create(
         name as string,
         alarmInfo,
       );
@@ -1211,7 +1224,7 @@ const chromePassthroughHandlers = new Map<string, ChromeApiCaller>([
     async (api, firstRec, first) => {
       const alarmName =
         firstRec.name || (typeof first === "string" ? first : "") || "";
-      return (api as unknown as typeof chrome.alarms).clear(
+			return (api as typeof chrome.alarms).clear(
         alarmName as string,
       );
     },
@@ -1219,7 +1232,7 @@ const chromePassthroughHandlers = new Map<string, ChromeApiCaller>([
   [
     "chrome_action_setBadgeText",
     async (api, firstRec) => {
-      await (api as unknown as typeof chrome.action).setBadgeText(
+			await (api as typeof chrome.action).setBadgeText(
         (firstRec || {}) as chrome.action.BadgeTextDetails,
       );
       return null;
@@ -1227,18 +1240,18 @@ const chromePassthroughHandlers = new Map<string, ChromeApiCaller>([
   ],
   [
     "chrome_action_setBadgeBackgroundColor",
-    async (api, firstRec) => {
-      await (api as unknown as typeof chrome.action).setBadgeBackgroundColor(
-        (firstRec || {}) as unknown as any,
+		async (api, firstRec, first) => {
+			await (api as typeof chrome.action).setBadgeBackgroundColor(
+				first as chrome.action.BadgeColorDetails,
       );
       return null;
     },
   ],
   [
     "chrome_action_setTitle",
-    async (api, firstRec) => {
-      await (api as unknown as typeof chrome.action).setTitle(
-        (firstRec || {}) as unknown as any,
+		async (api, firstRec, first) => {
+			await (api as typeof chrome.action).setTitle(
+				first as chrome.action.TitleDetails,
       );
       return null;
     },
@@ -1246,7 +1259,7 @@ const chromePassthroughHandlers = new Map<string, ChromeApiCaller>([
   [
     "chrome_action_setIcon",
     async (api, firstRec) => {
-      return (api as unknown as typeof chrome.action).setIcon(
+			return (api as typeof chrome.action).setIcon(
         (firstRec || {}) as chrome.action.TabIconDetails,
       );
     },
@@ -1255,7 +1268,7 @@ const chromePassthroughHandlers = new Map<string, ChromeApiCaller>([
     "chrome_contextMenus_remove",
     async (api, firstRec, first) => {
       const menuId = firstRec.menuItemId || firstRec.id || first;
-      await (api as unknown as typeof chrome.contextMenus).remove(
+			await (api as typeof chrome.contextMenus).remove(
         menuId as string | number,
       );
       return null;
@@ -1266,7 +1279,7 @@ const chromePassthroughHandlers = new Map<string, ChromeApiCaller>([
     async (api, firstRec, first, second) => {
       const windowId = firstRec.windowId || first;
       const updateInfo = firstRec.update || second || {};
-      return (api as unknown as typeof chrome.windows).update(
+			return (api as typeof chrome.windows).update(
         windowId as number,
         updateInfo as chrome.windows.UpdateInfo,
       );
@@ -1276,7 +1289,7 @@ const chromePassthroughHandlers = new Map<string, ChromeApiCaller>([
     "chrome_windows_remove",
     async (api, firstRec, first) => {
       const windowId = firstRec.windowId || first;
-      await (api as unknown as typeof chrome.windows).remove(
+			await (api as typeof chrome.windows).remove(
         windowId as number,
       );
       return null;
@@ -1284,32 +1297,32 @@ const chromePassthroughHandlers = new Map<string, ChromeApiCaller>([
   ],
   [
     "chrome_cookies_get",
-    async (api, firstRec) => {
-      return (api as unknown as typeof chrome.cookies).get(
-        (firstRec || {}) as unknown as any,
+		async (api, firstRec, first) => {
+			return (api as typeof chrome.cookies).get(
+				first as chrome.cookies.CookieDetails,
       );
     },
   ],
   [
     "chrome_cookies_set",
-    async (api, firstRec) => {
-      return (api as unknown as typeof chrome.cookies).set(
-        (firstRec || {}) as unknown as any,
+		async (api, firstRec, first) => {
+			return (api as typeof chrome.cookies).set(
+				first as chrome.cookies.SetDetails,
       );
     },
   ],
   [
     "chrome_cookies_remove",
-    async (api, firstRec) => {
-      return (api as unknown as typeof chrome.cookies).remove(
-        (firstRec || {}) as unknown as any,
+		async (api, firstRec, first) => {
+			return (api as typeof chrome.cookies).remove(
+				first as chrome.cookies.CookieDetails,
       );
     },
   ],
   [
     "chrome_cookies_getAll",
     async (api, firstRec) => {
-      return (api as unknown as typeof chrome.cookies).getAll(
+			return (api as typeof chrome.cookies).getAll(
         (firstRec || {}) as chrome.cookies.GetAllDetails,
       );
     },
@@ -1319,7 +1332,7 @@ const chromePassthroughHandlers = new Map<string, ChromeApiCaller>([
     async (api, firstRec, first) => {
       const query =
         firstRec.query || (typeof first === "string" ? first : "") || "";
-      return (api as unknown as typeof chrome.bookmarks).search(
+			return (api as typeof chrome.bookmarks).search(
         query as string,
       );
     },
@@ -1328,7 +1341,7 @@ const chromePassthroughHandlers = new Map<string, ChromeApiCaller>([
     "chrome_bookmarks_remove",
     async (api, firstRec, first) => {
       const bookmarkId = firstRec.id || first;
-      await (api as unknown as typeof chrome.bookmarks).remove(
+			await (api as typeof chrome.bookmarks).remove(
         bookmarkId as string,
       );
       return null;
@@ -1336,17 +1349,17 @@ const chromePassthroughHandlers = new Map<string, ChromeApiCaller>([
   ],
   [
     "chrome_history_search",
-    async (api, firstRec) => {
-      return (api as unknown as typeof chrome.history).search(
-        (firstRec || {}) as unknown as chrome.history.HistoryQuery,
+		async (api, firstRec, first) => {
+			return (api as typeof chrome.history).search(
+				first as chrome.history.HistoryQuery,
       );
     },
   ],
   [
     "chrome_history_deleteUrl",
     async (api, firstRec, first) => {
-      await (api as unknown as typeof chrome.history).deleteUrl(
-        (firstRec.url || first) as unknown as any,
+			await (api as typeof chrome.history).deleteUrl(
+				{ url: (firstRec.url || first) as string } as chrome.history.UrlDetails,
       );
       return null;
     },
@@ -1357,9 +1370,9 @@ const chromePassthroughHandlers = new Map<string, ChromeApiCaller>([
       const notifId =
         firstRec.id || (typeof first === "string" ? first : "") || "";
       const options = firstRec.options || second || {};
-      return (api as unknown as typeof chrome.notifications).create(
+			return (api as typeof chrome.notifications).create(
         notifId as string,
-        options as unknown as any,
+				options as chrome.notifications.NotificationCreateOptions,
       );
     },
   ],
@@ -1368,19 +1381,104 @@ const chromePassthroughHandlers = new Map<string, ChromeApiCaller>([
     async (api, firstRec, first) => {
       const notifId =
         firstRec.id || (typeof first === "string" ? first : "") || "";
-      return (api as unknown as typeof chrome.notifications).clear(
+			return (api as typeof chrome.notifications).clear(
         notifId as string,
       );
     },
   ],
   [
-    "chrome_scripting_executeScript",
-    async (api, firstRec) => {
-      return (api as unknown as typeof chrome.scripting).executeScript(
-        (firstRec || {}) as unknown as any,
+		"chrome_tabGroups_get",
+		async (api, firstRec, first) => {
+			const groupId = firstRec.groupId || first;
+			return (api as typeof chrome.tabGroups).get(
+				groupId as number,
       );
     },
   ],
+	[
+		"chrome_tabGroups_update",
+		async (api, firstRec, first, second) => {
+			const groupId = firstRec.groupId || first;
+			const updateProps = firstRec.update || second || {};
+			return (api as typeof chrome.tabGroups).update(
+				groupId as number,
+				updateProps as chrome.tabGroups.UpdateProperties,
+			);
+		},
+	],
+	[
+		"chrome_tabs_ungroup",
+		async (api, firstRec, first) => {
+			const tabIds = firstRec.tabIds || firstRec.tabId || first;
+			if (typeof tabIds === "number") {
+				(api as typeof chrome.tabs).ungroup(tabIds);
+			} else {
+				(api as typeof chrome.tabs).ungroup(tabIds as number | [number, ...number[]]);
+			}
+			return null;
+		},
+	],
+	[
+		"chrome_sessions_restore",
+		async (api, firstRec, first) => {
+			return (api as typeof chrome.sessions).restore(
+				(firstRec.sessionId || first || undefined) as string | undefined,
+			);
+		},
+	],
+	[
+		"chrome_downloads_pause",
+		async (api, firstRec, first) => {
+			(api as typeof chrome.downloads).pause((firstRec.downloadId || first) as number);
+			return null;
+		},
+	],
+	[
+		"chrome_downloads_resume",
+		async (api, firstRec, first) => {
+			(api as typeof chrome.downloads).resume((firstRec.downloadId || first) as number);
+			return null;
+		},
+	],
+	[
+		"chrome_downloads_cancel",
+		async (api, firstRec, first) => {
+			(api as typeof chrome.downloads).cancel((firstRec.downloadId || first) as number);
+			return null;
+		},
+	],
+	[
+		"chrome_downloads_open",
+		async (api, firstRec, first) => {
+			(api as typeof chrome.downloads).open((firstRec.downloadId || first) as number);
+			return null;
+		},
+	],
+	[
+		"chrome_downloads_show",
+		async (api, firstRec, first) => {
+			(api as typeof chrome.downloads).show((firstRec.downloadId || first) as number);
+			return null;
+		},
+	],
+	[
+		"chrome_system_cpu_getInfo",
+		async (api) => {
+			return (api as typeof chrome.system.cpu).getInfo();
+		},
+	],
+	[
+		"chrome_system_memory_getInfo",
+		async (api) => {
+			return (api as typeof chrome.system.memory).getInfo();
+		},
+	],
+	[
+		"chrome_system_storage_getInfo",
+		async (api) => {
+			return (api as typeof chrome.system.storage).getInfo();
+		},
+	],
 ]);
 
 // ─── Tool registrations ────────────────────────────────────────
@@ -1412,12 +1510,9 @@ function registerChromePassthrough(
           "permission",
         );
       }
-      let api: Record<string, unknown> = chrome as unknown as Record<
-        string,
-        unknown
-      >;
+				let api: unknown = chrome;
       for (const part of apiPath) {
-        api = api[part] as Record<string, unknown>;
+				api = (api as Record<string, unknown>)[part];
       }
       const first = Array.isArray(params) ? params[0] : params;
       const firstRec = asRecord(first);
@@ -1433,7 +1528,7 @@ function registerChromePassthrough(
         if (handler) {
           result = await handler(api, firstRec, first, second);
         } else {
-          const method = api[action.split("_").pop()!] as (
+					const method = (api as Record<string, unknown>)[action.split("_").pop()!] as (
             ...args: unknown[]
           ) => Promise<unknown>;
           result = await (method as (...args: unknown[]) => Promise<unknown>)(
@@ -1858,9 +1953,7 @@ registerTool({
   handler: async () => {
     const activeTab = await resolveActiveTabId();
     if (activeTab === null) {
-      const err = new Error("No active tab");
-      (err as unknown as Record<string, unknown>).code = "E_NO_TAB";
-      throw err;
+			throw makeError("No active tab", "E_NO_TAB");
     }
     return unwrapResult(
       await executeInTab(activeTab, () => window.location.href, []),
@@ -1880,9 +1973,7 @@ registerTool({
   handler: async () => {
     const activeTab = await resolveActiveTabId();
     if (activeTab === null) {
-      const err = new Error("No active tab");
-      (err as unknown as Record<string, unknown>).code = "E_NO_TAB";
-      throw err;
+			throw makeError("No active tab", "E_NO_TAB");
     }
     return unwrapResult(
       await executeInTab(activeTab, () => document.title, []),
@@ -1902,9 +1993,7 @@ registerTool({
   handler: async (params) => {
     const activeTab = await resolveActiveTabId();
     if (activeTab === null) {
-      const err = new Error("No active tab");
-      (err as unknown as Record<string, unknown>).code = "E_NO_TAB";
-      throw err;
+			throw makeError("No active tab", "E_NO_TAB");
     }
     const result = await dispatchTool("chrome_tabs_update", {
       tabId: activeTab,
@@ -1933,9 +2022,7 @@ registerTool({
   handler: async () => {
     const activeTab = await resolveActiveTabId();
     if (activeTab === null) {
-      const err = new Error("No active tab");
-      (err as unknown as Record<string, unknown>).code = "E_NO_TAB";
-      throw err;
+			throw makeError("No active tab", "E_NO_TAB");
     }
     return unwrapResult(
       await sendMessageToTab(activeTab, { action: "back", params: {} }),
@@ -1955,9 +2042,7 @@ registerTool({
   handler: async () => {
     const activeTab = await resolveActiveTabId();
     if (activeTab === null) {
-      const err = new Error("No active tab");
-      (err as unknown as Record<string, unknown>).code = "E_NO_TAB";
-      throw err;
+			throw makeError("No active tab", "E_NO_TAB");
     }
     return unwrapResult(
       await executeInTab(activeTab, () => {
@@ -1980,9 +2065,7 @@ registerTool({
   handler: async () => {
     const activeTab = await resolveActiveTabId();
     if (activeTab === null) {
-      const err = new Error("No active tab");
-      (err as unknown as Record<string, unknown>).code = "E_NO_TAB";
-      throw err;
+			throw makeError("No active tab", "E_NO_TAB");
     }
     return unwrapResult(
       await dispatchTool("chrome_tabs_reload", { tabId: activeTab }),
@@ -2029,9 +2112,7 @@ registerTool({
     const refId = extractRefId(params);
     const label = obj.label ?? "";
     if (!refId && !label) {
-      const err = new Error("page_click requires refId or label");
-      (err as unknown as Record<string, unknown>).code = "E_MISSING_PARAM";
-      throw err;
+			throw makeError("page_click requires refId or label", "E_MISSING_PARAM");
     }
     return unwrapResult(
       await sendMessageToTab(activeTab, {
@@ -2071,9 +2152,7 @@ registerTool({
     const value = obj.value ?? "";
     const label = obj.label ?? "";
     if (!refId && !label) {
-      const err = new Error("page_fill requires refId or label");
-      (err as unknown as Record<string, unknown>).code = "E_MISSING_PARAM";
-      throw err;
+			throw makeError("page_fill requires refId or label", "E_MISSING_PARAM");
     }
     return unwrapResult(
       await sendMessageToTab(activeTab, {
@@ -2119,9 +2198,7 @@ registerTool({
     const text = obj.text ?? "";
     const label = obj.label ?? "";
     if (!refId && !label) {
-      const err = new Error("page_type requires refId or label");
-      (err as unknown as Record<string, unknown>).code = "E_MISSING_PARAM";
-      throw err;
+			throw makeError("page_type requires refId or label", "E_MISSING_PARAM");
     }
     return unwrapResult(
       await sendMessageToTab(activeTab, {
@@ -2167,9 +2244,7 @@ registerTool({
     const text = obj.text ?? "";
     const label = obj.label ?? "";
     if (!refId && !label) {
-      const err = new Error("page_append requires refId or label");
-      (err as unknown as Record<string, unknown>).code = "E_MISSING_PARAM";
-      throw err;
+			throw makeError("page_append requires refId or label", "E_MISSING_PARAM");
     }
     return unwrapResult(
       await sendMessageToTab(activeTab, {
@@ -2241,9 +2316,7 @@ registerTool({
     const refId = extractRefId(params);
     const value = obj.value ?? "";
     if (!refId) {
-      const err = new Error("page_select requires refId");
-      (err as unknown as Record<string, unknown>).code = "E_MISSING_PARAM";
-      throw err;
+			throw makeError("page_select requires refId", "E_MISSING_PARAM");
     }
     return unwrapResult(
       await sendMessageToTab(activeTab, {
@@ -2282,9 +2355,7 @@ registerTool({
     const refId = extractRefId(params);
     const checked = typeof obj.checked === "boolean" ? obj.checked : true;
     if (!refId) {
-      const err = new Error("page_check requires refId");
-      (err as unknown as Record<string, unknown>).code = "E_MISSING_PARAM";
-      throw err;
+			throw makeError("page_check requires refId", "E_MISSING_PARAM");
     }
     return unwrapResult(
       await sendMessageToTab(activeTab, {
@@ -2321,9 +2392,7 @@ registerTool({
     const activeTab = await resolveActiveTabId();
     const refId = extractRefId(params);
     if (!refId) {
-      const err = new Error("page_hover requires refId");
-      (err as unknown as Record<string, unknown>).code = "E_MISSING_PARAM";
-      throw err;
+			throw makeError("page_hover requires refId", "E_MISSING_PARAM");
     }
     return unwrapResult(
       await sendMessageToTab(activeTab, { action: "hover", params: { refId } }),
@@ -2404,9 +2473,7 @@ registerTool({
     const activeTab = await resolveActiveTabId();
     const refId = extractRefId(params);
     if (!refId) {
-      const err = new Error("page_scroll_to requires refId");
-      (err as unknown as Record<string, unknown>).code = "E_MISSING_PARAM";
-      throw err;
+			throw makeError("page_scroll_to requires refId", "E_MISSING_PARAM");
     }
     return unwrapResult(
       await sendMessageToTab(activeTab, {
@@ -2437,9 +2504,7 @@ registerTool({
     const activeTab = await resolveActiveTabId();
     const refId = extractRefId(params);
     if (!refId) {
-      const err = new Error("page_dblclick requires refId");
-      (err as unknown as Record<string, unknown>).code = "E_MISSING_PARAM";
-      throw err;
+			throw makeError("page_dblclick requires refId", "E_MISSING_PARAM");
     }
     return unwrapResult(
       await sendMessageToTab(activeTab, {
@@ -2475,9 +2540,7 @@ registerTool({
   handler: async (params) => {
     const activeTab = await resolveActiveTabId();
     if (activeTab === null) {
-      const err = new Error("No active tab");
-      (err as unknown as Record<string, unknown>).code = "E_NO_TAB";
-      throw err;
+			throw makeError("No active tab", "E_NO_TAB");
     }
     return unwrapResult(
       await executeInTab(
@@ -2515,9 +2578,7 @@ registerTool({
   handler: async (params) => {
     const activeTab = await resolveActiveTabId();
     if (activeTab === null) {
-      const err = new Error("No active tab");
-      (err as unknown as Record<string, unknown>).code = "E_NO_TAB";
-      throw err;
+			throw makeError("No active tab", "E_NO_TAB");
     }
     const start = Date.now();
     const timeoutMs = Number(params.timeout) || DEFAULT_TIMEOUT_MS;
@@ -2535,8 +2596,8 @@ registerTool({
         const err = new Error(
           `Timeout waiting for selector: ${params.selector}`,
         );
-        (err as unknown as Record<string, unknown>).code = "E_TIMEOUT";
-        (err as unknown as Record<string, unknown>).category = "timeout";
+				
+				
         throw err;
       }
       await new Promise((resolve) =>
@@ -2572,9 +2633,7 @@ registerTool({
   handler: async (params) => {
     const activeTab = await resolveActiveTabId();
     if (activeTab === null) {
-      const err = new Error("No active tab");
-      (err as unknown as Record<string, unknown>).code = "E_NO_TAB";
-      throw err;
+			throw makeError("No active tab", "E_NO_TAB");
     }
     return unwrapResult(
       await executeInTab(
@@ -2634,9 +2693,7 @@ registerTool({
   handler: async (params) => {
     const tabId = typeof params === "number" ? params : extractTabId(params);
     if (tabId === null) {
-      const err = new Error("page_close requires a tabId");
-      (err as unknown as Record<string, unknown>).code = "E_MISSING_PARAM";
-      throw err;
+			throw makeError("page_close requires a tabId", "E_MISSING_PARAM");
     }
     return unwrapResult(await dispatchTool("chrome_tabs_remove", { tabId }));
   },
@@ -3268,9 +3325,7 @@ registerTool({
   handler: async (params) => {
     const activeTab = await resolveActiveTabId();
     if (activeTab === null) {
-      const err = new Error("No active tab");
-      (err as unknown as Record<string, unknown>).code = "E_NO_TAB";
-      throw err;
+			throw makeError("No active tab", "E_NO_TAB");
     }
     const obj = asRecord(params);
     const opts = asRecord(obj.options ?? obj);
@@ -3319,9 +3374,7 @@ registerTool({
   handler: async (params) => {
     const activeTab = await resolveActiveTabId();
     if (activeTab === null) {
-      const err = new Error("No active tab");
-      (err as unknown as Record<string, unknown>).code = "E_NO_TAB";
-      throw err;
+			throw makeError("No active tab", "E_NO_TAB");
     }
     const obj = asRecord(params);
     const opts = asRecord(obj.options ?? obj);
@@ -3370,9 +3423,7 @@ registerTool({
   handler: async (params) => {
     const activeTab = await resolveActiveTabId();
     if (activeTab === null) {
-      const err = new Error("No active tab");
-      (err as unknown as Record<string, unknown>).code = "E_NO_TAB";
-      throw err;
+			throw makeError("No active tab", "E_NO_TAB");
     }
     const obj = asRecord(params);
     const opts = asRecord(obj.options ?? obj);
@@ -3536,9 +3587,7 @@ registerTool({
   handler: async (params) => {
     const tabId = typeof params === "number" ? params : extractTabId(params);
     if (tabId === null) {
-      const err = new Error("tab_activate requires a tabId");
-      (err as unknown as Record<string, unknown>).code = "E_MISSING_PARAM";
-      throw err;
+			throw makeError("tab_activate requires a tabId", "E_MISSING_PARAM");
     }
     return unwrapResult(
       await dispatchTool("chrome_tabs_update", {
@@ -3568,9 +3617,7 @@ registerTool({
   handler: async (params) => {
     const tabId = typeof params === "number" ? params : extractTabId(params);
     if (tabId === null) {
-      const err = new Error("tab_close requires a tabId");
-      (err as unknown as Record<string, unknown>).code = "E_MISSING_PARAM";
-      throw err;
+			throw makeError("tab_close requires a tabId", "E_MISSING_PARAM");
     }
     return unwrapResult(await dispatchTool("chrome_tabs_remove", { tabId }));
   },
@@ -4142,9 +4189,7 @@ registerTool({
   handler: async (params) => {
     const activeTab = await resolveActiveTabId();
     if (activeTab === null) {
-      const err = new Error("No active tab");
-      (err as unknown as Record<string, unknown>).code = "E_NO_TAB";
-      throw err;
+			throw makeError("No active tab", "E_NO_TAB");
     }
     const obj = asRecord(params);
     const opts = asRecord(obj.options ?? obj);
@@ -4194,9 +4239,7 @@ registerTool({
   handler: async (params) => {
     const activeTab = await resolveActiveTabId();
     if (activeTab === null) {
-      const err = new Error("No active tab");
-      (err as unknown as Record<string, unknown>).code = "E_NO_TAB";
-      throw err;
+			throw makeError("No active tab", "E_NO_TAB");
     }
     const obj = asRecord(params);
     const opts = asRecord(obj.options ?? obj);
@@ -4246,9 +4289,7 @@ registerTool({
   handler: async (params) => {
     const activeTab = await resolveActiveTabId();
     if (activeTab === null) {
-      const err = new Error("No active tab");
-      (err as unknown as Record<string, unknown>).code = "E_NO_TAB";
-      throw err;
+			throw makeError("No active tab", "E_NO_TAB");
     }
     const obj = asRecord(params);
     const opts = asRecord(obj.options ?? obj);
@@ -4326,9 +4367,7 @@ registerTool({
   handler: async (params) => {
     const result = extFs.stat(params.path);
     if (!result) {
-      const err = new Error(`File not found: ${params.path}`);
-      (err as unknown as Record<string, unknown>).code = "E_NOT_FOUND";
-      throw err;
+			throw makeError(`File not found: ${params.path}`, "E_NOT_FOUND");
     }
     return result;
   },
@@ -5416,6 +5455,358 @@ registerChromePassthrough(
     },
   ],
 );
+registerChromePassthrough(
+	"chrome_tabGroups_query",
+	"chrome",
+	"Query tab groups",
+	["tabGroups"],
+	schemas.ChromeTabGroupsQueryParamsSchema,
+	schemas.ChromeTabGroupArraySchema,
+	"ECHROME",
+	"extension",
+	[
+		{
+			name: "query",
+			type: "object",
+			required: false,
+			description: "Tab group query",
+		},
+	],
+);
+
+registerChromePassthrough(
+	"chrome_tabGroups_get",
+	"chrome",
+	"Get a tab group",
+	["tabGroups"],
+	schemas.ChromeTabGroupsGetParamsSchema,
+	schemas.ChromeTabGroupSchema,
+	"ECHROME",
+	"extension",
+	[
+		{
+			name: "groupId",
+			type: "number",
+			required: false,
+			description: "Tab group ID",
+		},
+	],
+);
+
+registerChromePassthrough(
+	"chrome_tabGroups_update",
+	"chrome",
+	"Update a tab group",
+	["tabGroups"],
+	schemas.ChromeTabGroupsUpdateParamsSchema,
+	schemas.ChromeTabGroupSchema,
+	"ECHROME",
+	"extension",
+	[
+		{
+			name: "groupId",
+			type: "number",
+			required: false,
+			description: "Tab group ID",
+		},
+		{
+			name: "update",
+			type: "object",
+			required: false,
+			description: "Update properties",
+		},
+	],
+);
+
+registerChromePassthrough(
+	"chrome_tabs_group",
+	"chrome",
+	"Group tabs",
+	["tabs"],
+	schemas.ChromeTabsGroupParamsSchema,
+	z.number(),
+	"ECHROME",
+	"extension",
+	[
+		{
+			name: "tabIds",
+			type: "array",
+			required: false,
+			description: "Tab IDs to group",
+		},
+		{
+			name: "groupId",
+			type: "number",
+			required: false,
+			description: "Group ID",
+		},
+	],
+);
+
+registerChromePassthrough(
+	"chrome_tabs_ungroup",
+	"chrome",
+	"Ungroup tabs",
+	["tabs"],
+	schemas.ChromeTabsUngroupParamsSchema,
+	z.null(),
+	"ECHROME",
+	"extension",
+	[
+		{
+			name: "tabIds",
+			type: "number",
+			required: false,
+			description: "Tab ID to ungroup",
+		},
+	],
+);
+
+registerChromePassthrough(
+	"chrome_sessions_getRecentlyClosed",
+	"chrome",
+	"Get recently closed sessions",
+	["sessions"],
+	schemas.ChromeSessionsGetRecentlyClosedParamsSchema,
+	schemas.ChromeSessionArraySchema,
+	"ECHROME",
+	"extension",
+	[
+		{
+			name: "filter",
+			type: "object",
+			required: false,
+			description: "Session filter",
+		},
+	],
+);
+
+registerChromePassthrough(
+	"chrome_sessions_restore",
+	"chrome",
+	"Restore a session",
+	["sessions"],
+	schemas.ChromeSessionsRestoreParamsSchema,
+	schemas.ChromeSessionArraySchema,
+	"ECHROME",
+	"extension",
+	[
+		{
+			name: "sessionId",
+			type: "string",
+			required: false,
+			description: "Session ID",
+		},
+	],
+);
+
+registerChromePassthrough(
+	"chrome_sessions_getDevices",
+	"chrome",
+	"Get synced devices",
+	["sessions"],
+	schemas.ChromeSessionsGetDevicesParamsSchema,
+	schemas.ChromeDeviceArraySchema,
+	"ECHROME",
+	"extension",
+	[
+		{
+			name: "filter",
+			type: "object",
+			required: false,
+			description: "Device filter",
+		},
+	],
+);
+
+registerChromePassthrough(
+	"chrome_downloads_download",
+	"chrome",
+	"Download a file",
+	["downloads"],
+	schemas.ChromeDownloadsDownloadParamsSchema,
+	schemas.ChromeDownloadIdSchema,
+	"ECHROME",
+	"extension",
+	[
+		{
+			name: "url",
+			type: "string",
+			required: false,
+			description: "Download URL",
+		},
+	],
+);
+
+registerChromePassthrough(
+	"chrome_downloads_search",
+	"chrome",
+	"Search downloads",
+	["downloads"],
+	schemas.ChromeDownloadsSearchParamsSchema,
+	schemas.ChromeDownloadArraySchema,
+	"ECHROME",
+	"extension",
+	[
+		{
+			name: "query",
+			type: "object",
+			required: false,
+			description: "Download query",
+		},
+	],
+);
+
+registerChromePassthrough(
+	"chrome_downloads_erase",
+	"chrome",
+	"Erase downloads",
+	["downloads"],
+	schemas.ChromeDownloadsEraseParamsSchema,
+	schemas.ChromeDownloadArraySchema,
+	"ECHROME",
+	"extension",
+	[
+		{
+			name: "query",
+			type: "object",
+			required: false,
+			description: "Download query",
+		},
+	],
+);
+
+registerChromePassthrough(
+	"chrome_downloads_pause",
+	"chrome",
+	"Pause a download",
+	["downloads"],
+	schemas.ChromeDownloadsPauseParamsSchema,
+	z.null(),
+	"ECHROME",
+	"extension",
+	[
+		{
+			name: "downloadId",
+			type: "number",
+			required: false,
+			description: "Download ID",
+		},
+	],
+);
+
+registerChromePassthrough(
+	"chrome_downloads_resume",
+	"chrome",
+	"Resume a download",
+	["downloads"],
+	schemas.ChromeDownloadsResumeParamsSchema,
+	z.null(),
+	"ECHROME",
+	"extension",
+	[
+		{
+			name: "downloadId",
+			type: "number",
+			required: false,
+			description: "Download ID",
+		},
+	],
+);
+
+registerChromePassthrough(
+	"chrome_downloads_cancel",
+	"chrome",
+	"Cancel a download",
+	["downloads"],
+	schemas.ChromeDownloadsCancelParamsSchema,
+	z.null(),
+	"ECHROME",
+	"extension",
+	[
+		{
+			name: "downloadId",
+			type: "number",
+			required: false,
+			description: "Download ID",
+		},
+	],
+);
+
+registerChromePassthrough(
+	"chrome_downloads_open",
+	"chrome",
+	"Open a downloaded file",
+	["downloads"],
+	schemas.ChromeDownloadsOpenParamsSchema,
+	z.null(),
+	"ECHROME",
+	"extension",
+	[
+		{
+			name: "downloadId",
+			type: "number",
+			required: false,
+			description: "Download ID",
+		},
+	],
+);
+
+registerChromePassthrough(
+	"chrome_downloads_show",
+	"chrome",
+	"Show a downloaded file",
+	["downloads"],
+	schemas.ChromeDownloadsShowParamsSchema,
+	z.null(),
+	"ECHROME",
+	"extension",
+	[
+		{
+			name: "downloadId",
+			type: "number",
+			required: false,
+			description: "Download ID",
+		},
+	],
+);
+
+registerChromePassthrough(
+	"chrome_system_cpu_getInfo",
+	"chrome",
+	"Get CPU info",
+	["system", "cpu"],
+	schemas.ChromeSystemCpuGetInfoParamsSchema,
+	schemas.ChromeSystemCpuInfoSchema,
+	"ECHROME",
+	"extension",
+	[],
+);
+
+registerChromePassthrough(
+	"chrome_system_memory_getInfo",
+	"chrome",
+	"Get memory info",
+	["system", "memory"],
+	schemas.ChromeSystemMemoryGetInfoParamsSchema,
+	schemas.ChromeSystemMemoryInfoSchema,
+	"ECHROME",
+	"extension",
+	[],
+);
+
+registerChromePassthrough(
+	"chrome_system_storage_getInfo",
+	"chrome",
+	"Get storage info",
+	["system", "storage"],
+	schemas.ChromeSystemStorageGetInfoParamsSchema,
+	schemas.ChromeSystemStorageInfoSchema,
+	"ECHROME",
+	"extension",
+	[],
+);
+
 
 // ─── Alias actions ───────────────────────────────────────────────
 

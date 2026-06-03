@@ -95,7 +95,42 @@ const mockChrome = {
 	sidePanel: {
 		setOptions: vi.fn(() => Promise.resolve()),
 	},
+	tabGroups: {
+		query: vi.fn(() => Promise.resolve([])),
+		get: vi.fn(() => Promise.resolve({})),
+		update: vi.fn(() => Promise.resolve({})),
+	},
+	sessions: {
+		getRecentlyClosed: vi.fn(() => Promise.resolve([])),
+		restore: vi.fn(() => Promise.resolve({})),
+		getDevices: vi.fn(() => Promise.resolve([])),
+	},
+	downloads: {
+		download: vi.fn(() => Promise.resolve(1)),
+		search: vi.fn(() => Promise.resolve([])),
+		pause: vi.fn(() => Promise.resolve()),
+		resume: vi.fn(() => Promise.resolve()),
+		cancel: vi.fn(() => Promise.resolve()),
+		erase: vi.fn(() => Promise.resolve([])),
+		open: vi.fn(() => Promise.resolve()),
+		show: vi.fn(() => Promise.resolve()),
+	},
+	system: {
+		cpu: {
+			getInfo: vi.fn(() => Promise.resolve({})),
+		},
+		memory: {
+			getInfo: vi.fn(() => Promise.resolve({})),
+		},
+		storage: {
+			getInfo: vi.fn(() => Promise.resolve([])),
+		},
+	},
 };
+
+// Extend existing tabs mock with group/ungroup
+(mockChrome.tabs as any).group = vi.fn(() => Promise.resolve(1));
+(mockChrome.tabs as any).ungroup = vi.fn(() => Promise.resolve());
 
 // ─── Imports ─────────────────────────────────────────────────────
 
@@ -746,6 +781,44 @@ describe("chrome passthrough", () => {
 		if (result.ok) {
 			expect(result.value).toBe("notif-id");
 		}
+	});
+
+	it("chrome_tabGroups_query returns array", async () => {
+		const result = await dispatchTool("chrome_tabGroups_query", {});
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(Array.isArray(result.value)).toBe(true);
+		}
+		expect(mockChrome.tabGroups.query).toHaveBeenCalled();
+	});
+
+	it("chrome_sessions_getRecentlyClosed returns array", async () => {
+		const result = await dispatchTool("chrome_sessions_getRecentlyClosed", {});
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(Array.isArray(result.value)).toBe(true);
+		}
+		expect(mockChrome.sessions.getRecentlyClosed).toHaveBeenCalled();
+	});
+
+	it("chrome_downloads_download returns id", async () => {
+		const result = await dispatchTool("chrome_downloads_download", {
+			url: "https://example.com/file.zip",
+		});
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.value).toBe(1);
+		}
+		expect(mockChrome.downloads.download).toHaveBeenCalled();
+	});
+
+	it("chrome_system_cpu_getInfo returns object", async () => {
+		const result = await dispatchTool("chrome_system_cpu_getInfo", {});
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(typeof result.value).toBe("object");
+		}
+		expect(mockChrome.system.cpu.getInfo).toHaveBeenCalled();
 	});
 });
 

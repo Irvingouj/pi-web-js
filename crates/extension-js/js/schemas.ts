@@ -353,6 +353,55 @@ export const ChromeNotificationsClearParamsSchema = z.union([
 
 export const ChromeScriptingExecuteScriptParamsSchema = z.record(z.unknown());
 
+export const ChromeTabGroupsQueryParamsSchema = z.record(z.unknown());
+export const ChromeTabGroupsGetParamsSchema = z.union([
+	z.number(),
+	z.record(z.unknown()),
+]);
+export const ChromeTabGroupsUpdateParamsSchema = z.record(z.unknown());
+
+export const ChromeTabsGroupParamsSchema = z.record(z.unknown());
+export const ChromeTabsUngroupParamsSchema = z.union([
+	z.number(),
+	z.record(z.unknown()),
+]);
+
+export const ChromeSessionsGetRecentlyClosedParamsSchema = z.record(z.unknown());
+export const ChromeSessionsRestoreParamsSchema = z.union([
+	z.string(),
+	z.number(),
+	z.record(z.unknown()),
+]);
+export const ChromeSessionsGetDevicesParamsSchema = z.record(z.unknown());
+
+export const ChromeDownloadsDownloadParamsSchema = z.record(z.unknown());
+export const ChromeDownloadsSearchParamsSchema = z.record(z.unknown());
+export const ChromeDownloadsEraseParamsSchema = z.record(z.unknown());
+export const ChromeDownloadsPauseParamsSchema = z.union([
+	z.number(),
+	z.record(z.unknown()),
+]);
+export const ChromeDownloadsResumeParamsSchema = z.union([
+	z.number(),
+	z.record(z.unknown()),
+]);
+export const ChromeDownloadsCancelParamsSchema = z.union([
+	z.number(),
+	z.record(z.unknown()),
+]);
+export const ChromeDownloadsOpenParamsSchema = z.union([
+	z.number(),
+	z.record(z.unknown()),
+]);
+export const ChromeDownloadsShowParamsSchema = z.union([
+	z.number(),
+	z.record(z.unknown()),
+]);
+
+export const ChromeSystemCpuGetInfoParamsSchema = z.record(z.unknown());
+export const ChromeSystemMemoryGetInfoParamsSchema = z.record(z.unknown());
+export const ChromeSystemStorageGetInfoParamsSchema = z.record(z.unknown());
+
 // ─── Host call schema ──────────────────────────────────────────
 
 export const HostCallParamsSchema = z.record(z.unknown());
@@ -402,6 +451,16 @@ export const ChromeNotificationIdSchema = z.string();
 export const ChromeNotificationClearSchema = z.boolean();
 export const ChromeMenuItemIdSchema = z.union([z.string(), z.number()]);
 export const ChromeAlarmsClearSchema = z.boolean();
+export const ChromeTabGroupSchema = z.record(z.unknown());
+export const ChromeTabGroupArraySchema = z.array(ChromeTabGroupSchema);
+export const ChromeSessionArraySchema = z.array(z.record(z.unknown()));
+export const ChromeDeviceArraySchema = z.array(z.record(z.unknown()));
+export const ChromeDownloadSchema = z.record(z.unknown());
+export const ChromeDownloadArraySchema = z.array(ChromeDownloadSchema);
+export const ChromeDownloadIdSchema = z.number();
+export const ChromeSystemCpuInfoSchema = z.record(z.unknown());
+export const ChromeSystemMemoryInfoSchema = z.record(z.unknown());
+export const ChromeSystemStorageInfoSchema = z.array(z.record(z.unknown()));
 
 // ─── Type-satisfaction checks ──────────────────────────────────
 // Ensure zod-inferred types align with ts-rs generated types.
