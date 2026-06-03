@@ -17,7 +17,10 @@
 		"clipboardRead",
 		"clipboardWrite",
 		"storage",
-		"windows"
+		"windows",
+		"tabGroups",
+		"sessions",
+		"downloads"
 	],
 	"host_permissions": ["<all_urls>"],
 	"background": {
