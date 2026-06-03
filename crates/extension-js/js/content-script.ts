@@ -4,18 +4,48 @@
 const __LOG_LEVELS = { debug: 0, info: 1, warn: 2, error: 3, none: 4 } as const;
 let __logLevel = 3; // default "error"
 
+function __formatMeta(meta: Record<string, unknown> | undefined): string {
+	if (!meta) return "";
+	const parts: string[] = [];
+	for (const [key, value] of Object.entries(meta)) {
+		let str: string;
+		if (value === null) str = "null";
+		else if (value === undefined) str = "undefined";
+		else if (typeof value === "string") str = value;
+		else if (typeof value === "number" || typeof value === "boolean")
+			str = String(value);
+		else
+			try {
+				str = JSON.stringify(value);
+			} catch {
+				str = "[Circular]";
+			}
+		parts.push(`${key}=${str}`);
+	}
+	return parts.length > 0 ? " " + parts.join(" ") : "";
+}
+
+function __log(level: number, event: string, meta?: Record<string, unknown>) {
+	if (level < __logLevel) return;
+	const metaStr = __formatMeta(meta);
+	const msg = `[extension-js][content-script] ${event}${metaStr}`;
+	if (level >= 3) console.error(msg);
+	else if (level === 2) console.warn(msg);
+	else console.log(msg);
+}
+
 const logger = {
-	debug: (...args: unknown[]) => {
-		if (__logLevel <= 0) console.log(...args);
+	debug: (event: string, meta?: Record<string, unknown>) => {
+		__log(0, event, meta);
 	},
-	info: (...args: unknown[]) => {
-		if (__logLevel <= 1) console.log(...args);
+	info: (event: string, meta?: Record<string, unknown>) => {
+		__log(1, event, meta);
 	},
-	warn: (...args: unknown[]) => {
-		if (__logLevel <= 2) console.warn(...args);
+	warn: (event: string, meta?: Record<string, unknown>) => {
+		__log(2, event, meta);
 	},
-	error: (...args: unknown[]) => {
-		if (__logLevel <= 3) console.error(...args);
+	error: (event: string, meta?: Record<string, unknown>) => {
+		__log(3, event, meta);
 	},
 };
 
@@ -505,14 +535,9 @@ const handlers: Record<string, Handler> = {
 	snapshot: async (params) => {
 		const obj = asRecord(params);
 		const maxNodes = typeof obj.max_nodes === "number" ? obj.max_nodes : 500;
-		logger.debug(
-			"[content-script] snapshot called, maxNodes:",
-			maxNodes,
-			"document.body:",
-			!!document.body,
-		);
+		logger.debug("snapshot", { maxNodes, hasBody: !!document.body });
 		const r = inlineSnapshot(maxNodes);
-		logger.debug("[content-script] snapshot result nodes:", r.nodes.length);
+		logger.debug("snapshot_result", { nodeCount: r.nodes.length });
 		return r;
 	},
 
@@ -556,15 +581,13 @@ const handlers: Record<string, Handler> = {
 
 chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
 	const action = (request as Record<string, unknown>)?.action;
-	logger.debug(
-		"[content-script] received action:",
+	logger.debug("received", {
 		action,
-		"params:",
-		(request as Record<string, unknown>)?.params,
-	);
+		hasParams: !!(request as Record<string, unknown>)?.params,
+	});
 	const handler = handlers[action as string];
 	if (!handler) {
-		logger.debug("[content-script] no handler for action:", action);
+		logger.debug("no_handler", { action });
 		sendResponse({
 			ok: false,
 			error: `Unknown content script action: ${action}`,
@@ -577,32 +600,22 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
 		if (result instanceof Promise) {
 			result
 				.then((value) => {
-					logger.debug(
-						"[content-script] async response for",
-						action,
-						":",
-						typeof value,
-					);
+					logger.debug("async_response", { action, resultType: typeof value });
 					sendResponse(value);
 				})
 				.catch((err: unknown) => {
 					const msg = err instanceof Error ? err.message : String(err);
-					logger.debug("[content-script] async error for", action, ":", msg);
+					logger.debug("async_error", { action, error: msg });
 					sendResponse({ ok: false, error: msg || String(err) });
 				});
 			return true;
 		}
-		logger.debug(
-			"[content-script] sync response for",
-			action,
-			":",
-			typeof result,
-		);
+		logger.debug("sync_response", { action, resultType: typeof result });
 		sendResponse(result);
 		return false;
 	} catch (err) {
 		const msg = err instanceof Error ? err.message : String(err);
-		logger.debug("[content-script] sync error for", action, ":", msg);
+		logger.debug("sync_error", { action, error: msg });
 		sendResponse({ ok: false, error: msg || String(err) });
 		return false;
 	}

@@ -6,13 +6,16 @@ pub use log::set_log_level;
 pub use session::ExtensionSession;
 
 use wasm_bindgen::prelude::*;
+use tracing_subscriber::{layer::SubscriberExt, Registry};
+use tracing_wasm::WASMLayer;
 
 #[wasm_bindgen(start)]
 pub fn main() {
-    tracing_wasm::set_as_global_default();
-    web_sys::console::log_1(&wasm_bindgen::JsValue::from_str("[tracing-wasm] init ok"));
+    let subscriber = Registry::default()
+        .with(log::LogLevelFilterLayer)
+        .with(WASMLayer::new(Default::default()));
+    tracing::subscriber::set_global_default(subscriber).unwrap();
     tracing::info!("extension-js WASM initialized, tracing enabled");
-    tracing::error!("[tracing-wasm] test error log");
 }
 
 #[wasm_bindgen(js_name = generateApiDocs)]

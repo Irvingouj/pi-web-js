@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { z } from "zod";
-import * as path from "node:path";
 import * as fs from "node:fs";
+import * as path from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 
 // ─── Mocks ───────────────────────────────────────────────────────
 
@@ -15,6 +15,25 @@ vi.mock("./logger.js", () => ({
 		error: vi.fn(),
 		warn: vi.fn(),
 		info: vi.fn(),
+		child: vi.fn(() => ({
+			debug: vi.fn(),
+			error: vi.fn(),
+			warn: vi.fn(),
+			info: vi.fn(),
+			timer: vi.fn(() => vi.fn()),
+		})),
+		timer: vi.fn(() => vi.fn()),
+	},
+	setLogLevel: vi.fn(),
+	getLogLevel: vi.fn(() => "error"),
+	registerWasmSetLogLevel: vi.fn(),
+	Logger: class MockLogger {
+		debug = vi.fn();
+		error = vi.fn();
+		warn = vi.fn();
+		info = vi.fn();
+		child = vi.fn(() => new MockLogger());
+		timer = vi.fn(() => vi.fn());
 	},
 }));
 
@@ -80,24 +99,25 @@ const mockChrome = {
 
 // ─── Imports ─────────────────────────────────────────────────────
 
+import { logger } from "./logger.js";
 // runner.ts registers all tools at module load time; initExtensionListeners()
 // is a no-op because chrome is not yet stubbed.  We stub it before tests
 // that need it.
 import {
 	executeMainThreadCommand,
+	initExtensionListeners,
 	normalizeParams,
 	registerHostHandler,
 	registerHostHandlers,
-	initExtensionListeners,
 	removeExtensionListeners,
 } from "./runner.js";
 
 import {
-	registerTool,
-	getTool,
 	clearRegistry,
-	listTools,
 	dispatchTool,
+	getTool,
+	listTools,
+	registerTool,
 	setRunnerAbortController,
 	throwIfAborted,
 } from "./tool-registry.js";
@@ -1073,5 +1093,70 @@ describe("registry core", () => {
 			expect(result.error.code).toBe("E_INVALID_PARAMS");
 			expect(result.error.category).toBe("validation");
 		}
+	});
+});
+
+// ─── 17. Logging tests ───────────────────────────────────────────
+
+describe("logging", () => {
+	it("logs command dispatch with runId on success", async () => {
+		registerHostHandler("test_logging_ok", async () => ({ ok: true }));
+
+		const finishFn = vi.fn();
+		const childLogger = {
+			debug: vi.fn(),
+			error: vi.fn(),
+			warn: vi.fn(),
+			info: vi.fn(),
+			timer: vi.fn(() => finishFn),
+		};
+		vi.mocked(logger.child).mockReturnValue(
+			childLogger as unknown as ReturnType<typeof logger.child>,
+		);
+
+		const result = await executeMainThreadCommand({
+			action: "host_test_logging_ok",
+			params: {},
+			runId: "test-run-123",
+			call_id: 42,
+		});
+
+		expect(logger.child).toHaveBeenCalledWith("runner");
+		expect(childLogger.timer).toHaveBeenCalledWith("command_dispatch", {
+			action: "host_test_logging_ok",
+			commandId: 42,
+			runId: "test-run-123",
+		});
+		expect(finishFn).toHaveBeenCalledWith({ ok: true, handler: "host" });
+		expect(result.ok).toBe(true);
+	});
+
+	it("logs command dispatch without runId on failure", async () => {
+		const finishFn = vi.fn();
+		const childLogger = {
+			debug: vi.fn(),
+			error: vi.fn(),
+			warn: vi.fn(),
+			info: vi.fn(),
+			timer: vi.fn(() => finishFn),
+		};
+		vi.mocked(logger.child).mockReturnValue(
+			childLogger as unknown as ReturnType<typeof logger.child>,
+		);
+
+		const result = await executeMainThreadCommand({
+			action: "host_nonexistent_handler_for_logging",
+			params: {},
+			call_id: 99,
+		});
+
+		expect(logger.child).toHaveBeenCalledWith("runner");
+		expect(childLogger.timer).toHaveBeenCalledWith("command_dispatch", {
+			action: "host_nonexistent_handler_for_logging",
+			commandId: 99,
+			runId: undefined,
+		});
+		expect(finishFn).toHaveBeenCalledWith({ ok: false, handler: "host" });
+		expect(result.ok).toBe(false);
 	});
 });

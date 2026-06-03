@@ -128,6 +128,16 @@ pub enum WasmRunResult {
     },
 }
 
+impl WasmRunResult {
+    pub fn status(&self) -> &'static str {
+        match self {
+            WasmRunResult::Pending { .. } => "Pending",
+            WasmRunResult::Ok { .. } => "Ok",
+            WasmRunResult::Err { .. } => "Err",
+        }
+    }
+}
+
 // ─── From impls ────────────────────────────────────────────────
 
 impl From<web_js_core::CellError> for WasmCellError {

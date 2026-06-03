@@ -5,51 +5,55 @@
 import type { TreeSnapshot } from "@pi-oxide/dom-semantic-tree";
 
 export type CommandParams =
-  | FetchParams
-  | SleepParams
-  | PageClickParams
-  | PageDblClickParams
-  | PageFillParams
-  | PageTypeParams
-  | PagePressParams
-  | PageSelectParams
-  | PageCheckParams
-  | PageHoverParams
-  | PageScrollParams
-  | PageScrollToParams
-  | PageGotoParams
-  | PageFindParams
-  | PageWaitForParams
-  | PageExtractParams
-  | PageAppendParams
-  | PageWaitParams
-  | StorageGetParams
-  | StorageSetParams
-  | StorageDeleteParams
-  | DomSnapshotParams
-  | DomFormatParams
-  | TabClickParams
-  | TabFillParams
-  | TabEvaluateParams
-  | TabBackParams
-  | TabWaitForLoadParams
-  | TabScrollToParams
-  | TabTypeParams
-  | TabPressParams
-  | TabSelectParams
-  | TabCheckParams
-  | TabHoverParams
-  | TabUnhoverParams
-  | TabScrollParams
-  | TabDblClickParams
-  | FsWriteParams
-  | FsPathParams
-  | FsCopyParams
-  | FsUpdateParams
-  | FsHashParams
-  | FsReadRangeParams;
+	| FetchParams
+	| SleepParams
+	| PageClickParams
+	| PageDblClickParams
+	| PageFillParams
+	| PageTypeParams
+	| PagePressParams
+	| PageSelectParams
+	| PageCheckParams
+	| PageHoverParams
+	| PageScrollParams
+	| PageScrollToParams
+	| PageGotoParams
+	| PageFindParams
+	| PageWaitForParams
+	| PageExtractParams
+	| PageAppendParams
+	| PageWaitParams
+	| StorageGetParams
+	| StorageSetParams
+	| StorageDeleteParams
+	| DomSnapshotParams
+	| DomFormatParams
+	| TabClickParams
+	| TabFillParams
+	| TabEvaluateParams
+	| TabBackParams
+	| TabWaitForLoadParams
+	| TabScrollToParams
+	| TabTypeParams
+	| TabPressParams
+	| TabSelectParams
+	| TabCheckParams
+	| TabHoverParams
+	| TabUnhoverParams
+	| TabScrollParams
+	| TabDblClickParams
+	| FsWriteParams
+	| FsPathParams
+	| FsCopyParams
+	| FsUpdateParams
+	| FsHashParams
+	| FsReadRangeParams;
 
-export type AsyncCommand = { call_id: number; action: string; params: CommandParams };
+export type AsyncCommand = {
+	call_id: number;
+	action: string;
+	params: CommandParams;
+};
 
 export type CellError =
 	| { kind: "compile"; message: string; line: number | null }

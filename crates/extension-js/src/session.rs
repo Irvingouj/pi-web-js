@@ -3,6 +3,10 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 use web_js_base::types::*;
 use web_js_base::BaseSession;
+use tracing::Instrument;
+use std::sync::atomic::{AtomicU64, Ordering};
+
+static SESSION_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[wasm_bindgen]
 extern "C" {
@@ -22,6 +26,7 @@ extern "C" {
 #[wasm_bindgen]
 pub struct ExtensionSession {
     base: BaseSession,
+    session_id: String,
 }
 
 impl Default for ExtensionSession {
@@ -37,10 +42,13 @@ impl ExtensionSession {
     pub fn new() -> Self {
         init_fs_registry();
         init_extension_registry();
+        let session_id = format!("sess_{}", SESSION_COUNTER.fetch_add(1, Ordering::Relaxed));
         let mut session = Self {
             base: BaseSession::new(),
+            session_id,
         };
         session.inject_registry_bindings();
+        tracing::info!(session_id = %session.session_id, "session_created");
         session
     }
 
@@ -50,6 +58,7 @@ impl ExtensionSession {
         init_fs_registry();
         init_extension_registry();
         self.inject_registry_bindings();
+        tracing::info!(session_id = %self.session_id, "session_reset");
     }
 
     /// Inject async API bindings from the doc registry into the JS environment.
@@ -84,23 +93,29 @@ impl ExtensionSession {
     /// Run a cell, automatically resolving all async calls by relaying
     /// them to the main-thread runner via `__extension_js_relay`.
     #[wasm_bindgen(js_name = runCellAsync)]
-    pub async fn run_cell_async(&mut self, code: String, stdin: String) -> CellResult {
+    pub async fn run_cell_async(&mut self, code: String, stdin: String, run_id: String) -> CellResult {
+        let span = tracing::info_span!("run_cell_async", session_id = %self.session_id, run_id = %run_id);
         let result = web_js_base::run_cell_async_loop(
             &mut self.base,
             &code,
             &stdin,
-            |cmd| async move {
-                match ExtensionSession::handle_command(&cmd).await {
-                    Ok(r) => Ok(r),
-                    Err(e) => Err(WasmAsyncError {
-                        message: e,
-                        code: "E_RELAY_ERROR".into(),
-                    }),
+            |cmd| {
+                let run_id_for_cmd = run_id.clone();
+                async move {
+                    let span = tracing::info_span!("handle_command", command_id = cmd.call_id, action = %cmd.action, run_id = %run_id_for_cmd);
+                    async {
+                        match ExtensionSession::handle_command(&cmd).await {
+                            Ok(r) => Ok(r),
+                            Err(e) => Err(WasmAsyncError {
+                                message: e,
+                                code: "E_RELAY_ERROR".into(),
+                            }),
+                        }
+                    }.instrument(span).await
                 }
             },
             None,
-        )
-        .await;
+        ).instrument(span).await;
 
         result.into()
     }
@@ -108,11 +123,7 @@ impl ExtensionSession {
 
 impl ExtensionSession {
     async fn handle_command(cmd: &WasmAsyncCommand) -> Result<WasmAsyncResponse, String> {
-        tracing::info!(
-            "[ExtensionSession] handle_command action={} call_id={}",
-            cmd.action,
-            cmd.call_id
-        );
+        tracing::info!(call_id = cmd.call_id, action = %cmd.action, "handle_command_start");
 
         // If action starts with "fs_", dispatch via the local registry.
         if cmd.action.starts_with("fs_") {
@@ -131,19 +142,11 @@ impl ExtensionSession {
                             code: e.code,
                         }),
                     };
-                    tracing::info!(
-                        "[ExtensionSession] handle_command action={} ok={} (local fs registry)",
-                        cmd.action,
-                        wasm_resp.ok
-                    );
+                    tracing::info!(call_id = cmd.call_id, action = %cmd.action, ok = wasm_resp.ok, "handle_command_fs_done");
                     return Ok(wasm_resp);
                 }
                 Err(e) => {
-                    tracing::info!(
-                        "[ExtensionSession] handle_command action={} error={} (local fs registry)",
-                        cmd.action,
-                        e
-                    );
+                    tracing::info!(call_id = cmd.call_id, action = %cmd.action, error = %e, "handle_command_fs_error");
                     return Err(e);
                 }
             }
@@ -171,11 +174,7 @@ impl ExtensionSession {
         let resp: WasmAsyncResponse = serde_json::from_str(&resp_json_str)
             .map_err(|e| format!("Failed to deserialize response: {:?}", e))?;
 
-        tracing::info!(
-            "[ExtensionSession] handle_command action={} ok={}",
-            cmd.action,
-            resp.ok
-        );
+        tracing::info!(call_id = cmd.call_id, action = %cmd.action, ok = resp.ok, "handle_command_relay_done");
         Ok(resp)
     }
 }

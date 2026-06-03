@@ -14,12 +14,14 @@ import {
 	setRunnerAbortController,
 } from "./runner.js";
 
+export { generateApiDocs } from "./extension_js.js";
+export type { LogLevel } from "./logger.js";
+export { setLogLevel } from "./logger.js";
 export type {
 	CellResult as JsRunResult,
 	WasmGlobalsSnapshot as JsGlobalsSnapshot,
 };
 export { registerHostHandler, registerHostHandlers };
-export { generateApiDocs } from "./extension_js.js";
 
 export interface JsApiDoc {
 	namespace: string;
@@ -39,18 +41,21 @@ export interface JsApiDoc {
 	source: string;
 }
 
-interface WorkerMessage {
-	type: string;
-	id?: string;
-	code?: string;
-	stdin?: string;
-	source?: string;
-	command?: unknown;
-	data?: unknown;
-	result?: unknown;
-	error?: string;
-	limit?: number;
-}
+type WorkerRequest =
+	| { type: "runCell"; id: string; code: string; stdin: string; runId?: string }
+	| { type: "reset"; id?: string }
+	| { type: "stop"; id: string }
+	| { type: "setFuelLimit"; id?: string; limit: number }
+	| { type: "inspectGlobals"; id: string }
+	| { type: "loadLibrary"; id: string; source: string }
+	| { type: "setLogLevel"; level: number }
+	| { type: "asyncRelayResult"; id: string; result: unknown };
+
+type WorkerResponse =
+	| { type: "asyncRelay"; id: string; command: unknown; runId?: string }
+	| { type: "result"; id: string; data?: unknown; runId?: string }
+	| { type: "error"; id?: string; error: string; runId?: string }
+	| { type: "ready" };
 
 /**
  * ExtensionSession proxy that lives on the main thread.
@@ -114,7 +119,7 @@ export class ExtensionSession {
 			readyReject(new Error(`Worker message deserialization error: ${e.data}`));
 		};
 
-		w.onmessage = async (e: MessageEvent<WorkerMessage>) => {
+		w.onmessage = async (e: MessageEvent<WorkerResponse>) => {
 			const msg = e.data;
 			switch (msg.type) {
 				case "ready": {
@@ -133,7 +138,7 @@ export class ExtensionSession {
 		return [readyPromise, runnerPromise];
 	}
 
-	private handleWorkerMessage(e: MessageEvent<WorkerMessage>) {
+	private handleWorkerMessage(e: MessageEvent<WorkerResponse>) {
 		const msg = e.data;
 		switch (msg.type) {
 			case "result": {
@@ -142,10 +147,8 @@ export class ExtensionSession {
 				const pending = this.pendingCalls.get(callId);
 				if (pending) {
 					this.pendingCalls.delete(callId);
-					console.log(
-						"[ExtensionSession] result data:",
-						JSON.stringify(msg.data),
-					);
+					// Intentionally omit msg.data from logs to avoid leaking large or sensitive cell outputs.
+					logger.debug("result", { callId, runId: msg.runId });
 					pending.resolve(msg.data);
 				}
 				break;
@@ -161,26 +164,24 @@ export class ExtensionSession {
 					}
 				}
 				// Global worker errors without a matching call
-				logger.error("[extension-js worker]", msg.error);
+				logger.error("worker_error", { error: msg.error });
 				break;
 			}
 			case "asyncRelay": {
 				if (!msg.id || !msg.command) break;
 				const action = (msg.command as Record<string, unknown>)?.action;
-				logger.debug(
-					"[ExtensionSession] asyncRelay action:",
-					action,
-					"id:",
-					msg.id,
-				);
-				executeMainThreadCommand(msg.command as Command)
+				logger.debug("asyncRelay", { action, id: msg.id, runId: msg.runId });
+				const cmd = msg.command as Command;
+				// Mutate the relayed command in-place to attach the correlation ID.
+				// The command object originates from WASM and is discarded after this call.
+				cmd.runId = msg.runId;
+				executeMainThreadCommand(cmd)
 					.then((result) => {
-						logger.debug(
-							"[ExtensionSession] asyncRelayResult action:",
+						logger.debug("asyncRelayResult", {
 							action,
-							"resultType:",
-							typeof result,
-						);
+							id: msg.id,
+							resultType: typeof result,
+						});
 						this.worker?.postMessage({
 							type: "asyncRelayResult",
 							id: msg.id,
@@ -189,12 +190,11 @@ export class ExtensionSession {
 					})
 					.catch((err: Error | unknown) => {
 						const message = err instanceof Error ? err.message : String(err);
-						logger.error(
-							"[ExtensionSession] asyncRelay error action:",
+						logger.error("asyncRelay_error", {
 							action,
-							"msg:",
-							message,
-						);
+							id: msg.id,
+							error: message,
+						});
 						this.worker?.postMessage({
 							type: "asyncRelayResult",
 							id: msg.id,
@@ -209,9 +209,7 @@ export class ExtensionSession {
 		}
 	}
 
-	private postAndWait<T>(
-		msg: Omit<WorkerMessage, "id"> & { id: string },
-	): Promise<T> {
+	private postAndWait<T>(msg: WorkerRequest & { id: string }): Promise<T> {
 		const worker = this.worker;
 		if (!worker || this.disposed) {
 			return Promise.reject(
@@ -229,7 +227,14 @@ export class ExtensionSession {
 
 	async runCellAsync(code: string, stdin?: string): Promise<CellResult> {
 		const id = this.generateId();
-		return this.postAndWait({ type: "runCell", id, code, stdin: stdin || "" });
+		const runId = this.generateId();
+		return this.postAndWait({
+			type: "runCell",
+			id,
+			code,
+			stdin: stdin || "",
+			runId,
+		});
 	}
 
 	reset(): Promise<void> {
@@ -302,7 +307,7 @@ export class ExtensionSession {
 		try {
 			await runner;
 		} catch (e) {
-			logger.warn("ExtensionSession runner rejected during stop:", e);
+			logger.warn("runner_rejected_during_stop", { error: e });
 		}
 	}
 

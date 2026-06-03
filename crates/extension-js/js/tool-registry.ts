@@ -1,8 +1,13 @@
 import type { z } from "zod";
+import { logger } from "./logger.js";
+
+const log = logger.child("tool-registry");
 
 export interface Command {
 	action: string;
 	params: unknown;
+	call_id?: number;
+	runId?: string;
 }
 
 export type AsyncError = {
@@ -93,6 +98,7 @@ export async function dispatchTool(
 	action: string,
 	params: unknown,
 ): Promise<AsyncResponse> {
+	log.debug("dispatch_start", { action });
 	const tool = toolRegistry.get(action);
 	if (!tool) {
 		return {
@@ -113,6 +119,7 @@ export async function dispatchTool(
 			const path = issue.path.join(".");
 			return `invalid value for field '${path}' (${issue.message})`;
 		});
+		log.warn("dispatch_invalid_params", { action, issues });
 		return {
 			ok: false,
 			error: {
@@ -125,6 +132,7 @@ export async function dispatchTool(
 
 	try {
 		const value = await tool.handler(parseResult.data);
+		log.debug("dispatch_done", { action, ok: true, resultType: typeof value });
 		return { ok: true, value };
 	} catch (err: unknown) {
 		const message = err instanceof Error ? err.message : String(err);
@@ -134,6 +142,7 @@ export async function dispatchTool(
 		const category = (err as unknown as Record<string, unknown>).category as
 			| string
 			| undefined;
+		log.error("dispatch_error", { action, error: message, code });
 		const error: AsyncError = { message, code };
 		if (category !== undefined) {
 			error.category = category;
