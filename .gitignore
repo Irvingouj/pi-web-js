@@ -58,3 +58,6 @@ crates/js/
 
 # Tool configuration
 .opencode/
+# Claude worktrees and backups
+.claude/
+*.bak

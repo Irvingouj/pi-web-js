@@ -13,15 +13,15 @@ test.describe("fs", () => {
     await waitForKernelReady(page);
   });
 
-  test("1: fs.write_text and fs.read_text roundtrip", async ({ page }) => {
+  test("1: fs.writeText and fs.readText roundtrip", async ({ page }) => {
     await setCellCode(
       page,
       0,
-      `await fs.write_text("/test_hello.txt", "hello world");
+      `await fs.writeText("/test_hello.txt", "hello world");
 let ok = true;
 let txt;
 try {
-  txt = await fs.read_text("/test_hello.txt");
+  txt = await fs.readText("/test_hello.txt");
 } catch (e) {
   ok = false;
   txt = e;
@@ -40,8 +40,8 @@ print("txt: " + txt);`,
       page,
       0,
       `await fs.mkdir("/test_dir");
-await fs.write_text("/test_dir/a.txt", "a");
-await fs.write_text("/test_dir/b.txt", "b");
+await fs.writeText("/test_dir/a.txt", "a");
+await fs.writeText("/test_dir/b.txt", "b");
 let ok = true;
 let entries;
 try {
@@ -72,7 +72,7 @@ if (Array.isArray(entries)) {
     await setCellCode(
       page,
       0,
-      `await fs.write_text("/stat_check.txt", "12345");
+      `await fs.writeText("/stat_check.txt", "12345");
 let ok = true;
 let meta;
 try {
@@ -120,7 +120,7 @@ print("dir: " + dir);`,
     await setCellCode(
       page,
       0,
-      `await fs.write_text("/to_delete.txt", "temporary");
+      `await fs.writeText("/to_delete.txt", "temporary");
 const before = await fs.exists("/to_delete.txt");
 print("before: " + before);
 await fs.delete("/to_delete.txt");
@@ -137,13 +137,13 @@ print("after: " + after);`,
     await setCellCode(
       page,
       0,
-      `await fs.write_text("/copy_src.txt", "copyme");
+      `await fs.writeText("/copy_src.txt", "copyme");
 await fs.copy("/copy_src.txt", "/copy_dst.txt");
-const copied = await fs.read_text("/copy_dst.txt");
+const copied = await fs.readText("/copy_dst.txt");
 print("copied: " + copied);
-await fs.write_text("/move_src.txt", "moveme");
+await fs.writeText("/move_src.txt", "moveme");
 await fs.move("/move_src.txt", "/move_dst.txt");
-const moved = await fs.read_text("/move_dst.txt");
+const moved = await fs.readText("/move_dst.txt");
 print("moved: " + moved);
 const srcExists = await fs.exists("/move_src.txt");
 print("src_exists: " + srcExists);`,
@@ -155,15 +155,15 @@ print("src_exists: " + srcExists);`,
     await expectCellOutputContains(page, 0, "src_exists: false");
   });
 
-  test("7: fs.write_base64 and fs.read_base64", async ({ page }) => {
+  test("7: fs.writeBase64 and fs.readBase64", async ({ page }) => {
     await setCellCode(
       page,
       0,
-      `await fs.write_base64("/b64.txt", "aGVsbG8=");
+      `await fs.writeBase64("/b64.txt", "aGVsbG8=");
 let ok = true;
 let txt;
 try {
-  txt = await fs.read_text("/b64.txt");
+  txt = await fs.readText("/b64.txt");
 } catch (e) {
   ok = false;
   txt = e;
@@ -175,13 +175,13 @@ print("decoded: " + txt);`,
     await expectCellOutputContains(page, 0, "decoded: hello");
   });
 
-  test("8: fs.append_text extends a file", async ({ page }) => {
+  test("8: fs.appendText extends a file", async ({ page }) => {
     await setCellCode(
       page,
       0,
-      `await fs.write_text("/append.txt", "hello");
-await fs.append_text("/append.txt", " world");
-const txt = await fs.read_text("/append.txt");
+      `await fs.writeText("/append.txt", "hello");
+await fs.appendText("/append.txt", " world");
+const txt = await fs.readText("/append.txt");
 print("appended: " + txt);`,
     );
     await runCell(page, 0);
@@ -189,12 +189,12 @@ print("appended: " + txt);`,
     await expectCellOutputContains(page, 0, "appended: hello world");
   });
 
-  test("9: fs.read_text returns file content", async ({ page }) => {
+  test("9: fs.readText returns file content", async ({ page }) => {
     await setCellCode(
       page,
       0,
-      `await fs.write_text("/readFile_test.txt", "readFile hello");
-const txt = await fs.read_text("/readFile_test.txt");
+      `await fs.writeText("/readFile_test.txt", "readFile hello");
+const txt = await fs.readText("/readFile_test.txt");
 print("txt: " + txt);`,
     );
     await runCell(page, 0);
@@ -202,12 +202,12 @@ print("txt: " + txt);`,
     await expectCellOutputContains(page, 0, "txt: readFile hello");
   });
 
-  test("10: fs.write_text writes and reads back", async ({ page }) => {
+  test("10: fs.writeText writes and reads back", async ({ page }) => {
     await setCellCode(
       page,
       0,
-      `await fs.write_text("/writeFile_test.txt", "writeFile data");
-const txt = await fs.read_text("/writeFile_test.txt");
+      `await fs.writeText("/writeFile_test.txt", "writeFile data");
+const txt = await fs.readText("/writeFile_test.txt");
 print("txt: " + txt);`,
     );
     await runCell(page, 0);
@@ -219,7 +219,7 @@ print("txt: " + txt);`,
     await setCellCode(
       page,
       0,
-      `await fs.write_text("/existsSync_test.txt", "x");
+      `await fs.writeText("/existsSync_test.txt", "x");
 const before = await fs.exists("/existsSync_test.txt");
 const after = await fs.exists("/existsSync_missing.txt");
 print("before: " + before);
@@ -236,8 +236,8 @@ print("after: " + after);`,
       page,
       0,
       `await fs.mkdir("/readdirSync_dir");
-await fs.write_text("/readdirSync_dir/a.txt", "a");
-await fs.write_text("/readdirSync_dir/b.txt", "b");
+await fs.writeText("/readdirSync_dir/a.txt", "a");
+await fs.writeText("/readdirSync_dir/b.txt", "b");
 const entries = await fs.list("/readdirSync_dir");
 print("count: " + entries.length);
 for (const e of entries) {
@@ -268,7 +268,7 @@ print("exists: " + exists);`,
     await setCellCode(
       page,
       0,
-      `await fs.write_text("/unlinkSync_test.txt", "delete me");
+      `await fs.writeText("/unlinkSync_test.txt", "delete me");
 const before = await fs.exists("/unlinkSync_test.txt");
 await fs.delete("/unlinkSync_test.txt");
 const after = await fs.exists("/unlinkSync_test.txt");
@@ -285,8 +285,8 @@ print("after: " + after);`,
     await setCellCode(
       page,
       0,
-      `await fs.write_text("/promises_read.txt", "promises hello");
-const txt = await fs.read_text("/promises_read.txt");
+      `await fs.writeText("/promises_read.txt", "promises hello");
+const txt = await fs.readText("/promises_read.txt");
 print("txt: " + txt);`,
     );
     await runCell(page, 0);

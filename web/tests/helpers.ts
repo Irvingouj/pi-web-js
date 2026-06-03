@@ -45,17 +45,25 @@ export function getCellRunButton(page: Page, index: number): Locator {
 
 /**
  * Set code in a cell's CodeMirror editor.
- * Uses keyboard: click, select all, type.
+ * Uses direct CodeMirror dispatch for reliability, with keyboard fallback.
  */
 export async function setCellCode(page: Page, index: number, code: string) {
   const editor = getCellEditor(page, index);
   await editor.click();
-  // Select all existing content
-  await page.keyboard.press("Meta+a");
-  // Delete it
-  await page.keyboard.press("Backspace");
-  // Type new content (split into chunks for reliability with special chars)
-  await page.keyboard.insertText(code);
+  // Use direct CodeMirror dispatch to reliably set content
+  await page.evaluate(({ idx, codeStr }) => {
+    const cells = document.querySelectorAll('[data-testid="cell"]');
+    const cell = cells[idx];
+    const editorWrapper = cell?.querySelector('.cm-editor-wrapper') as any;
+    const view = editorWrapper?.__codemirror;
+    if (view) {
+      view.dispatch({
+        changes: { from: 0, to: view.state.doc.length, insert: codeStr }
+      });
+    }
+  }, { idx: index, codeStr: code });
+  // Ensure kernel is idle before returning
+  await page.waitForFunction(() => !(window as any).__kernelRunning, { timeout: 30000 });
 }
 
 /**
@@ -68,6 +76,9 @@ export async function runCell(page: Page, index: number) {
 }
 
 export async function runCellViaKernel(page: Page, index: number) {
+  // Wait for kernel to be idle before running
+  await page.waitForFunction(() => !(window as any).__kernelRunning, { timeout: 30000 });
+
   await page.evaluate((idx) => {
     const cells = document.querySelectorAll('[data-testid="cell"]');
     const cell = cells[idx];
@@ -79,6 +90,14 @@ export async function runCellViaKernel(page: Page, index: number) {
       (window as any).__kernel.runCell(cellId, code, '');
     }
   }, index);
+
+  // Poll for kernel idle instead of using page.waitForFunction on the DOM,
+  // which can hang when nested async functions are called across run_cell boundaries.
+  for (let i = 0; i < 240; i++) {
+    await page.waitForTimeout(500);
+    const running = await page.evaluate(() => (window as any).__kernelRunning);
+    if (!running) break;
+  }
 }
 
 /**

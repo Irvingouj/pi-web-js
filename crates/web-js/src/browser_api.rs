@@ -3216,7 +3216,7 @@ pub fn init_registry() {
     web_js_core::web_api! {
         action: "fs_read_text",
         namespace: "fs",
-        name: "read_text",
+        name: "readText",
         doc: "Read a file as text.",
         params: [
             path: "string", "required", "File path",
@@ -3230,7 +3230,7 @@ pub fn init_registry() {
     web_js_core::web_api! {
         action: "fs_read_base64",
         namespace: "fs",
-        name: "read_base64",
+        name: "readBase64",
         doc: "Read a file as base64.",
         params: [
             path: "string", "required", "File path",
@@ -3244,7 +3244,7 @@ pub fn init_registry() {
     web_js_core::web_api! {
         action: "fs_read_range",
         namespace: "fs",
-        name: "read_range",
+        name: "readRange",
         doc: "Read a range of bytes from a file.",
         params: [
             path: "string", "required", "File path",
@@ -3275,7 +3275,7 @@ pub fn init_registry() {
     web_js_core::web_api! {
         action: "fs_write_text",
         namespace: "fs",
-        name: "write_text",
+        name: "writeText",
         doc: "Write text to a file.",
         params: [
             path: "string", "required", "File path",
@@ -3290,7 +3290,7 @@ pub fn init_registry() {
     web_js_core::web_api! {
         action: "fs_write_base64",
         namespace: "fs",
-        name: "write_base64",
+        name: "writeBase64",
         doc: "Write base64 data to a file.",
         params: [
             path: "string", "required", "File path",
@@ -3320,7 +3320,7 @@ pub fn init_registry() {
     web_js_core::web_api! {
         action: "fs_append_text",
         namespace: "fs",
-        name: "append_text",
+        name: "appendText",
         doc: "Append text to a file.",
         params: [
             path: "string", "required", "File path",

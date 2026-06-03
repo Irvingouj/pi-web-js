@@ -514,7 +514,7 @@ pub fn init_fs_registry() {
     web_api! {
         action: "fs_read_text",
         namespace: "fs",
-        name: "read_text",
+        name: "readText",
         doc: "Read a file as UTF-8 text.",
         params: [
             path: "string", "required", "File path",
@@ -528,7 +528,7 @@ pub fn init_fs_registry() {
     web_api! {
         action: "fs_read_base64",
         namespace: "fs",
-        name: "read_base64",
+        name: "readBase64",
         doc: "Read a file as base64-encoded string.",
         params: [
             path: "string", "required", "File path",
@@ -542,7 +542,7 @@ pub fn init_fs_registry() {
     web_api! {
         action: "fs_read_range",
         namespace: "fs",
-        name: "read_range",
+        name: "readRange",
         doc: "Read a byte range from a file as base64.",
         params: [
             path: "string", "required", "File path",
@@ -573,7 +573,7 @@ pub fn init_fs_registry() {
     web_api! {
         action: "fs_write_text",
         namespace: "fs",
-        name: "write_text",
+        name: "writeText",
         doc: "Write UTF-8 text to a file.",
         params: [
             path: "string", "required", "File path",
@@ -588,7 +588,7 @@ pub fn init_fs_registry() {
     web_api! {
         action: "fs_write_base64",
         namespace: "fs",
-        name: "write_base64",
+        name: "writeBase64",
         doc: "Write base64-encoded data to a file.",
         params: [
             path: "string", "required", "File path",
@@ -618,7 +618,7 @@ pub fn init_fs_registry() {
     web_api! {
         action: "fs_append_text",
         namespace: "fs",
-        name: "append_text",
+        name: "appendText",
         doc: "Append UTF-8 text to a file.",
         params: [
             path: "string", "required", "File path",
