@@ -3,8 +3,18 @@
 // ExtensionSession.init() spawns the Worker internally, starts the main-thread
 // runner loop, and returns a proxy + runner promise.
 
-import type { CellResult, WasmGlobalsSnapshot } from "./extension_js.js";
+import type {
+	CellResult,
+	WasmGlobalsSnapshot,
+	FsPathParams,
+	FsCopyParams,
+	FsWriteParams,
+	FsReadRangeParams,
+	FsReadRangeDataParams,
+	FsHashParams,
+} from "./extension_js.js";
 import { logger } from "./logger.js";
+import type { FsActionMap, FsAction } from "./fs-types.js";
 import type { Command } from "./runner.js";
 import {
 	executeMainThreadCommand,
@@ -49,7 +59,8 @@ type WorkerRequest =
 	| { type: "inspectGlobals"; id: string }
 	| { type: "loadLibrary"; id: string; source: string }
 	| { type: "setLogLevel"; level: number }
-	| { type: "asyncRelayResult"; id: string; result: unknown };
+	| { type: "asyncRelayResult"; id: string; result: unknown }
+	| { type: "fsCall"; id: string; action: string; params: unknown };
 
 type WorkerResponse =
 	| { type: "asyncRelay"; id: string; command: unknown; runId?: string }
@@ -255,6 +266,44 @@ export class ExtensionSession {
 	loadLibrary(source: string): Promise<CellResult> {
 		const id = this.generateId();
 		return this.postAndWait({ type: "loadLibrary", id, source });
+	}
+
+	private async safePost<K extends FsAction>(
+		action: K,
+		params: FsActionMap[K]["params"],
+	): Promise<FsActionMap[K]["result"]> {
+		const id = this.generateId();
+		return this.postAndWait({
+			type: "fsCall",
+			id,
+			action,
+			params,
+		} as WorkerRequest & { id: string });
+	}
+
+	get fs() {
+		const self = this;
+		return {
+			exists: (params: FsPathParams) => self.safePost("exists", params),
+			stat: (params: FsPathParams) => self.safePost("stat", params),
+			read: (params: FsPathParams) => self.safePost("read", params),
+			readText: (params: FsPathParams) => self.safePost("readText", params),
+			readBase64: (params: FsPathParams) => self.safePost("readBase64", params),
+			list: (params: FsPathParams) => self.safePost("list", params),
+			mkdir: (params: FsPathParams) => self.safePost("mkdir", params),
+			delete: (params: FsPathParams) => self.safePost("delete", params),
+			copy: (params: FsCopyParams) => self.safePost("copy", params),
+			move: (params: FsCopyParams) => self.safePost("move", params),
+			write: (params: FsWriteParams) => self.safePost("write", params),
+			writeText: (params: FsWriteParams) => self.safePost("writeText", params),
+			writeBase64: (params: FsWriteParams) => self.safePost("writeBase64", params),
+			append: (params: FsWriteParams) => self.safePost("append", params),
+			appendText: (params: FsWriteParams) => self.safePost("appendText", params),
+			appendBase64: (params: FsWriteParams) => self.safePost("appendBase64", params),
+			readRange: (params: FsReadRangeParams) => self.safePost("readRange", params),
+			update: (params: FsReadRangeDataParams) => self.safePost("update", params),
+			hash: (params: FsHashParams) => self.safePost("hash", params),
+		};
 	}
 
 	/**

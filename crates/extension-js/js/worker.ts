@@ -7,6 +7,7 @@ import init, {
 } from "./extension_js.js";
 import type { LogLevel } from "./logger.js";
 import { logger, registerWasmSetLogLevel, setLogLevel } from "./logger.js";
+import type { FsActionMap, FsAction } from "./fs-types.js";
 
 let session: ExtensionSession | null = null;
 let initialized = false;
@@ -53,12 +54,44 @@ workerSelf.__extension_js_relay = (cmd: unknown) => {
 	});
 };
 
+const fsRegistry = new Map<string, (params: unknown) => Promise<unknown>>();
+
+function registerFs<K extends FsAction>(
+	action: K,
+	handler: (params: FsActionMap[K]["params"]) => Promise<FsActionMap[K]["result"]>,
+) {
+	fsRegistry.set(action, handler as (params: unknown) => Promise<unknown>);
+}
+
+function initFsRegistry(s: ExtensionSession) {
+	registerFs("exists", (p) => s.fsExists(p));
+	registerFs("stat", (p) => s.fsStat(p));
+	registerFs("read", (p) => s.fsRead(p));
+	registerFs("readText", (p) => s.fsReadText(p));
+	registerFs("readBase64", (p) => s.fsReadBase64(p));
+	registerFs("list", (p) => s.fsList(p));
+	registerFs("mkdir", (p) => s.fsMkdir(p));
+	registerFs("delete", (p) => s.fsDelete(p));
+	registerFs("copy", (p) => s.fsCopy(p));
+	registerFs("move", (p) => s.fsMove(p));
+	registerFs("write", (p) => s.fsWrite(p));
+	registerFs("writeText", (p) => s.fsWriteText(p));
+	registerFs("writeBase64", (p) => s.fsWriteBase64(p));
+	registerFs("append", (p) => s.fsAppend(p));
+	registerFs("appendText", (p) => s.fsAppendText(p));
+	registerFs("appendBase64", (p) => s.fsAppendBase64(p));
+	registerFs("readRange", (p) => s.fsReadRange(p));
+	registerFs("update", (p) => s.fsUpdate(p));
+	registerFs("hash", (p) => s.fsHash(p));
+}
+
 async function initWasm() {
 	if (initialized) return;
 	await init();
 	session = new ExtensionSession();
 	setWasmLogLevel(3); // default "error"
 	registerWasmSetLogLevel(setWasmLogLevel);
+	initFsRegistry(session);
 	initialized = true;
 }
 
@@ -78,6 +111,7 @@ export type WorkerMessage =
 	| { type: "setFuelLimit"; id?: string; limit: number }
 	| { type: "inspectGlobals"; id: string }
 	| { type: "loadLibrary"; id: string; source: string }
+	| { type: "fsCall"; id: string; action: string; params: unknown }
 	| { type: "setLogLevel"; level: number }
 	| { type: "asyncRelayResult"; id: string; result: unknown };
 
@@ -181,6 +215,25 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
 		case "loadLibrary": {
 			try {
 				const result = session.load_library(msg.source);
+				self.postMessage({ type: "result", id: msg.id, data: result });
+			} catch (err: unknown) {
+				const message = err instanceof Error ? err.message : String(err);
+				self.postMessage({ type: "error", id: msg.id, error: message });
+			}
+			break;
+		}
+		case "fsCall": {
+			const handler = fsRegistry.get(msg.action);
+			if (!handler) {
+				self.postMessage({
+					type: "error",
+					id: msg.id,
+					error: `Unknown fs action: ${msg.action}`,
+				});
+				break;
+			}
+			try {
+				const result = await handler(msg.params);
 				self.postMessage({ type: "result", id: msg.id, data: result });
 			} catch (err: unknown) {
 				const message = err instanceof Error ? err.message : String(err);

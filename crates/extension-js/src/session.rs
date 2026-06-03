@@ -395,3 +395,6 @@ mod tests {
         web_js_core::api_docs::clear_docs();
     }
 }
+
+// ─── Macro-generated wasm_bindgen fs methods ──────────────────────
+crate::impl_extension_session_fs!();

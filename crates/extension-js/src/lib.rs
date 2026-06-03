@@ -1,4 +1,5 @@
 pub mod browser_api;
+pub mod fs;
 pub mod log;
 pub mod session;
 
