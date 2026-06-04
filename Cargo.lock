@@ -121,7 +121,7 @@ dependencies = [
 
 [[package]]
 name = "dom-semantic-tree"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "js-sys",
  "serde",
@@ -142,7 +142,7 @@ checksum = "877a4ace8713b0bcf2a4e7eec82529c029f1d0619886d18145fea96c3ffe5c0f"
 
 [[package]]
 name = "extension-js"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "data-encoding",
  "js-sys",
@@ -1076,7 +1076,7 @@ checksum = "684365b586a9a6256c1cc3544eee8680de48d6041142f581776ec7b139622ae9"
 
 [[package]]
 name = "web-fs"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "data-encoding",
  "js-sys",
@@ -1091,7 +1091,7 @@ dependencies = [
 
 [[package]]
 name = "web-js"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "console_error_panic_hook",
  "data-encoding",
@@ -1115,7 +1115,7 @@ dependencies = [
 
 [[package]]
 name = "web-js-base"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "futures-util",
  "js-sys",
@@ -1131,7 +1131,7 @@ dependencies = [
 
 [[package]]
 name = "web-js-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "dom-semantic-tree",
  "getrandom",
