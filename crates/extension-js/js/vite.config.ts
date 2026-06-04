@@ -2,6 +2,11 @@ import { defineConfig } from "vite";
 import dts from "vite-plugin-dts";
 import path from "path";
 
+const externalize = (id: string) =>
+	id === "zod" ||
+	id === "@pi-oxide/dom-semantic-tree" ||
+	id.endsWith("extension_js.js");
+
 export default defineConfig({
 	base: "./",
 	build: {
@@ -14,10 +19,17 @@ export default defineConfig({
 		emptyOutDir: false,
 		assetsDir: ".",
 		rollupOptions: {
-			external: (id) =>
-				id === "zod" ||
-				id === "@pi-oxide/dom-semantic-tree" ||
-				id.endsWith("extension_js.js"),
+			external: externalize,
+			output: {
+				chunkFileNames: "[name].js",
+				entryFileNames: "[name].js",
+			},
+		},
+	},
+	worker: {
+		format: "es",
+		rollupOptions: {
+			external: externalize,
 			output: {
 				chunkFileNames: "[name].js",
 				entryFileNames: "[name].js",
