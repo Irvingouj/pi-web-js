@@ -140,11 +140,9 @@ import { logger } from "./logger.js";
 // that need it.
 import {
 	executeMainThreadCommand,
-	initExtensionListeners,
 	normalizeParams,
 	registerHostHandler,
 	registerHostHandlers,
-	removeExtensionListeners,
 } from "./runner.js";
 
 import {
@@ -294,8 +292,7 @@ describe("abort behavior", () => {
 	});
 
 	it("dispatchTool throws when aborted before handler", async () => {
-		const actionName =
-			"test_abort_dispatch_" + Math.random().toString(36).slice(2);
+		const actionName = `test_abort_dispatch_${Math.random().toString(36).slice(2)}`;
 		registerTool(makeTestTool(actionName));
 		const controller = new AbortController();
 		setRunnerAbortController(controller);
@@ -460,7 +457,7 @@ describe("integration", () => {
 		for (const tool of tools) {
 			const definition = getTool(tool.action);
 			expect(definition).toBeDefined();
-			expect(Array.isArray(definition!.paramTypes)).toBe(true);
+			expect(Array.isArray(definition?.paramTypes)).toBe(true);
 		}
 	});
 });
@@ -468,8 +465,8 @@ describe("integration", () => {
 // ─── 6. Filesystem tests ─────────────────────────────────────────
 
 describe("filesystem", () => {
-	const testPath = "/test/fs_test_" + Date.now() + ".txt";
-	const testDir = "/test/dir_" + Date.now();
+	const testPath = `/test/fs_test_${Date.now()}.txt`;
+	const testDir = `/test/dir_${Date.now()}`;
 
 	it("fs_write + fs_read_text roundtrip", async () => {
 		const writeResult = await dispatchTool("fs_write", {
@@ -486,7 +483,7 @@ describe("filesystem", () => {
 	});
 
 	it("fs_exists true after write, false after delete", async () => {
-		const path = testPath + "_exists";
+		const path = `${testPath}_exists`;
 		await dispatchTool("fs_write", { path, data: "x" });
 
 		const existsResult = await dispatchTool("fs_exists", { path });
@@ -504,7 +501,7 @@ describe("filesystem", () => {
 	});
 
 	it("fs_stat returns correct kind and size", async () => {
-		const path = testPath + "_stat";
+		const path = `${testPath}_stat`;
 		await dispatchTool("fs_write", { path, data: "abc" });
 
 		const statResult = await dispatchTool("fs_stat", { path });
@@ -527,8 +524,8 @@ describe("filesystem", () => {
 
 	it("fs_list returns directory entries", async () => {
 		await dispatchTool("fs_mkdir", { path: testDir });
-		await dispatchTool("fs_write", { path: testDir + "/a.txt", data: "a" });
-		await dispatchTool("fs_write", { path: testDir + "/b.txt", data: "b" });
+		await dispatchTool("fs_write", { path: `${testDir}/a.txt`, data: "a" });
+		await dispatchTool("fs_write", { path: `${testDir}/b.txt`, data: "b" });
 
 		const listResult = await dispatchTool("fs_list", { path: testDir });
 		expect(listResult.ok).toBe(true);
@@ -540,8 +537,8 @@ describe("filesystem", () => {
 	});
 
 	it("fs_copy duplicates file", async () => {
-		const from = testPath + "_copy_src";
-		const to = testPath + "_copy_dst";
+		const from = `${testPath}_copy_src`;
+		const to = `${testPath}_copy_dst`;
 		await dispatchTool("fs_write", { path: from, data: "copyme" });
 		await dispatchTool("fs_copy", { from, to });
 
@@ -553,8 +550,8 @@ describe("filesystem", () => {
 	});
 
 	it("fs_move moves file", async () => {
-		const from = testPath + "_move_src";
-		const to = testPath + "_move_dst";
+		const from = `${testPath}_move_src`;
+		const to = `${testPath}_move_dst`;
 		await dispatchTool("fs_write", { path: from, data: "moveme" });
 		await dispatchTool("fs_move", { from, to });
 
@@ -572,7 +569,7 @@ describe("filesystem", () => {
 	});
 
 	it("fs_hash returns correct SHA-256", async () => {
-		const path = testPath + "_hash";
+		const path = `${testPath}_hash`;
 		await dispatchTool("fs_write", { path, data: "hashme" });
 
 		const hashResult = await dispatchTool("fs_hash", { path, algo: "sha256" });
@@ -584,7 +581,7 @@ describe("filesystem", () => {
 	});
 
 	it("fs_append concatenates data", async () => {
-		const path = testPath + "_append";
+		const path = `${testPath}_append`;
 		await dispatchTool("fs_write", { path, data: "hello" });
 		await dispatchTool("fs_append", { path, data: " world" });
 
@@ -599,7 +596,7 @@ describe("filesystem", () => {
 // ─── 7. Storage tests ────────────────────────────────────────────
 
 describe("storage", () => {
-	const testKey = "runner_test_key_" + Date.now();
+	const testKey = `runner_test_key_${Date.now()}`;
 
 	it("storage_set + storage_get roundtrip", async () => {
 		await dispatchTool("storage_set", { key: testKey, value: "roundtrip" });
@@ -611,7 +608,7 @@ describe("storage", () => {
 	});
 
 	it("storage_delete removes key", async () => {
-		const key = testKey + "_del";
+		const key = `${testKey}_del`;
 		await dispatchTool("storage_set", { key, value: "x" });
 		await dispatchTool("storage_delete", { key });
 		const result = await dispatchTool("storage_get", { key });
@@ -622,7 +619,7 @@ describe("storage", () => {
 	});
 
 	it("storage_list returns all keys", async () => {
-		const key = testKey + "_list";
+		const key = `${testKey}_list`;
 		await dispatchTool("storage_set", { key, value: "x" });
 		const result = await dispatchTool("storage_list", {});
 		expect(result.ok).toBe(true);
@@ -1052,7 +1049,7 @@ describe("acceptance criteria verification", () => {
 			/export async function executeMainThreadCommand\([\s\S]*?^\}/m,
 		);
 		expect(match).toBeTruthy();
-		const lines = match![0].split("\n");
+		const lines = match?.[0].split("\n");
 		expect(lines.length).toBeLessThanOrEqual(10);
 	});
 
@@ -1082,7 +1079,7 @@ describe("acceptance criteria verification", () => {
 			/export function normalizeParams\([\s\S]*?^\}/m,
 		);
 		expect(normalizeMatch).toBeTruthy();
-		expect(normalizeMatch![0]).not.toContain("switch");
+		expect(normalizeMatch?.[0]).not.toContain("switch");
 	});
 });
 

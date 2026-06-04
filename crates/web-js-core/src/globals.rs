@@ -1,5 +1,5 @@
 use crate::state::HostState;
-use crate::utils::{exception_to_string, format_js_value, js_value_to_json};
+use crate::utils::{format_js_value, js_value_to_json};
 use rquickjs::{
     function::{Func, Rest},
     Ctx, Object, Value,
@@ -91,8 +91,7 @@ pub(crate) fn register_host_globals<'js>(
         Func::new(
             move |ctx: Ctx<'js>, args: Rest<Value<'js>>| -> rquickjs::Result<()> {
                 let action_str = args
-                    .0
-                    .get(0)
+                    .0.first()
                     .and_then(|v| v.as_string())
                     .and_then(|s| s.to_string().ok())
                     .unwrap_or_default();

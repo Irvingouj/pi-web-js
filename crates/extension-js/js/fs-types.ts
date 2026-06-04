@@ -1,16 +1,16 @@
 import type {
-	FsPathParams,
-	FsExistsResult,
 	FsBoolResult,
-	FsStringResult,
-	FsListResult,
-	FsStatResult,
+	FsCopyParams,
+	FsExistsResult,
 	FsHashParams,
 	FsHashResult,
-	FsCopyParams,
-	FsWriteParams,
-	FsReadRangeParams,
+	FsListResult,
+	FsPathParams,
 	FsReadRangeDataParams,
+	FsReadRangeParams,
+	FsStatResult,
+	FsStringResult,
+	FsWriteParams,
 } from "./extension_js.js";
 
 export type FsActionMap = {

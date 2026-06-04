@@ -82,7 +82,7 @@ pub struct ReturnDoc {
 }
 
 thread_local! {
-    pub(crate) static REGISTRY: RefCell<Vec<JsApiDoc>> = RefCell::new(Vec::new());
+    pub(crate) static REGISTRY: RefCell<Vec<JsApiDoc>> = const { RefCell::new(Vec::new()) };
 }
 
 pub fn register(doc: JsApiDoc) {

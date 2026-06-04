@@ -40,8 +40,7 @@ pub(crate) fn register_web_module<'js>(
         returns: "object" => "Parsed URL components (scheme, host, port, path, fragment, query)",
         handler: move |ctx: Ctx<'js>, args: Rest<Value<'js>>| -> rquickjs::Result<Value<'js>> {
             let url_str = args
-                .0
-                .get(0)
+                .0.first()
                 .and_then(|v| v.as_string())
                 .and_then(|s| s.to_string().ok())
                 .unwrap_or_default();
@@ -93,8 +92,7 @@ pub(crate) fn register_web_module<'js>(
         returns: "string" => "URL-encoded query string",
         handler: move |ctx: Ctx<'js>, args: Rest<Value<'js>>| -> rquickjs::Result<String> {
             let params_val = args
-                .0
-                .get(0)
+                .0.first()
                 .cloned()
                 .unwrap_or_else(|| Value::new_undefined(ctx.clone()));
             let json_str = ctx
@@ -228,8 +226,7 @@ pub(crate) fn register_web_module<'js>(
         returns: "string" => "Hex-encoded SHA-256 hash",
         handler: move |_ctx: Ctx<'js>, args: Rest<Value<'js>>| -> rquickjs::Result<String> {
             let msg = args
-                .0
-                .get(0)
+                .0.first()
                 .and_then(|v| v.as_string())
                 .and_then(|s| s.to_string().ok())
                 .unwrap_or_default();
@@ -256,8 +253,7 @@ pub(crate) fn register_web_module<'js>(
         returns: "string" => "Hex-encoded MD5 hash",
         handler: move |_ctx: Ctx<'js>, args: Rest<Value<'js>>| -> rquickjs::Result<String> {
             let msg = args
-                .0
-                .get(0)
+                .0.first()
                 .and_then(|v| v.as_string())
                 .and_then(|s| s.to_string().ok())
                 .unwrap_or_default();
@@ -285,8 +281,7 @@ pub(crate) fn register_web_module<'js>(
         returns: "string" => "Hex-encoded HMAC-SHA256",
         handler: move |_ctx: Ctx<'js>, args: Rest<Value<'js>>| -> rquickjs::Result<String> {
             let key = args
-                .0
-                .get(0)
+                .0.first()
                 .and_then(|v| v.as_string())
                 .and_then(|s| s.to_string().ok())
                 .unwrap_or_default();
@@ -324,8 +319,7 @@ pub(crate) fn register_web_module<'js>(
         returns: "string" => "Hex-encoded string",
         handler: move |_ctx: Ctx<'js>, args: Rest<Value<'js>>| -> rquickjs::Result<String> {
             let msg = args
-                .0
-                .get(0)
+                .0.first()
                 .and_then(|v| v.as_string())
                 .and_then(|s| s.to_string().ok())
                 .unwrap_or_default();
@@ -349,12 +343,11 @@ pub(crate) fn register_web_module<'js>(
         returns: "string" => "Decoded string",
         handler: move |_ctx: Ctx<'js>, args: Rest<Value<'js>>| -> rquickjs::Result<String> {
             let hex = args
-                .0
-                .get(0)
+                .0.first()
                 .and_then(|v| v.as_string())
                 .and_then(|s| s.to_string().ok())
                 .unwrap_or_default();
-            if hex.len() % 2 != 0 {
+            if !hex.len().is_multiple_of(2) {
                 return Err(rquickjs::Error::new_from_js_message(
                     "hex",
                     "decode",

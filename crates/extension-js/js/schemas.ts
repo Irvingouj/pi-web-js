@@ -366,7 +366,9 @@ export const ChromeTabsUngroupParamsSchema = z.union([
 	z.record(z.unknown()),
 ]);
 
-export const ChromeSessionsGetRecentlyClosedParamsSchema = z.record(z.unknown());
+export const ChromeSessionsGetRecentlyClosedParamsSchema = z.record(
+	z.unknown(),
+);
 export const ChromeSessionsRestoreParamsSchema = z.union([
 	z.string(),
 	z.number(),

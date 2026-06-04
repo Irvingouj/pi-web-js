@@ -8,73 +8,76 @@ import { WebSession as RawWebSession } from "./web_js.js";
 
 export { registerHostHandler, registerHostHandlers } from "./registry.js";
 export type {
-  CellResult as JsRunResult,
-  WasmGlobalsSnapshot as JsGlobalsSnapshot,
+	CellResult as JsRunResult,
+	WasmGlobalsSnapshot as JsGlobalsSnapshot,
 };
 
 export interface JsApiDoc {
-  namespace: string;
-  name: string;
-  action: string | null;
-  description: string;
-  params: {
-    name: string;
-    js_type: string;
-    required: boolean;
-    description: string;
-  }[];
-  returns: {
-    js_type: string;
-    description: string;
-  };
-  source: string;
+	namespace: string;
+	name: string;
+	action: string | null;
+	description: string;
+	params: {
+		name: string;
+		js_type: string;
+		required: boolean;
+		description: string;
+	}[];
+	returns: {
+		js_type: string;
+		description: string;
+	};
+	source: string;
 }
 
 export class WebSession {
-  private raw: RawWebSession;
+	private raw: RawWebSession;
 
-  private constructor(raw: RawWebSession) {
-    this.raw = raw;
-  }
+	private constructor(raw: RawWebSession) {
+		this.raw = raw;
+	}
 
-  static async init(): Promise<[WebSession, Promise<void>]> {
-    const session = new WebSession(new RawWebSession());
-    return [session, Promise.resolve()];
-  }
+	static async init(): Promise<[WebSession, Promise<void>]> {
+		const session = new WebSession(new RawWebSession());
+		return [session, Promise.resolve()];
+	}
 
-  async stopWith(runner: Promise<void>): Promise<void> {
-    this.raw.stopWith();
-    try {
-      await runner;
-    } catch (e) {
-      console.warn("WebSession runner rejected during stop:", e);
-    }
-  }
+	async stopWith(runner: Promise<void>): Promise<void> {
+		this.raw.stopWith();
+		try {
+			await runner;
+		} catch (e) {
+			console.warn("WebSession runner rejected during stop:", e);
+		}
+	}
 
-  async runCellAsync(code: string, stdin?: string): Promise<CellResult> {
-    console.log("[WebSession] runCellAsync called", code);
-    const result = await this.raw.runCellAsync(code, stdin || "");
-    console.log("[WebSession] runCellAsync result", JSON.stringify(result, null, 2));
-    return result;
-  }
+	async runCellAsync(code: string, stdin?: string): Promise<CellResult> {
+		console.log("[WebSession] runCellAsync called", code);
+		const result = await this.raw.runCellAsync(code, stdin || "");
+		console.log(
+			"[WebSession] runCellAsync result",
+			JSON.stringify(result, null, 2),
+		);
+		return result;
+	}
 
-  reset(): void {
-    this.raw.reset();
-  }
+	reset(): void {
+		this.raw.reset();
+	}
 
-  hasGlobal(name: string): boolean {
-    return this.raw.has_global(name);
-  }
+	hasGlobal(name: string): boolean {
+		return this.raw.has_global(name);
+	}
 
-  inspectGlobals(): WasmGlobalsSnapshot {
-    return this.raw.inspect_globals();
-  }
+	inspectGlobals(): WasmGlobalsSnapshot {
+		return this.raw.inspect_globals();
+	}
 
-  setFuelLimit(limit: number): void {
-    this.raw.set_fuel_limit(limit);
-  }
+	setFuelLimit(limit: number): void {
+		this.raw.set_fuel_limit(limit);
+	}
 
-  loadLibrary(source: string): CellResult {
-    return this.raw.load_library(source);
-  }
+	loadLibrary(source: string): CellResult {
+		return this.raw.load_library(source);
+	}
 }

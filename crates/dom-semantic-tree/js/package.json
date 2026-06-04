@@ -1,17 +1,17 @@
 {
-  "name": "@pi-oxide/dom-semantic-tree",
-  "version": "0.1.1",
-  "description": "DOM-derived semantic tree extractor for browser agents",
-  "type": "module",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "files": [
-    "dist",
-    "README.md"
-  ],
-  "scripts": {
-    "build": "node ../../../scripts/build-npm.js dom",
-    "prepublishOnly": "npm run build && cd ../../../ && node scripts/build.js dom"
-  },
-  "license": "LicenseRef-PiccoloNotebook-Fair-BYOK-1.0"
+	"name": "@pi-oxide/dom-semantic-tree",
+	"version": "0.1.1",
+	"description": "DOM-derived semantic tree extractor for browser agents",
+	"type": "module",
+	"main": "dist/index.js",
+	"types": "dist/index.d.ts",
+	"files": [
+		"dist",
+		"README.md"
+	],
+	"scripts": {
+		"build": "node ../../../scripts/build-npm.js dom",
+		"prepublishOnly": "npm run build && cd ../../../ && node scripts/build.js dom"
+	},
+	"license": "LicenseRef-PiccoloNotebook-Fair-BYOK-1.0"
 }

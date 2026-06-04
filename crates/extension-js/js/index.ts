@@ -5,16 +5,16 @@
 
 import type {
 	CellResult,
-	WasmGlobalsSnapshot,
-	FsPathParams,
 	FsCopyParams,
-	FsWriteParams,
-	FsReadRangeParams,
-	FsReadRangeDataParams,
 	FsHashParams,
+	FsPathParams,
+	FsReadRangeDataParams,
+	FsReadRangeParams,
+	FsWriteParams,
+	WasmGlobalsSnapshot,
 } from "./extension_js.js";
+import type { FsAction, FsActionMap } from "./fs-types.js";
 import { logger } from "./logger.js";
-import type { FsActionMap, FsAction } from "./fs-types.js";
 import type { Command } from "./runner.js";
 import {
 	executeMainThreadCommand,
@@ -282,27 +282,31 @@ export class ExtensionSession {
 	}
 
 	get fs() {
-		const self = this;
 		return {
-			exists: (params: FsPathParams) => self.safePost("exists", params),
-			stat: (params: FsPathParams) => self.safePost("stat", params),
-			read: (params: FsPathParams) => self.safePost("read", params),
-			readText: (params: FsPathParams) => self.safePost("readText", params),
-			readBase64: (params: FsPathParams) => self.safePost("readBase64", params),
-			list: (params: FsPathParams) => self.safePost("list", params),
-			mkdir: (params: FsPathParams) => self.safePost("mkdir", params),
-			delete: (params: FsPathParams) => self.safePost("delete", params),
-			copy: (params: FsCopyParams) => self.safePost("copy", params),
-			move: (params: FsCopyParams) => self.safePost("move", params),
-			write: (params: FsWriteParams) => self.safePost("write", params),
-			writeText: (params: FsWriteParams) => self.safePost("writeText", params),
-			writeBase64: (params: FsWriteParams) => self.safePost("writeBase64", params),
-			append: (params: FsWriteParams) => self.safePost("append", params),
-			appendText: (params: FsWriteParams) => self.safePost("appendText", params),
-			appendBase64: (params: FsWriteParams) => self.safePost("appendBase64", params),
-			readRange: (params: FsReadRangeParams) => self.safePost("readRange", params),
-			update: (params: FsReadRangeDataParams) => self.safePost("update", params),
-			hash: (params: FsHashParams) => self.safePost("hash", params),
+			exists: (params: FsPathParams) => this.safePost("exists", params),
+			stat: (params: FsPathParams) => this.safePost("stat", params),
+			read: (params: FsPathParams) => this.safePost("read", params),
+			readText: (params: FsPathParams) => this.safePost("readText", params),
+			readBase64: (params: FsPathParams) => this.safePost("readBase64", params),
+			list: (params: FsPathParams) => this.safePost("list", params),
+			mkdir: (params: FsPathParams) => this.safePost("mkdir", params),
+			delete: (params: FsPathParams) => this.safePost("delete", params),
+			copy: (params: FsCopyParams) => this.safePost("copy", params),
+			move: (params: FsCopyParams) => this.safePost("move", params),
+			write: (params: FsWriteParams) => this.safePost("write", params),
+			writeText: (params: FsWriteParams) => this.safePost("writeText", params),
+			writeBase64: (params: FsWriteParams) =>
+				this.safePost("writeBase64", params),
+			append: (params: FsWriteParams) => this.safePost("append", params),
+			appendText: (params: FsWriteParams) =>
+				this.safePost("appendText", params),
+			appendBase64: (params: FsWriteParams) =>
+				this.safePost("appendBase64", params),
+			readRange: (params: FsReadRangeParams) =>
+				this.safePost("readRange", params),
+			update: (params: FsReadRangeDataParams) =>
+				this.safePost("update", params),
+			hash: (params: FsHashParams) => this.safePost("hash", params),
 		};
 	}
 

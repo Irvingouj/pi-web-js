@@ -89,14 +89,12 @@ where
 
         let mut batch_counter = 0u32;
 
-        loop {
-            let batch: Vec<WasmAsyncCommand> = match &result {
-                WasmRunResult::Pending {
-                    ref pending_commands,
-                    ..
-                } => pending_commands.clone(),
-                _ => break,
-            };
+        while let WasmRunResult::Pending {
+            ref pending_commands,
+            ..
+        } = &result
+        {
+            let batch: Vec<WasmAsyncCommand> = pending_commands.clone();
 
             if batch.is_empty() {
                 tracing::error!("batch_empty");
@@ -156,7 +154,7 @@ where
             let call_ids: Vec<u32> = batch.iter().map(|c| c.call_id).collect();
             let actions: Vec<String> = batch.iter().map(|c| c.action.clone()).collect();
             tracing::info!(batch_id = %batch_id, "awaiting_handle_command_batch");
-            let futures: Vec<Fut> = batch.into_iter().map(|cmd| handle_command(cmd)).collect();
+            let futures: Vec<Fut> = batch.into_iter().map(&mut handle_command).collect();
             let responses: Vec<Result<WasmAsyncResponse, WasmAsyncError>> =
                 futures_util::future::join_all(futures).await;
             tracing::info!(batch_id = %batch_id, response_count = responses.len(), "handle_command_batch_done");
@@ -168,7 +166,7 @@ where
             let mut last_execution_count = 0;
 
             for (idx, (call_id, response_result)) in
-                call_ids.into_iter().zip(responses.into_iter()).enumerate()
+                call_ids.into_iter().zip(responses).enumerate()
             {
                 let action = actions
                     .get(idx)

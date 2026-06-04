@@ -566,25 +566,22 @@ impl JsSession {
             let top_promise = ctx.globals().get::<_, Value>("__webJsTopPromise").ok();
             if let Some(promise) = top_promise {
                 if promise.is_promise() {
-                    match check_promise_state(ctx, &promise) {
-                        PromiseState::Rejected(err) => {
-                            let msg = exception_to_string(&err);
-                            let line = extract_line_number(&msg);
-                            tracing::error!(call_id, "resume_top_level_promise_rejected");
-                            let hs = host_state.borrow();
-                            return RunResult::with_partial_output(
-                                hs.stdout.clone(),
-                                hs.stderr.clone(),
-                                hs.commands.clone(),
-                                CellError::Runtime {
-                                    message: clean_error_message(&msg),
-                                    line,
-                                },
-                                false,
-                                exec_count,
-                            );
-                        }
-                        _ => {}
+                    if let PromiseState::Rejected(err) = check_promise_state(ctx, &promise) {
+                        let msg = exception_to_string(&err);
+                        let line = extract_line_number(&msg);
+                        tracing::error!(call_id, "resume_top_level_promise_rejected");
+                        let hs = host_state.borrow();
+                        return RunResult::with_partial_output(
+                            hs.stdout.clone(),
+                            hs.stderr.clone(),
+                            hs.commands.clone(),
+                            CellError::Runtime {
+                                message: clean_error_message(&msg),
+                                line,
+                            },
+                            false,
+                            exec_count,
+                        );
                     }
                 }
             }

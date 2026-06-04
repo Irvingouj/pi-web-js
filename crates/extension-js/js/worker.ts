@@ -5,9 +5,9 @@ import init, {
 	ExtensionSession,
 	setLogLevel as setWasmLogLevel,
 } from "./extension_js.js";
+import type { FsAction, FsActionMap } from "./fs-types.js";
 import type { LogLevel } from "./logger.js";
 import { logger, registerWasmSetLogLevel, setLogLevel } from "./logger.js";
-import type { FsActionMap, FsAction } from "./fs-types.js";
 
 let session: ExtensionSession | null = null;
 let initialized = false;
@@ -58,7 +58,9 @@ const fsRegistry = new Map<string, (params: unknown) => Promise<unknown>>();
 
 function registerFs<K extends FsAction>(
 	action: K,
-	handler: (params: FsActionMap[K]["params"]) => Promise<FsActionMap[K]["result"]>,
+	handler: (
+		params: FsActionMap[K]["params"],
+	) => Promise<FsActionMap[K]["result"]>,
 ) {
 	fsRegistry.set(action, handler as (params: unknown) => Promise<unknown>);
 }

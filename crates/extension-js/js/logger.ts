@@ -78,7 +78,7 @@ function formatMetadata(
 	} catch {
 		return " metadata=[unreadable]";
 	}
-	return parts.length > 0 ? " " + parts.join(" ") : "";
+	return parts.length > 0 ? ` ${parts.join(" ")}` : "";
 }
 
 function normalizeArgs(

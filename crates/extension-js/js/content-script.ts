@@ -22,7 +22,7 @@ function __formatMeta(meta: Record<string, unknown> | undefined): string {
 			}
 		parts.push(`${key}=${str}`);
 	}
-	return parts.length > 0 ? " " + parts.join(" ") : "";
+	return parts.length > 0 ? ` ${parts.join(" ")}` : "";
 }
 
 function __log(level: number, event: string, meta?: Record<string, unknown>) {

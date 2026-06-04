@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ExtensionSession } from "./index.js";
 
 describe("ExtensionSession fs namespace e2e", () => {
@@ -50,12 +50,14 @@ describe("ExtensionSession fs namespace e2e", () => {
 		sessions = [];
 	});
 
-	async function initSession(): Promise<[ExtensionSession, Promise<void>, any]> {
+	async function initSession(): Promise<
+		[ExtensionSession, Promise<void>, any]
+	> {
 		const initPromise = ExtensionSession.init();
 
 		queueMicrotask(() => {
 			const latestWorker = workerInstances[workerInstances.length - 1];
-			if (latestWorker && latestWorker.onmessage) {
+			if (latestWorker?.onmessage) {
 				latestWorker.onmessage({
 					data: { type: "ready" },
 				} as MessageEvent);
@@ -170,29 +172,32 @@ describe("ExtensionSession fs namespace e2e", () => {
 		},
 	];
 
-	it.each(fsTestCases)(
-		"$action sends correct fsCall message and resolves",
-		async ({ action, params, result }) => {
-			const [session, , worker] = await initSession();
+	it.each(
+		fsTestCases,
+	)("$action sends correct fsCall message and resolves", async ({
+		action,
+		params,
+		result,
+	}) => {
+		const [session, , worker] = await initSession();
 
-			const fsMethod = (session.fs as any)[action];
-			const promise = fsMethod(params);
+		const fsMethod = (session.fs as any)[action];
+		const promise = fsMethod(params);
 
-			const fsCallMsg = postMessages.find(
-				(m: any) => m.type === "fsCall" && m.action === action,
-			);
-			expect(fsCallMsg).toBeDefined();
-			expect(fsCallMsg).toMatchObject({
-				type: "fsCall",
-				action,
-				params,
-			});
+		const fsCallMsg = postMessages.find(
+			(m: any) => m.type === "fsCall" && m.action === action,
+		);
+		expect(fsCallMsg).toBeDefined();
+		expect(fsCallMsg).toMatchObject({
+			type: "fsCall",
+			action,
+			params,
+		});
 
-			sendWorkerResult(worker, (fsCallMsg as any).id, result);
-			const actualResult = await promise;
-			expect(actualResult).toEqual(result);
-		},
-	);
+		sendWorkerResult(worker, (fsCallMsg as any).id, result);
+		const actualResult = await promise;
+		expect(actualResult).toEqual(result);
+	});
 
 	it("handles unknown fs action error from worker", async () => {
 		const [session, , worker] = await initSession();

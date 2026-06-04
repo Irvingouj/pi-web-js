@@ -136,7 +136,7 @@ describe("Logger", () => {
 		const err = new Error("boom");
 		log.debug("test", { err });
 		// At debug level, the full stack is present (including second line)
-		const secondLine = err.stack!.split("\n")[1];
+		const secondLine = err.stack?.split("\n")[1];
 		expect(consoleLogSpy).toHaveBeenCalledWith(
 			expect.stringContaining(secondLine),
 		);
@@ -147,12 +147,12 @@ describe("Logger", () => {
 		const log = new Logger("test");
 		const err = new Error("boom");
 		log.info("test", { err });
-		const firstLine = err.stack!.split("\n")[0];
+		const firstLine = err.stack?.split("\n")[0];
 		expect(consoleLogSpy).toHaveBeenCalledWith(
 			expect.stringContaining(firstLine),
 		);
 		// Verify second line is NOT present
-		const secondLine = err.stack!.split("\n")[1];
+		const secondLine = err.stack?.split("\n")[1];
 		const calls = consoleLogSpy.mock.calls;
 		const hasSecondLine = calls.some((call) => call[0].includes(secondLine));
 		expect(hasSecondLine).toBe(false);

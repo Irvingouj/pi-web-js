@@ -82,7 +82,7 @@ fn is_selector(s: &str) -> bool {
 /// If `selector` is explicitly provided, use it. Otherwise, if `ref_id` looks like
 /// a CSS selector, treat it as one and resolve it via page.find.
 async fn resolve_ref_id_or_selector(
-    document: &web_sys::Document,
+    _document: &web_sys::Document,
     ref_id: &str,
     selector: &Option<String>,
 ) -> Result<String, WasmAsyncResponse> {
@@ -668,17 +668,6 @@ pub fn execute_dom_format(params: DomFormatParams) -> WasmAsyncResponse {
 }
 
 // ─── Page Agent Actions ─────────────────────────────────────────
-
-fn get_element_by_ref_id(ref_id: &str) -> Result<web_sys::Element, String> {
-    let document = web_sys::window()
-        .ok_or("No window available")?
-        .document()
-        .ok_or("No document available")?;
-    document
-        .query_selector(&format!("[data-ref-id='{}']", ref_id))
-        .map_err(|e| format!("{:?}", e))?
-        .ok_or_else(|| format!("Element with ref_id '{}' not found", ref_id))
-}
 
 pub async fn execute_page_url(_params: EmptyParams) -> WasmAsyncResponse {
     let window = match web_sys::window() {
@@ -2297,7 +2286,6 @@ macro_rules! core_wrap_sync {
 
 // Generate core wrappers for all handlers
 
-core_wrap_async!(core_execute_fetch, FetchParams, execute_fetch);
 core_wrap_async!(core_execute_fetch_positional, FetchArgs, execute_fetch_positional);
 core_wrap_async!(core_execute_sleep, SleepParams, execute_sleep);
 core_wrap_async!(core_execute_page_wait, PageWaitParams, execute_page_wait);

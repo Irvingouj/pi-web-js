@@ -16,7 +16,7 @@ function bgLog(level, event, meta) {
 	else console.log(msg);
 }
 
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 	// Echo back for basic ping/pong testing
 	if (message && message.action === "ping") {
 		sendResponse({ pong: true, timestamp: Date.now() });
@@ -34,7 +34,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 });
 
 // Context menu click handler
-chrome.contextMenus.onClicked.addListener((info, tab) => {
+chrome.contextMenus.onClicked.addListener((info, _tab) => {
 	// Context menu clicks are handled via direct listening in the popup
 	bgLog(1, "context_menu_clicked", { menuItemId: info.menuItemId });
 });

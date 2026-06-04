@@ -5,14 +5,14 @@
 const hostHandlers: Record<string, (params: unknown) => Promise<unknown>> = {};
 
 export function registerHostHandler<T, R>(
-  action: string,
-  handler: (params: T) => Promise<R>,
+	action: string,
+	handler: (params: T) => Promise<R>,
 ) {
-  hostHandlers[action] = handler as (params: unknown) => Promise<unknown>;
+	hostHandlers[action] = handler as (params: unknown) => Promise<unknown>;
 }
 
 export function registerHostHandlers(
-  handlers: Record<string, (params: unknown) => Promise<unknown>>,
+	handlers: Record<string, (params: unknown) => Promise<unknown>>,
 ) {
-  Object.assign(hostHandlers, handlers);
+	Object.assign(hostHandlers, handlers);
 }

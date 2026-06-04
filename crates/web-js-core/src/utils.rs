@@ -86,19 +86,6 @@ pub(crate) fn js_value_to_json<'js>(
     }
 }
 
-/// Convert a `serde_json::Value` to a rquickjs `Value` by round-tripping through JSON.parse.
-pub(crate) fn json_to_js_value<'js>(
-    ctx: Ctx<'js>,
-    value: &serde_json::Value,
-) -> Result<Value<'js>, CellError> {
-    let json_str = serde_json::to_string(value).map_err(|e| CellError::Internal {
-        message: format!("JSON serialize error: {}", e),
-    })?;
-    ctx.json_parse(json_str).map_err(|e| CellError::Internal {
-        message: format!("JSON parse error: {}", e),
-    })
-}
-
 /// Format a Value for display (used by print/emit).
 pub(crate) fn format_js_value<'js>(value: &Value<'js>) -> String {
     if value.is_undefined() {

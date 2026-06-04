@@ -86,49 +86,49 @@ export interface FsReadRangeDataParams {
 export class ExtensionSession {
 	free(): void {}
 	[Symbol.dispose](): void {}
-	fsAppend(params: FsWriteParams): Promise<FsBoolResult> {
+	fsAppend(_params: FsWriteParams): Promise<FsBoolResult> {
 		return Promise.resolve({ ok: true });
 	}
-	fsAppendBase64(params: FsWriteParams): Promise<FsBoolResult> {
+	fsAppendBase64(_params: FsWriteParams): Promise<FsBoolResult> {
 		return Promise.resolve({ ok: true });
 	}
-	fsAppendText(params: FsWriteParams): Promise<FsBoolResult> {
+	fsAppendText(_params: FsWriteParams): Promise<FsBoolResult> {
 		return Promise.resolve({ ok: true });
 	}
-	fsCopy(params: FsCopyParams): Promise<FsBoolResult> {
+	fsCopy(_params: FsCopyParams): Promise<FsBoolResult> {
 		return Promise.resolve({ ok: true });
 	}
-	fsDelete(params: FsPathParams): Promise<FsBoolResult> {
+	fsDelete(_params: FsPathParams): Promise<FsBoolResult> {
 		return Promise.resolve({ ok: true });
 	}
-	fsExists(params: FsPathParams): Promise<FsExistsResult> {
+	fsExists(_params: FsPathParams): Promise<FsExistsResult> {
 		return Promise.resolve({ exists: true });
 	}
-	fsHash(params: FsHashParams): Promise<FsHashResult> {
+	fsHash(_params: FsHashParams): Promise<FsHashResult> {
 		return Promise.resolve({ hash: "mock" });
 	}
-	fsList(params: FsPathParams): Promise<FsListResult> {
+	fsList(_params: FsPathParams): Promise<FsListResult> {
 		return Promise.resolve({ entries: [] });
 	}
-	fsMkdir(params: FsPathParams): Promise<FsBoolResult> {
+	fsMkdir(_params: FsPathParams): Promise<FsBoolResult> {
 		return Promise.resolve({ ok: true });
 	}
-	fsMove(params: FsCopyParams): Promise<FsBoolResult> {
+	fsMove(_params: FsCopyParams): Promise<FsBoolResult> {
 		return Promise.resolve({ ok: true });
 	}
-	fsRead(params: FsPathParams): Promise<FsStringResult> {
+	fsRead(_params: FsPathParams): Promise<FsStringResult> {
 		return Promise.resolve({ data: "mock" });
 	}
-	fsReadBase64(params: FsPathParams): Promise<FsStringResult> {
+	fsReadBase64(_params: FsPathParams): Promise<FsStringResult> {
 		return Promise.resolve({ data: "mock" });
 	}
-	fsReadRange(params: FsReadRangeParams): Promise<FsStringResult> {
+	fsReadRange(_params: FsReadRangeParams): Promise<FsStringResult> {
 		return Promise.resolve({ data: "mock" });
 	}
-	fsReadText(params: FsPathParams): Promise<FsStringResult> {
+	fsReadText(_params: FsPathParams): Promise<FsStringResult> {
 		return Promise.resolve({ data: "mock" });
 	}
-	fsStat(params: FsPathParams): Promise<FsStatResult> {
+	fsStat(_params: FsPathParams): Promise<FsStatResult> {
 		return Promise.resolve({
 			path: "",
 			name: "",
@@ -139,22 +139,22 @@ export class ExtensionSession {
 			modified_at: null,
 		});
 	}
-	fsUpdate(params: FsReadRangeDataParams): Promise<FsBoolResult> {
+	fsUpdate(_params: FsReadRangeDataParams): Promise<FsBoolResult> {
 		return Promise.resolve({ ok: true });
 	}
-	fsWrite(params: FsWriteParams): Promise<FsBoolResult> {
+	fsWrite(_params: FsWriteParams): Promise<FsBoolResult> {
 		return Promise.resolve({ ok: true });
 	}
-	fsWriteBase64(params: FsWriteParams): Promise<FsBoolResult> {
+	fsWriteBase64(_params: FsWriteParams): Promise<FsBoolResult> {
 		return Promise.resolve({ ok: true });
 	}
-	fsWriteText(params: FsWriteParams): Promise<FsBoolResult> {
+	fsWriteText(_params: FsWriteParams): Promise<FsBoolResult> {
 		return Promise.resolve({ ok: true });
 	}
 	inspect_globals(): WasmGlobalsSnapshot {
 		return { variables: [], execution_count: 0 };
 	}
-	load_library(source: string): CellResult {
+	load_library(_source: string): CellResult {
 		return {
 			status: "ok",
 			stdout: [],
@@ -164,12 +164,11 @@ export class ExtensionSession {
 			execution_count: 0,
 		};
 	}
-	constructor() {}
 	reset(): void {}
 	runCellAsync(
-		code: string,
-		stdin: string,
-		run_id: string,
+		_code: string,
+		_stdin: string,
+		_run_id: string,
 	): Promise<CellResult> {
 		return Promise.resolve({
 			status: "ok",
@@ -180,14 +179,14 @@ export class ExtensionSession {
 			execution_count: 0,
 		});
 	}
-	set_fuel_limit(limit: number): void {}
+	set_fuel_limit(_limit: number): void {}
 	stopWith(): void {}
 }
 
-export function generateApiDocs(format: string): string {
+export function generateApiDocs(_format: string): string {
 	return "mock docs";
 }
 
-export function setLogLevel(level: number): void {
+export function setLogLevel(_level: number): void {
 	// mock
 }

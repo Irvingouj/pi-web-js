@@ -5,70 +5,77 @@
 import type { TreeSnapshot } from "@pi-oxide/dom-semantic-tree";
 
 export type CommandParams =
-  | FetchParams
-  | SleepParams
-  | PageClickParams
-  | PageDblClickParams
-  | PageFillParams
-  | PageTypeParams
-  | PagePressParams
-  | PageSelectParams
-  | PageCheckParams
-  | PageHoverParams
-  | PageScrollParams
-  | PageScrollToParams
-  | PageGotoParams
-  | PageFindParams
-  | PageWaitForParams
-  | PageExtractParams
-  | PageAppendParams
-  | PageWaitParams
-  | StorageGetParams
-  | StorageSetParams
-  | StorageDeleteParams
-  | DomSnapshotParams
-  | DomFormatParams
-  | TabClickParams
-  | TabFillParams
-  | TabEvaluateParams
-  | TabBackParams
-  | TabWaitForLoadParams
-  | TabScrollToParams
-  | TabTypeParams
-  | TabPressParams
-  | TabSelectParams
-  | TabCheckParams
-  | TabHoverParams
-  | TabUnhoverParams
-  | TabScrollParams
-  | TabDblClickParams
-  | FsWriteParams
-  | FsPathParams
-  | FsCopyParams
-  | FsUpdateParams
-  | FsHashParams
-  | FsReadRangeParams;
+	| FetchParams
+	| SleepParams
+	| PageClickParams
+	| PageDblClickParams
+	| PageFillParams
+	| PageTypeParams
+	| PagePressParams
+	| PageSelectParams
+	| PageCheckParams
+	| PageHoverParams
+	| PageScrollParams
+	| PageScrollToParams
+	| PageGotoParams
+	| PageFindParams
+	| PageWaitForParams
+	| PageExtractParams
+	| PageAppendParams
+	| PageWaitParams
+	| StorageGetParams
+	| StorageSetParams
+	| StorageDeleteParams
+	| DomSnapshotParams
+	| DomFormatParams
+	| TabClickParams
+	| TabFillParams
+	| TabEvaluateParams
+	| TabBackParams
+	| TabWaitForLoadParams
+	| TabScrollToParams
+	| TabTypeParams
+	| TabPressParams
+	| TabSelectParams
+	| TabCheckParams
+	| TabHoverParams
+	| TabUnhoverParams
+	| TabScrollParams
+	| TabDblClickParams
+	| FsWriteParams
+	| FsPathParams
+	| FsCopyParams
+	| FsUpdateParams
+	| FsHashParams
+	| FsReadRangeParams;
 
-export type AsyncCommand = { call_id: number; action: string; params: CommandParams };
+export type AsyncCommand = {
+	call_id: number;
+	action: string;
+	params: CommandParams;
+};
 
 export type CellError =
-  | { kind: "compile"; message: string; line: number | null }
-  | { kind: "runtime"; message: string; line: number | null }
-  | { kind: "fuel_exhausted" }
-  | { kind: "internal"; message: string };
+	| { kind: "compile"; message: string; line: number | null }
+	| { kind: "runtime"; message: string; line: number | null }
+	| { kind: "fuel_exhausted" }
+	| { kind: "internal"; message: string };
 
 export type CellStatus = "done" | "async_pending";
 
-export type DomSnapshotParams = { interactive_only: boolean; max_nodes: bigint };
+export type DomSnapshotParams = {
+	interactive_only: boolean;
+	max_nodes: bigint;
+};
 
 export type DomFormatParams = { snapshot: TreeSnapshot; format?: string };
 
 export type FetchParams = {
-  url: string;
-  method: string;
-  headers: Record<string, string>;
-  body: string | null;
-  timeout: bigint;
+	url: string;
+	method: string;
+	headers: Record<string, string>;
+	body: string | null;
+	timeout: bigint;
 };
 
 export type FsCopyParams = { from: string; to: string };
@@ -116,15 +123,15 @@ export type PageWaitForParams = { selector: string; timeout: bigint };
 export type PageWaitParams = { duration: bigint };
 
 export type RunResult = {
-  stdout: string[];
-  stderr: string[];
-  result: string | null;
-  error: CellError | null;
-  commands: CommandParams[];
-  fuel_exhausted: boolean;
-  execution_count: number;
-  status: CellStatus;
-  pending_commands: AsyncCommand[];
+	stdout: string[];
+	stderr: string[];
+	result: string | null;
+	error: CellError | null;
+	commands: CommandParams[];
+	fuel_exhausted: boolean;
+	execution_count: number;
+	status: CellStatus;
+	pending_commands: AsyncCommand[];
 };
 
 export type SleepParams = { duration: bigint };
@@ -151,9 +158,18 @@ export type TabHoverParams = { tabId: bigint; refId: string };
 
 export type TabPressParams = { tabId: bigint; key: string };
 
-export type TabScrollParams = { tabId: bigint; direction: string; amount: number };
+export type TabScrollParams = {
+	tabId: bigint;
+	direction: string;
+	amount: number;
+};
 
-export type TabScrollToParams = { tabId: bigint; x: number; y: number; refId: string | null };
+export type TabScrollToParams = {
+	tabId: bigint;
+	x: number;
+	y: number;
+	refId: string | null;
+};
 
 export type TabSelectParams = { tabId: bigint; refId: string; value: string };
 

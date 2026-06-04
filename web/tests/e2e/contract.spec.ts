@@ -1,106 +1,108 @@
-import { test, expect } from "@playwright/test";
-import { readFileSync } from "fs";
-import { fileURLToPath } from "url";
-import { dirname, join } from "path";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { expect, test } from "@playwright/test";
 import {
-  expectCellOutputContains,
-  runCell,
-  runCellViaKernel,
-  setCellCode,
-  waitForCellStatus,
-  waitForKernelReady,
+	expectCellOutputContains,
+	runCell,
+	runCellViaKernel,
+	setCellCode,
+	waitForCellStatus,
+	waitForKernelReady,
 } from "../helpers";
 
 test.describe("all-apis extension contract", () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto("/");
-    await waitForKernelReady(page);
-    page.on("console", (msg) => {
-      console.log(`[BROWSER] ${msg.text()}`);
-    });
-  });
+	test.beforeEach(async ({ page }) => {
+		await page.goto("/");
+		await waitForKernelReady(page);
+		page.on("console", (msg) => {
+			console.log(`[BROWSER] ${msg.text()}`);
+		});
+	});
 
-  test("Promise.all with two sleeps", async ({ page }) => {
-    await setCellCode(
-      page,
-      0,
-      `const [a, b] = await Promise.all([web.sleep(1), web.sleep(1)]);
+	test("Promise.all with two sleeps", async ({ page }) => {
+		await setCellCode(
+			page,
+			0,
+			`const [a, b] = await Promise.all([web.sleep(1), web.sleep(1)]);
 print("both done: " + a + " " + b);`,
-    );
-    await runCell(page, 0);
-    await waitForCellStatus(page, 0, "success", 15_000);
-    await expectCellOutputContains(page, 0, "both done:");
-  });
+		);
+		await runCell(page, 0);
+		await waitForCellStatus(page, 0, "success", 15_000);
+		await expectCellOutputContains(page, 0, "both done:");
+	});
 
-  test("Promise.all with two fs operations", async ({ page }) => {
-    await setCellCode(
-      page,
-      0,
-      `await fs.writeText("/pa_test1.txt", "a");
+	test("Promise.all with two fs operations", async ({ page }) => {
+		await setCellCode(
+			page,
+			0,
+			`await fs.writeText("/pa_test1.txt", "a");
 await fs.writeText("/pa_test2.txt", "b");
 const [r1, r2] = await Promise.all([
   fs.readText("/pa_test1.txt"),
   fs.readText("/pa_test2.txt"),
 ]);
 print("r1: " + r1 + " r2: " + r2);`,
-    );
-    await runCell(page, 0);
-    await waitForCellStatus(page, 0, "success", 15_000);
-    await expectCellOutputContains(page, 0, "r1: a");
-    await expectCellOutputContains(page, 0, "r2: b");
-  });
+		);
+		await runCell(page, 0);
+		await waitForCellStatus(page, 0, "success", 15_000);
+		await expectCellOutputContains(page, 0, "r1: a");
+		await expectCellOutputContains(page, 0, "r2: b");
+	});
 
-  test("extension-only API returns typed error", async ({ page }) => {
-    await setCellCode(
-      page,
-      0,
-      `let caught = false;
+	test("extension-only API returns typed error", async ({ page }) => {
+		await setCellCode(
+			page,
+			0,
+			`let caught = false;
 try {
   await chrome.tabs.query({ active: true });
 } catch (e) {
   caught = true;
 }
 print("caught: " + caught);`,
-    );
-    await runCell(page, 0);
-    await waitForCellStatus(page, 0, "success", 15_000);
-    await expectCellOutputContains(page, 0, "caught: true");
-  });
+		);
+		await runCell(page, 0);
+		await waitForCellStatus(page, 0, "success", 15_000);
+		await expectCellOutputContains(page, 0, "caught: true");
+	});
 
-  test("host.call blocked paths return error", async ({ page }) => {
-    await setCellCode(
-      page,
-      0,
-      `let protoBlocked = false;
+	test("host.call blocked paths return error", async ({ page }) => {
+		await setCellCode(
+			page,
+			0,
+			`let protoBlocked = false;
 try { await host.call("__proto__", {}); } catch (e) { protoBlocked = true; }
 let unknownBlocked = false;
 try { await host.call("nonexistent_action", {}); } catch (e) { unknownBlocked = true; }
 print("proto: " + protoBlocked + " unknown: " + unknownBlocked);`,
-    );
-    await runCell(page, 0);
-    await waitForCellStatus(page, 0, "success", 15_000);
-    await expectCellOutputContains(page, 0, "proto: true");
-    await expectCellOutputContains(page, 0, "unknown: true");
-  });
+		);
+		await runCell(page, 0);
+		await waitForCellStatus(page, 0, "success", 15_000);
+		await expectCellOutputContains(page, 0, "proto: true");
+		await expectCellOutputContains(page, 0, "unknown: true");
+	});
 
-  test("fs camelCase aliases work", async ({ page }) => {
-    await setCellCode(
-      page,
-      0,
-      `await fs.writeText("/contract_alias_test.txt", "hello alias");
+	test("fs camelCase aliases work", async ({ page }) => {
+		await setCellCode(
+			page,
+			0,
+			`await fs.writeText("/contract_alias_test.txt", "hello alias");
 const txt = await fs.readText("/contract_alias_test.txt");
 print("alias: " + txt);`,
-    );
-    await runCell(page, 0);
-    await waitForCellStatus(page, 0, "success", 15_000);
-    await expectCellOutputContains(page, 0, "alias: hello alias");
-  });
+		);
+		await runCell(page, 0);
+		await waitForCellStatus(page, 0, "success", 15_000);
+		await expectCellOutputContains(page, 0, "alias: hello alias");
+	});
 
-  test("smoke test: representative APIs from each namespace", async ({ page }) => {
-    await setCellCode(
-      page,
-      0,
-      `const results = [];
+	test("smoke test: representative APIs from each namespace", async ({
+		page,
+	}) => {
+		await setCellCode(
+			page,
+			0,
+			`const results = [];
 
 // web namespace
 try { await web.sleep(1); results.push({api: "web.sleep", ok: true}); }
@@ -156,57 +158,59 @@ print("SMOKE_PASS: " + pass);
 for (const r of results.filter(r => !r.ok)) {
   print("SMOKE_FAIL: " + r.api);
 }`,
-    );
-    await runCell(page, 0);
-    await waitForCellStatus(page, 0, "success", 60_000);
+		);
+		await runCell(page, 0);
+		await waitForCellStatus(page, 0, "success", 60_000);
 
-    await expectCellOutputContains(page, 0, "SMOKE_TOTAL:");
-    await expectCellOutputContains(page, 0, "SMOKE_PASS:");
+		await expectCellOutputContains(page, 0, "SMOKE_TOTAL:");
+		await expectCellOutputContains(page, 0, "SMOKE_PASS:");
 
-    const output = await page
-      .locator('[data-testid="cell-output"]')
-      .first()
-      .textContent();
+		const output = await page
+			.locator('[data-testid="cell-output"]')
+			.first()
+			.textContent();
 
-    const totalMatch = output?.match(/SMOKE_TOTAL:\s*(\d+)/);
-    const passMatch = output?.match(/SMOKE_PASS:\s*(\d+)/);
+		const totalMatch = output?.match(/SMOKE_TOTAL:\s*(\d+)/);
+		const passMatch = output?.match(/SMOKE_PASS:\s*(\d+)/);
 
-    expect(totalMatch).toBeTruthy();
-    expect(passMatch).toBeTruthy();
+		expect(totalMatch).toBeTruthy();
+		expect(passMatch).toBeTruthy();
 
-    const total = parseInt(totalMatch![1], 10);
-    const pass = parseInt(passMatch![1], 10);
+		const total = parseInt(totalMatch?.[1], 10);
+		const pass = parseInt(passMatch?.[1], 10);
 
-    expect(pass).toBe(total);
+		expect(pass).toBe(total);
 
-    console.log(`Smoke test: ${pass}/${total} passed`);
-    console.log(output?.slice(0, 3000));
-  });
+		console.log(`Smoke test: ${pass}/${total} passed`);
+		console.log(output?.slice(0, 3000));
+	});
 
-  test("all-apis extension contract file loads and executes", async ({ page }) => {
-    test.setTimeout(180_000);
-    const __dirname = dirname(fileURLToPath(import.meta.url));
-    const contractPath = join(__dirname, "all-apis-extension-contract.js");
-    const contractCode = readFileSync(contractPath, "utf-8");
+	test("all-apis extension contract file loads and executes", async ({
+		page,
+	}) => {
+		test.setTimeout(180_000);
+		const __dirname = dirname(fileURLToPath(import.meta.url));
+		const contractPath = join(__dirname, "all-apis-extension-contract.js");
+		const contractCode = readFileSync(contractPath, "utf-8");
 
-    // Inject the contract file into the QuickJS runtime.
-    await setCellCode(page, 0, contractCode);
-    await runCellViaKernel(page, 0);
-    await waitForCellStatus(page, 0, "success", 30_000);
+		// Inject the contract file into the QuickJS runtime.
+		await setCellCode(page, 0, contractCode);
+		await runCellViaKernel(page, 0);
+		await waitForCellStatus(page, 0, "success", 30_000);
 
-    // Capture browser console logs
-    const browserLogs: string[] = [];
-    page.on("console", (msg) => {
-      const text = msg.text();
-      browserLogs.push(text);
-      console.log(`[BROWSER] ${text}`);
-    });
+		// Capture browser console logs
+		const browserLogs: string[] = [];
+		page.on("console", (msg) => {
+			const text = msg.text();
+			browserLogs.push(text);
+			console.log(`[BROWSER] ${text}`);
+		});
 
-    // Run the contract in lenient mode (default non-destructive) and report results.
-    await setCellCode(
-      page,
-      0,
-      `let contractResults = null;
+		// Run the contract in lenient mode (default non-destructive) and report results.
+		await setCellCode(
+			page,
+			0,
+			`let contractResults = null;
 let contractError = null;
 try {
   print("before contract");
@@ -234,27 +238,27 @@ if (contractResults) {
 }
 print("CONTRACT_RUN: done");
 `,
-    );
-    await runCellViaKernel(page, 0);
-    await waitForCellStatus(page, 0, "success", 120_000);
+		);
+		await runCellViaKernel(page, 0);
+		await waitForCellStatus(page, 0, "success", 120_000);
 
-    const output = await page
-      .locator('[data-testid="cell-output"]')
-      .first()
-      .textContent();
+		const output = await page
+			.locator('[data-testid="cell-output"]')
+			.first()
+			.textContent();
 
-    // Assert the contract runner executed and produced results.
-    expect(output).toContain("CONTRACT_TOTAL:");
-    expect(output).toContain("CONTRACT_PASSED:");
-    expect(output).toContain("CONTRACT_FAILED:");
-    expect(output).toContain("CONTRACT_SKIPPED:");
+		// Assert the contract runner executed and produced results.
+		expect(output).toContain("CONTRACT_TOTAL:");
+		expect(output).toContain("CONTRACT_PASSED:");
+		expect(output).toContain("CONTRACT_FAILED:");
+		expect(output).toContain("CONTRACT_SKIPPED:");
 
-    const totalMatch = output?.match(/CONTRACT_TOTAL:\s*(\d+)/);
-    expect(totalMatch).toBeTruthy();
-    const total = parseInt(totalMatch![1], 10);
-    expect(total).toBeGreaterThan(0);
+		const totalMatch = output?.match(/CONTRACT_TOTAL:\s*(\d+)/);
+		expect(totalMatch).toBeTruthy();
+		const total = parseInt(totalMatch?.[1], 10);
+		expect(total).toBeGreaterThan(0);
 
-    console.log(`Contract: ${total} APIs total`);
-    console.log(output?.slice(0, 4000));
-  });
+		console.log(`Contract: ${total} APIs total`);
+		console.log(output?.slice(0, 4000));
+	});
 });
