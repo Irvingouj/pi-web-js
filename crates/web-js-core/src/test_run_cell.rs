@@ -551,6 +551,26 @@ mod tests {
     }
 
     #[test]
+    fn test_browser_dom_globals_are_not_injected_into_quickjs() {
+        let mut session = JsSession::new();
+
+        let result = session.run_cell("typeof document + ',' + typeof window", "");
+
+        assert!(result.error.is_none());
+        assert_eq!(result.result, Some("undefined,undefined".to_string()));
+
+        let result = session.run_cell("document.title", "");
+        let error = result
+            .error
+            .as_ref()
+            .expect("direct document access should fail in QuickJS");
+        assert!(
+            format!("{:?}", error).contains("document"),
+            "error should mention document, got {error:?}"
+        );
+    }
+
+    #[test]
     fn test_promise_value() {
         let mut session = JsSession::new();
         let result = session.run_cell("1 + 1", "");

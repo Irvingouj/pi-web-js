@@ -1301,27 +1301,6 @@ api(
 	async () => navigator.clipboard.writeText("web-js contract"),
 	{ expected: "success" },
 );
-api(
-	"global.document.querySelector",
-	"runtime",
-	async () => document.querySelector("body"),
-	{ expected: "success" },
-);
-api(
-	"global.document.querySelectorAll",
-	"runtime",
-	async () => document.querySelectorAll("body"),
-	{ expected: "success" },
-);
-api("global.document.title", "runtime", async () => document.title, {
-	expected: "success",
-});
-api(
-	"global.window.location.href",
-	"runtime",
-	async () => window.location.href,
-	{ expected: "success" },
-);
 
 // host namespace.
 api(
@@ -1610,9 +1589,6 @@ const MANIFEST = [
 	"global.URLSearchParams",
 	"global.clearInterval",
 	"global.clearTimeout",
-	"global.document.querySelector",
-	"global.document.querySelectorAll",
-	"global.document.title",
 	"global.fetch",
 	"global.localStorage",
 	"global.navigator.clipboard.readText",
@@ -1620,7 +1596,6 @@ const MANIFEST = [
 	"global.sessionStorage",
 	"global.setInterval",
 	"global.setTimeout",
-	"global.window.location.href",
 	"host.call",
 	"host.call.__proto__.blocked",
 	"host.call.unknown.blocked",

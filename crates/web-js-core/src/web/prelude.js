@@ -11,8 +11,6 @@ var clearTimeout = globalThis.clearTimeout;
 var clearInterval = globalThis.clearInterval;
 var localStorage = globalThis.localStorage;
 var sessionStorage = globalThis.sessionStorage;
-var document = globalThis.document;
-var window = globalThis.window;
 var navigator = globalThis.navigator;
 var crypto = globalThis.crypto;
 
