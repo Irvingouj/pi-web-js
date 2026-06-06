@@ -3,6 +3,7 @@
 		"target": "ES2022",
 		"module": "ES2022",
 		"moduleResolution": "bundler",
+		"rootDir": "src",
 		"declaration": false,
 		"outDir": "dist",
 		"strict": true,
@@ -11,13 +12,6 @@
 		"types": ["chrome"],
 		"lib": ["ES2022", "DOM", "DOM.Iterable"]
 	},
-	"include": [
-		"content-script.ts",
-		"runner.ts",
-		"tool-registry.ts",
-		"schemas.ts",
-		"index.ts",
-		"generated.ts"
-	],
-	"exclude": ["dist"]
+	"include": ["src/**/*.ts", "pkg/**/*.d.ts"],
+	"exclude": ["dist", "test"]
 }

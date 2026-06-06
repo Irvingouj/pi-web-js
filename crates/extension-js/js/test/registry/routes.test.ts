@@ -1,0 +1,38 @@
+// @vitest-environment node
+
+import { describe, expect, it, beforeEach } from "vitest";
+import {
+	clearRoutes,
+	inferTabPolicy,
+	populateRoutesFromManifest,
+	routeFromOwner,
+} from "../../src/shared/registry/routes.js";
+
+describe("registry routes", () => {
+	beforeEach(() => {
+		clearRoutes();
+	});
+
+	it("inferTabPolicy requires tabId for tab_* actions", () => {
+		expect(inferTabPolicy("tab_click")).toBe("required");
+		expect(inferTabPolicy("page_click")).toBe("active");
+	});
+
+	it("routeFromOwner rewrites main-thread page actions to content-script", () => {
+		const route = routeFromOwner("page_click", "main-thread");
+		expect(route.endpoint).toBe("content-script");
+		expect(route.tabPolicy).toBe("active");
+	});
+
+	it("populateRoutesFromManifest registers manifest owners", () => {
+		populateRoutesFromManifest([
+			{ action: "sidepanel_url", owner: "main-thread" },
+			{ action: "tab_click", owner: "content-script" },
+		]);
+		const main = routeFromOwner("sidepanel_url", "main-thread");
+		const tab = routeFromOwner("tab_click", "content-script");
+		expect(main.endpoint).toBe("main-thread");
+		expect(tab.endpoint).toBe("content-script");
+		expect(tab.tabPolicy).toBe("required");
+	});
+});

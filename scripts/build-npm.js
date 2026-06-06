@@ -63,8 +63,8 @@ function stripEsmMarker(filePath) {
     console.log(`  Stripped ESM marker from ${path.basename(filePath)}`);
   }
 }
-stripEsmMarker(path.join(absDir, "content-script.js"));
-stripEsmMarker(path.join(distDir, "content-script.js"));
+stripEsmMarker(path.join(absDir, "pkg/content-script.js"));
+stripEsmMarker(path.join(distDir, "content-script/index.js"));
 
 // Copy WASM bundles and static assets into dist/
 for (const file of [...pkg.wasm, ...pkg.extra]) {
@@ -84,19 +84,25 @@ for (const file of [...pkg.wasm, ...pkg.extra]) {
 }
 
 // Patch worker URL in compiled output: .ts → .js
-const indexJs = path.join(distDir, "index.js");
-const indexDts = path.join(distDir, "index.d.ts");
-if (fs.existsSync(indexJs)) {
-  let content = fs.readFileSync(indexJs, "utf-8");
-  content = content.replace(/new URL\("\.\/worker\.ts"/g, 'new URL("./worker.js"');
-  fs.writeFileSync(indexJs, content);
-  console.log("  Patched worker URL in dist/index.js");
-}
-if (fs.existsSync(indexDts)) {
-  let content = fs.readFileSync(indexDts, "utf-8");
-  content = content.replace(/new URL\("\.\/worker\.ts"/g, 'new URL("./worker.js"');
-  fs.writeFileSync(indexDts, content);
-  console.log("  Patched worker URL in dist/index.d.ts");
+const workerUrlTargets = [
+  path.join(distDir, "main/session/extension-session.js"),
+  path.join(distDir, "main/session/extension-session.d.ts"),
+  path.join(distDir, "main/index.js"),
+  path.join(distDir, "main/index.d.ts"),
+];
+for (const targetFile of workerUrlTargets) {
+  if (!fs.existsSync(targetFile)) continue;
+  let content = fs.readFileSync(targetFile, "utf-8");
+  content = content.replace(
+    /new URL\("\.\.\/\.\.\/worker\/worker\.ts"/g,
+    'new URL("../../worker/worker.js"',
+  );
+  content = content.replace(
+    /new URL\("\.\.\/worker\/worker\.ts"/g,
+    'new URL("../worker/worker.js"',
+  );
+  fs.writeFileSync(targetFile, content);
+  console.log(`  Patched worker URL in ${path.relative(distDir, targetFile)}`);
 }
 
 console.log(`✅ ${target} JS built in ${distDir}`);

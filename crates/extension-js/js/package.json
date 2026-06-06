@@ -1,6 +1,15 @@
 {
+  "name": "extension-js",
+  "type": "module",
+  "exports": {
+    ".": "./src/main/index.ts",
+    "./worker": "./src/worker/worker.ts",
+    "./content-script": "./src/content-script/index.ts"
+  },
   "scripts": {
-    "build": "npx vite build && npx vite build --config vite.content-script.config.ts"
+    "pretest": "cd ../../.. && node scripts/build.js extension",
+    "test": "vitest run",
+    "build": "npx tsc --noEmit && npx vite build && npx vite build --config vite.content-script.config.ts"
   },
   "dependencies": {
     "zod": "^3.23.8",

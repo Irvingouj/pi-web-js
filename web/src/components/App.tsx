@@ -114,11 +114,12 @@ const App: FunctionalComponent = () => {
 	);
 
 	const handleRunCell = useCallback(
-		(cellId: string) => {
+		(cellId: string, source?: string) => {
 			const cell = notebookRef.current.cells.find((c) => c.id === cellId);
 			if (!cell) return;
+			const runSource = source ?? cell.source;
 			updateCell(cellId, { status: "running", outputs: [], errors: [] });
-			kernel.runCell(cellId, cell.source, "");
+			kernel.runCell(cellId, runSource, "");
 		},
 		[updateCell, kernel],
 	);

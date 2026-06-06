@@ -69,6 +69,7 @@ pub struct WasmAsyncCommand {
     pub action: String,
     #[tsify(type = "CommandParams")]
     pub params: serde_json::Value,
+    pub run_id: Option<String>,
 }
 
 impl WasmAsyncCommand {
@@ -181,6 +182,7 @@ impl From<web_js_core::AsyncCommand> for WasmAsyncCommand {
             call_id: c.call_id,
             action: c.action,
             params: c.params,
+            run_id: c.run_id,
         }
     }
 }

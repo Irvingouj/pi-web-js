@@ -1,5 +1,6 @@
 use crate::utils::format_js_value;
 use rquickjs::{
+    context::EvalOptions,
     function::Rest,
     Ctx, Value,
 };
@@ -30,14 +31,14 @@ pub(crate) fn register_web_module<'js>(
 
     crate::web_api_sync! {
         ctx: ctx,
-        action: "__webJsUrlParse",
-        namespace: "web",
-        name: "url_parse",
+        action: "url_parse",
+        namespace: "web.url",
+        name: "parse",
         doc: "Parses a URL string into its components.",
         params: [
             url: "string", "required", "URL string to parse",
         ],
-        returns: "object" => "Parsed URL components (scheme, host, port, path, fragment, query)",
+        returns: "object" => "Parsed URL components (href, protocol, host, hostname, port, pathname, search, hash, origin)",
         handler: move |ctx: Ctx<'js>, args: Rest<Value<'js>>| -> rquickjs::Result<Value<'js>> {
             let url_str = args
                 .0.first()
@@ -55,22 +56,28 @@ pub(crate) fn register_web_module<'js>(
                 }
             };
 
-            let mut query = Vec::new();
-            for (key, value) in parsed.query_pairs() {
-                query.push(serde_json::json!({
-                    "key": key.as_ref(),
-                    "value": value.as_ref(),
-                }));
-            }
+            let host = if let Some(port) = parsed.port() {
+                format!("{}:{}", parsed.host_str().unwrap_or(""), port)
+            } else {
+                parsed.host_str().unwrap_or("").to_string()
+            };
+
+            let origin = if let Some(port) = parsed.port() {
+                format!("{}://{}:{}", parsed.scheme(), parsed.host_str().unwrap_or(""), port)
+            } else {
+                format!("{}://{}", parsed.scheme(), parsed.host_str().unwrap_or(""))
+            };
 
             let result = serde_json::json!({
-                "scheme": parsed.scheme(),
-                "host": parsed.host_str(),
-                "port": parsed.port(),
-                "path": parsed.path(),
-                "fragment": parsed.fragment(),
-                "query": query,
-                "query_string": parsed.query(),
+                "href": parsed.as_str(),
+                "protocol": format!("{}:", parsed.scheme()),
+                "host": host,
+                "hostname": parsed.host_str().unwrap_or(""),
+                "port": parsed.port().map(|p| p.to_string()).unwrap_or_default(),
+                "pathname": parsed.path(),
+                "search": parsed.query().map(|q| format!("?{}", q)).unwrap_or_default(),
+                "hash": parsed.fragment().map(|f| format!("#{}", f)).unwrap_or_default(),
+                "origin": origin,
             });
 
             let json_str = serde_json::to_string(&result).map_err(|e| {
@@ -78,13 +85,14 @@ pub(crate) fn register_web_module<'js>(
             })?;
             ctx.json_parse(json_str)
         },
+        local_name: "__webJsUrlParse",
     };
 
     crate::web_api_sync! {
         ctx: ctx,
-        action: "__webJsUrlEncode",
-        namespace: "web",
-        name: "url_encode",
+        action: "url_encode",
+        namespace: "web.url",
+        name: "encode",
         doc: "Encodes an object into a URL query string.",
         params: [
             params: "object", "required", "Object to encode",
@@ -124,11 +132,12 @@ pub(crate) fn register_web_module<'js>(
             let encoded = pairs.join("&");
             Ok(encoded)
         },
+        local_name: "__webJsUrlEncode",
     };
 
     crate::web_api_sync! {
         ctx: ctx,
-        action: "__webJsRuntimeInspect",
+        action: "runtime_inspect",
         namespace: "runtime",
         name: "inspect",
         doc: "Inspects the current JS runtime globals and returns their types and values.",
@@ -212,11 +221,37 @@ pub(crate) fn register_web_module<'js>(
             })?;
             ctx.json_parse(json_str)
         },
+        local_name: "__webJsRuntimeInspect",
     };
 
     crate::web_api_sync! {
         ctx: ctx,
-        action: "__webJsSha256",
+        action: "runtime_loadLibrary",
+        namespace: "runtime",
+        name: "loadLibrary",
+        doc: "Load and execute JavaScript source into the current runtime globals.",
+        params: [
+            source: "string", "required", "JavaScript source to execute",
+        ],
+        returns: "undefined" => "Nothing",
+        handler: move |ctx: Ctx<'js>, args: Rest<Value<'js>>| -> rquickjs::Result<()> {
+            let source = args
+                .0.first()
+                .and_then(|v| v.as_string())
+                .and_then(|s| s.to_string().ok())
+                .unwrap_or_default();
+            let mut eval_opts = EvalOptions::default();
+            eval_opts.global = true;
+            eval_opts.strict = false;
+            ctx.eval_with_options::<Value, _>(source, eval_opts)?;
+            Ok(())
+        },
+        local_name: "__webJsRuntimeLoadLibrary",
+    };
+
+    crate::web_api_sync! {
+        ctx: ctx,
+        action: "crypto_sha256",
         namespace: "crypto",
         name: "sha256",
         doc: "Computes the SHA-256 hash of a message.",
@@ -239,11 +274,12 @@ pub(crate) fn register_web_module<'js>(
                 .map(|b| format!("{:02x}", b))
                 .collect())
         },
+        local_name: "__webJsSha256",
     };
 
     crate::web_api_sync! {
         ctx: ctx,
-        action: "__webJsMd5",
+        action: "crypto_md5",
         namespace: "crypto",
         name: "md5",
         doc: "Computes the MD5 hash of a message.",
@@ -266,13 +302,14 @@ pub(crate) fn register_web_module<'js>(
                 .map(|b| format!("{:02x}", b))
                 .collect())
         },
+        local_name: "__webJsMd5",
     };
 
     crate::web_api_sync! {
         ctx: ctx,
-        action: "__webJsHmacSha256",
+        action: "crypto_hmac_sha256",
         namespace: "crypto",
-        name: "hmac_sha256",
+        name: "hmacSha256",
         doc: "Computes the HMAC-SHA256 of a message with a key.",
         params: [
             key: "string", "required", "HMAC key",
@@ -305,13 +342,14 @@ pub(crate) fn register_web_module<'js>(
                 .map(|b| format!("{:02x}", b))
                 .collect())
         },
+        local_name: "__webJsHmacSha256",
     };
 
     crate::web_api_sync! {
         ctx: ctx,
-        action: "__webJsHexEncode",
+        action: "crypto_hex_encode",
         namespace: "crypto",
-        name: "hex_encode",
+        name: "hexEncode",
         doc: "Encodes a string to hexadecimal.",
         params: [
             message: "string", "required", "String to encode",
@@ -329,13 +367,14 @@ pub(crate) fn register_web_module<'js>(
                 .map(|b| format!("{:02x}", b))
                 .collect())
         },
+        local_name: "__webJsHexEncode",
     };
 
     crate::web_api_sync! {
         ctx: ctx,
-        action: "__webJsHexDecode",
+        action: "crypto_hex_decode",
         namespace: "crypto",
-        name: "hex_decode",
+        name: "hexDecode",
         doc: "Decodes a hexadecimal string.",
         params: [
             hex: "string", "required", "Hex string to decode",
@@ -369,6 +408,7 @@ pub(crate) fn register_web_module<'js>(
             }
             Ok(String::from_utf8_lossy(&bytes).to_string())
         },
+        local_name: "__webJsHexDecode",
     };
 
     // Inject async API wrappers

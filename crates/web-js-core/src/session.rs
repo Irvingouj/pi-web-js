@@ -21,6 +21,7 @@ use std::sync::Arc;
 pub struct SessionBuilder {
     fuel_limit: u64,
     js_libraries: Vec<(String, String)>,
+    allow_user_eval: bool,
 }
 
 impl Default for SessionBuilder {
@@ -28,6 +29,7 @@ impl Default for SessionBuilder {
         Self {
             fuel_limit: 50_000,
             js_libraries: Vec::new(),
+            allow_user_eval: false,
         }
     }
 }
@@ -36,6 +38,12 @@ impl SessionBuilder {
     /// Set the fuel limit (mapped to QuickJS interrupt-check iterations).
     pub fn fuel_limit(mut self, limit: u64) -> Self {
         self.fuel_limit = limit;
+        self
+    }
+
+    /// Allow user-facing `eval()` in the QuickJS runtime (extension context only).
+    pub fn allow_user_eval(mut self, allow: bool) -> Self {
+        self.allow_user_eval = allow;
         self
     }
 
@@ -57,7 +65,8 @@ impl SessionBuilder {
         let host_state = Rc::new(RefCell::new(HostState::default()));
 
         context.with(|ctx| {
-            register_host_globals(ctx.clone(), host_state.clone()).expect("register globals");
+            register_host_globals(ctx.clone(), host_state.clone(), self.allow_user_eval)
+                .expect("register globals");
             crate::web::register_web_module(ctx.clone(), host_state.clone())
                 .expect("register web module");
         });
@@ -70,6 +79,7 @@ impl SessionBuilder {
             host_state,
             fuel_counter: Arc::new(AtomicU64::new(0)),
             needs_reset: false,
+            allow_user_eval: self.allow_user_eval,
         };
 
         // Load JS libraries (uses run_cell, so after session creation)
@@ -95,6 +105,7 @@ pub struct JsSession {
     host_state: Rc<RefCell<HostState>>,
     fuel_counter: Arc<AtomicU64>,
     needs_reset: bool,
+    allow_user_eval: bool,
 }
 
 enum PromiseState<'js> {
@@ -246,6 +257,11 @@ impl JsSession {
         self.needs_reset = true;
     }
 
+    /// Reset the session immediately, creating a fresh JS context.
+    pub fn reset_now(&mut self) {
+        self.perform_reset();
+    }
+
     fn perform_reset(&mut self) {
         let rt = Runtime::new().expect("Failed to create QuickJS runtime");
         rt.set_max_stack_size(0);
@@ -253,7 +269,8 @@ impl JsSession {
         let host_state = Rc::new(RefCell::new(HostState::default()));
 
         context.with(|ctx| {
-            register_host_globals(ctx.clone(), host_state.clone()).expect("register globals");
+            register_host_globals(ctx.clone(), host_state.clone(), self.allow_user_eval)
+                .expect("register globals");
             crate::web::register_web_module(ctx.clone(), host_state.clone())
                 .expect("register web module");
         });

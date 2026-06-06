@@ -44,11 +44,22 @@ macro_rules! web_api {
                 check_deserialize::<$param_struct>();
             };
 
-            // Register API doc
-            $crate::api_docs::register($crate::api_docs::JsApiDoc {
+            let __action_for_entry = __action_clone.clone();
+            let __handler = std::rc::Rc::new(move |cmd: $crate::AsyncCommand| {
+                let action = __action_clone.clone();
+                Box::pin(async move {
+                    let params = cmd.parse_params::<$param_struct>()
+                        .map_err(|e| format!("Invalid {} params: {}", action, e))?;
+                    let resp = $handler(params).await;
+                    Ok(resp)
+                }) as std::pin::Pin<Box<dyn std::future::Future<Output = Result<$crate::AsyncResponse, String>>>>
+            });
+
+            // Register manifest entry with RustCore tool source
+            let __entry = $crate::api_docs::ApiManifestEntry {
                 namespace: ($namespace).into(),
                 name: ($name).into(),
-                action: Some(__action_clone.clone()),
+                action: Some(__action_for_entry),
                 description: ($doc).into(),
                 params: vec![
                     $($crate::api_docs::ParamDoc {
@@ -67,21 +78,12 @@ macro_rules! web_api {
                 transport: $crate::api_docs::ToolTransport::Async,
                 tool_source: $crate::api_docs::ToolSource::RustCore,
                 fields: None,
-            });
-
-            // Register handler
-            $crate::handler_registry::register_handler(
-                __action.as_str(),
-                Box::new(move |cmd: $crate::AsyncCommand| {
-                    let action = __action_clone.clone();
-                    Box::pin(async move {
-                        let params = cmd.parse_params::<$param_struct>()
-                            .map_err(|e| format!("Invalid {} params: {}", action, e))?;
-                        let resp = $handler(params).await;
-                        Ok(resp)
-                    })
-                })
-            );
+                aliases: vec![],
+            };
+            $crate::api_docs::register_executable_entry(
+                __entry,
+                $crate::api_docs::ApiHandler::Rust(__handler),
+            ).expect("failed to register executable entry");
         }
     };
     (
@@ -105,11 +107,22 @@ macro_rules! web_api {
                 check_deserialize::<$param_struct>();
             };
 
-            // Register API doc
-            $crate::api_docs::register($crate::api_docs::JsApiDoc {
+            let __action_for_entry = __action_clone.clone();
+            let __handler = std::rc::Rc::new(move |cmd: $crate::AsyncCommand| {
+                let action = __action_clone.clone();
+                Box::pin(async move {
+                    let params = cmd.parse_params::<$param_struct>()
+                        .map_err(|e| format!("Invalid {} params: {}", action, e))?;
+                    let resp = $handler(params).await;
+                    Ok(resp)
+                }) as std::pin::Pin<Box<dyn std::future::Future<Output = Result<$crate::AsyncResponse, String>>>>
+            });
+
+            // Register manifest entry with RustCore tool source
+            let __entry = $crate::api_docs::ApiManifestEntry {
                 namespace: ($namespace).into(),
                 name: ($name).into(),
-                action: Some(__action_clone.clone()),
+                action: Some(__action_for_entry),
                 description: ($doc).into(),
                 params: vec![
                     $($crate::api_docs::ParamDoc {
@@ -128,44 +141,181 @@ macro_rules! web_api {
                 transport: $crate::api_docs::ToolTransport::Async,
                 tool_source: $crate::api_docs::ToolSource::RustCore,
                 fields: Some(vec![$($field.to_string()),*]),
+                aliases: vec![],
+            };
+            $crate::api_docs::register_executable_entry(
+                __entry,
+                $crate::api_docs::ApiHandler::Rust(__handler),
+            ).expect("failed to register executable entry");
+        }
+    };
+    (
+        action: $action:expr,
+        namespace: $namespace:expr,
+        name: $name:expr,
+        doc: $doc:expr,
+        params: [$($param_name:ident: $param_type:expr, $required:literal, $param_desc:expr),* $(,)?],
+        returns: $ret_type:expr => $ret_desc:expr,
+        param_struct: $param_struct:ty,
+        handler: $handler:path,
+        aliases: [$($alias_ns:expr => $alias_name:expr),* $(,)?],
+    ) => {
+        {
+            let __action = $action.to_string();
+            let __action_clone = __action.clone();
+
+            // Compile-time check: param_struct must implement DeserializeOwned
+            const _: () = {
+                const fn check_deserialize<T: serde::de::DeserializeOwned>() {}
+                check_deserialize::<$param_struct>();
+            };
+
+            let __action_for_entry = __action_clone.clone();
+            let __handler = std::rc::Rc::new(move |cmd: $crate::AsyncCommand| {
+                let action = __action_clone.clone();
+                Box::pin(async move {
+                    let params = cmd.parse_params::<$param_struct>()
+                        .map_err(|e| format!("Invalid {} params: {}", action, e))?;
+                    let resp = $handler(params).await;
+                    Ok(resp)
+                }) as std::pin::Pin<Box<dyn std::future::Future<Output = Result<$crate::AsyncResponse, String>>>>
             });
 
-            // Register handler
-            $crate::handler_registry::register_handler(
-                __action.as_str(),
-                Box::new(move |cmd: $crate::AsyncCommand| {
-                    let action = __action_clone.clone();
-                    Box::pin(async move {
-                        let params = cmd.parse_params::<$param_struct>()
-                            .map_err(|e| format!("Invalid {} params: {}", action, e))?;
-                        let resp = $handler(params).await;
-                        Ok(resp)
-                    })
-                })
-            );
+            // Register manifest entry with RustCore tool source
+            let __entry = $crate::api_docs::ApiManifestEntry {
+                namespace: ($namespace).into(),
+                name: ($name).into(),
+                action: Some(__action_for_entry),
+                description: ($doc).into(),
+                params: vec![
+                    $($crate::api_docs::ParamDoc {
+                        name: stringify!($param_name).into(),
+                        js_type: ($param_type).into(),
+                        required: $required == "required",
+                        description: ($param_desc).into(),
+                    }),*
+                ],
+                returns: $crate::api_docs::ReturnDoc {
+                    js_type: ($ret_type).into(),
+                    description: ($ret_desc).into(),
+                },
+                public_name: format!("{}.{}", $namespace, $name),
+                local_name: None,
+                transport: $crate::api_docs::ToolTransport::Async,
+                tool_source: $crate::api_docs::ToolSource::RustCore,
+                fields: None,
+                aliases: vec![
+                    $($crate::api_docs::ApiAlias {
+                        namespace: ($alias_ns).into(),
+                        name: ($alias_name).into(),
+                        fields: None,
+                    }),*
+                ],
+            };
+            $crate::api_docs::register_executable_entry(
+                __entry,
+                $crate::api_docs::ApiHandler::Rust(__handler),
+            ).expect("failed to register executable entry");
+        }
+    };
+    (
+        action: $action:expr,
+        namespace: $namespace:expr,
+        name: $name:expr,
+        doc: $doc:expr,
+        params: [$($param_name:ident: $param_type:expr, $required:literal, $param_desc:expr),* $(,)?],
+        returns: $ret_type:expr => $ret_desc:expr,
+        param_struct: $param_struct:ty,
+        handler: $handler:path,
+        fields: [$($field:expr),* $(,)?],
+        aliases: [$($alias_ns:expr => $alias_name:expr),* $(,)?],
+    ) => {
+        {
+            let __action = $action.to_string();
+            let __action_clone = __action.clone();
+
+            // Compile-time check: param_struct must implement DeserializeOwned
+            const _: () = {
+                const fn check_deserialize<T: serde::de::DeserializeOwned>() {}
+                check_deserialize::<$param_struct>();
+            };
+
+            let __action_for_entry = __action_clone.clone();
+            let __handler = std::rc::Rc::new(move |cmd: $crate::AsyncCommand| {
+                let action = __action_clone.clone();
+                Box::pin(async move {
+                    let params = cmd.parse_params::<$param_struct>()
+                        .map_err(|e| format!("Invalid {} params: {}", action, e))?;
+                    let resp = $handler(params).await;
+                    Ok(resp)
+                }) as std::pin::Pin<Box<dyn std::future::Future<Output = Result<$crate::AsyncResponse, String>>>>
+            });
+
+            let __fields = Some(vec![$($field.to_string()),*]);
+
+            // Register manifest entry with RustCore tool source
+            let __entry = $crate::api_docs::ApiManifestEntry {
+                namespace: ($namespace).into(),
+                name: ($name).into(),
+                action: Some(__action_for_entry),
+                description: ($doc).into(),
+                params: vec![
+                    $($crate::api_docs::ParamDoc {
+                        name: stringify!($param_name).into(),
+                        js_type: ($param_type).into(),
+                        required: $required == "required",
+                        description: ($param_desc).into(),
+                    }),*
+                ],
+                returns: $crate::api_docs::ReturnDoc {
+                    js_type: ($ret_type).into(),
+                    description: ($ret_desc).into(),
+                },
+                public_name: format!("{}.{}", $namespace, $name),
+                local_name: None,
+                transport: $crate::api_docs::ToolTransport::Async,
+                tool_source: $crate::api_docs::ToolSource::RustCore,
+                fields: __fields.clone(),
+                aliases: vec![
+                    $($crate::api_docs::ApiAlias {
+                        namespace: ($alias_ns).into(),
+                        name: ($alias_name).into(),
+                        fields: __fields.clone(),
+                    }),*
+                ],
+            };
+            $crate::api_docs::register_executable_entry(
+                __entry,
+                $crate::api_docs::ApiHandler::Rust(__handler),
+            ).expect("failed to register executable entry");
         }
     };
 }
-
 /// Register a sync web API with both documentation and an rquickjs callback.
 ///
 /// This macro performs two atomic operations:
 /// 1. Registers API documentation in the doc registry.
 /// 2. Registers an rquickjs `Func::new` callback on the global object.
 ///
+/// The optional `local_name` parameter specifies the rquickjs global name
+/// for the handler. When omitted, it defaults to the action name. Use it
+/// to keep the internal rquickjs function private (e.g. `__webJsSha256`)
+/// while exposing a public action name in the manifest.
+///
 /// # Example
 /// ```ignore
 /// web_api_sync! {
 ///     ctx: ctx,
-///     action: "fetch",
-///     namespace: "web",
-///     name: "fetch",
-///     doc: "Performs an HTTP fetch.",
+///     action: "crypto_sha256",
+///     namespace: "crypto",
+///     name: "sha256",
+///     doc: "Computes the SHA-256 hash of a message.",
 ///     params: [
-///         url: "string", "required", "URL to fetch",
+///         message: "string", "required", "Message to hash",
 ///     ],
-///     returns: "object" => "Response object",
-///     handler: execute_fetch,
+///     returns: "string" => "Hex-encoded SHA-256 hash",
+///     handler: execute_sha256,
+///     local_name: "__webJsSha256",
 /// }
 /// ```
 #[macro_export]
@@ -180,15 +330,38 @@ macro_rules! web_api_sync {
         returns: $ret_type:expr => $ret_desc:expr,
         handler: $handler:expr,
     ) => {
+        $crate::web_api_sync! {
+            ctx: $ctx,
+            action: $action,
+            namespace: $namespace,
+            name: $name,
+            doc: $doc,
+            params: [$($param_name: $param_type, $required, $param_desc),*],
+            returns: $ret_type => $ret_desc,
+            handler: $handler,
+            local_name: $action,
+        }
+    };
+    (
+        ctx: $ctx:expr,
+        action: $action:expr,
+        namespace: $namespace:expr,
+        name: $name:expr,
+        doc: $doc:expr,
+        params: [$($param_name:ident: $param_type:expr, $required:literal, $param_desc:expr),* $(,)?],
+        returns: $ret_type:expr => $ret_desc:expr,
+        handler: $handler:expr,
+        local_name: $local_name:expr,
+    ) => {
         {
             let __action = $action.to_string();
-            let __action_clone = __action.clone();
+            let __local_name = $local_name.to_string();
 
             // Register API doc
             $crate::api_docs::register($crate::api_docs::JsApiDoc {
                 namespace: ($namespace).into(),
                 name: ($name).into(),
-                action: Some(__action_clone),
+                action: Some(__action),
                 description: ($doc).into(),
                 params: vec![
                     $($crate::api_docs::ParamDoc {
@@ -203,146 +376,17 @@ macro_rules! web_api_sync {
                     description: ($ret_desc).into(),
                 },
                 public_name: format!("{}.{}", $namespace, $name),
-                local_name: None,
+                local_name: Some(__local_name),
                 transport: $crate::api_docs::ToolTransport::Sync,
                 tool_source: $crate::api_docs::ToolSource::RustCore,
                 fields: None,
             });
 
-            // Register rquickjs callback
+            // Register rquickjs callback with local_name
             $ctx.globals().set(
-                __action,
+                $local_name,
                 rquickjs::function::Func::new($handler),
             )?;
         }
-    };
-}
-
-/// Register an action that is unavailable in the current context.
-///
-/// Any dispatch to this action will immediately return an error indicating
-/// that the action is not available. Used for extension-only APIs in web context.
-///
-/// When namespace and name are provided, also registers a doc entry so that
-/// JS bindings can be generated from the registry.
-///
-/// # Example
-/// ```ignore
-/// web_api_unavailable!("fs_read");
-/// web_api_unavailable!("tab_query", "web.tab", "query");
-/// ```
-#[macro_export]
-macro_rules! web_api_unavailable {
-    ($action:expr) => {
-        {
-            let __action = $action.to_string();
-            let __action_clone = __action.clone();
-            $crate::handler_registry::register_handler(
-                &__action,
-                Box::new(move |_cmd: $crate::AsyncCommand| {
-                    let action = __action_clone.clone();
-                    Box::pin(async move {
-                        Err($crate::handler_registry::unavailable_error(&action))
-                    })
-                })
-            );
-        }
-    };
-    ($action:expr, $namespace:expr, $name:expr) => {
-        {
-            let __action = ($action).to_string();
-            let __action_for_handler = __action.clone();
-            let __action_for_doc = __action.clone();
-            let __namespace = ($namespace).to_string();
-            let __name = ($name).to_string();
-            $crate::handler_registry::register_handler(
-                &__action,
-                Box::new(move |_cmd: $crate::AsyncCommand| {
-                    let action = __action_for_handler.clone();
-                    Box::pin(async move {
-                        Err($crate::handler_registry::unavailable_error(&action))
-                    })
-                })
-            );
-            $crate::api_docs::register($crate::api_docs::JsApiDoc {
-                namespace: __namespace.clone(),
-                name: __name.clone(),
-                action: Some(__action),
-                description: format!("{} is not available in this context.", __action_for_doc).into(),
-                params: vec![],
-                returns: $crate::api_docs::ReturnDoc {
-                    js_type: "null".into(),
-                    description: "None".into(),
-                },
-                public_name: format!("{}.{}", __namespace, __name),
-                local_name: None,
-                transport: $crate::api_docs::ToolTransport::Async,
-                tool_source: $crate::api_docs::ToolSource::Extension,
-                fields: None,
-            });
-        }
-    };
-    ($action:expr, $namespace:expr, $name:expr, fields: [$($field:expr),* $(,)?]) => {
-        {
-            let __action = ($action).to_string();
-            let __action_for_handler = __action.clone();
-            let __action_for_doc = __action.clone();
-            let __namespace = ($namespace).to_string();
-            let __name = ($name).to_string();
-            $crate::handler_registry::register_handler(
-                &__action,
-                Box::new(move |_cmd: $crate::AsyncCommand| {
-                    let action = __action_for_handler.clone();
-                    Box::pin(async move {
-                        Err($crate::handler_registry::unavailable_error(&action))
-                    })
-                })
-            );
-            $crate::api_docs::register($crate::api_docs::JsApiDoc {
-                namespace: __namespace.clone(),
-                name: __name.clone(),
-                action: Some(__action),
-                description: format!("{} is not available in this context.", __action_for_doc).into(),
-                params: vec![],
-                returns: $crate::api_docs::ReturnDoc {
-                    js_type: "null".into(),
-                    description: "None".into(),
-                },
-                public_name: format!("{}.{}", __namespace, __name),
-                local_name: None,
-                transport: $crate::api_docs::ToolTransport::Async,
-                tool_source: $crate::api_docs::ToolSource::Extension,
-                fields: Some(vec![$($field.to_string()),*]),
-            });
-        }
-    };
-}
-
-/// Internal helper for batch macro — do not use directly.
-#[macro_export]
-macro_rules! __web_api_unavailable_one {
-    ($action:expr, $namespace:expr, $name:expr) => {
-        $crate::web_api_unavailable!($action, $namespace, $name);
-    };
-    ($action:expr, $namespace:expr, $name:expr, fields: [$($field:expr),* $(,)?]) => {
-        $crate::web_api_unavailable!($action, $namespace, $name, fields: [$($field),*]);
-    };
-}
-
-/// Batch-register multiple unavailable actions.
-///
-/// # Example
-/// ```ignore
-/// web_api_unavailable_batch! {
-///     ("tab_query", "web.tab", "query"),
-///     ("tab_activate", "web.tab", "activate", fields: ["tabId"]),
-/// }
-/// ```
-#[macro_export]
-macro_rules! web_api_unavailable_batch {
-    ($($entry:tt),* $(,)?) => {
-        $(
-            $crate::__web_api_unavailable_one!$entry;
-        )*
     };
 }

@@ -25,6 +25,8 @@ web-fs = { path = "crates/web-fs" }
 rquickjs = { version = "0.11", features = ["rust-alloc", "disable-assertions"] }
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
+gloo-timers = "0.3"
+futures-util = "0.3"
 js-sys = "0.3"
 tsify = "0.5"
 ts-rs = "12"

@@ -1,29 +1,20 @@
-use std::cell::RefCell;
-use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
+use std::rc::Rc;
 
 use crate::types::{AsyncCommand, AsyncResponse};
 
-pub type Handler = Box<
+pub type Handler = Rc<
     dyn Fn(AsyncCommand) -> Pin<Box<dyn Future<Output = Result<AsyncResponse, String>>>>
 >;
 
 const HOST_PREFIX: &str = "host_";
 
-thread_local! {
-    static HANDLER_REGISTRY: RefCell<HashMap<String, Handler>> = RefCell::new(HashMap::new());
-}
-
 /// Register a handler for the given action name.
-/// Returns `true` if the action was newly registered, `false` if it overwrote an existing handler.
+/// Registers in the unified executable handler registry.
+/// Returns `true` if the action was newly registered, `false` if duplicate or frozen.
 pub fn register_handler(name: &str, handler: Handler) -> bool {
-    HANDLER_REGISTRY.with(|reg| {
-        let mut reg = reg.borrow_mut();
-        let is_new = !reg.contains_key(name);
-        reg.insert(name.to_string(), handler);
-        is_new
-    })
+    crate::api_docs::register_handler(name, crate::api_docs::ApiHandler::Rust(handler))
 }
 
 /// Shared error message for unavailable actions.
@@ -32,16 +23,16 @@ pub fn unavailable_error(action: &str) -> String {
 }
 
 pub fn clear_handlers() {
-    HANDLER_REGISTRY.with(|reg| reg.borrow_mut().clear());
+    crate::api_docs::clear_handlers();
 }
 
 pub fn is_empty() -> bool {
-    HANDLER_REGISTRY.with(|reg| reg.borrow().is_empty())
+    crate::api_docs::list_handler_actions().is_empty()
 }
 
 /// Return a snapshot of all registered handler action names.
 pub fn list_handlers() -> Vec<String> {
-    HANDLER_REGISTRY.with(|reg| reg.borrow().keys().cloned().collect())
+    crate::api_docs::list_handler_actions()
 }
 
 pub async fn dispatch_command(cmd: &AsyncCommand) -> Result<AsyncResponse, String> {
@@ -54,14 +45,11 @@ pub async fn dispatch_command(cmd: &AsyncCommand) -> Result<AsyncResponse, Strin
         }
     }
 
-    let future_opt = HANDLER_REGISTRY.with(|reg| {
-        reg.borrow().get(&cmd.action).map(|h| h(cmd.clone()))
-    });
-
-    match future_opt {
-        Some(fut) => fut.await,
-        None => Err(unavailable_error(&cmd.action)),
+    if let Some(fut) = crate::api_docs::dispatch_handler(&cmd.action, cmd.clone()) {
+        return fut.await;
     }
+
+    Err(unavailable_error(&cmd.action))
 }
 
 async fn dispatch_host_call(
@@ -83,15 +71,12 @@ async fn dispatch_host_call(
         call_id: cmd.call_id,
         action: "host_call".to_string(),
         params,
+        run_id: cmd.run_id.clone(),
     };
-    // Look up host_call handler directly to avoid recursion
-    let future_opt = HANDLER_REGISTRY.with(|reg| {
-        reg.borrow().get("host_call").map(|h| h(host_cmd))
-    });
-    match future_opt {
-        Some(fut) => fut.await,
-        None => Err("host_call handler not registered".to_string()),
+    if let Some(fut) = crate::api_docs::dispatch_handler("host_call", host_cmd.clone()) {
+        return fut.await;
     }
+    Err("host_call handler not registered".to_string())
 }
 
 #[cfg(test)]
@@ -127,7 +112,7 @@ mod tests {
     fn test_register_and_dispatch() {
         clear_handlers();
 
-        register_handler("test_action", Box::new(|_cmd| {
+        register_handler("test_action", Rc::new(|_cmd| {
             Box::pin(async move {
                 Ok(AsyncResponse {
                     ok: true,
@@ -141,6 +126,7 @@ mod tests {
             call_id: 1,
             action: "test_action".to_string(),
             params: serde_json::json!({}),
+            run_id: None,
         };
 
         let result = block_on(dispatch_command(&cmd));
@@ -160,6 +146,7 @@ mod tests {
             call_id: 1,
             action: "unknown".to_string(),
             params: serde_json::json!({}),
+            run_id: None,
         };
 
         let result = block_on(dispatch_command(&cmd));
@@ -174,7 +161,7 @@ mod tests {
         clear_handlers();
         assert!(is_empty());
 
-        register_handler("test", Box::new(|_cmd| {
+        register_handler("test", Rc::new(|_cmd| {
             Box::pin(async move {
                 Ok(AsyncResponse {
                     ok: true,
@@ -193,7 +180,7 @@ mod tests {
     fn test_register_handler_duplicate_detection() {
         clear_handlers();
 
-        assert!(register_handler("dup_test", Box::new(|_cmd| {
+        assert!(register_handler("dup_test", Rc::new(|_cmd| {
             Box::pin(async move {
                 Ok(AsyncResponse {
                     ok: true,
@@ -202,7 +189,7 @@ mod tests {
                 })
             })
         })));
-        assert!(!register_handler("dup_test", Box::new(|_cmd| {
+        assert!(!register_handler("dup_test", Rc::new(|_cmd| {
             Box::pin(async move {
                 Ok(AsyncResponse {
                     ok: true,
@@ -212,9 +199,10 @@ mod tests {
             })
         })));
 
-        let cmd = AsyncCommand { call_id: 1, action: "dup_test".to_string(), params: serde_json::json!({}) };
+        let cmd = AsyncCommand { call_id: 1, action: "dup_test".to_string(), params: serde_json::json!({}), run_id: None };
         let result = block_on(dispatch_command(&cmd));
-        assert!(result.unwrap().value == Some(serde_json::json!(2)));
+        // Original handler (value 1) should remain after duplicate rejection
+        assert_eq!(result.unwrap().value, Some(serde_json::json!(1)));
 
         clear_handlers();
     }
@@ -224,7 +212,7 @@ mod tests {
         clear_handlers();
 
         // Register a host_call handler that just echoes back the action
-        register_handler("host_call", Box::new(|cmd| {
+        register_handler("host_call", Rc::new(|cmd| {
             Box::pin(async move {
                 let action = cmd.params.get("action")
                     .and_then(|v| v.as_str())
@@ -242,6 +230,7 @@ mod tests {
             call_id: 1,
             action: "host_greet".to_string(),
             params: serde_json::json!({"name": "Alice"}),
+            run_id: None,
         };
 
         let result = block_on(dispatch_command(&cmd));
@@ -257,7 +246,7 @@ mod tests {
     fn test_host_call_direct_no_recursion() {
         clear_handlers();
 
-        register_handler("host_call", Box::new(|_cmd| {
+        register_handler("host_call", Rc::new(|_cmd| {
             Box::pin(async move {
                 Ok(AsyncResponse {
                     ok: true,
@@ -272,6 +261,7 @@ mod tests {
             call_id: 1,
             action: "host_call".to_string(),
             params: serde_json::json!({}),
+            run_id: None,
         };
 
         let result = block_on(dispatch_command(&cmd));
@@ -286,7 +276,7 @@ mod tests {
     fn test_host_call_non_object_params_errors() {
         clear_handlers();
 
-        register_handler("host_call", Box::new(|_cmd| {
+        register_handler("host_call", Rc::new(|_cmd| {
             Box::pin(async move {
                 Ok(AsyncResponse {
                     ok: true,
@@ -301,6 +291,7 @@ mod tests {
             call_id: 1,
             action: "host_greet".to_string(),
             params: serde_json::json!(["alice"]),
+            run_id: None,
         };
 
         let result = block_on(dispatch_command(&cmd));
@@ -313,6 +304,7 @@ mod tests {
             call_id: 2,
             action: "host_greet".to_string(),
             params: serde_json::json!("alice"),
+            run_id: None,
         };
 
         let result2 = block_on(dispatch_command(&cmd2));
@@ -356,38 +348,20 @@ mod tests {
             call_id: 1,
             action: "test_sleep".to_string(),
             params: serde_json::json!({"duration": 100}),
+            run_id: None,
         };
         let result = block_on(dispatch_command(&cmd));
         assert!(result.is_ok());
         assert!(result.unwrap().ok);
 
         // Verify doc is registered via generate_json
-        let json = crate::api_docs::generate_json();
+        let json = crate::api_docs::generate_json().unwrap();
         assert!(json.contains("test_sleep"));
         assert!(json.contains("web.sleep"));
         assert!(json.contains("Async"));
 
         clear_handlers();
         crate::api_docs::REGISTRY.with(|reg| reg.borrow_mut().clear());
-    }
-
-    #[test]
-    fn test_web_api_unavailable_macro() {
-        clear_handlers();
-
-        crate::web_api_unavailable!("test_unavailable");
-
-        let cmd = AsyncCommand {
-            call_id: 1,
-            action: "test_unavailable".to_string(),
-            params: serde_json::json!({}),
-        };
-
-        let result = block_on(dispatch_command(&cmd));
-        assert!(result.is_err());
-        assert!(result.unwrap_err().contains("test_unavailable is not available"));
-
-        clear_handlers();
     }
 
     #[test]
@@ -459,13 +433,13 @@ mod tests {
             handler: h1,
         }
 
-        let handlers = list_handlers();
-        let docs = crate::api_docs::list_docs();
+        let entries = crate::api_docs::list_manifest_entries();
 
-        for doc in &docs {
-            if let Some(ref action) = doc.action {
+        for entry in &entries {
+            if let Some(ref action) = entry.action {
+                let has_handler = crate::api_docs::has_handler(action);
                 assert!(
-                    handlers.contains(action),
+                    has_handler,
                     "Doc action '{}' has no matching handler",
                     action
                 );

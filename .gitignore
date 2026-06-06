@@ -47,8 +47,10 @@ web/public/manifest.json
 web/src/wasm/
 crates/js/
 
-# Playwright
+# Playwright / Vitest run artifacts
 .last-run.json
+/test-results/
+crates/extension-js/js/test-results/
 
 # OS / Editor
 .DS_Store

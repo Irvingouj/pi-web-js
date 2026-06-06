@@ -3,7 +3,7 @@ import { useRef } from "preact/hooks";
 import type { KernelStatus } from "../hooks/useKernel";
 import type { CellKind, Cell as CellType } from "../notebook";
 import CellOutput from "./CellOutput";
-import CodeMirrorEditor from "./CodeMirrorEditor";
+import CodeMirrorEditor, { type CellEditorHandle } from "./CodeMirrorEditor";
 import MarkdownPreview from "./MarkdownPreview";
 
 interface Props {
@@ -12,7 +12,7 @@ interface Props {
 	totalCells: number;
 	kernelStatus: KernelStatus;
 	editing: boolean;
-	onRun: (cellId: string) => void;
+	onRun: (cellId: string, source?: string) => void;
 	onDelete: (cellId: string) => void;
 	onMove: (cellId: string, direction: "up" | "down") => void;
 	onAdd: (afterId: string, kind: CellKind) => void;
@@ -64,6 +64,7 @@ const Cell: FunctionalComponent<Props> = ({
 		onChangeSource(cell.id, source);
 	};
 
+	const editorRef = useRef<CellEditorHandle>(null);
 	const lastRunRef = useRef(0);
 	const handleRun = () => {
 		const now = Date.now();
@@ -72,8 +73,9 @@ const Cell: FunctionalComponent<Props> = ({
 			return;
 		}
 		lastRunRef.current = now;
+		const source = editorRef.current?.getText() ?? cell.source;
 		console.log(`[Cell.handleRun] running cell ${cell.id}`);
-		onRun(cell.id);
+		onRun(cell.id, source);
 	};
 
 	const handleToggleEdit = () => {
@@ -206,6 +208,7 @@ const Cell: FunctionalComponent<Props> = ({
 			<div class="cell-body">
 				{isCode ? (
 					<CodeMirrorEditor
+						ref={editorRef}
 						id={cell.id}
 						value={cell.source}
 						placeholder="Enter JavaScript code here..."

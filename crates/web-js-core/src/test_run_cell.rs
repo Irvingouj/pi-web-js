@@ -686,7 +686,7 @@ mod tests {
     fn test_contract_file_loads() {
         let mut session = JsSession::new();
         let contract_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../web/tests/e2e/all-apis-extension-contract.js");
+            .join("../../web/tests/e2e/extension/contract/all-apis-extension-contract.js");
         let contract_code = std::fs::read_to_string(&contract_path)
             .unwrap_or_else(|e| panic!("Failed to read contract file: {}", e));
         let result = session.run_cell(&contract_code, "");

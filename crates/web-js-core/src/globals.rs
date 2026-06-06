@@ -10,6 +10,7 @@ use std::rc::Rc;
 pub(crate) fn register_host_globals<'js>(
     ctx: Ctx<'js>,
     host_state: Rc<RefCell<HostState>>,
+    allow_user_eval: bool,
 ) -> rquickjs::Result<()> {
     let hs = host_state.clone();
     ctx.globals().set(
@@ -119,6 +120,7 @@ pub(crate) fn register_host_globals<'js>(
                     call_id,
                     action: action_str,
                     params,
+                    run_id: None,
                 };
                 hs.pending_async_commands.push(command);
 
@@ -134,15 +136,34 @@ pub(crate) fn register_host_globals<'js>(
         ),
     )?;
 
-    // Disable eval for security.
-    ctx.globals().set(
-        "eval",
-        Func::new(
-            move |_ctx: Ctx<'js>, _args: Rest<Value<'js>>| -> rquickjs::Result<Value<'js>> {
-                Err(rquickjs::Error::new_from_js("eval", "disabled"))
-            },
-        ),
-    )?;
+    if allow_user_eval {
+        ctx.globals().set(
+            "eval",
+            Func::new(
+                move |ctx: Ctx<'js>, args: Rest<Value<'js>>| -> rquickjs::Result<Value<'js>> {
+                    let source = args
+                        .0
+                        .first()
+                        .and_then(|v| v.as_string())
+                        .and_then(|s| s.to_string().ok())
+                        .unwrap_or_default();
+                    let mut eval_opts = rquickjs::context::EvalOptions::default();
+                    eval_opts.global = true;
+                    eval_opts.strict = false;
+                    ctx.eval_with_options::<Value, _>(source, eval_opts)
+                },
+            ),
+        )?;
+    } else {
+        ctx.globals().set(
+            "eval",
+            Func::new(
+                move |_ctx: Ctx<'js>, _args: Rest<Value<'js>>| -> rquickjs::Result<Value<'js>> {
+                    Err(rquickjs::Error::new_from_js("eval", "disabled"))
+                },
+            ),
+        )?;
+    }
 
     // Build console object directly from Rust to avoid JS-eval issues in WASM.
     let console = Object::new(ctx.clone())?;

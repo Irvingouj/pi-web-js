@@ -52,7 +52,7 @@ const targets = [
     name: "extension-js",
     crate: "extension-js",
     wasm: "extension_js.wasm",
-    outDir: "crates/extension-js/pkg",
+    outDir: "crates/extension-js/js/pkg",
     cratePrefix: "extension_js",
   },
   {
@@ -74,9 +74,15 @@ async function buildTarget(target) {
   );
   const outDir = path.join(rootDir, target.outDir);
 
-  run(
-    `rustup run stable cargo build --target wasm32-unknown-unknown -p ${target.crate}`,
-  );
+  const cargoCmd = (() => {
+    try {
+      execSync("rustup run stable cargo --version", { stdio: "ignore", env });
+      return `rustup run stable cargo build --target wasm32-unknown-unknown -p ${target.crate}`;
+    } catch {
+      return `cargo build --target wasm32-unknown-unknown -p ${target.crate}`;
+    }
+  })();
+  run(cargoCmd);
 
   ensureDir(outDir);
   run(
@@ -129,13 +135,15 @@ function copyExtensionAssets() {
   // Compile TypeScript sources if any .ts files need it.
   // runner.ts etc. are built by the web app pipeline; we only need tsc for
   // content-script.ts and other files referenced directly by the extension.
-  const hasTsSources = fs.readdirSync(srcDir).some((f) => f.endsWith(".ts"));
+  const srcTree = path.join(srcDir, "src");
+  const hasTsSources = fs.existsSync(srcTree);
   if (hasTsSources) {
-    // runner.ts imports ./generated.js — copy the source so tsc can resolve it.
+    // runner.ts imports generated.js — copy the source so tsc can resolve it.
     const generatedSrc = path.join(rootDir, "web/src/types/generated.ts");
-    const generatedTmp = path.join(srcDir, "generated.ts");
+    const generatedTmp = path.join(srcDir, "src/shared/generated.ts");
     let generatedCopied = false;
     if (fs.existsSync(generatedSrc) && !fs.existsSync(generatedTmp)) {
+      fs.mkdirSync(path.dirname(generatedTmp), { recursive: true });
       fs.copyFileSync(generatedSrc, generatedTmp);
       generatedCopied = true;
     }
@@ -143,17 +151,15 @@ function copyExtensionAssets() {
       execSync("tsc", { cwd: srcDir, stdio: "pipe" });
       console.log("  Compiled TypeScript sources");
       // Strip ESM marker from content-script.js so it works as a classic MV3 script
-      // tsc may emit into dist/ (when outDir is set), so strip both locations
       function stripEsmMarker(filePath) {
         if (fs.existsSync(filePath)) {
           let cs = fs.readFileSync(filePath, "utf-8");
           cs = cs.replace(/export\s*\{\s*\};?\s*$/, "");
           fs.writeFileSync(filePath, cs);
-          console.log(`  Stripped ESM marker from ${path.basename(filePath)}`);
+          console.log(`  Stripped ESM marker from ${path.relative(srcDir, filePath)}`);
         }
       }
-      stripEsmMarker(path.join(srcDir, "content-script.js"));
-      stripEsmMarker(path.join(distDir, "content-script.js"));
+      stripEsmMarker(path.join(srcDir, "pkg/content-script.js"));
     } catch (e) {
       console.error("  TypeScript compilation failed:", e.message);
       process.exit(1);
@@ -165,9 +171,16 @@ function copyExtensionAssets() {
   }
 
   for (const file of ["content-script.js", "manifest.json", "background.js"]) {
-    const src = fs.existsSync(path.join(distDir, file))
-      ? path.join(distDir, file)
-      : path.join(srcDir, file);
+    const pkgCandidate = path.join(srcDir, "pkg", file);
+    const distCandidate =
+      file === "content-script.js"
+        ? path.join(distDir, "content-script/index.js")
+        : path.join(distDir, file);
+    const src = fs.existsSync(pkgCandidate)
+      ? pkgCandidate
+      : fs.existsSync(distCandidate)
+        ? distCandidate
+        : path.join(srcDir, file);
     const dest = path.join(destDir, file);
     if (fs.existsSync(src)) {
       fs.copyFileSync(src, dest);

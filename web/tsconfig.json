@@ -15,7 +15,7 @@
     "jsxImportSource": "preact",
     "paths": {
       "@pi-oxide/web-js": ["../crates/web-js/js/index.ts"],
-      "@pi-oxide/extension-js": ["../crates/extension-js/js/index.ts"],
+      "@pi-oxide/extension-js": ["../crates/extension-js/js/src/main/index.ts"],
       "@pi-oxide/dom-semantic-tree": ["../crates/dom-semantic-tree/js/index.ts"]
     }
   },

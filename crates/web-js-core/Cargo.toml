@@ -21,6 +21,12 @@ md-5 = { workspace = true }
 hmac = { workspace = true }
 web-sys = { version = "0.3", features = ["console"] }
 wasm-bindgen = { workspace = true }
+wasm-bindgen-futures = { workspace = true }
+gloo-timers = { workspace = true, features = ["futures"] }
+futures-util = { workspace = true }
+serde-wasm-bindgen = { workspace = true }
+js-sys = { workspace = true }
+tsify = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]

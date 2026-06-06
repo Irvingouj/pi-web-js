@@ -12,6 +12,7 @@ pub fn main() {
 
 /// Generate API documentation for the JS runtime.
 #[wasm_bindgen::prelude::wasm_bindgen(js_name = generateApiDocs)]
-pub fn generate_api_docs(format: &str) -> String {
+pub fn generate_api_docs(format: &str) -> Result<String, wasm_bindgen::JsValue> {
     web_js_core::api_docs::generate(format)
+        .map_err(|e| wasm_bindgen::JsValue::from_str(&e))
 }

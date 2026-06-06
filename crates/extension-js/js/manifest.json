@@ -26,7 +26,15 @@
 	"background": {
 		"service_worker": "background.js"
 	},
-	"action": {},
+	"icons": {
+		"16": "icon.svg",
+		"32": "icon.svg",
+		"48": "icon.svg",
+		"128": "icon.svg"
+	},
+	"action": {
+		"default_icon": "icon.svg"
+	},
 	"side_panel": {
 		"default_path": "index.html"
 	},
@@ -43,7 +51,7 @@
 	},
 	"web_accessible_resources": [
 		{
-			"resources": ["dom_semantic_tree.js"],
+			"resources": ["dom_semantic_tree.js", "e2e/*.js"],
 			"matches": ["<all_urls>"]
 		}
 	]

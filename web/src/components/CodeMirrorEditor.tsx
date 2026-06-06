@@ -29,9 +29,13 @@ import {
 	lineNumbers,
 	rectangularSelection,
 } from "@codemirror/view";
-import type { FunctionalComponent } from "preact";
-import { useEffect, useRef } from "preact/hooks";
+import { forwardRef } from "preact/compat";
+import { useEffect, useImperativeHandle, useRef } from "preact/hooks";
 import { useTheme } from "../hooks/useTheme";
+
+export type CellEditorHandle = {
+	getText: () => string;
+};
 
 interface Props {
 	id: string;
@@ -372,19 +376,27 @@ function getLightTheme() {
 	});
 }
 
-const CodeMirrorEditor: FunctionalComponent<Props> = ({
-	id,
-	value,
-	placeholder,
-	kind,
-	onChange,
-	onRun,
-	onDoneEditing,
-	autoFocus,
-}) => {
+const CodeMirrorEditor = forwardRef<CellEditorHandle, Props>(
+	(
+		{
+			id,
+			value,
+			placeholder,
+			kind,
+			onChange,
+			onRun,
+			onDoneEditing,
+			autoFocus,
+		},
+		ref,
+	) => {
 	const containerRef = useRef<HTMLDivElement>(null);
 	const viewRef = useRef<EditorView | null>(null);
 	const { theme } = useTheme();
+
+	useImperativeHandle(ref, () => ({
+		getText: () => viewRef.current?.state.doc.toString() ?? "",
+	}));
 
 	useEffect(() => {
 		if (!containerRef.current) return;
@@ -439,6 +451,7 @@ const CodeMirrorEditor: FunctionalComponent<Props> = ({
 			class="cm-editor-wrapper"
 		/>
 	);
-};
+	},
+);
 
 export default CodeMirrorEditor;

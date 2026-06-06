@@ -5,13 +5,13 @@ import path from "path";
 const externalize = (id: string) =>
 	id === "zod" ||
 	id === "@pi-oxide/dom-semantic-tree" ||
-	id.endsWith("extension_js.js");
+	id.endsWith("pkg/extension_js.js");
 
 export default defineConfig({
 	base: "./",
 	build: {
 		lib: {
-			entry: path.resolve(__dirname, "index.ts"),
+			entry: path.resolve(__dirname, "src/main/index.ts"),
 			formats: ["es"],
 			fileName: "index",
 		},
@@ -41,14 +41,15 @@ export default defineConfig({
 			name: "external-extension-js",
 			enforce: "pre",
 			resolveId(id) {
-				if (id.endsWith("extension_js.js")) {
+				if (id.endsWith("pkg/extension_js.js")) {
 					return { id, external: true };
 				}
 			},
 		},
 		dts({
-			include: ["./*.ts"],
-			exclude: ["./*.test.ts", "./vitest.config.ts"],
+			include: ["src/**/*.ts"],
+			exclude: ["./test/**/*.test.ts", "./vitest.config.ts"],
+			entryRoot: "src",
 		}),
 	],
 });

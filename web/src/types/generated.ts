@@ -53,6 +53,7 @@ export type AsyncCommand = {
 	call_id: number;
 	action: string;
 	params: CommandParams;
+	run_id?: string;
 };
 
 export type CellError =

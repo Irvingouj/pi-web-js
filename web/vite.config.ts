@@ -24,7 +24,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@pi-oxide/web-js': path.resolve(__dirname, '../crates/web-js/js/index.ts'),
-      '@pi-oxide/extension-js': path.resolve(__dirname, '../crates/extension-js/js/index.ts'),
+      '@pi-oxide/extension-js': path.resolve(__dirname, '../crates/extension-js/js/src/main/index.ts'),
       '@pi-oxide/dom-semantic-tree': path.resolve(__dirname, '../crates/dom-semantic-tree/js/index.ts'),
     },
   },

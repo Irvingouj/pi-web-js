@@ -9,7 +9,7 @@ export default defineConfig({
 		emptyOutDir: false,
 		assetsDir: ".",
 		rollupOptions: {
-			input: path.resolve(__dirname, "content-script.ts"),
+			input: path.resolve(__dirname, "src/content-script/index.ts"),
 			output: {
 				entryFileNames: "content-script.js",
 				format: "iife",
@@ -18,9 +18,9 @@ export default defineConfig({
 	},
 	plugins: [
 		dts({
-			include: ["./content-script.ts"],
+			include: ["src/content-script/index.ts"],
 			exclude: ["./vitest.config.ts"],
-			entryRoot: ".",
+			entryRoot: "src/content-script",
 		}),
 	],
 });

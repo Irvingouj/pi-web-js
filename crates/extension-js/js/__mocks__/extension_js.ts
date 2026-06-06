@@ -180,6 +180,7 @@ export class ExtensionSession {
 		});
 	}
 	set_fuel_limit(_limit: number): void {}
+	setAborted(_value: boolean): void {}
 	stopWith(): void {}
 }
 
@@ -188,5 +189,21 @@ export function generateApiDocs(_format: string): string {
 }
 
 export function setLogLevel(_level: number): void {
+	// mock
+}
+
+export function registerJsCall(_entry: unknown, _callback: unknown): void {
+	// mock
+}
+
+export function registerJsCallBatch(_items: unknown[]): void {
+	// mock
+}
+
+export function registerSharedDispatch(_callback: unknown): void {
+	// mock
+}
+
+export function importManifestEntries(_entries: unknown[]): void {
 	// mock
 }

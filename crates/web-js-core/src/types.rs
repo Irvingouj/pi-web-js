@@ -80,6 +80,7 @@ pub struct AsyncCommand {
     pub action: String,
     #[ts(type = "CommandParams")]
     pub params: serde_json::Value,
+    pub run_id: Option<String>,
 }
 
 impl AsyncCommand {

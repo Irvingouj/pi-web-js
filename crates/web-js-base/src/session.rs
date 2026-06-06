@@ -28,6 +28,16 @@ impl BaseSession {
         }
     }
 
+    /// Create an extension notebook session with eval enabled and higher fuel.
+    pub fn new_extension() -> Self {
+        Self {
+            inner: JsSession::build()
+                .allow_user_eval(true)
+                .fuel_limit(10_000_000)
+                .finish(),
+        }
+    }
+
     /// Run a cell of code with optional stdin.
     pub fn run_cell(&mut self, code: &str, stdin: &str) -> WasmRunResult {
         self.inner.run_cell(code, stdin).into()
@@ -41,6 +51,11 @@ impl BaseSession {
     /// Reset the session, clearing all JS state.
     pub fn reset(&mut self) {
         self.inner.reset();
+    }
+
+    /// Reset the session immediately, creating a fresh JS context.
+    pub fn reset_now(&mut self) {
+        self.inner.reset_now();
     }
 
     /// Set the fuel limit for execution.
