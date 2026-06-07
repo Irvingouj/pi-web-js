@@ -1,9 +1,6 @@
-use crate::utils::format_js_value;
-use rquickjs::{
-    context::EvalOptions,
-    function::Rest,
-    Ctx, Value,
-};
+use crate::error::exception_to_string;
+use crate::js_value::format_js_value;
+use rquickjs::{context::EvalOptions, function::Rest, Ctx, Value};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -444,7 +441,7 @@ pub(crate) fn register_web_module<'js>(
     if let Err(e) = ctx.eval::<i32, _>("1+1") {
         let msg = if let rquickjs::Error::Exception = &e {
             let exc = ctx.catch();
-            crate::utils::exception_to_string(&exc)
+            exception_to_string(&exc)
         } else {
             e.to_string()
         };
@@ -459,7 +456,7 @@ pub(crate) fn register_web_module<'js>(
     if let Err(e) = ctx.eval::<(), _>(setup_js) {
         let msg = if let rquickjs::Error::Exception = &e {
             let exc = ctx.catch();
-            crate::utils::exception_to_string(&exc)
+            exception_to_string(&exc)
         } else {
             e.to_string()
         };

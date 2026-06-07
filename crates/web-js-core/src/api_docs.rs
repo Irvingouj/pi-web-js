@@ -11,6 +11,8 @@ use wasm_bindgen::prelude::*;
 use crate::handler_registry::Handler;
 use crate::types::{AsyncCommand, AsyncResponse};
 
+type AsyncHandlerFuture = Pin<Box<dyn Future<Output = Result<AsyncResponse, String>>>>;
+
 // Each action occupies one registry record. Production registration inserts
 // metadata and its non-serializable executable handler together.
 
@@ -344,7 +346,9 @@ fn alias_public_name(namespace: &str, name: &str) -> String {
     format!("{namespace}.{name}")
 }
 
-fn occupied_public_names(registry: &BTreeMap<String, RegistryRecord>) -> std::collections::BTreeSet<String> {
+fn occupied_public_names(
+    registry: &BTreeMap<String, RegistryRecord>,
+) -> std::collections::BTreeSet<String> {
     let mut names = std::collections::BTreeSet::new();
     for record in registry.values() {
         let Some(manifest) = record.manifest.as_ref() else {
@@ -379,7 +383,9 @@ fn validate_manifest_names(
     validate_entry_internal_aliases(entry)?;
     let occupied = occupied_public_names(registry);
     if occupied.contains(&entry.public_name) {
-        return Err(RegistryError::DuplicatePublicName(entry.public_name.clone()));
+        return Err(RegistryError::DuplicatePublicName(
+            entry.public_name.clone(),
+        ));
     }
     for alias in &entry.aliases {
         let alias_name = alias_public_name(&alias.namespace, &alias.name);
@@ -409,7 +415,9 @@ fn validate_batch_entries(
         }
         validate_entry_internal_aliases(entry)?;
         if !batch_public_names.insert(entry.public_name.clone()) {
-            return Err(RegistryError::DuplicatePublicName(entry.public_name.clone()));
+            return Err(RegistryError::DuplicatePublicName(
+                entry.public_name.clone(),
+            ));
         }
         for alias in &entry.aliases {
             let alias_name = alias_public_name(&alias.namespace, &alias.name);
@@ -548,7 +556,12 @@ pub fn register_handler(action: &str, handler: ApiHandler) -> bool {
 
 /// Check whether a handler is registered for the given action.
 pub fn has_handler(action: &str) -> bool {
-    REGISTRY.with(|reg| reg.borrow().get(action).and_then(|record| record.handler.as_ref()).is_some())
+    REGISTRY.with(|reg| {
+        reg.borrow()
+            .get(action)
+            .and_then(|record| record.handler.as_ref())
+            .is_some()
+    })
 }
 
 /// Return a snapshot of executable handler action names.
@@ -580,7 +593,7 @@ fn extract_js_error_message(e: &JsValue) -> String {
 pub fn dispatch_handler(
     action: &str,
     cmd: AsyncCommand,
-) -> Option<Pin<Box<dyn Future<Output = Result<AsyncResponse, String>>>>> {
+) -> Option<AsyncHandlerFuture> {
     let handler = REGISTRY.with(|reg| {
         reg.borrow()
             .get(action)
@@ -589,79 +602,100 @@ pub fn dispatch_handler(
     match handler {
         ApiHandler::Rust(handler_fn) => Some(handler_fn(cmd)),
         ApiHandler::JsCallback(js_value) => {
-                let cb = js_sys::Function::from(js_value);
-                // Round-trip through JSON so nested objects become plain JS objects, not Maps.
-                // serde_wasm_bindgen::to_value maps JSON objects to JS Map, which breaks
-                // native-parity chrome APIs (JSON.stringify(Map) => "{}" inside arg arrays).
-                let params_js = match serde_json::to_string(&cmd.params) {
-                    Ok(params_json) => match js_sys::JSON::parse(&params_json) {
-                        Ok(v) => v,
-                        Err(e) => {
-                            tracing::warn!(action = %cmd.action, error = ?e, "dispatch_handler_params_parse_failed");
-                            return Some(Box::pin(async move {
-                                Err(format!("Failed to parse params JSON: {:?}", e))
-                            }) as Pin<Box<dyn Future<Output = Result<AsyncResponse, String>>>>)
-                        }
-                    },
-                    Err(e) => {
-                        tracing::warn!(action = %cmd.action, error = %e, "dispatch_handler_params_serialize_failed");
-                        return Some(Box::pin(async move {
-                            Err(format!("Failed to serialize params: {}", e))
-                        }) as Pin<Box<dyn Future<Output = Result<AsyncResponse, String>>>>)
-                    }
-                };
-                tracing::debug!(action = %cmd.action, "dispatch_handler_js_callback_call");
-                // Build context object with action, call_id and run_id for the JS callback
-                let context_js = js_sys::Object::new();
-                let _ = js_sys::Reflect::set(&context_js, &"action".into(), &JsValue::from_str(&cmd.action));
-                let _ = js_sys::Reflect::set(&context_js, &"callId".into(), &JsValue::from_f64(cmd.call_id as f64));
-                let _ = js_sys::Reflect::set(&context_js, &"runId".into(), &cmd.run_id.as_ref().map(|s| JsValue::from_str(s)).unwrap_or(JsValue::NULL));
-                let result_js = match cb.call2(&JsValue::NULL, &params_js, &context_js) {
+            let cb = js_sys::Function::from(js_value);
+            // Round-trip through JSON so nested objects become plain JS objects, not Maps.
+            // serde_wasm_bindgen::to_value maps JSON objects to JS Map, which breaks
+            // native-parity chrome APIs (JSON.stringify(Map) => "{}" inside arg arrays).
+            let params_js = match serde_json::to_string(&cmd.params) {
+                Ok(params_json) => match js_sys::JSON::parse(&params_json) {
                     Ok(v) => v,
                     Err(e) => {
-                        let err_msg = extract_js_error_message(&e);
-                        tracing::warn!(action = %cmd.action, error = %err_msg, "dispatch_handler_js_callback_threw");
+                        tracing::warn!(action = %cmd.action, error = ?e, "dispatch_handler_params_parse_failed");
                         return Some(Box::pin(async move {
-                            Err(format!("JS callback error: {}", err_msg))
-                        }) as Pin<Box<dyn Future<Output = Result<AsyncResponse, String>>>>)
+                            Err(format!("Failed to parse params JSON: {:?}", e))
+                        })
+                            as Pin<Box<dyn Future<Output = Result<AsyncResponse, String>>>>);
+                    }
+                },
+                Err(e) => {
+                    tracing::warn!(action = %cmd.action, error = %e, "dispatch_handler_params_serialize_failed");
+                    return Some(Box::pin(async move {
+                        Err(format!("Failed to serialize params: {}", e))
+                    })
+                        as Pin<Box<dyn Future<Output = Result<AsyncResponse, String>>>>);
+                }
+            };
+            tracing::debug!(action = %cmd.action, "dispatch_handler_js_callback_call");
+            // Build context object with action, call_id and run_id for the JS callback
+            let context_js = js_sys::Object::new();
+            let _ = js_sys::Reflect::set(
+                &context_js,
+                &"action".into(),
+                &JsValue::from_str(&cmd.action),
+            );
+            let _ = js_sys::Reflect::set(
+                &context_js,
+                &"callId".into(),
+                &JsValue::from_f64(cmd.call_id as f64),
+            );
+            let _ = js_sys::Reflect::set(
+                &context_js,
+                &"runId".into(),
+                &cmd.run_id
+                    .as_ref()
+                    .map(|s| JsValue::from_str(s))
+                    .unwrap_or(JsValue::NULL),
+            );
+            let result_js = match cb.call2(&JsValue::NULL, &params_js, &context_js) {
+                Ok(v) => v,
+                Err(e) => {
+                    let err_msg = extract_js_error_message(&e);
+                    tracing::warn!(action = %cmd.action, error = %err_msg, "dispatch_handler_js_callback_threw");
+                    return Some(Box::pin(
+                        async move { Err(format!("JS callback error: {}", err_msg)) },
+                    )
+                        as Pin<Box<dyn Future<Output = Result<AsyncResponse, String>>>>);
+                }
+            };
+            // If the JS callback returns a non-Promise value, wrap it in a resolved Promise
+            let promise = if result_js.is_instance_of::<js_sys::Promise>() {
+                js_sys::Promise::from(result_js)
+            } else {
+                js_sys::Promise::resolve(&result_js)
+            };
+            let action_for_timeout = cmd.action.clone();
+            Some(Box::pin(async move {
+                let timeout = gloo_timers::future::TimeoutFuture::new(30_000);
+                let resp_js = match futures_util::future::select(
+                    wasm_bindgen_futures::JsFuture::from(promise),
+                    timeout,
+                )
+                .await
+                {
+                    futures_util::future::Either::Left((result, _)) => match result {
+                        Ok(v) => v,
+                        Err(e) => {
+                            let err_msg = extract_js_error_message(&e);
+                            tracing::warn!(action = %action_for_timeout, error = %err_msg, "dispatch_handler_js_callback_rejected");
+                            return Err(format!("JS callback promise rejected: {}", err_msg));
+                        }
+                    },
+                    futures_util::future::Either::Right((_, _)) => {
+                        tracing::warn!(action = %action_for_timeout, "dispatch_handler_js_callback_timeout");
+                        return Err("JS callback timed out after 30s".to_string());
                     }
                 };
-                // If the JS callback returns a non-Promise value, wrap it in a resolved Promise
-                let promise = if result_js.is_instance_of::<js_sys::Promise>() {
-                    js_sys::Promise::from(result_js)
-                } else {
-                    js_sys::Promise::resolve(&result_js)
-                };
-                let action_for_timeout = cmd.action.clone();
-                Some(Box::pin(async move {
-                    let timeout = gloo_timers::future::TimeoutFuture::new(30_000);
-                    let resp_js = match futures_util::future::select(
-                        wasm_bindgen_futures::JsFuture::from(promise),
-                        timeout,
-                    ).await {
-                        futures_util::future::Either::Left((result, _)) => {
-                            match result {
-                                Ok(v) => v,
-                                Err(e) => {
-                                    let err_msg = extract_js_error_message(&e);
-                                    tracing::warn!(action = %action_for_timeout, error = %err_msg, "dispatch_handler_js_callback_rejected");
-                                    return Err(format!("JS callback promise rejected: {}", err_msg));
-                                }
-                            }
-                        }
-                        futures_util::future::Either::Right((_, _)) => {
-                            tracing::warn!(action = %action_for_timeout, "dispatch_handler_js_callback_timeout");
-                            return Err("JS callback timed out after 30s".to_string());
-                        }
-                    };
-                    let resp: AsyncResponse = serde_wasm_bindgen::from_value(resp_js)
+                let resp: AsyncResponse = serde_wasm_bindgen::from_value(resp_js)
                         .map_err(|e| {
                             tracing::warn!(action = %action_for_timeout, error = %e, "dispatch_handler_js_callback_deserialize_failed");
                             format!("Failed to deserialize JS callback response: {}", e)
                         })?;
-                    tracing::info!(action = %action_for_timeout, ok = resp.ok, "dispatch_handler_js_callback_done");
-                    Ok(resp)
-                }) as Pin<Box<dyn Future<Output = Result<AsyncResponse, String>>>>)
+                tracing::info!(action = %action_for_timeout, ok = resp.ok, "dispatch_handler_js_callback_done");
+                Ok(resp)
+            })
+                as Pin<
+                    Box<dyn Future<Output = Result<AsyncResponse, String>>>,
+                >)
         }
     }
 }
@@ -669,7 +703,8 @@ pub fn dispatch_handler(
 /// Clear all registered handlers. Primarily useful in tests.
 pub fn clear_handlers() {
     REGISTRY.with(|reg| {
-        reg.borrow_mut().retain(|_, record| record.handler.is_none());
+        reg.borrow_mut()
+            .retain(|_, record| record.handler.is_none());
     });
 }
 
@@ -682,9 +717,10 @@ pub fn register(doc: JsApiDoc) {
     REGISTRY.with(|reg| {
         let mut registry = reg.borrow_mut();
         // Avoid duplicates when sessions are recreated (e.g. reset)
-        if registry.values().filter_map(|record| record.manifest.as_ref()).any(
-            |entry| entry.namespace == doc.namespace && entry.name == doc.name,
-        )
+        if registry
+            .values()
+            .filter_map(|record| record.manifest.as_ref())
+            .any(|entry| entry.namespace == doc.namespace && entry.name == doc.name)
         {
             return;
         }
@@ -709,11 +745,18 @@ pub fn register_manifest_entry(entry: ApiManifestEntry) -> Result<(), RegistryEr
     REGISTRY.with(|reg| {
         let mut registry = reg.borrow_mut();
         // Check duplicate action
-        if registry.get(&action).and_then(|record| record.manifest.as_ref()).is_some() {
+        if registry
+            .get(&action)
+            .and_then(|record| record.manifest.as_ref())
+            .is_some()
+        {
             return Err(RegistryError::DuplicateAction(action));
         }
         // Check duplicate public_name
-        for existing in registry.values().filter_map(|record| record.manifest.as_ref()) {
+        for existing in registry
+            .values()
+            .filter_map(|record| record.manifest.as_ref())
+        {
             if existing.public_name == entry.public_name {
                 return Err(RegistryError::DuplicatePublicName(
                     entry.public_name.clone(),
@@ -737,13 +780,22 @@ pub fn list_manifest_entries() -> Vec<ApiManifestEntry> {
 
 /// Look up a manifest entry by action name.
 pub fn get_manifest_entry(action: &str) -> Option<ApiManifestEntry> {
-    REGISTRY.with(|reg| reg.borrow().get(action).and_then(|record| record.manifest.clone()))
+    REGISTRY.with(|reg| {
+        reg.borrow()
+            .get(action)
+            .and_then(|record| record.manifest.clone())
+    })
 }
 
 /// Remove a manifest entry by action. Returns true if removed.
 /// Primarily used for rollback during atomic registration.
 pub fn remove_manifest_entry(action: &str) -> bool {
-    REGISTRY.with(|reg| reg.borrow_mut().remove(action).and_then(|record| record.manifest).is_some())
+    REGISTRY.with(|reg| {
+        reg.borrow_mut()
+            .remove(action)
+            .and_then(|record| record.manifest)
+            .is_some()
+    })
 }
 
 /// Clear all manifest entries and reset the freeze flag.
@@ -810,8 +862,7 @@ pub fn list_docs() -> Vec<JsApiDoc> {
 
 pub fn generate_json() -> Result<String, String> {
     let docs = list_docs();
-    serde_json::to_string_pretty(&docs)
-        .map_err(|e| format!("Failed to serialize manifest: {}", e))
+    serde_json::to_string_pretty(&docs).map_err(|e| format!("Failed to serialize manifest: {}", e))
 }
 
 pub fn generate_markdown() -> String {
@@ -854,10 +905,7 @@ pub fn generate_markdown() -> String {
                 md.push_str(&format!("**Example**\n\n```js\n{}\n```\n\n", example));
             }
             if let Some(permission) = &api.permission {
-                md.push_str(&format!(
-                    "**Permission required:** `{}`\n\n",
-                    permission
-                ));
+                md.push_str(&format!("**Permission required:** `{}`\n\n", permission));
             }
             if !api.aliases.is_empty() {
                 md.push_str("**Aliases**\n\n");
@@ -960,10 +1008,7 @@ pub fn generate_js_bindings_code() -> String {
                         .as_ref()
                         .is_some_and(|a| is_native_parity_action(a)) =>
             {
-                let escaped: Vec<String> = fields
-                    .iter()
-                    .map(|f| escape_js_string(f))
-                    .collect();
+                let escaped: Vec<String> = fields.iter().map(|f| escape_js_string(f)).collect();
                 format!(
                     ",fields:[{}]",
                     escaped
@@ -999,11 +1044,8 @@ pub fn generate_js_bindings_code() -> String {
                             .action
                             .as_ref()
                             .is_some_and(|a| is_native_parity_action(a)) =>
-            {
-                    let escaped: Vec<String> = fields
-                        .iter()
-                        .map(|f| escape_js_string(f))
-                        .collect();
+                {
+                    let escaped: Vec<String> = fields.iter().map(|f| escape_js_string(f)).collect();
                     format!(
                         ",fields:[{}]",
                         escaped
@@ -1061,9 +1103,7 @@ pub fn generate_js_sync_bindings_code() -> String {
         }
 
         let name = escape_js_string(&entry.name);
-        let local = escape_js_string(
-            entry.local_name.as_deref().unwrap_or(action.as_str()),
-        );
+        let local = escape_js_string(entry.local_name.as_deref().unwrap_or(action.as_str()));
 
         // Build namespace chain: var ns=globalThis; ns=ns["web"]||(ns["web"]={}); ...
         let ns_parts: Vec<&str> = entry.namespace.split('.').collect();
@@ -1371,10 +1411,18 @@ mod tests {
             example: None,
         });
         // Register a handler so the binding is generated
-        let _ = register_handler("fetch", ApiHandler::Rust(std::rc::Rc::new(|_cmd| {
-            Box::pin(async move { Ok(AsyncResponse { ok: true, value: None, error: None }) })
-                as Pin<Box<dyn Future<Output = Result<AsyncResponse, String>>>>
-        })));
+        let _ = register_handler(
+            "fetch",
+            ApiHandler::Rust(std::rc::Rc::new(|_cmd| {
+                Box::pin(async move {
+                    Ok(AsyncResponse {
+                        ok: true,
+                        value: None,
+                        error: None,
+                    })
+                }) as Pin<Box<dyn Future<Output = Result<AsyncResponse, String>>>>
+            })),
+        );
 
         register(JsApiDoc {
             namespace: "chrome.tabs".into(),
@@ -1396,10 +1444,18 @@ mod tests {
             example: None,
         });
         // Register a handler so the binding is generated
-        let _ = register_handler("chrome_tabs_query", ApiHandler::Rust(std::rc::Rc::new(|_cmd| {
-            Box::pin(async move { Ok(AsyncResponse { ok: true, value: None, error: None }) })
-                as Pin<Box<dyn Future<Output = Result<AsyncResponse, String>>>>
-        })));
+        let _ = register_handler(
+            "chrome_tabs_query",
+            ApiHandler::Rust(std::rc::Rc::new(|_cmd| {
+                Box::pin(async move {
+                    Ok(AsyncResponse {
+                        ok: true,
+                        value: None,
+                        error: None,
+                    })
+                }) as Pin<Box<dyn Future<Output = Result<AsyncResponse, String>>>>
+            })),
+        );
 
         register(JsApiDoc {
             namespace: "web.url".into(),
@@ -1509,10 +1565,18 @@ mod tests {
             example: None,
         });
         // Register a handler so the binding is generated
-        let _ = register_handler(r#"test_"quote""#, ApiHandler::Rust(std::rc::Rc::new(|_cmd| {
-            Box::pin(async move { Ok(AsyncResponse { ok: true, value: None, error: None }) })
-                as Pin<Box<dyn Future<Output = Result<AsyncResponse, String>>>>
-        })));
+        let _ = register_handler(
+            r#"test_"quote""#,
+            ApiHandler::Rust(std::rc::Rc::new(|_cmd| {
+                Box::pin(async move {
+                    Ok(AsyncResponse {
+                        ok: true,
+                        value: None,
+                        error: None,
+                    })
+                }) as Pin<Box<dyn Future<Output = Result<AsyncResponse, String>>>>
+            })),
+        );
 
         let js = generate_js_bindings_code();
         // The action string contains a quote, so it must be escaped
@@ -1547,10 +1611,18 @@ mod tests {
             example: None,
         });
         // Register a handler so the binding is generated
-        let _ = register_handler("sleep", ApiHandler::Rust(std::rc::Rc::new(|_cmd| {
-            Box::pin(async move { Ok(AsyncResponse { ok: true, value: None, error: None }) })
-                as Pin<Box<dyn Future<Output = Result<AsyncResponse, String>>>>
-        })));
+        let _ = register_handler(
+            "sleep",
+            ApiHandler::Rust(std::rc::Rc::new(|_cmd| {
+                Box::pin(async move {
+                    Ok(AsyncResponse {
+                        ok: true,
+                        value: None,
+                        error: None,
+                    })
+                }) as Pin<Box<dyn Future<Output = Result<AsyncResponse, String>>>>
+            })),
+        );
 
         let js = generate_js_bindings_code();
         assert!(
@@ -1585,10 +1657,18 @@ mod tests {
             example: None,
         });
         // Register a handler so the binding is generated
-        let _ = register_handler("chrome_sessions_getRecentlyClosed", ApiHandler::Rust(std::rc::Rc::new(|_cmd| {
-            Box::pin(async move { Ok(AsyncResponse { ok: true, value: None, error: None }) })
-                as Pin<Box<dyn Future<Output = Result<AsyncResponse, String>>>>
-        })));
+        let _ = register_handler(
+            "chrome_sessions_getRecentlyClosed",
+            ApiHandler::Rust(std::rc::Rc::new(|_cmd| {
+                Box::pin(async move {
+                    Ok(AsyncResponse {
+                        ok: true,
+                        value: None,
+                        error: None,
+                    })
+                }) as Pin<Box<dyn Future<Output = Result<AsyncResponse, String>>>>
+            })),
+        );
 
         register(JsApiDoc {
             namespace: "chrome.windows".into(),
@@ -1610,10 +1690,18 @@ mod tests {
             example: None,
         });
         // Register a handler so the binding is generated
-        let _ = register_handler("chrome_windows_getCurrent", ApiHandler::Rust(std::rc::Rc::new(|_cmd| {
-            Box::pin(async move { Ok(AsyncResponse { ok: true, value: None, error: None }) })
-                as Pin<Box<dyn Future<Output = Result<AsyncResponse, String>>>>
-        })));
+        let _ = register_handler(
+            "chrome_windows_getCurrent",
+            ApiHandler::Rust(std::rc::Rc::new(|_cmd| {
+                Box::pin(async move {
+                    Ok(AsyncResponse {
+                        ok: true,
+                        value: None,
+                        error: None,
+                    })
+                }) as Pin<Box<dyn Future<Output = Result<AsyncResponse, String>>>>
+            })),
+        );
 
         let js = generate_js_bindings_code();
 
@@ -1813,22 +1901,30 @@ mod tests {
             example: None,
         };
 
-        assert!(
-            register_executable_entry(
-                first,
-                ApiHandler::Rust(std::rc::Rc::new(|_cmd| {
-                    Box::pin(async move { Ok(AsyncResponse { ok: true, value: None, error: None }) })
-                        as Pin<Box<dyn Future<Output = Result<AsyncResponse, String>>>>
-                })),
-            )
-            .is_ok()
-        );
+        assert!(register_executable_entry(
+            first,
+            ApiHandler::Rust(std::rc::Rc::new(|_cmd| {
+                Box::pin(async move {
+                    Ok(AsyncResponse {
+                        ok: true,
+                        value: None,
+                        error: None,
+                    })
+                }) as Pin<Box<dyn Future<Output = Result<AsyncResponse, String>>>>
+            })),
+        )
+        .is_ok());
 
         let result = register_executable_entry(
             second,
             ApiHandler::Rust(std::rc::Rc::new(|_cmd| {
-                Box::pin(async move { Ok(AsyncResponse { ok: true, value: None, error: None }) })
-                    as Pin<Box<dyn Future<Output = Result<AsyncResponse, String>>>>
+                Box::pin(async move {
+                    Ok(AsyncResponse {
+                        ok: true,
+                        value: None,
+                        error: None,
+                    })
+                }) as Pin<Box<dyn Future<Output = Result<AsyncResponse, String>>>>
             })),
         );
 
@@ -1880,8 +1976,13 @@ mod tests {
         let result = register_executable_entry(
             entry,
             ApiHandler::Rust(std::rc::Rc::new(|_cmd| {
-                Box::pin(async move { Ok(AsyncResponse { ok: true, value: None, error: None }) })
-                    as Pin<Box<dyn Future<Output = Result<AsyncResponse, String>>>>
+                Box::pin(async move {
+                    Ok(AsyncResponse {
+                        ok: true,
+                        value: None,
+                        error: None,
+                    })
+                }) as Pin<Box<dyn Future<Output = Result<AsyncResponse, String>>>>
             })),
         );
 
@@ -1926,8 +2027,13 @@ mod tests {
         let result = register_executable_entry(
             entry,
             ApiHandler::Rust(std::rc::Rc::new(|_cmd| {
-                Box::pin(async move { Ok(AsyncResponse { ok: true, value: None, error: None }) })
-                    as Pin<Box<dyn Future<Output = Result<AsyncResponse, String>>>>
+                Box::pin(async move {
+                    Ok(AsyncResponse {
+                        ok: true,
+                        value: None,
+                        error: None,
+                    })
+                }) as Pin<Box<dyn Future<Output = Result<AsyncResponse, String>>>>
             })),
         );
 
@@ -1997,8 +2103,13 @@ mod tests {
         };
 
         let handler = ApiHandler::Rust(std::rc::Rc::new(|_cmd| {
-            Box::pin(async move { Ok(AsyncResponse { ok: true, value: None, error: None }) })
-                as Pin<Box<dyn Future<Output = Result<AsyncResponse, String>>>>
+            Box::pin(async move {
+                Ok(AsyncResponse {
+                    ok: true,
+                    value: None,
+                    error: None,
+                })
+            }) as Pin<Box<dyn Future<Output = Result<AsyncResponse, String>>>>
         }));
 
         let result = register_executable_entries_batch(vec![
@@ -2045,7 +2156,17 @@ mod tests {
 
         // Register both manifest and handler atomically so freeze validation passes.
         use std::rc::Rc;
-        assert!(register_executable_entry(entry.clone(), ApiHandler::Rust(Rc::new(|_| Box::pin(async { Ok(AsyncResponse { ok: true, value: Some(serde_json::Value::Null), error: None }) })))).is_ok());
+        assert!(register_executable_entry(
+            entry.clone(),
+            ApiHandler::Rust(Rc::new(|_| Box::pin(async {
+                Ok(AsyncResponse {
+                    ok: true,
+                    value: Some(serde_json::Value::Null),
+                    error: None,
+                })
+            })))
+        )
+        .is_ok());
         assert!(freeze_manifest().is_ok());
         assert!(is_manifest_frozen());
 
@@ -2129,10 +2250,18 @@ mod tests {
 
         let _ = register_manifest_entry(entry);
         // Register a handler so the binding is generated
-        let _ = register_handler("fs_readText", ApiHandler::Rust(std::rc::Rc::new(|_cmd| {
-            Box::pin(async move { Ok(AsyncResponse { ok: true, value: None, error: None }) })
-                as Pin<Box<dyn Future<Output = Result<AsyncResponse, String>>>>
-        })));
+        let _ = register_handler(
+            "fs_readText",
+            ApiHandler::Rust(std::rc::Rc::new(|_cmd| {
+                Box::pin(async move {
+                    Ok(AsyncResponse {
+                        ok: true,
+                        value: None,
+                        error: None,
+                    })
+                }) as Pin<Box<dyn Future<Output = Result<AsyncResponse, String>>>>
+            })),
+        );
         let js = generate_js_bindings_code();
 
         assert!(js.contains(r#"namespace:"fs",name:"readText",action:"fs_readText""#));
@@ -2179,8 +2308,13 @@ mod tests {
         FROZEN.with(|f| *f.borrow_mut() = false);
 
         let handler = ApiHandler::Rust(std::rc::Rc::new(|_cmd| {
-            Box::pin(async move { Ok(AsyncResponse { ok: true, value: None, error: None }) })
-                as Pin<Box<dyn Future<Output = Result<AsyncResponse, String>>>>
+            Box::pin(async move {
+                Ok(AsyncResponse {
+                    ok: true,
+                    value: None,
+                    error: None,
+                })
+            }) as Pin<Box<dyn Future<Output = Result<AsyncResponse, String>>>>
         }));
 
         assert!(register_handler("test_action", handler.clone()));
@@ -2199,12 +2333,22 @@ mod tests {
         clear_handlers();
 
         let handler1 = ApiHandler::Rust(std::rc::Rc::new(|_cmd| {
-            Box::pin(async move { Ok(AsyncResponse { ok: true, value: Some(serde_json::json!(1)), error: None }) })
-                as Pin<Box<dyn Future<Output = Result<AsyncResponse, String>>>>
+            Box::pin(async move {
+                Ok(AsyncResponse {
+                    ok: true,
+                    value: Some(serde_json::json!(1)),
+                    error: None,
+                })
+            }) as Pin<Box<dyn Future<Output = Result<AsyncResponse, String>>>>
         }));
         let handler2 = ApiHandler::Rust(std::rc::Rc::new(|_cmd| {
-            Box::pin(async move { Ok(AsyncResponse { ok: true, value: Some(serde_json::json!(2)), error: None }) })
-                as Pin<Box<dyn Future<Output = Result<AsyncResponse, String>>>>
+            Box::pin(async move {
+                Ok(AsyncResponse {
+                    ok: true,
+                    value: Some(serde_json::json!(2)),
+                    error: None,
+                })
+            }) as Pin<Box<dyn Future<Output = Result<AsyncResponse, String>>>>
         }));
 
         assert!(register_handler("dup_test", handler1));
@@ -2250,7 +2394,10 @@ mod tests {
         };
 
         let fut = dispatch_handler("rust_action", cmd);
-        assert!(fut.is_some(), "dispatch_handler should return Some(future) for registered Rust handler");
+        assert!(
+            fut.is_some(),
+            "dispatch_handler should return Some(future) for registered Rust handler"
+        );
 
         // Await the future and verify the response
         let result = block_on(fut.unwrap());
@@ -2274,7 +2421,10 @@ mod tests {
         };
 
         let fut = dispatch_handler("unknown", cmd);
-        assert!(fut.is_none(), "dispatch_handler should return None for unknown action");
+        assert!(
+            fut.is_none(),
+            "dispatch_handler should return None for unknown action"
+        );
 
         clear_handlers();
     }
@@ -2285,8 +2435,13 @@ mod tests {
         clear_handlers();
 
         // Use a real JS function instead of undefined
-        let cb = js_sys::Function::new_no_args("return Promise.resolve({ok:true,value:null,error:null})");
-        assert!(register_handler("js_registered_action", ApiHandler::JsCallback(JsValue::from(cb))));
+        let cb = js_sys::Function::new_no_args(
+            "return Promise.resolve({ok:true,value:null,error:null})",
+        );
+        assert!(register_handler(
+            "js_registered_action",
+            ApiHandler::JsCallback(JsValue::from(cb))
+        ));
         assert!(has_handler("js_registered_action"));
 
         clear_handlers();
@@ -2298,10 +2453,12 @@ mod tests {
         clear_handlers();
 
         // Create a JS function that returns a resolved Promise with an AsyncResponse
-        let cb = js_sys::Function::new_no_args(
-            "return Promise.resolve({ok:true,value:42,error:null})"
-        );
-        assert!(register_handler("js_success", ApiHandler::JsCallback(JsValue::from(cb))));
+        let cb =
+            js_sys::Function::new_no_args("return Promise.resolve({ok:true,value:42,error:null})");
+        assert!(register_handler(
+            "js_success",
+            ApiHandler::JsCallback(JsValue::from(cb))
+        ));
 
         let cmd = AsyncCommand {
             call_id: 1,
@@ -2327,10 +2484,12 @@ mod tests {
         clear_handlers();
 
         // Create a JS function that returns a rejected Promise
-        let cb = js_sys::Function::new_no_args(
-            "return Promise.reject(new Error('test rejection'))"
-        );
-        assert!(register_handler("js_reject", ApiHandler::JsCallback(JsValue::from(cb))));
+        let cb =
+            js_sys::Function::new_no_args("return Promise.reject(new Error('test rejection'))");
+        assert!(register_handler(
+            "js_reject",
+            ApiHandler::JsCallback(JsValue::from(cb))
+        ));
 
         let cmd = AsyncCommand {
             call_id: 1,
@@ -2344,7 +2503,11 @@ mod tests {
         let result = fut.unwrap().await;
         assert!(result.is_err(), "Expected Err, got: {:?}", result);
         let err = result.unwrap_err();
-        assert!(err.contains("rejected"), "Error should mention rejection, got: {}", err);
+        assert!(
+            err.contains("rejected"),
+            "Error should mention rejection, got: {}",
+            err
+        );
 
         clear_handlers();
     }
@@ -2355,10 +2518,11 @@ mod tests {
         clear_handlers();
 
         // Create a JS function that returns a never-resolving Promise
-        let cb = js_sys::Function::new_no_args(
-            "return new Promise(() => {})"
-        );
-        assert!(register_handler("js_timeout", ApiHandler::JsCallback(JsValue::from(cb))));
+        let cb = js_sys::Function::new_no_args("return new Promise(() => {})");
+        assert!(register_handler(
+            "js_timeout",
+            ApiHandler::JsCallback(JsValue::from(cb))
+        ));
 
         let cmd = AsyncCommand {
             call_id: 1,
@@ -2372,7 +2536,11 @@ mod tests {
         let result = fut.unwrap().await;
         assert!(result.is_err(), "Expected Err, got: {:?}", result);
         let err = result.unwrap_err();
-        assert!(err.contains("timed out"), "Error should mention timeout, got: {}", err);
+        assert!(
+            err.contains("timed out"),
+            "Error should mention timeout, got: {}",
+            err
+        );
 
         clear_handlers();
     }
@@ -2420,7 +2588,10 @@ mod tests {
         let value = resp.value.expect("expected value");
         assert_eq!(value["isPlainObject"], serde_json::json!(true));
         assert_eq!(value["isMap"], serde_json::json!(false));
-        assert_eq!(value["url"], serde_json::json!("https://extension-js.test/fixture"));
+        assert_eq!(
+            value["url"],
+            serde_json::json!("https://extension-js.test/fixture")
+        );
         assert_eq!(value["name"], serde_json::json!("web_js_contract"));
 
         clear_handlers();

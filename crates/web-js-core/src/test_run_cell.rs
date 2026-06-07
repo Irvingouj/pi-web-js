@@ -112,13 +112,29 @@ mod tests {
         let resumed = session.resume_cell(call_id, &json);
         assert!(resumed.error.is_some());
         let err = resumed.error.unwrap();
-        match err {
-            crate::types::CellError::Runtime { message, .. } => {
-                assert!(message.contains("tab_snapshot"), "{message}");
-                assert!(message.contains("E_SCRIPTING"), "{message}");
+        match &err {
+            crate::types::CellError::Runtime {
+                name,
+                message,
+                action,
+                code,
+                ..
+            } => {
+                assert_eq!(action.as_deref(), Some("tab_snapshot"), "{err:?}");
+                assert_eq!(code.as_deref(), Some("E_SCRIPTING"), "{err:?}");
                 assert!(message.contains("Cannot execute script"), "{message}");
                 assert!(!message.contains("<no message>"), "{message}");
                 assert!(!message.contains("<no details available>"), "{message}");
+                let display = crate::format_cell_error_text(&err);
+                assert!(
+                    display.contains("[tab_snapshot] (E_SCRIPTING)"),
+                    "{display}"
+                );
+                assert!(display.contains("Cannot execute script"), "{display}");
+                assert!(
+                    name.is_none() || name.as_deref() == Some("Error"),
+                    "{name:?}"
+                );
             }
             other => panic!("expected runtime error, got {other:?}"),
         }
@@ -370,6 +386,8 @@ mod tests {
                 await Promise.all([myAsync(1), myAsync(2)]);
             } catch(e) {
                 __caught = e.message;
+                __caughtAction = e.action;
+                __caughtCode = e.code;
             }
         "#,
             "",
@@ -399,9 +417,11 @@ mod tests {
         let r2 = session.resume_cell(id2, &serde_json::to_string(&resp2).unwrap());
         assert_eq!(r2.status, CellStatus::Done);
 
-        // Check caught error — resume_async_pending wraps action+code+message
-        let check = session.run_cell("print(__caught)", "");
-        assert_eq!(check.stdout[0], "[test_action] (E_TEST) boom");
+        let check = session.run_cell(
+            "print(__caught + '|' + __caughtAction + '|' + __caughtCode)",
+            "",
+        );
+        assert_eq!(check.stdout[0], "boom|test_action|E_TEST");
     }
 
     /// String-based action dispatch works (registry path)
@@ -448,7 +468,7 @@ mod tests {
         // Trigger async with a dangerous-looking action name
         let result = session.run_cell(
             r#"
-            new Promise((resolve, reject) => {
+            await new Promise((resolve, reject) => {
                 __webJsTriggerAsync("__proto__", {}, resolve, reject);
             });
         "#,
@@ -470,8 +490,20 @@ mod tests {
             }),
         };
         let resumed = session.resume_cell(call_id, &serde_json::to_string(&response).unwrap());
-        // The cell should handle the rejection gracefully
-        assert!(resumed.error.is_some() || resumed.status == CellStatus::Done);
+        assert!(resumed.error.is_some(), "{:?}", resumed.error);
+        match resumed.error.unwrap() {
+            crate::types::CellError::Runtime {
+                action,
+                code,
+                message,
+                ..
+            } => {
+                assert_eq!(action.as_deref(), Some("__proto__"));
+                assert_eq!(code.as_deref(), Some("E_BLOCKED_ACTION"));
+                assert!(message.contains("not allowed"), "{message}");
+            }
+            other => panic!("expected runtime error, got {other:?}"),
+        }
     }
 
     /// Unknown action string gets safe error from host
@@ -481,7 +513,7 @@ mod tests {
 
         let result = session.run_cell(
             r#"
-            new Promise((resolve, reject) => {
+            await new Promise((resolve, reject) => {
                 __webJsTriggerAsync("nonexistent_api", {}, resolve, reject);
             });
         "#,
@@ -502,7 +534,20 @@ mod tests {
             }),
         };
         let resumed = session.resume_cell(call_id, &serde_json::to_string(&response).unwrap());
-        assert!(resumed.error.is_some() || resumed.status == CellStatus::Done);
+        assert!(resumed.error.is_some(), "{:?}", resumed.error);
+        match resumed.error.unwrap() {
+            crate::types::CellError::Runtime {
+                action,
+                code,
+                message,
+                ..
+            } => {
+                assert_eq!(action.as_deref(), Some("nonexistent_api"));
+                assert_eq!(code.as_deref(), Some("E_UNKNOWN_ACTION"));
+                assert!(message.contains("Unknown action"), "{message}");
+            }
+            other => panic!("expected runtime error, got {other:?}"),
+        }
     }
 
     /// Promise.race resolves when the first promise completes, without waiting for the other.
@@ -715,8 +760,8 @@ mod tests {
     #[test]
     fn test_page_goto_extract_cell_runs_twice() {
         use crate::api_docs::{
-            clear_docs, clear_handlers, generate_js_bindings_code, register,
-            register_handler, ApiHandler, JsApiDoc, ReturnDoc, ToolSource, ToolTransport,
+            clear_docs, clear_handlers, generate_js_bindings_code, register, register_handler,
+            ApiHandler, JsApiDoc, ReturnDoc, ToolSource, ToolTransport,
         };
         use std::future::Future;
         use std::pin::Pin;
@@ -804,10 +849,8 @@ console.log(result)"#;
                         },
                         error: None,
                     };
-                    result = session.resume_cell(
-                        cmd.call_id,
-                        &serde_json::to_string(&response).unwrap(),
-                    );
+                    result = session
+                        .resume_cell(cmd.call_id, &serde_json::to_string(&response).unwrap());
                 }
             }
             assert!(
@@ -816,7 +859,10 @@ console.log(result)"#;
                 result.error
             );
             assert!(
-                result.stdout.iter().any(|line| line.contains("example.com")),
+                result
+                    .stdout
+                    .iter()
+                    .any(|line| line.contains("example.com")),
                 "run {run} stdout missing extract output: {:?}",
                 result.stdout
             );
@@ -880,8 +926,8 @@ console.log(result)"#;
     #[test]
     fn test_chrome_cookies_get_parity_binding_preserves_pending_params() {
         use crate::api_docs::{
-            clear_docs, clear_handlers, generate_js_bindings_code, register,
-            register_handler, ApiHandler, JsApiDoc, ReturnDoc, ToolSource, ToolTransport,
+            clear_docs, clear_handlers, generate_js_bindings_code, register, register_handler,
+            ApiHandler, JsApiDoc, ReturnDoc, ToolSource, ToolTransport,
         };
         use std::future::Future;
         use std::pin::Pin;
@@ -918,7 +964,8 @@ console.log(result)"#;
                         value: None,
                         error: None,
                     })
-                }) as Pin<Box<dyn Future<Output = Result<crate::types::AsyncResponse, String>>>>
+                })
+                    as Pin<Box<dyn Future<Output = Result<crate::types::AsyncResponse, String>>>>
             })),
         );
 
@@ -954,8 +1001,8 @@ console.log(result)"#;
     #[test]
     fn test_page_extract_array_positional_binding() {
         use crate::api_docs::{
-            clear_docs, clear_handlers, generate_js_bindings_code, register,
-            register_handler, ApiHandler, JsApiDoc, ReturnDoc, ToolSource, ToolTransport,
+            clear_docs, clear_handlers, generate_js_bindings_code, register, register_handler,
+            ApiHandler, JsApiDoc, ReturnDoc, ToolSource, ToolTransport,
         };
         use std::future::Future;
         use std::pin::Pin;
@@ -1055,7 +1102,9 @@ console.log(result)"#;
 
     #[test]
     fn test_chrome_tabs_create_pending() {
-        use crate::api_docs::{register, register_handler, ApiHandler, JsApiDoc, ReturnDoc, ToolSource, ToolTransport};
+        use crate::api_docs::{
+            register, register_handler, ApiHandler, JsApiDoc, ReturnDoc, ToolSource, ToolTransport,
+        };
         use std::future::Future;
         use std::pin::Pin;
         use std::rc::Rc;
@@ -1088,7 +1137,8 @@ console.log(result)"#;
                         value: None,
                         error: None,
                     })
-                }) as Pin<Box<dyn Future<Output = Result<crate::types::AsyncResponse, String>>>>
+                })
+                    as Pin<Box<dyn Future<Output = Result<crate::types::AsyncResponse, String>>>>
             })),
         );
 
@@ -1151,17 +1201,114 @@ console.log(result)"#;
 
         let second = session.run_cell_unwrapped("const x = 2", "");
         println!("second error: {:?}", second.error);
-        assert!(second.error.is_some(), "Expected error for redeclaring const");
+        assert!(
+            second.error.is_some(),
+            "Expected error for redeclaring const"
+        );
         let err = second.error.unwrap();
-        let msg = format!("{}", err);
+        match &err {
+            crate::types::CellError::Compile { name, message, .. } => {
+                assert_eq!(name.as_deref(), Some("SyntaxError"), "{err:?}");
+                assert!(
+                    message.contains("redeclaration") || message.contains("already been declared"),
+                    "{message}"
+                );
+            }
+            other => panic!("expected compile error, got {other:?}"),
+        }
+        let msg = crate::format_cell_error_text(&err);
         println!("error message: {}", msg);
         assert!(
             msg.contains("redeclaration") || msg.contains("already been declared"),
             "Expected redeclaration error in: {}",
             msg
         );
-        assert!(!msg.contains("<no message>"), "Message must not contain '<no message>': {}", msg);
-        assert!(!msg.contains("<no details available>"), "Message must not contain '<no details available>': {}", msg);
+        assert!(
+            !msg.contains("<no message>"),
+            "Message must not contain '<no message>': {}",
+            msg
+        );
+        assert!(
+            !msg.ends_with(": )"),
+            "Message must not be corrupted: {}",
+            msg
+        );
+    }
+
+    #[test]
+    fn test_let_redeclare_global_without_wrap_is_compile_error() {
+        let mut session = JsSession::new();
+        let first = session.run_cell_unwrapped("let result = 1", "");
+        assert!(first.error.is_none(), "{:?}", first.error);
+
+        let second = session.run_cell_unwrapped("let result = 2", "");
+        assert!(
+            second.error.is_some(),
+            "Expected redeclaration error: {:?}",
+            second.error
+        );
+        let err = second.error.unwrap();
+        match &err {
+            crate::types::CellError::Compile { name, message, .. } => {
+                assert_eq!(name.as_deref(), Some("SyntaxError"), "{err:?}");
+                assert!(
+                    message.contains("redeclaration") || message.contains("already been declared"),
+                    "{message}"
+                );
+            }
+            other => panic!("expected compile error, got {other:?}"),
+        }
+        let display = crate::format_cell_error_text(&err);
+        assert!(
+            !display.ends_with(": )"),
+            "display must not be corrupted: {display}"
+        );
+    }
+
+    #[test]
+    fn test_thrown_syntax_error_is_runtime_not_compile() {
+        let mut session = JsSession::new();
+        let result = session.run_cell(r#"throw new SyntaxError("bad token")"#, "");
+        assert!(result.error.is_some(), "{:?}", result.error);
+        match result.error.unwrap() {
+            crate::types::CellError::Runtime { name, message, .. } => {
+                assert_eq!(name.as_deref(), Some("SyntaxError"));
+                assert_eq!(message, "bad token");
+            }
+            other => panic!("thrown SyntaxError should be runtime, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_syntax_error_classification_parity_eval_and_throw() {
+        let mut session = JsSession::new();
+
+        let eval_err = session.run_cell("const +++", "");
+        assert!(eval_err.error.is_some(), "{:?}", eval_err.error);
+        let thrown = session.run_cell(r#"throw new SyntaxError("bad token")"#, "");
+        assert!(thrown.error.is_some(), "{:?}", thrown.error);
+
+        let eval_msg = crate::format_cell_error_text(eval_err.error.as_ref().unwrap());
+        let thrown_msg = crate::format_cell_error_text(thrown.error.as_ref().unwrap());
+        assert!(eval_msg.contains("SyntaxError"), "{eval_msg}");
+        assert!(
+            thrown_msg.contains("SyntaxError: bad token"),
+            "{thrown_msg}"
+        );
+        assert!(!eval_msg.ends_with(": )"), "{eval_msg}");
+        assert!(!thrown_msg.ends_with(": )"), "{thrown_msg}");
+    }
+
+    #[test]
+    fn test_fuel_exhausted_interrupt_message() {
+        let mut session = JsSession::build().fuel_limit(50).finish();
+        let result = session.run_cell("while (true) {}", "");
+        assert!(result.error.is_some(), "{:?}", result.error);
+        assert!(
+            matches!(result.error, Some(crate::types::CellError::FuelExhausted)),
+            "{:?}",
+            result.error
+        );
     }
 
     #[test]
@@ -1183,7 +1330,11 @@ console.log(result)"#;
         println!("caught assignment result: {:?}", result);
         assert!(result.error.is_none(), "{:?}", result.error);
         let msg = result.result.expect("expected caught message");
-        assert!(!msg.is_empty(), "Caught error message must not be empty: {}", msg);
+        assert!(
+            !msg.is_empty(),
+            "Caught error message must not be empty: {}",
+            msg
+        );
         assert!(
             msg.contains("constant") || msg.contains("read-only") || msg.contains("immutable"),
             "Expected 'constant' or similar in caught error message: {}",
@@ -1202,7 +1353,10 @@ console.log(result)"#;
             "",
         );
         println!("uncaught assignment result: {:?}", result);
-        assert!(result.error.is_some(), "Expected uncaught error for assignment to const");
+        assert!(
+            result.error.is_some(),
+            "Expected uncaught error for assignment to const"
+        );
         let msg = format!("{}", result.error.unwrap());
         assert!(
             msg.contains("read-only") || msg.contains("constant") || msg.contains("immutable"),
@@ -1216,12 +1370,23 @@ console.log(result)"#;
         let mut session = JsSession::new();
         let result = session.run_cell(r#"throw new Error()"#, "");
         println!("empty error result: {:?}", result);
-        assert!(result.error.is_some(), "Expected error for throw new Error()");
+        assert!(
+            result.error.is_some(),
+            "Expected error for throw new Error()"
+        );
         let err = result.error.unwrap();
         let msg = format!("{}", err);
         println!("empty error: {}", msg);
-        assert!(!msg.contains("<no message>"), "Should not contain '<no message>': {}", msg);
-        assert!(!msg.contains("<no details available>"), "Should not contain '<no details available>': {}", msg);
+        assert!(
+            !msg.contains("<no message>"),
+            "Should not contain '<no message>': {}",
+            msg
+        );
+        assert!(
+            !msg.contains("<no details available>"),
+            "Should not contain '<no details available>': {}",
+            msg
+        );
     }
 
     /// Bare SyntaxError must not be rewritten to `<no details available>`.
@@ -1230,14 +1395,29 @@ console.log(result)"#;
         let mut session = JsSession::new();
         let result = session.run_cell(r#"throw new SyntaxError()"#, "");
         println!("bare syntax error result: {:?}", result);
-        assert!(result.error.is_some(), "Expected error for throw new SyntaxError()");
+        assert!(
+            result.error.is_some(),
+            "Expected error for throw new SyntaxError()"
+        );
         let err = result.error.unwrap();
         let msg = format!("{}", err);
         println!("bare syntax error: {}", msg);
-        assert!(!msg.contains("<no details available>"), "Bare SyntaxError must not be rewritten to '<no details available>': {}", msg);
-        assert!(!msg.contains("<no message>"), "Message must not contain '<no message>': {}", msg);
+        assert!(
+            !msg.contains("<no details available>"),
+            "Bare SyntaxError must not be rewritten to '<no details available>': {}",
+            msg
+        );
+        assert!(
+            !msg.contains("<no message>"),
+            "Message must not contain '<no message>': {}",
+            msg
+        );
         // Should still mention SyntaxError somewhere
-        assert!(msg.contains("SyntaxError"), "Message should mention SyntaxError: {}", msg);
+        assert!(
+            msg.contains("SyntaxError"),
+            "Message should mention SyntaxError: {}",
+            msg
+        );
     }
 
     #[test]
@@ -1248,10 +1428,72 @@ console.log(result)"#;
         if let Some(err) = &result.error {
             let msg = format!("{}", err);
             println!("undefined error: {}", msg);
-            assert!(!msg.contains("<no message>"), "Message must not contain '<no message>': {}", msg);
-            assert!(!msg.contains("<no details available>"), "Message must not contain '<no details available>': {}", msg);
+            assert!(
+                !msg.contains("<no message>"),
+                "Message must not contain '<no message>': {}",
+                msg
+            );
+            assert!(
+                !msg.contains("<no details available>"),
+                "Message must not contain '<no details available>': {}",
+                msg
+            );
         } else {
             panic!("Expected error for throw undefined");
         }
+    }
+
+    #[test]
+    fn test_fuel_exhausted_after_await_on_resume() {
+        let mut session = JsSession::build().fuel_limit(200).finish();
+        let setup = session.run_cell(
+            r#"
+            function myAsync() {
+                return new Promise((resolve, reject) => {
+                    __webJsTriggerAsync("test_action", {}, resolve, reject);
+                });
+            }
+        "#,
+            "",
+        );
+        assert!(setup.error.is_none());
+        let result = session.run_cell("await myAsync(); while (true) {}", "");
+        assert_eq!(result.status, CellStatus::AsyncPending);
+        let call_id = result.pending_commands[0].call_id;
+        let response = crate::types::AsyncResponse {
+            ok: true,
+            value: Some(serde_json::json!(null)),
+            error: None,
+        };
+        let resumed = session.resume_cell(call_id, &serde_json::to_string(&response).unwrap());
+        assert!(
+            matches!(resumed.error, Some(crate::types::CellError::FuelExhausted)),
+            "{:?}",
+            resumed.error
+        );
+        assert!(resumed.fuel_exhausted);
+    }
+
+    #[test]
+    fn test_eval_syntax_error_is_compile_kind() {
+        let mut session = JsSession::new();
+        let result = session.run_cell("const +++", "");
+        assert!(result.error.is_some(), "{:?}", result.error);
+        assert!(
+            matches!(result.error, Some(crate::types::CellError::Compile { .. })),
+            "{:?}",
+            result.error
+        );
+    }
+
+    #[test]
+    fn test_invalid_resume_json_is_internal() {
+        let mut session = JsSession::new();
+        let result = session.resume_cell(999, "not-json");
+        assert!(
+            matches!(result.error, Some(crate::types::CellError::Internal { .. })),
+            "{:?}",
+            result.error
+        );
     }
 }

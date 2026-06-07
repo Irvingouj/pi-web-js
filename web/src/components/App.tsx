@@ -12,7 +12,8 @@ import {
 	serializeNotebook,
 } from "../notebook";
 import type { WorkerRunResult } from "../types";
-import Cell, { formatCellError } from "./Cell";
+import Cell from "./Cell";
+import { formatCellError } from "../lib/formatCellError";
 import Toolbar from "./Toolbar";
 import TopBar from "./TopBar";
 

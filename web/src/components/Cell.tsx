@@ -21,27 +21,6 @@ interface Props {
 	onToggleEdit: (cellId: string) => void;
 }
 
-export function formatCellError(err: {
-	kind: string;
-	message?: string;
-	line?: number | null;
-}): string {
-	switch (err.kind) {
-		case "compile":
-			return err.line
-				? `Compile error (line ${err.line}): ${err.message}`
-				: `Compile error: ${err.message}`;
-		case "runtime":
-			return `Runtime error: ${err.message}`;
-		case "fuel_exhausted":
-			return "Execution stopped: fuel limit reached";
-		case "internal":
-			return `Internal error: ${err.message}`;
-		default:
-			return err.message || "Unknown error";
-	}
-}
-
 const Cell: FunctionalComponent<Props> = ({
 	cell,
 	index,

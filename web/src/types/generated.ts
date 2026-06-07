@@ -57,8 +57,15 @@ export type AsyncCommand = {
 };
 
 export type CellError =
-	| { kind: "compile"; message: string; line: number | null }
-	| { kind: "runtime"; message: string; line: number | null }
+	| { kind: "compile"; name: string | null; message: string; line: number | null }
+	| {
+			kind: "runtime";
+			name: string | null;
+			message: string;
+			line: number | null;
+			action: string | null;
+			code: string | null;
+	  }
 	| { kind: "fuel_exhausted" }
 	| { kind: "internal"; message: string };
 

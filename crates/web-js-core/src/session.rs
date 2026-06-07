@@ -1,12 +1,14 @@
+use crate::async_resume::resume_async_pending;
+use crate::cell_wrap::{cell_needs_isolation_wrap, wrap_user_cell_code};
+use crate::error::{
+    cell_error_from_exception, cell_error_from_rquickjs_error, drain_pending_jobs,
+    exception_to_string, fuel_depleted, fuel_exhausted_flag_for,
+};
 use crate::globals::register_host_globals;
+use crate::js_value::format_js_value;
 use crate::state::HostState;
 use crate::types::{
     AsyncCommand, AsyncResponse, CellError, CellStatus, GlobalVariable, GlobalsSnapshot, RunResult,
-};
-use crate::utils::{
-    cell_needs_isolation_wrap, classify_js_error, exception_to_string, extract_line_number,
-    format_js_value, format_runtime_error_with_context, resume_async_pending,
-    wrap_user_cell_code,
 };
 use rquickjs::context::EvalOptions;
 use rquickjs::promise::PromiseState as QjsPromiseState;
@@ -124,7 +126,7 @@ fn check_promise_state<'js>(ctx: Ctx<'js>, promise: &Value<'js>) -> PromiseState
                 _ => PromiseState::Pending,
             },
             QjsPromiseState::Rejected => {
-                // result() throws the rejection reason as an exception
+                // rquickjs surfaces rejections as thrown exceptions; read via catch().
                 let _ = p.result::<Value>();
                 let exc = ctx.catch();
                 let exc_msg = exception_to_string(&exc);
@@ -322,13 +324,14 @@ impl JsSession {
 
         // Set up interrupt handler for fuel limit
         let fuel_counter = self.fuel_counter.clone();
-        fuel_counter.store(fuel_limit, Ordering::Relaxed);
+        let fuel_counter_for_handler = fuel_counter.clone();
+        fuel_counter_for_handler.store(fuel_limit, Ordering::Relaxed);
         self.runtime.set_interrupt_handler(Some(Box::new(move || {
-            let remaining = fuel_counter.load(Ordering::Relaxed);
+            let remaining = fuel_counter_for_handler.load(Ordering::Relaxed);
             if remaining == 0 {
                 true
             } else {
-                fuel_counter.fetch_sub(1, Ordering::Relaxed);
+                fuel_counter_for_handler.fetch_sub(1, Ordering::Relaxed);
                 false
             }
         })));
@@ -353,32 +356,14 @@ impl JsSession {
                 Ok(val) => val,
                 Err(e) => {
                     let hs = host_state.borrow();
-                    let (msg, _line) = if let rquickjs::Error::Exception = &e {
-                        let exc_msg = {
-                            let exc = ctx.catch();
-                            let m = exception_to_string(&exc);
-                            tracing::error!(execution_count = exec_count, "eval_exception");
-                            m
-                        };
-                        let l = extract_line_number(&exc_msg);
-                        (exc_msg, l)
-                    } else {
-                        let m = e.to_string();
-                        let l = extract_line_number(&m);
-                        tracing::error!(execution_count = exec_count, "eval_error");
-                        (m, l)
-                    };
-                    let cell_err = if msg.contains("interrupted") {
-                        CellError::FuelExhausted
-                    } else {
-                        classify_js_error(&msg)
-                    };
+                    let cell_err = cell_error_from_rquickjs_error(&ctx, e);
+                    tracing::error!(execution_count = exec_count, "eval_error");
                     return RunResult::with_partial_output(
                         hs.stdout.clone(),
                         hs.stderr.clone(),
                         hs.commands.clone(),
-                        cell_err,
-                        false,
+                        cell_err.clone(),
+                        fuel_exhausted_flag_for(&cell_err, &fuel_counter),
                         exec_count,
                     );
                 }
@@ -388,12 +373,18 @@ impl JsSession {
             let _ = ctx.globals().set("__webJsTopPromise", result_val.clone());
             tracing::info!("stored_top_promise");
 
-            // Run job queue to process Promise microtasks
-            let mut job_count = 0;
-            while ctx.execute_pending_job() {
-                job_count += 1;
+            if let Some(fuel_err) = drain_pending_jobs(&ctx, &fuel_counter) {
+                let hs = host_state.borrow();
+                return RunResult::with_partial_output(
+                    hs.stdout.clone(),
+                    hs.stderr.clone(),
+                    hs.commands.clone(),
+                    fuel_err,
+                    true,
+                    exec_count,
+                );
             }
-            tracing::info!(jobs_executed = job_count, "execute_pending_job_done");
+            tracing::info!("execute_pending_job_done");
 
             // Check for host async first
             let pending: Vec<AsyncCommand> = host_state.borrow_mut().pending_async_commands.drain(..).collect();
@@ -413,34 +404,40 @@ impl JsSession {
                     }
                     PromiseState::Rejected(err) => {
                         let msg = exception_to_string(&err);
-                        let line = extract_line_number(&msg);
                         tracing::error!(execution_count = exec_count, error = %msg, "top_level_promise_rejected");
                         let hs = host_state.borrow();
+                        let cell_err = cell_error_from_exception(&err);
                         return RunResult::with_partial_output(
                             hs.stdout.clone(),
                             hs.stderr.clone(),
                             hs.commands.clone(),
-                            CellError::Runtime {
-                                message: format_runtime_error_with_context(
-                                    &msg,
-                                    &hs.stdout,
-                                    &hs.stderr,
-                                ),
-                                line,
-                            },
-                            false,
+                            cell_err.clone(),
+                            fuel_exhausted_flag_for(&cell_err, &fuel_counter),
                             exec_count,
                         );
                     }
                     PromiseState::Pending => {
                         let hs = host_state.borrow();
+                        if fuel_depleted(&fuel_counter) {
+                            return RunResult::with_partial_output(
+                                hs.stdout.clone(),
+                                hs.stderr.clone(),
+                                hs.commands.clone(),
+                                CellError::FuelExhausted,
+                                true,
+                                exec_count,
+                            );
+                        }
                         return RunResult::with_partial_output(
                             hs.stdout.clone(),
                             hs.stderr.clone(),
                             hs.commands.clone(),
                             CellError::Runtime {
+                                name: None,
                                 message: "Promise is still pending after execution".into(),
                                 line: None,
+                                action: None,
+                                code: None,
                             },
                             false,
                             exec_count,
@@ -463,7 +460,8 @@ impl JsSession {
             };
 
             let hs = host_state.borrow();
-            let error = if hs.fuel_exhausted {
+            let fuel_exhausted = fuel_depleted(&fuel_counter);
+            let error = if fuel_exhausted {
                 Some(CellError::FuelExhausted)
             } else {
                 None
@@ -476,7 +474,7 @@ impl JsSession {
                 result: result_str,
                 error,
                 commands: hs.commands.clone(),
-                fuel_exhausted: hs.fuel_exhausted,
+                fuel_exhausted,
                 execution_count: exec_count,
                 status: CellStatus::Done,
                 pending_commands: vec![],
@@ -513,14 +511,15 @@ impl JsSession {
 
         // Set up interrupt handler for fuel limit
         let fuel_counter = self.fuel_counter.clone();
+        let fuel_counter_for_handler = fuel_counter.clone();
         let fuel_limit = self.fuel_limit;
-        fuel_counter.store(fuel_limit, Ordering::Relaxed);
+        fuel_counter_for_handler.store(fuel_limit, Ordering::Relaxed);
         self.runtime.set_interrupt_handler(Some(Box::new(move || {
-            let remaining = fuel_counter.load(Ordering::Relaxed);
+            let remaining = fuel_counter_for_handler.load(Ordering::Relaxed);
             if remaining == 0 {
                 true
             } else {
-                fuel_counter.fetch_sub(1, Ordering::Relaxed);
+                fuel_counter_for_handler.fetch_sub(1, Ordering::Relaxed);
                 false
             }
         })));
@@ -530,41 +529,41 @@ impl JsSession {
             if let Err(e) = resume_result {
                 reset_after_internal_resume_error_for_ctx.set(true);
                 let hs = host_state.borrow();
-                let msg = if let rquickjs::Error::Exception = &e {
-                    let exc = ctx.catch();
-                    let m = exception_to_string(&exc);
-                    tracing::error!(call_id, error = %m, "resume_pending_exception");
-                    m
-                } else {
-                    let m = e.to_string();
-                    tracing::error!(call_id, error = %m, "resume_pending_error");
-                    m
-                };
-                let line = extract_line_number(&msg);
+                let cell_err = cell_error_from_rquickjs_error(&ctx, e);
+                tracing::error!(call_id, error = %cell_err, "resume_pending_error");
                 return RunResult::with_partial_output(
                     hs.stdout.clone(),
                     hs.stderr.clone(),
                     hs.commands.clone(),
-                    CellError::Runtime {
-                        message: format_runtime_error_with_context(
-                            &msg,
-                            &hs.stdout,
-                            &hs.stderr,
-                        ),
-                        line,
-                    },
-                    false,
+                    cell_err.clone(),
+                    fuel_exhausted_flag_for(&cell_err, &fuel_counter),
                     exec_count,
                 );
             }
 
-            while ctx.execute_pending_job() {}
+            if let Some(fuel_err) = drain_pending_jobs(&ctx, &fuel_counter) {
+                let hs = host_state.borrow();
+                return RunResult::with_partial_output(
+                    hs.stdout.clone(),
+                    hs.stderr.clone(),
+                    hs.commands.clone(),
+                    fuel_err,
+                    true,
+                    exec_count,
+                );
+            }
 
             // Check for NEW pending commands generated by the resolve
-            let new_pending: Vec<AsyncCommand> = host_state.borrow_mut().pending_async_commands.drain(..).collect();
+            let new_pending: Vec<AsyncCommand> = host_state
+                .borrow_mut()
+                .pending_async_commands
+                .drain(..)
+                .collect();
 
             // Check if there are still unresolved promises in QuickJS
-            let has_remaining: bool = ctx.eval::<bool, _>("Object.keys(__webJsPending).length > 0").unwrap_or(false);
+            let has_remaining: bool = ctx
+                .eval::<bool, _>("Object.keys(__webJsPending).length > 0")
+                .unwrap_or(false);
 
             if has_remaining || !new_pending.is_empty() {
                 let hs = host_state.borrow();
@@ -577,22 +576,15 @@ impl JsSession {
                 if promise.is_promise() {
                     if let PromiseState::Rejected(err) = check_promise_state(ctx, &promise) {
                         let msg = exception_to_string(&err);
-                        let line = extract_line_number(&msg);
                         tracing::error!(call_id, error = %msg, "resume_top_level_promise_rejected");
                         let hs = host_state.borrow();
+                        let cell_err = cell_error_from_exception(&err);
                         return RunResult::with_partial_output(
                             hs.stdout.clone(),
                             hs.stderr.clone(),
                             hs.commands.clone(),
-                            CellError::Runtime {
-                                message: format_runtime_error_with_context(
-                                    &msg,
-                                    &hs.stdout,
-                                    &hs.stderr,
-                                ),
-                                line,
-                            },
-                            false,
+                            cell_err.clone(),
+                            fuel_exhausted_flag_for(&cell_err, &fuel_counter),
                             exec_count,
                         );
                     }
@@ -600,7 +592,8 @@ impl JsSession {
             }
 
             let hs = host_state.borrow();
-            let error = if hs.fuel_exhausted {
+            let fuel_exhausted = fuel_depleted(&fuel_counter);
+            let error = if fuel_exhausted {
                 Some(CellError::FuelExhausted)
             } else {
                 None
@@ -612,7 +605,7 @@ impl JsSession {
                 result: None,
                 error,
                 commands: hs.commands.clone(),
-                fuel_exhausted: hs.fuel_exhausted,
+                fuel_exhausted,
                 execution_count: exec_count,
                 status: CellStatus::Done,
                 pending_commands: vec![],

@@ -30,7 +30,10 @@ pub struct HostCallParams {
 }
 
 /// Find an element by its accessible label, placeholder, or text content.
-pub fn find_element_by_label(document: &web_sys::Document, query: &str) -> Option<web_sys::Element> {
+pub fn find_element_by_label(
+    document: &web_sys::Document,
+    query: &str,
+) -> Option<web_sys::Element> {
     let lower_query = query.to_lowercase().trim().to_string();
     if lower_query.is_empty() {
         return None;
@@ -81,7 +84,7 @@ fn is_selector(s: &str) -> bool {
 /// Resolve a ref_id or CSS selector to an actual ref_id.
 /// If `selector` is explicitly provided, use it. Otherwise, if `ref_id` looks like
 /// a CSS selector, treat it as one and resolve it via page.find.
-fn optional_str<'a>(value: &'a Option<String>) -> &'a str {
+fn optional_str(value: &Option<String>) -> &str {
     value.as_deref().unwrap_or("")
 }
 
@@ -846,10 +849,13 @@ pub async fn execute_page_click(params: PageClickParams) -> WasmAsyncResponse {
             }
         }
     };
-    let ref_id = match resolve_ref_id_or_selector(&document, optional_str(&params.ref_id), &params.selector).await {
-        Ok(rid) => rid,
-        Err(resp) => return resp,
-    };
+    let ref_id =
+        match resolve_ref_id_or_selector(&document, optional_str(&params.ref_id), &params.selector)
+            .await
+        {
+            Ok(rid) => rid,
+            Err(resp) => return resp,
+        };
     let label = resolved_label(&ref_id, &params.label);
     let element = match document.query_selector(&format!("[data-ref-id='{}']", ref_id)) {
         Ok(el) => el,
@@ -912,10 +918,13 @@ pub async fn execute_page_fill(params: PageFillParams) -> WasmAsyncResponse {
             }
         }
     };
-    let ref_id = match resolve_ref_id_or_selector(&document, optional_str(&params.ref_id), &params.selector).await {
-        Ok(rid) => rid,
-        Err(resp) => return resp,
-    };
+    let ref_id =
+        match resolve_ref_id_or_selector(&document, optional_str(&params.ref_id), &params.selector)
+            .await
+        {
+            Ok(rid) => rid,
+            Err(resp) => return resp,
+        };
     let label = resolved_label(&ref_id, &params.label);
     let element = match document.query_selector(&format!("[data-ref-id='{}']", ref_id)) {
         Ok(el) => el,
@@ -990,10 +999,13 @@ pub async fn execute_page_append(params: PageAppendParams) -> WasmAsyncResponse 
             }
         }
     };
-    let ref_id = match resolve_ref_id_or_selector(&document, optional_str(&params.ref_id), &params.selector).await {
-        Ok(rid) => rid,
-        Err(resp) => return resp,
-    };
+    let ref_id =
+        match resolve_ref_id_or_selector(&document, optional_str(&params.ref_id), &params.selector)
+            .await
+        {
+            Ok(rid) => rid,
+            Err(resp) => return resp,
+        };
     let label = resolved_label(&ref_id, &params.label);
     let element = match document.query_selector(&format!("[data-ref-id='{}']", ref_id)) {
         Ok(el) => el,
@@ -1069,10 +1081,13 @@ pub async fn execute_page_hover(params: PageHoverParams) -> WasmAsyncResponse {
             }
         }
     };
-    let ref_id = match resolve_ref_id_or_selector(&document, optional_str(&params.ref_id), &params.selector).await {
-        Ok(rid) => rid,
-        Err(resp) => return resp,
-    };
+    let ref_id =
+        match resolve_ref_id_or_selector(&document, optional_str(&params.ref_id), &params.selector)
+            .await
+        {
+            Ok(rid) => rid,
+            Err(resp) => return resp,
+        };
     let element = match document.query_selector(&format!("[data-ref-id='{}']", ref_id)) {
         Ok(el) => el,
         Err(e) => {
@@ -1215,10 +1230,13 @@ pub async fn execute_page_scroll_to(params: PageScrollToParams) -> WasmAsyncResp
             }
         }
     };
-    let ref_id = match resolve_ref_id_or_selector(&document, optional_str(&params.ref_id), &params.selector).await {
-        Ok(rid) => rid,
-        Err(resp) => return resp,
-    };
+    let ref_id =
+        match resolve_ref_id_or_selector(&document, optional_str(&params.ref_id), &params.selector)
+            .await
+        {
+            Ok(rid) => rid,
+            Err(resp) => return resp,
+        };
     let label = resolved_label(&ref_id, &params.label);
     let element = match document.query_selector(&format!("[data-ref-id='{}']", ref_id)) {
         Ok(el) => el,
@@ -1269,10 +1287,13 @@ pub async fn execute_page_dblclick(params: PageDblClickParams) -> WasmAsyncRespo
             }
         }
     };
-    let ref_id = match resolve_ref_id_or_selector(&document, optional_str(&params.ref_id), &params.selector).await {
-        Ok(rid) => rid,
-        Err(resp) => return resp,
-    };
+    let ref_id =
+        match resolve_ref_id_or_selector(&document, optional_str(&params.ref_id), &params.selector)
+            .await
+        {
+            Ok(rid) => rid,
+            Err(resp) => return resp,
+        };
     let element = match document.query_selector(&format!("[data-ref-id='{}']", ref_id)) {
         Ok(el) => el,
         Err(e) => {
@@ -1337,10 +1358,13 @@ pub async fn execute_page_type(params: PageTypeParams) -> WasmAsyncResponse {
             }
         }
     };
-    let ref_id = match resolve_ref_id_or_selector(&document, optional_str(&params.ref_id), &params.selector).await {
-        Ok(rid) => rid,
-        Err(resp) => return resp,
-    };
+    let ref_id =
+        match resolve_ref_id_or_selector(&document, optional_str(&params.ref_id), &params.selector)
+            .await
+        {
+            Ok(rid) => rid,
+            Err(resp) => return resp,
+        };
     let element = match document.query_selector(&format!("[data-ref-id='{}']", ref_id)) {
         Ok(el) => el,
         Err(e) => {
@@ -1441,10 +1465,13 @@ pub async fn execute_page_select(params: PageSelectParams) -> WasmAsyncResponse 
             }
         }
     };
-    let ref_id = match resolve_ref_id_or_selector(&document, optional_str(&params.ref_id), &params.selector).await {
-        Ok(rid) => rid,
-        Err(resp) => return resp,
-    };
+    let ref_id =
+        match resolve_ref_id_or_selector(&document, optional_str(&params.ref_id), &params.selector)
+            .await
+        {
+            Ok(rid) => rid,
+            Err(resp) => return resp,
+        };
     let element = match document.query_selector(&format!("[data-ref-id='{}']", ref_id)) {
         Ok(el) => el,
         Err(e) => {
@@ -1504,10 +1531,13 @@ pub async fn execute_page_check(params: PageCheckParams) -> WasmAsyncResponse {
             }
         }
     };
-    let ref_id = match resolve_ref_id_or_selector(&document, optional_str(&params.ref_id), &params.selector).await {
-        Ok(rid) => rid,
-        Err(resp) => return resp,
-    };
+    let ref_id =
+        match resolve_ref_id_or_selector(&document, optional_str(&params.ref_id), &params.selector)
+            .await
+        {
+            Ok(rid) => rid,
+            Err(resp) => return resp,
+        };
     let element = match document.query_selector(&format!("[data-ref-id='{}']", ref_id)) {
         Ok(el) => el,
         Err(e) => {
@@ -2084,11 +2114,7 @@ pub async fn execute_page_wait_for(params: PageWaitForParams) -> WasmAsyncRespon
                     .unwrap()
                     .dyn_into::<js_sys::Function>()
                     .unwrap();
-                let _ = set_timeout.call2(
-                    &window,
-                    &resolve,
-                    &JsValue::from_f64(interval_ms),
-                );
+                let _ = set_timeout.call2(&window, &resolve, &JsValue::from_f64(interval_ms));
             },
         );
         let _ = JsFuture::from(promise).await;
@@ -2307,21 +2333,57 @@ macro_rules! core_wrap_sync {
 
 // Generate core wrappers for all handlers
 
-core_wrap_async!(core_execute_fetch_positional, FetchArgs, execute_fetch_positional);
+core_wrap_async!(
+    core_execute_fetch_positional,
+    FetchArgs,
+    execute_fetch_positional
+);
 core_wrap_async!(core_execute_sleep, SleepParams, execute_sleep);
 core_wrap_async!(core_execute_page_wait, PageWaitParams, execute_page_wait);
-core_wrap_async!(core_execute_storage_get, StorageGetParams, execute_storage_get);
-core_wrap_async!(core_execute_storage_set, StorageSetParams, execute_storage_set);
-core_wrap_async!(core_execute_storage_delete, StorageDeleteParams, execute_storage_delete);
-core_wrap_async!(core_execute_host_call, HostCallParams, execute_host_call_from_registry);
+core_wrap_async!(
+    core_execute_storage_get,
+    StorageGetParams,
+    execute_storage_get
+);
+core_wrap_async!(
+    core_execute_storage_set,
+    StorageSetParams,
+    execute_storage_set
+);
+core_wrap_async!(
+    core_execute_storage_delete,
+    StorageDeleteParams,
+    execute_storage_delete
+);
+core_wrap_async!(
+    core_execute_host_call,
+    HostCallParams,
+    execute_host_call_from_registry
+);
 core_wrap_async!(core_execute_page_hover, PageHoverParams, execute_page_hover);
 core_wrap_async_empty!(core_execute_page_unhover, execute_page_unhover);
-core_wrap_async!(core_execute_page_scroll, PageScrollParams, execute_page_scroll);
-core_wrap_async!(core_execute_page_scroll_to, PageScrollToParams, execute_page_scroll_to);
-core_wrap_async!(core_execute_page_dblclick, PageDblClickParams, execute_page_dblclick);
+core_wrap_async!(
+    core_execute_page_scroll,
+    PageScrollParams,
+    execute_page_scroll
+);
+core_wrap_async!(
+    core_execute_page_scroll_to,
+    PageScrollToParams,
+    execute_page_scroll_to
+);
+core_wrap_async!(
+    core_execute_page_dblclick,
+    PageDblClickParams,
+    execute_page_dblclick
+);
 core_wrap_async!(core_execute_page_type, PageTypeParams, execute_page_type);
 core_wrap_async!(core_execute_page_press, PagePressParams, execute_page_press);
-core_wrap_async!(core_execute_page_select, PageSelectParams, execute_page_select);
+core_wrap_async!(
+    core_execute_page_select,
+    PageSelectParams,
+    execute_page_select
+);
 core_wrap_async!(core_execute_page_check, PageCheckParams, execute_page_check);
 core_wrap_async!(core_execute_fs_exists, FsPathParams, execute_fs_exists);
 core_wrap_async!(core_execute_fs_stat, FsPathParams, execute_fs_stat);
@@ -2331,15 +2393,43 @@ core_wrap_async!(core_execute_fs_delete, FsPathParams, execute_fs_delete);
 core_wrap_async!(core_execute_fs_copy, FsCopyParams, execute_fs_copy);
 core_wrap_async!(core_execute_fs_move, FsCopyParams, execute_fs_move);
 core_wrap_async!(core_execute_fs_read, FsPathParams, execute_fs_read);
-core_wrap_async!(core_execute_fs_read_text, FsPathParams, execute_fs_read_text);
-core_wrap_async!(core_execute_fs_read_base64, FsPathParams, execute_fs_read_base64);
-core_wrap_async!(core_execute_fs_read_range, FsReadRangeParams, execute_fs_read_range);
+core_wrap_async!(
+    core_execute_fs_read_text,
+    FsPathParams,
+    execute_fs_read_text
+);
+core_wrap_async!(
+    core_execute_fs_read_base64,
+    FsPathParams,
+    execute_fs_read_base64
+);
+core_wrap_async!(
+    core_execute_fs_read_range,
+    FsReadRangeParams,
+    execute_fs_read_range
+);
 core_wrap_async!(core_execute_fs_write, FsWriteParams, execute_fs_write);
-core_wrap_async!(core_execute_fs_write_text, FsWriteParams, execute_fs_write_text);
-core_wrap_async!(core_execute_fs_write_base64, FsWriteParams, execute_fs_write_base64);
+core_wrap_async!(
+    core_execute_fs_write_text,
+    FsWriteParams,
+    execute_fs_write_text
+);
+core_wrap_async!(
+    core_execute_fs_write_base64,
+    FsWriteParams,
+    execute_fs_write_base64
+);
 core_wrap_async!(core_execute_fs_append, FsWriteParams, execute_fs_append);
-core_wrap_async!(core_execute_fs_append_text, FsWriteParams, execute_fs_append_text);
-core_wrap_async!(core_execute_fs_append_base64, FsWriteParams, execute_fs_append_base64);
+core_wrap_async!(
+    core_execute_fs_append_text,
+    FsWriteParams,
+    execute_fs_append_text
+);
+core_wrap_async!(
+    core_execute_fs_append_base64,
+    FsWriteParams,
+    execute_fs_append_base64
+);
 core_wrap_async!(core_execute_fs_update, FsUpdateParams, execute_fs_update);
 core_wrap_async!(core_execute_fs_hash, FsHashParams, execute_fs_hash);
 
@@ -2352,22 +2442,70 @@ core_wrap_async!(core_execute_page_forward, EmptyParams, execute_page_forward);
 core_wrap_async!(core_execute_page_reload, EmptyParams, execute_page_reload);
 core_wrap_async!(core_execute_page_click, PageClickParams, execute_page_click);
 core_wrap_async!(core_execute_page_fill, PageFillParams, execute_page_fill);
-core_wrap_async!(core_execute_page_append, PageAppendParams, execute_page_append);
+core_wrap_async!(
+    core_execute_page_append,
+    PageAppendParams,
+    execute_page_append
+);
 core_wrap_async!(core_execute_page_find, PageFindParams, execute_page_find);
-core_wrap_async!(core_execute_page_wait_for, PageWaitForParams, execute_page_wait_for);
-core_wrap_async!(core_execute_page_extract, PageExtractParams, execute_page_extract);
-core_wrap_async!(core_execute_page_screenshot, EmptyParams, execute_page_screenshot);
-core_wrap_async!(core_execute_page_snapshot_text, DomSnapshotParams, execute_page_snapshot_text);
-core_wrap_async!(core_execute_page_snapshot_data, DomSnapshotParams, execute_page_snapshot_data);
-core_wrap_async!(core_execute_sidepanel_snapshot_text, DomSnapshotParams, execute_sidepanel_snapshot_text);
-core_wrap_async!(core_execute_sidepanel_snapshot_data, DomSnapshotParams, execute_sidepanel_snapshot_data);
-core_wrap_async!(core_execute_sidepanel_click, PageClickParams, execute_sidepanel_click);
-core_wrap_async!(core_execute_sidepanel_fill, PageFillParams, execute_sidepanel_fill);
-core_wrap_async!(core_execute_sidepanel_append, PageAppendParams, execute_sidepanel_append);
+core_wrap_async!(
+    core_execute_page_wait_for,
+    PageWaitForParams,
+    execute_page_wait_for
+);
+core_wrap_async!(
+    core_execute_page_extract,
+    PageExtractParams,
+    execute_page_extract
+);
+core_wrap_async!(
+    core_execute_page_screenshot,
+    EmptyParams,
+    execute_page_screenshot
+);
+core_wrap_async!(
+    core_execute_page_snapshot_text,
+    DomSnapshotParams,
+    execute_page_snapshot_text
+);
+core_wrap_async!(
+    core_execute_page_snapshot_data,
+    DomSnapshotParams,
+    execute_page_snapshot_data
+);
+core_wrap_async!(
+    core_execute_sidepanel_snapshot_text,
+    DomSnapshotParams,
+    execute_sidepanel_snapshot_text
+);
+core_wrap_async!(
+    core_execute_sidepanel_snapshot_data,
+    DomSnapshotParams,
+    execute_sidepanel_snapshot_data
+);
+core_wrap_async!(
+    core_execute_sidepanel_click,
+    PageClickParams,
+    execute_sidepanel_click
+);
+core_wrap_async!(
+    core_execute_sidepanel_fill,
+    PageFillParams,
+    execute_sidepanel_fill
+);
+core_wrap_async!(
+    core_execute_sidepanel_append,
+    PageAppendParams,
+    execute_sidepanel_append
+);
 core_wrap_async_empty!(core_execute_sidepanel_url, execute_sidepanel_url);
 core_wrap_async_empty!(core_execute_sidepanel_title, execute_sidepanel_title);
 
-core_wrap_sync!(core_execute_dom_snapshot, DomSnapshotParams, execute_dom_snapshot);
+core_wrap_sync!(
+    core_execute_dom_snapshot,
+    DomSnapshotParams,
+    execute_dom_snapshot
+);
 core_wrap_sync!(core_execute_dom_format, DomFormatParams, execute_dom_format);
 
 core_wrap_async_empty!(core_execute_storage_list, execute_storage_list);
@@ -2377,8 +2515,6 @@ core_wrap_async_empty!(core_execute_storage_list, execute_storage_list);
 /// Initialize the handler registry with all web-available async APIs.
 /// This function is idempotent — calling it multiple times is safe.
 pub fn init_registry() {
-
-
     // Avoid double-registration
     if !web_js_core::handler_registry::is_empty() {
         return;
@@ -3401,11 +3537,12 @@ pub fn init_registry() {
         param_struct: HostCallParams,
         handler: core_execute_host_call,
     }
-
 }
 
 /// Dispatch a command via the handler registry, auto-initializing if needed.
-pub async fn dispatch_command(cmd: &web_js_base::types::WasmAsyncCommand) -> Result<web_js_base::types::WasmAsyncResponse, String> {
+pub async fn dispatch_command(
+    cmd: &web_js_base::types::WasmAsyncCommand,
+) -> Result<web_js_base::types::WasmAsyncResponse, String> {
     if web_js_core::handler_registry::is_empty() {
         init_registry();
     }
@@ -3430,6 +3567,3 @@ pub async fn dispatch_command(cmd: &web_js_base::types::WasmAsyncCommand) -> Res
 }
 
 // ─── Tests ──────────────────────────────────────────────────────
-
-
-

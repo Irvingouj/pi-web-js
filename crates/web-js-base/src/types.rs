@@ -36,10 +36,22 @@ pub struct WasmAsyncResponse {
 #[tsify(into_wasm_abi)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum WasmCellError {
-    Compile { message: String, line: Option<u32> },
-    Runtime { message: String, line: Option<u32> },
+    Compile {
+        name: Option<String>,
+        message: String,
+        line: Option<u32>,
+    },
+    Runtime {
+        name: Option<String>,
+        message: String,
+        line: Option<u32>,
+        action: Option<String>,
+        code: Option<String>,
+    },
     FuelExhausted,
-    Internal { message: String },
+    Internal {
+        message: String,
+    },
 }
 
 /// A single global variable observed by `inspect_globals`.
@@ -144,12 +156,28 @@ impl WasmRunResult {
 impl From<web_js_core::CellError> for WasmCellError {
     fn from(e: web_js_core::CellError) -> Self {
         match e {
-            web_js_core::CellError::Compile { message, line } => {
-                WasmCellError::Compile { message, line }
-            }
-            web_js_core::CellError::Runtime { message, line } => {
-                WasmCellError::Runtime { message, line }
-            }
+            web_js_core::CellError::Compile {
+                name,
+                message,
+                line,
+            } => WasmCellError::Compile {
+                name,
+                message,
+                line,
+            },
+            web_js_core::CellError::Runtime {
+                name,
+                message,
+                line,
+                action,
+                code,
+            } => WasmCellError::Runtime {
+                name,
+                message,
+                line,
+                action,
+                code,
+            },
             web_js_core::CellError::FuelExhausted => WasmCellError::FuelExhausted,
             web_js_core::CellError::Internal { message } => WasmCellError::Internal { message },
         }

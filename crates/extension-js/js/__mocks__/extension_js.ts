@@ -1,9 +1,22 @@
+export type WasmCellError =
+	| { kind: "compile"; name: string | null; message: string; line: number | null }
+	| {
+			kind: "runtime";
+			name: string | null;
+			message: string;
+			line: number | null;
+			action: string | null;
+			code: string | null;
+	  }
+	| { kind: "fuel_exhausted" }
+	| { kind: "internal"; message: string };
+
 export interface CellResult {
 	status: "ok" | "err";
 	stdout: string[];
 	stderr: string[];
 	result: string | null;
-	error: { message: string } | null;
+	error: WasmCellError | null;
 	execution_count: number;
 }
 

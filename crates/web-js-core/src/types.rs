@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use std::fmt;
 use ts_rs::TS;
 
 // ─── Error Types ────────────────────────────────────────────────
@@ -10,36 +9,23 @@ use ts_rs::TS;
 #[ts(export_to = "web/src/types/generated.ts")]
 pub enum CellError {
     /// Syntax or parse error during compilation.
-    Compile { message: String, line: Option<u32> },
+    Compile {
+        name: Option<String>,
+        message: String,
+        line: Option<u32>,
+    },
     /// JavaScript runtime error (type mismatch, undefined access, etc.)
-    Runtime { message: String, line: Option<u32> },
+    Runtime {
+        name: Option<String>,
+        message: String,
+        line: Option<u32>,
+        action: Option<String>,
+        code: Option<String>,
+    },
     /// Execution exceeded the time limit (likely an infinite loop).
     FuelExhausted,
     /// Internal error (Rust/WASM panic, unexpected state).
     Internal { message: String },
-}
-
-impl fmt::Display for CellError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            CellError::Compile { message, line } => {
-                if let Some(line) = line {
-                    write!(f, "Compile error (line {}): {}", line, message)
-                } else {
-                    write!(f, "Compile error: {}", message)
-                }
-            }
-            CellError::Runtime { message, line } => {
-                if let Some(line) = line {
-                    write!(f, "Runtime error (line {}): {}", line, message)
-                } else {
-                    write!(f, "Runtime error: {}", message)
-                }
-            }
-            CellError::FuelExhausted => write!(f, "Execution stopped: time limit reached"),
-            CellError::Internal { message } => write!(f, "Internal error: {}", message),
-        }
-    }
 }
 
 /// Status of a cell execution.
@@ -121,13 +107,14 @@ pub struct RunResult {
 
 impl RunResult {
     pub(crate) fn err(error: CellError, execution_count: u32) -> Self {
+        let fuel_exhausted = matches!(&error, CellError::FuelExhausted);
         Self {
             stdout: vec![],
             stderr: vec![],
             result: None,
             error: Some(error),
             commands: vec![],
-            fuel_exhausted: false,
+            fuel_exhausted,
             execution_count,
             status: CellStatus::Done,
             pending_commands: vec![],
