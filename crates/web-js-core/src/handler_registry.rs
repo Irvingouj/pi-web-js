@@ -4,9 +4,8 @@ use std::rc::Rc;
 
 use crate::types::{AsyncCommand, AsyncResponse};
 
-pub type Handler = Rc<
-    dyn Fn(AsyncCommand) -> Pin<Box<dyn Future<Output = Result<AsyncResponse, String>>>>
->;
+pub type Handler =
+    Rc<dyn Fn(AsyncCommand) -> Pin<Box<dyn Future<Output = Result<AsyncResponse, String>>>>>;
 
 const HOST_PREFIX: &str = "host_";
 
@@ -96,7 +95,7 @@ mod tests {
         loop {
             match pinned.as_mut().poll(&mut context) {
                 Poll::Ready(val) => return val,
-                Poll::Pending => {},
+                Poll::Pending => {}
             }
         }
     }
@@ -112,15 +111,18 @@ mod tests {
     fn test_register_and_dispatch() {
         clear_handlers();
 
-        register_handler("test_action", Rc::new(|_cmd| {
-            Box::pin(async move {
-                Ok(AsyncResponse {
-                    ok: true,
-                    value: Some(serde_json::json!("test_result")),
-                    error: None,
+        register_handler(
+            "test_action",
+            Rc::new(|_cmd| {
+                Box::pin(async move {
+                    Ok(AsyncResponse {
+                        ok: true,
+                        value: Some(serde_json::json!("test_result")),
+                        error: None,
+                    })
                 })
-            })
-        }));
+            }),
+        );
 
         let cmd = AsyncCommand {
             call_id: 1,
@@ -161,15 +163,18 @@ mod tests {
         clear_handlers();
         assert!(is_empty());
 
-        register_handler("test", Rc::new(|_cmd| {
-            Box::pin(async move {
-                Ok(AsyncResponse {
-                    ok: true,
-                    value: None,
-                    error: None,
+        register_handler(
+            "test",
+            Rc::new(|_cmd| {
+                Box::pin(async move {
+                    Ok(AsyncResponse {
+                        ok: true,
+                        value: None,
+                        error: None,
+                    })
                 })
-            })
-        }));
+            }),
+        );
 
         assert!(!is_empty());
         clear_handlers();
@@ -180,26 +185,37 @@ mod tests {
     fn test_register_handler_duplicate_detection() {
         clear_handlers();
 
-        assert!(register_handler("dup_test", Rc::new(|_cmd| {
-            Box::pin(async move {
-                Ok(AsyncResponse {
-                    ok: true,
-                    value: Some(serde_json::json!(1)),
-                    error: None,
+        assert!(register_handler(
+            "dup_test",
+            Rc::new(|_cmd| {
+                Box::pin(async move {
+                    Ok(AsyncResponse {
+                        ok: true,
+                        value: Some(serde_json::json!(1)),
+                        error: None,
+                    })
                 })
             })
-        })));
-        assert!(!register_handler("dup_test", Rc::new(|_cmd| {
-            Box::pin(async move {
-                Ok(AsyncResponse {
-                    ok: true,
-                    value: Some(serde_json::json!(2)),
-                    error: None,
+        ));
+        assert!(!register_handler(
+            "dup_test",
+            Rc::new(|_cmd| {
+                Box::pin(async move {
+                    Ok(AsyncResponse {
+                        ok: true,
+                        value: Some(serde_json::json!(2)),
+                        error: None,
+                    })
                 })
             })
-        })));
+        ));
 
-        let cmd = AsyncCommand { call_id: 1, action: "dup_test".to_string(), params: serde_json::json!({}), run_id: None };
+        let cmd = AsyncCommand {
+            call_id: 1,
+            action: "dup_test".to_string(),
+            params: serde_json::json!({}),
+            run_id: None,
+        };
         let result = block_on(dispatch_command(&cmd));
         // Original handler (value 1) should remain after duplicate rejection
         assert_eq!(result.unwrap().value, Some(serde_json::json!(1)));
@@ -212,18 +228,23 @@ mod tests {
         clear_handlers();
 
         // Register a host_call handler that just echoes back the action
-        register_handler("host_call", Rc::new(|cmd| {
-            Box::pin(async move {
-                let action = cmd.params.get("action")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("none");
-                Ok(AsyncResponse {
-                    ok: true,
-                    value: Some(serde_json::json!(action)),
-                    error: None,
+        register_handler(
+            "host_call",
+            Rc::new(|cmd| {
+                Box::pin(async move {
+                    let action = cmd
+                        .params
+                        .get("action")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("none");
+                    Ok(AsyncResponse {
+                        ok: true,
+                        value: Some(serde_json::json!(action)),
+                        error: None,
+                    })
                 })
-            })
-        }));
+            }),
+        );
 
         // Dispatch a host_greet command — should hit the escape hatch
         let cmd = AsyncCommand {
@@ -246,15 +267,18 @@ mod tests {
     fn test_host_call_direct_no_recursion() {
         clear_handlers();
 
-        register_handler("host_call", Rc::new(|_cmd| {
-            Box::pin(async move {
-                Ok(AsyncResponse {
-                    ok: true,
-                    value: Some(serde_json::json!("direct")),
-                    error: None,
+        register_handler(
+            "host_call",
+            Rc::new(|_cmd| {
+                Box::pin(async move {
+                    Ok(AsyncResponse {
+                        ok: true,
+                        value: Some(serde_json::json!("direct")),
+                        error: None,
+                    })
                 })
-            })
-        }));
+            }),
+        );
 
         // Direct host_call should NOT hit the escape hatch
         let cmd = AsyncCommand {
@@ -276,15 +300,18 @@ mod tests {
     fn test_host_call_non_object_params_errors() {
         clear_handlers();
 
-        register_handler("host_call", Rc::new(|_cmd| {
-            Box::pin(async move {
-                Ok(AsyncResponse {
-                    ok: true,
-                    value: None,
-                    error: None,
+        register_handler(
+            "host_call",
+            Rc::new(|_cmd| {
+                Box::pin(async move {
+                    Ok(AsyncResponse {
+                        ok: true,
+                        value: None,
+                        error: None,
+                    })
                 })
-            })
-        }));
+            }),
+        );
 
         // Array params should error, not silently drop the action field
         let cmd = AsyncCommand {
@@ -297,7 +324,11 @@ mod tests {
         let result = block_on(dispatch_command(&cmd));
         assert!(result.is_err());
         let err = result.unwrap_err();
-        assert!(err.contains("requires object params"), "Expected object-params error, got: {}", err);
+        assert!(
+            err.contains("requires object params"),
+            "Expected object-params error, got: {}",
+            err
+        );
 
         // Scalar params should also error
         let cmd2 = AsyncCommand {
@@ -310,7 +341,11 @@ mod tests {
         let result2 = block_on(dispatch_command(&cmd2));
         assert!(result2.is_err());
         let err2 = result2.unwrap_err();
-        assert!(err2.contains("requires object params"), "Expected object-params error, got: {}", err2);
+        assert!(
+            err2.contains("requires object params"),
+            "Expected object-params error, got: {}",
+            err2
+        );
 
         clear_handlers();
     }
@@ -370,10 +405,18 @@ mod tests {
         crate::api_docs::clear_docs();
 
         async fn h1(_params: crate::command_params::SleepParams) -> AsyncResponse {
-            AsyncResponse { ok: true, value: None, error: None }
+            AsyncResponse {
+                ok: true,
+                value: None,
+                error: None,
+            }
         }
         async fn h2(_params: crate::command_params::SleepParams) -> AsyncResponse {
-            AsyncResponse { ok: true, value: None, error: None }
+            AsyncResponse {
+                ok: true,
+                value: None,
+                error: None,
+            }
         }
 
         crate::web_api! {
@@ -419,7 +462,11 @@ mod tests {
         crate::api_docs::clear_docs();
 
         async fn h1(_params: crate::command_params::SleepParams) -> AsyncResponse {
-            AsyncResponse { ok: true, value: None, error: None }
+            AsyncResponse {
+                ok: true,
+                value: None,
+                error: None,
+            }
         }
 
         crate::web_api! {

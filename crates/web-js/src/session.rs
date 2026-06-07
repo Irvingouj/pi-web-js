@@ -170,7 +170,8 @@ fn browser_local_storage_get<'js>(
     args: Rest<Value<'js>>,
 ) -> rquickjs::Result<Value<'js>> {
     let key = args
-        .0.first()
+        .0
+        .first()
         .and_then(|v| v.as_string())
         .and_then(|s| s.to_string().ok())
         .unwrap_or_default();
@@ -190,7 +191,8 @@ fn browser_local_storage_set<'js>(
     args: Rest<Value<'js>>,
 ) -> rquickjs::Result<Value<'js>> {
     let key = args
-        .0.first()
+        .0
+        .first()
         .and_then(|v| v.as_string())
         .and_then(|s| s.to_string().ok())
         .unwrap_or_default();
@@ -212,7 +214,8 @@ fn browser_local_storage_remove<'js>(
     args: Rest<Value<'js>>,
 ) -> rquickjs::Result<Value<'js>> {
     let key = args
-        .0.first()
+        .0
+        .first()
         .and_then(|v| v.as_string())
         .and_then(|s| s.to_string().ok())
         .unwrap_or_default();
@@ -267,7 +270,8 @@ fn browser_query_selector<'js>(
     args: Rest<Value<'js>>,
 ) -> rquickjs::Result<Value<'js>> {
     let selector = args
-        .0.first()
+        .0
+        .first()
         .and_then(|v| v.as_string())
         .and_then(|s| s.to_string().ok())
         .unwrap_or_default();
@@ -304,7 +308,8 @@ fn browser_query_selector_all<'js>(
     args: Rest<Value<'js>>,
 ) -> rquickjs::Result<Value<'js>> {
     let selector = args
-        .0.first()
+        .0
+        .first()
         .and_then(|v| v.as_string())
         .and_then(|s| s.to_string().ok())
         .unwrap_or_default();

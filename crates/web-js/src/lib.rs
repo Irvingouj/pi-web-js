@@ -9,4 +9,3 @@ pub fn main() {
     tracing_wasm::set_as_global_default();
     tracing::info!("web-js WASM initialized, tracing enabled");
 }
-

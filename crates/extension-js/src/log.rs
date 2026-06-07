@@ -1,6 +1,6 @@
 use std::sync::atomic::{AtomicI32, Ordering};
-use wasm_bindgen::prelude::*;
 use tracing_subscriber::layer::Layer;
+use wasm_bindgen::prelude::*;
 
 static LOG_LEVEL: AtomicI32 = AtomicI32::new(3); // default "error"
 
@@ -12,8 +12,15 @@ pub fn set_log_level(level: i32) {
 
 pub struct LogLevelFilterLayer;
 
-impl<S> Layer<S> for LogLevelFilterLayer where S: tracing::Subscriber {
-    fn enabled(&self, metadata: &tracing::Metadata<'_>, _ctx: tracing_subscriber::layer::Context<'_, S>) -> bool {
+impl<S> Layer<S> for LogLevelFilterLayer
+where
+    S: tracing::Subscriber,
+{
+    fn enabled(
+        &self,
+        metadata: &tracing::Metadata<'_>,
+        _ctx: tracing_subscriber::layer::Context<'_, S>,
+    ) -> bool {
         let level = metadata.level();
         let log_level = LOG_LEVEL.load(Ordering::Relaxed);
         match *level {

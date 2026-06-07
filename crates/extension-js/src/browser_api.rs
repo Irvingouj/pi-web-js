@@ -1,5 +1,5 @@
-use web_js_core::types::{AsyncError, AsyncResponse};
 use web_js_core::command_params::*;
+use web_js_core::types::{AsyncError, AsyncResponse};
 
 // ─── fs.* helpers ───────────────────────────────────────────────
 
@@ -10,9 +10,7 @@ fn fs_err_to_async(err: web_fs::FsError) -> AsyncError {
     }
 }
 
-pub async fn execute_fs_exists(
-    params: FsPathParams,
-) -> AsyncResponse {
+pub async fn execute_fs_exists(params: FsPathParams) -> AsyncResponse {
     let exists = web_fs::exists(&params.path).await;
     AsyncResponse {
         ok: true,
@@ -21,9 +19,7 @@ pub async fn execute_fs_exists(
     }
 }
 
-pub async fn execute_fs_stat(
-    params: FsPathParams,
-) -> AsyncResponse {
+pub async fn execute_fs_stat(params: FsPathParams) -> AsyncResponse {
     match web_fs::stat(&params.path).await {
         Ok(meta) => match serde_json::to_value(&meta) {
             Ok(v) => AsyncResponse {
@@ -48,9 +44,7 @@ pub async fn execute_fs_stat(
     }
 }
 
-pub async fn execute_fs_list(
-    params: FsPathParams,
-) -> AsyncResponse {
+pub async fn execute_fs_list(params: FsPathParams) -> AsyncResponse {
     match web_fs::list(&params.path).await {
         Ok(entries) => match serde_json::to_value(&entries) {
             Ok(v) => AsyncResponse {
@@ -75,9 +69,7 @@ pub async fn execute_fs_list(
     }
 }
 
-pub async fn execute_fs_mkdir(
-    params: FsPathParams,
-) -> AsyncResponse {
+pub async fn execute_fs_mkdir(params: FsPathParams) -> AsyncResponse {
     match web_fs::mkdir(&params.path).await {
         Ok(_) => AsyncResponse {
             ok: true,
@@ -92,9 +84,7 @@ pub async fn execute_fs_mkdir(
     }
 }
 
-pub async fn execute_fs_delete(
-    params: FsPathParams,
-) -> AsyncResponse {
+pub async fn execute_fs_delete(params: FsPathParams) -> AsyncResponse {
     match web_fs::delete(&params.path).await {
         Ok(_) => AsyncResponse {
             ok: true,
@@ -109,9 +99,7 @@ pub async fn execute_fs_delete(
     }
 }
 
-pub async fn execute_fs_copy(
-    params: FsCopyParams,
-) -> AsyncResponse {
+pub async fn execute_fs_copy(params: FsCopyParams) -> AsyncResponse {
     match web_fs::copy(&params.from, &params.to).await {
         Ok(_) => AsyncResponse {
             ok: true,
@@ -126,9 +114,7 @@ pub async fn execute_fs_copy(
     }
 }
 
-pub async fn execute_fs_move(
-    params: FsCopyParams,
-) -> AsyncResponse {
+pub async fn execute_fs_move(params: FsCopyParams) -> AsyncResponse {
     match web_fs::rename(&params.from, &params.to).await {
         Ok(_) => AsyncResponse {
             ok: true,
@@ -143,9 +129,7 @@ pub async fn execute_fs_move(
     }
 }
 
-pub async fn execute_fs_read(
-    params: FsPathParams,
-) -> AsyncResponse {
+pub async fn execute_fs_read(params: FsPathParams) -> AsyncResponse {
     match web_fs::read(&params.path).await {
         Ok(bytes) => AsyncResponse {
             ok: true,
@@ -162,9 +146,7 @@ pub async fn execute_fs_read(
     }
 }
 
-pub async fn execute_fs_read_text(
-    params: FsPathParams,
-) -> AsyncResponse {
+pub async fn execute_fs_read_text(params: FsPathParams) -> AsyncResponse {
     match web_fs::read_text(&params.path).await {
         Ok(text) => AsyncResponse {
             ok: true,
@@ -179,9 +161,7 @@ pub async fn execute_fs_read_text(
     }
 }
 
-pub async fn execute_fs_read_base64(
-    params: FsPathParams,
-) -> AsyncResponse {
+pub async fn execute_fs_read_base64(params: FsPathParams) -> AsyncResponse {
     match web_fs::read_base64(&params.path).await {
         Ok(b64) => AsyncResponse {
             ok: true,
@@ -196,9 +176,7 @@ pub async fn execute_fs_read_base64(
     }
 }
 
-pub async fn execute_fs_read_range(
-    params: FsReadRangeParams,
-) -> AsyncResponse {
+pub async fn execute_fs_read_range(params: FsReadRangeParams) -> AsyncResponse {
     match web_fs::read_range(&params.path, params.offset, params.len).await {
         Ok(bytes) => AsyncResponse {
             ok: true,
@@ -215,9 +193,7 @@ pub async fn execute_fs_read_range(
     }
 }
 
-pub async fn execute_fs_write(
-    params: FsWriteParams,
-) -> AsyncResponse {
+pub async fn execute_fs_write(params: FsWriteParams) -> AsyncResponse {
     let bytes = match data_encoding::BASE64.decode(params.data.as_bytes()) {
         Ok(b) => b,
         Err(_) => {
@@ -245,9 +221,7 @@ pub async fn execute_fs_write(
     }
 }
 
-pub async fn execute_fs_write_text(
-    params: FsWriteParams,
-) -> AsyncResponse {
+pub async fn execute_fs_write_text(params: FsWriteParams) -> AsyncResponse {
     match web_fs::write_text(&params.path, &params.data).await {
         Ok(_) => AsyncResponse {
             ok: true,
@@ -262,9 +236,7 @@ pub async fn execute_fs_write_text(
     }
 }
 
-pub async fn execute_fs_write_base64(
-    params: FsWriteParams,
-) -> AsyncResponse {
+pub async fn execute_fs_write_base64(params: FsWriteParams) -> AsyncResponse {
     match web_fs::write_base64(&params.path, &params.data).await {
         Ok(_) => AsyncResponse {
             ok: true,
@@ -279,9 +251,7 @@ pub async fn execute_fs_write_base64(
     }
 }
 
-pub async fn execute_fs_append(
-    params: FsWriteParams,
-) -> AsyncResponse {
+pub async fn execute_fs_append(params: FsWriteParams) -> AsyncResponse {
     let bytes = match data_encoding::BASE64.decode(params.data.as_bytes()) {
         Ok(b) => b,
         Err(_) => {
@@ -309,9 +279,7 @@ pub async fn execute_fs_append(
     }
 }
 
-pub async fn execute_fs_append_text(
-    params: FsWriteParams,
-) -> AsyncResponse {
+pub async fn execute_fs_append_text(params: FsWriteParams) -> AsyncResponse {
     match web_fs::append_text(&params.path, &params.data).await {
         Ok(_) => AsyncResponse {
             ok: true,
@@ -326,9 +294,7 @@ pub async fn execute_fs_append_text(
     }
 }
 
-pub async fn execute_fs_append_base64(
-    params: FsWriteParams,
-) -> AsyncResponse {
+pub async fn execute_fs_append_base64(params: FsWriteParams) -> AsyncResponse {
     match web_fs::append_base64(&params.path, &params.data).await {
         Ok(_) => AsyncResponse {
             ok: true,
@@ -343,9 +309,7 @@ pub async fn execute_fs_append_base64(
     }
 }
 
-pub async fn execute_fs_update(
-    params: FsUpdateParams,
-) -> AsyncResponse {
+pub async fn execute_fs_update(params: FsUpdateParams) -> AsyncResponse {
     let bytes = match data_encoding::BASE64.decode(params.data.as_bytes()) {
         Ok(b) => b,
         Err(_) => {
@@ -373,9 +337,7 @@ pub async fn execute_fs_update(
     }
 }
 
-pub async fn execute_fs_hash(
-    params: FsHashParams,
-) -> AsyncResponse {
+pub async fn execute_fs_hash(params: FsHashParams) -> AsyncResponse {
     match web_fs::hash(&params.path, &params.algo).await {
         Ok(hex) => AsyncResponse {
             ok: true,

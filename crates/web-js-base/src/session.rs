@@ -1,8 +1,8 @@
 use std::cell::Cell;
 
 use crate::types::*;
-use web_js_core::JsSession;
 use tracing::Instrument;
+use web_js_core::JsSession;
 
 // ─── BaseSession ────────────────────────────────────────────────
 

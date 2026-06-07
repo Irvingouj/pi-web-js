@@ -1,9 +1,9 @@
 use crate::browser_api::init_fs_registry;
+use std::sync::atomic::{AtomicU64, Ordering};
+use tracing::Instrument;
 use wasm_bindgen::prelude::*;
 use web_js_base::types::*;
 use web_js_base::BaseSession;
-use tracing::Instrument;
-use std::sync::atomic::{AtomicU64, Ordering};
 
 static SESSION_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -83,8 +83,7 @@ impl ExtensionSession {
     /// Generate API documentation for every registered public API.
     #[wasm_bindgen(js_name = apiDocs)]
     pub fn api_docs(&self, format: String) -> Result<String, JsValue> {
-        web_js_core::api_docs::generate(&format)
-            .map_err(|e| JsValue::from_str(&e))
+        web_js_core::api_docs::generate(&format).map_err(|e| JsValue::from_str(&e))
     }
 
     /// Clean up the session and release resources.
@@ -102,8 +101,14 @@ impl ExtensionSession {
     /// Run a cell, automatically resolving all async calls through the
     /// unified handler registry.
     #[wasm_bindgen(js_name = runCellAsync)]
-    pub async fn run_cell_async(&mut self, code: String, stdin: String, run_id: String) -> CellResult {
-        let span = tracing::info_span!("run_cell_async", session_id = %self.session_id, run_id = %run_id);
+    pub async fn run_cell_async(
+        &mut self,
+        code: String,
+        stdin: String,
+        run_id: String,
+    ) -> CellResult {
+        let span =
+            tracing::info_span!("run_cell_async", session_id = %self.session_id, run_id = %run_id);
         self.aborted.set(false);
         let result = web_js_base::run_cell_async_loop(
             &mut self.base,
@@ -177,7 +182,7 @@ mod tests {
         loop {
             match pinned.as_mut().poll(&mut context) {
                 Poll::Ready(val) => return val,
-                Poll::Pending => {},
+                Poll::Pending => {}
             }
         }
     }
@@ -202,7 +207,16 @@ mod tests {
 
         // After creating session, fs manifest entries should be registered with handlers
         let entries = web_js_core::api_docs::list_manifest_entries();
-        let fs_entries: Vec<_> = entries.iter().filter(|e| e.namespace == "fs" && e.action.as_ref().map(|a| web_js_core::api_docs::has_handler(a)).unwrap_or(false)).collect();
+        let fs_entries: Vec<_> = entries
+            .iter()
+            .filter(|e| {
+                e.namespace == "fs"
+                    && e.action
+                        .as_ref()
+                        .map(|a| web_js_core::api_docs::has_handler(a))
+                        .unwrap_or(false)
+            })
+            .collect();
         assert!(
             !fs_entries.is_empty(),
             "ExtensionSession::new() should register fs manifest entries with handlers"
@@ -222,17 +236,16 @@ mod tests {
         // JS-registered APIs should NOT be hardcoded in the Rust registry.
         // They are supplied by the JS manifest via register_js_call().
         let docs = web_js_core::api_docs::list_docs();
-        let doc_actions: Vec<String> = docs
-            .iter()
-            .filter_map(|d| d.action.clone())
-            .collect();
+        let doc_actions: Vec<String> = docs.iter().filter_map(|d| d.action.clone()).collect();
 
         assert!(
             !doc_actions.iter().any(|a| a == "chrome_tabs_query"),
             "chrome_tabs_query should NOT be in Rust registry at session creation"
         );
         assert!(
-            !doc_actions.iter().any(|a| a == "chrome_action_setBadgeText"),
+            !doc_actions
+                .iter()
+                .any(|a| a == "chrome_action_setBadgeText"),
             "chrome_action_setBadgeText should NOT be in Rust registry at session creation"
         );
         assert!(
@@ -297,7 +310,13 @@ mod tests {
                         error: None,
                     })
                 })
-                    as std::pin::Pin<Box<dyn std::future::Future<Output = Result<web_js_core::AsyncResponse, String>>>>
+                    as std::pin::Pin<
+                        Box<
+                            dyn std::future::Future<
+                                Output = Result<web_js_core::AsyncResponse, String>,
+                            >,
+                        >,
+                    >
             })),
         );
 
@@ -332,7 +351,13 @@ mod tests {
                         error: None,
                     })
                 })
-                    as std::pin::Pin<Box<dyn std::future::Future<Output = Result<web_js_core::AsyncResponse, String>>>>
+                    as std::pin::Pin<
+                        Box<
+                            dyn std::future::Future<
+                                Output = Result<web_js_core::AsyncResponse, String>,
+                            >,
+                        >,
+                    >
             })),
         );
 
@@ -362,12 +387,27 @@ mod tests {
         let entries = web_js_core::api_docs::list_manifest_entries();
         let fs_actions: Vec<String> = entries
             .iter()
-            .filter(|e| e.namespace == "fs" && e.action.as_ref().map(|a| web_js_core::api_docs::has_handler(a)).unwrap_or(false))
+            .filter(|e| {
+                e.namespace == "fs"
+                    && e.action
+                        .as_ref()
+                        .map(|a| web_js_core::api_docs::has_handler(a))
+                        .unwrap_or(false)
+            })
             .filter_map(|e| e.action.clone())
             .collect();
-        assert!(fs_actions.iter().any(|a| a == "fs_exists"), "fs_exists should be registered");
-        assert!(fs_actions.iter().any(|a| a == "fs_read"), "fs_read should be registered");
-        assert!(fs_actions.iter().any(|a| a == "fs_write"), "fs_write should be registered");
+        assert!(
+            fs_actions.iter().any(|a| a == "fs_exists"),
+            "fs_exists should be registered"
+        );
+        assert!(
+            fs_actions.iter().any(|a| a == "fs_read"),
+            "fs_read should be registered"
+        );
+        assert!(
+            fs_actions.iter().any(|a| a == "fs_write"),
+            "fs_write should be registered"
+        );
 
         // Verify dispatch works for an fs command (handler_registry checks manifest first)
         let cmd = web_js_core::AsyncCommand {
@@ -398,7 +438,13 @@ mod tests {
         let entries = web_js_core::api_docs::list_manifest_entries();
         let fs_actions: Vec<String> = entries
             .iter()
-            .filter(|e| e.namespace == "fs" && e.action.as_ref().map(|a| web_js_core::api_docs::has_handler(a)).unwrap_or(false))
+            .filter(|e| {
+                e.namespace == "fs"
+                    && e.action
+                        .as_ref()
+                        .map(|a| web_js_core::api_docs::has_handler(a))
+                        .unwrap_or(false)
+            })
             .filter_map(|e| e.action.clone())
             .collect();
 
@@ -425,7 +471,10 @@ mod tests {
             run_id: None,
         };
         let result = block_on(web_js_core::handler_registry::dispatch_command(&cmd));
-        assert!(result.is_err(), "fetch should return error in extension context");
+        assert!(
+            result.is_err(),
+            "fetch should return error in extension context"
+        );
         assert!(result.unwrap_err().contains("not available"));
 
         web_js_core::handler_registry::clear_handlers();
@@ -441,25 +490,27 @@ mod tests {
         init_fs_registry();
 
         // Register chrome_tabs_query as JS-registered
-        let _ = web_js_core::api_docs::register_manifest_entry(web_js_core::api_docs::ApiManifestEntry {
-            namespace: "chrome.tabs".into(),
-            name: "query".into(),
-            action: Some("chrome_tabs_query".into()),
-            description: "Query tabs.".into(),
-            params: vec![],
-            returns: web_js_core::api_docs::ReturnDoc {
-                js_type: "object[]".into(),
-                description: "Array of tab objects.".into(),
+        let _ = web_js_core::api_docs::register_manifest_entry(
+            web_js_core::api_docs::ApiManifestEntry {
+                namespace: "chrome.tabs".into(),
+                name: "query".into(),
+                action: Some("chrome_tabs_query".into()),
+                description: "Query tabs.".into(),
+                params: vec![],
+                returns: web_js_core::api_docs::ReturnDoc {
+                    js_type: "object[]".into(),
+                    description: "Array of tab objects.".into(),
+                },
+                public_name: "chrome.tabs.query".into(),
+                local_name: None,
+                transport: web_js_core::api_docs::ToolTransport::Async,
+                tool_source: web_js_core::api_docs::ToolSource::Extension,
+                fields: None,
+                aliases: vec![],
+                permission: None,
+                example: None,
             },
-            public_name: "chrome.tabs.query".into(),
-            local_name: None,
-            transport: web_js_core::api_docs::ToolTransport::Async,
-            tool_source: web_js_core::api_docs::ToolSource::Extension,
-            fields: None,
-            aliases: vec![],
-            permission: None,
-            example: None,
-        });
+        );
 
         // Test 1: fs_exists routes to handler_registry and succeeds
         let cmd = WasmAsyncCommand {
@@ -523,25 +574,27 @@ mod tests {
         let _session = ExtensionSession::new();
 
         // Simulate JS manifest registration for a JS-registered API
-        let _ = web_js_core::api_docs::register_manifest_entry(web_js_core::api_docs::ApiManifestEntry {
-            namespace: "chrome.tabs".into(),
-            name: "query".into(),
-            action: Some("chrome_tabs_query".into()),
-            description: "Query tabs.".into(),
-            params: vec![],
-            returns: web_js_core::api_docs::ReturnDoc {
-                js_type: "object[]".into(),
-                description: "Array of tab objects.".into(),
+        let _ = web_js_core::api_docs::register_manifest_entry(
+            web_js_core::api_docs::ApiManifestEntry {
+                namespace: "chrome.tabs".into(),
+                name: "query".into(),
+                action: Some("chrome_tabs_query".into()),
+                description: "Query tabs.".into(),
+                params: vec![],
+                returns: web_js_core::api_docs::ReturnDoc {
+                    js_type: "object[]".into(),
+                    description: "Array of tab objects.".into(),
+                },
+                public_name: "chrome.tabs.query".into(),
+                local_name: None,
+                transport: web_js_core::api_docs::ToolTransport::Async,
+                tool_source: web_js_core::api_docs::ToolSource::Extension,
+                fields: None,
+                aliases: vec![],
+                permission: None,
+                example: None,
             },
-            public_name: "chrome.tabs.query".into(),
-            local_name: None,
-            transport: web_js_core::api_docs::ToolTransport::Async,
-            tool_source: web_js_core::api_docs::ToolSource::Extension,
-            fields: None,
-            aliases: vec![],
-            permission: None,
-            example: None,
-        });
+        );
 
         let entries = web_js_core::api_docs::list_manifest_entries();
         let mut seen_actions = std::collections::HashSet::new();
@@ -595,35 +648,33 @@ mod tests {
         ];
 
         for (action, ns, name) in &js_registered_actions {
-            let _ = web_js_core::api_docs::register_manifest_entry(web_js_core::api_docs::ApiManifestEntry {
-                namespace: (*ns).into(),
-                name: (*name).into(),
-                action: Some((*action).into()),
-                description: "Test API.".into(),
-                params: vec![],
-                returns: web_js_core::api_docs::ReturnDoc {
-                    js_type: "null".into(),
-                    description: "None".into(),
+            let _ = web_js_core::api_docs::register_manifest_entry(
+                web_js_core::api_docs::ApiManifestEntry {
+                    namespace: (*ns).into(),
+                    name: (*name).into(),
+                    action: Some((*action).into()),
+                    description: "Test API.".into(),
+                    params: vec![],
+                    returns: web_js_core::api_docs::ReturnDoc {
+                        js_type: "null".into(),
+                        description: "None".into(),
+                    },
+                    public_name: format!("{}.{}", ns, name),
+                    local_name: None,
+                    transport: web_js_core::api_docs::ToolTransport::Async,
+                    tool_source: web_js_core::api_docs::ToolSource::Extension,
+                    fields: None,
+                    aliases: vec![],
+                    permission: None,
+                    example: None,
                 },
-                public_name: format!("{}.{}", ns, name),
-                local_name: None,
-                transport: web_js_core::api_docs::ToolTransport::Async,
-                tool_source: web_js_core::api_docs::ToolSource::Extension,
-            fields: None,
-            aliases: vec![],
-            permission: None,
-            example: None,
-        });
+            );
         }
 
         // Verify each action is in the manifest
         for (action, _ns, _name) in &js_registered_actions {
             let entry = web_js_core::api_docs::get_manifest_entry(action);
-            assert!(
-                entry.is_some(),
-                "action '{}' must be in manifest",
-                action
-            );
+            assert!(entry.is_some(), "action '{}' must be in manifest", action);
         }
 
         web_js_core::handler_registry::clear_handlers();
@@ -700,7 +751,10 @@ mod tests {
             run_id: None,
         };
         let result = block_on(web_js_core::handler_registry::dispatch_command(&cmd));
-        assert!(result.is_err(), "unknown action should return error from handler_registry");
+        assert!(
+            result.is_err(),
+            "unknown action should return error from handler_registry"
+        );
         let err = result.unwrap_err();
         assert!(
             err.contains("not available"),
@@ -716,7 +770,10 @@ mod tests {
             run_id: None,
         };
         let result = block_on(ExtensionSession::handle_command(&cmd));
-        assert!(result.is_err(), "unknown action should return error from handle_command");
+        assert!(
+            result.is_err(),
+            "unknown action should return error from handle_command"
+        );
         let err = result.unwrap_err();
         assert!(
             err.contains("Unknown action"),
@@ -751,8 +808,7 @@ mod tests {
 
         let _session = ExtensionSession::new();
 
-        let markdown = web_js_core::api_docs::generate("markdown")
-            .expect("markdown docs");
+        let markdown = web_js_core::api_docs::generate("markdown").expect("markdown docs");
         assert!(markdown.contains("## `fs` module"));
         assert!(markdown.contains("fs.exists"));
         assert!(markdown.contains("_(action: `fs_exists`)_"));
@@ -805,7 +861,11 @@ mod tests {
                     })
                 })
                     as std::pin::Pin<
-                        Box<dyn std::future::Future<Output = Result<web_js_core::AsyncResponse, String>>>,
+                        Box<
+                            dyn std::future::Future<
+                                Output = Result<web_js_core::AsyncResponse, String>,
+                            >,
+                        >,
                     >
             })),
         );
@@ -861,7 +921,11 @@ mod tests {
                     })
                 })
                     as std::pin::Pin<
-                        Box<dyn std::future::Future<Output = Result<web_js_core::AsyncResponse, String>>>,
+                        Box<
+                            dyn std::future::Future<
+                                Output = Result<web_js_core::AsyncResponse, String>,
+                            >,
+                        >,
                     >
             })),
         );
@@ -901,7 +965,10 @@ mod tests {
 
         // Verify bindings exist after reset
         let js_after = web_js_core::api_docs::generate_js_bindings_code();
-        assert!(!js_after.is_empty(), "Bindings should be re-injected after reset");
+        assert!(
+            !js_after.is_empty(),
+            "Bindings should be re-injected after reset"
+        );
         assert!(
             js_after.contains("fs"),
             "Bindings should include fs namespace after reset"

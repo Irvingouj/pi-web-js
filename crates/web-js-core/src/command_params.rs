@@ -440,8 +440,8 @@ pub struct FsReadRangeParams {
 
 #[cfg(test)]
 mod tests {
-    use ts_rs::TS;
     use std::fs;
+    use ts_rs::TS;
 
     #[test]
     fn test_fetch_params_ts_name() {
@@ -455,44 +455,72 @@ mod tests {
 
     #[test]
     fn test_dom_format_params_ts_name() {
-        assert_eq!(super::DomFormatParams::name(&Default::default()), "DomFormatParams");
+        assert_eq!(
+            super::DomFormatParams::name(&Default::default()),
+            "DomFormatParams"
+        );
     }
 
     #[test]
     fn test_all_param_structs_in_web_union() {
         let _cfg = ts_rs::Config::default();
-        let content = fs::read_to_string(
-            concat!(env!("CARGO_MANIFEST_DIR"), "/../../web/src/types/generated.ts")
-        ).expect("web generated.ts should exist");
+        let content = fs::read_to_string(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../web/src/types/generated.ts"
+        ))
+        .expect("web generated.ts should exist");
 
-        let union_start = content.find("export type CommandParams =")
+        let union_start = content
+            .find("export type CommandParams =")
             .expect("CommandParams union should exist in web/generated.ts");
-        let union_end = content[union_start..].find(";")
+        let union_end = content[union_start..]
+            .find(";")
             .expect("CommandParams union should end with ;");
         let union_body = &content[union_start..union_start + union_end];
 
         let expected = [
-            super::FetchParams::name(&Default::default()), super::SleepParams::name(&Default::default()),
-            super::PageClickParams::name(&Default::default()), super::PageDblClickParams::name(&Default::default()),
-            super::PageFillParams::name(&Default::default()), super::PageTypeParams::name(&Default::default()),
-            super::PagePressParams::name(&Default::default()), super::PageSelectParams::name(&Default::default()),
-            super::PageCheckParams::name(&Default::default()), super::PageHoverParams::name(&Default::default()),
-            super::PageScrollParams::name(&Default::default()), super::PageScrollToParams::name(&Default::default()),
-            super::PageGotoParams::name(&Default::default()), super::PageFindParams::name(&Default::default()),
-            super::PageWaitForParams::name(&Default::default()), super::PageExtractParams::name(&Default::default()),
-            super::PageAppendParams::name(&Default::default()), super::PageWaitParams::name(&Default::default()),
-            super::StorageGetParams::name(&Default::default()), super::StorageSetParams::name(&Default::default()),
-            super::StorageDeleteParams::name(&Default::default()), super::DomSnapshotParams::name(&Default::default()),
-            super::DomFormatParams::name(&Default::default()), super::TabClickParams::name(&Default::default()),
-            super::TabFillParams::name(&Default::default()), super::TabEvaluateParams::name(&Default::default()),
-            super::TabBackParams::name(&Default::default()), super::TabWaitForLoadParams::name(&Default::default()),
-            super::TabScrollToParams::name(&Default::default()), super::TabTypeParams::name(&Default::default()),
-            super::TabPressParams::name(&Default::default()), super::TabSelectParams::name(&Default::default()),
-            super::TabCheckParams::name(&Default::default()), super::TabHoverParams::name(&Default::default()),
-            super::TabUnhoverParams::name(&Default::default()), super::TabScrollParams::name(&Default::default()),
-            super::TabDblClickParams::name(&Default::default()), super::FsWriteParams::name(&Default::default()),
-            super::FsPathParams::name(&Default::default()), super::FsCopyParams::name(&Default::default()),
-            super::FsUpdateParams::name(&Default::default()), super::FsHashParams::name(&Default::default()),
+            super::FetchParams::name(&Default::default()),
+            super::SleepParams::name(&Default::default()),
+            super::PageClickParams::name(&Default::default()),
+            super::PageDblClickParams::name(&Default::default()),
+            super::PageFillParams::name(&Default::default()),
+            super::PageTypeParams::name(&Default::default()),
+            super::PagePressParams::name(&Default::default()),
+            super::PageSelectParams::name(&Default::default()),
+            super::PageCheckParams::name(&Default::default()),
+            super::PageHoverParams::name(&Default::default()),
+            super::PageScrollParams::name(&Default::default()),
+            super::PageScrollToParams::name(&Default::default()),
+            super::PageGotoParams::name(&Default::default()),
+            super::PageFindParams::name(&Default::default()),
+            super::PageWaitForParams::name(&Default::default()),
+            super::PageExtractParams::name(&Default::default()),
+            super::PageAppendParams::name(&Default::default()),
+            super::PageWaitParams::name(&Default::default()),
+            super::StorageGetParams::name(&Default::default()),
+            super::StorageSetParams::name(&Default::default()),
+            super::StorageDeleteParams::name(&Default::default()),
+            super::DomSnapshotParams::name(&Default::default()),
+            super::DomFormatParams::name(&Default::default()),
+            super::TabClickParams::name(&Default::default()),
+            super::TabFillParams::name(&Default::default()),
+            super::TabEvaluateParams::name(&Default::default()),
+            super::TabBackParams::name(&Default::default()),
+            super::TabWaitForLoadParams::name(&Default::default()),
+            super::TabScrollToParams::name(&Default::default()),
+            super::TabTypeParams::name(&Default::default()),
+            super::TabPressParams::name(&Default::default()),
+            super::TabSelectParams::name(&Default::default()),
+            super::TabCheckParams::name(&Default::default()),
+            super::TabHoverParams::name(&Default::default()),
+            super::TabUnhoverParams::name(&Default::default()),
+            super::TabScrollParams::name(&Default::default()),
+            super::TabDblClickParams::name(&Default::default()),
+            super::FsWriteParams::name(&Default::default()),
+            super::FsPathParams::name(&Default::default()),
+            super::FsCopyParams::name(&Default::default()),
+            super::FsUpdateParams::name(&Default::default()),
+            super::FsHashParams::name(&Default::default()),
             super::FsReadRangeParams::name(&Default::default()),
         ];
 
@@ -507,9 +535,11 @@ mod tests {
 
     #[test]
     fn test_web_async_command_params_typed() {
-        let content = fs::read_to_string(
-            concat!(env!("CARGO_MANIFEST_DIR"), "/../../web/src/types/generated.ts")
-        ).expect("web generated.ts should exist");
+        let content = fs::read_to_string(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../web/src/types/generated.ts"
+        ))
+        .expect("web generated.ts should exist");
         assert!(
             content.contains("params: CommandParams"),
             "AsyncCommand.params should be typed as CommandParams in web/generated.ts"
@@ -518,9 +548,11 @@ mod tests {
 
     #[test]
     fn test_web_run_result_commands_typed() {
-        let content = fs::read_to_string(
-            concat!(env!("CARGO_MANIFEST_DIR"), "/../../web/src/types/generated.ts")
-        ).expect("web generated.ts should exist");
+        let content = fs::read_to_string(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../web/src/types/generated.ts"
+        ))
+        .expect("web generated.ts should exist");
         assert!(
             content.contains("commands: CommandParams[]"),
             "RunResult.commands should be typed as CommandParams[] in web/generated.ts"
@@ -529,9 +561,11 @@ mod tests {
 
     #[test]
     fn test_extension_async_command_params_typed() {
-        let content = fs::read_to_string(
-            concat!(env!("CARGO_MANIFEST_DIR"), "/../../crates/extension-js/js/src/shared/generated.ts")
-        ).expect("extension generated.ts should exist");
+        let content = fs::read_to_string(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../crates/extension-js/js/src/shared/generated.ts"
+        ))
+        .expect("extension generated.ts should exist");
         assert!(
             content.contains("params: CommandParams"),
             "Extension AsyncCommand.params should be typed as CommandParams"
@@ -540,9 +574,11 @@ mod tests {
 
     #[test]
     fn test_extension_run_result_commands_typed() {
-        let content = fs::read_to_string(
-            concat!(env!("CARGO_MANIFEST_DIR"), "/../../crates/extension-js/js/src/shared/generated.ts")
-        ).expect("extension generated.ts should exist");
+        let content = fs::read_to_string(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../crates/extension-js/js/src/shared/generated.ts"
+        ))
+        .expect("extension generated.ts should exist");
         assert!(
             content.contains("commands: CommandParams[]"),
             "Extension RunResult.commands should be typed as CommandParams[]"
@@ -551,13 +587,14 @@ mod tests {
 
     #[test]
     fn test_extension_generated_ts_has_command_params_union() {
-        let content = fs::read_to_string(
-            concat!(env!("CARGO_MANIFEST_DIR"), "/../../crates/extension-js/js/src/shared/generated.ts")
-        ).expect("extension generated.ts should exist");
+        let content = fs::read_to_string(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../crates/extension-js/js/src/shared/generated.ts"
+        ))
+        .expect("extension generated.ts should exist");
         assert!(
             content.contains("export type CommandParams ="),
             "Extension generated.ts should define CommandParams union"
         );
     }
 }
-

@@ -590,10 +590,7 @@ fn extract_js_error_message(e: &JsValue) -> String {
 
 /// Dispatch a command by looking up its handler in the handler registry.
 /// Returns `Some(future)` if a handler was found, `None` otherwise.
-pub fn dispatch_handler(
-    action: &str,
-    cmd: AsyncCommand,
-) -> Option<AsyncHandlerFuture> {
+pub fn dispatch_handler(action: &str, cmd: AsyncCommand) -> Option<AsyncHandlerFuture> {
     let handler = REGISTRY.with(|reg| {
         reg.borrow()
             .get(action)

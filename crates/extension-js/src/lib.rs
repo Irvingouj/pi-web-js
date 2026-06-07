@@ -6,10 +6,10 @@ pub mod session;
 pub use log::set_log_level;
 pub use session::ExtensionSession;
 
-use wasm_bindgen::prelude::*;
-use wasm_bindgen::JsCast;
 use tracing_subscriber::{layer::SubscriberExt, Registry};
 use tracing_wasm::WASMLayer;
+use wasm_bindgen::prelude::*;
+use wasm_bindgen::JsCast;
 
 #[wasm_bindgen(start)]
 pub fn main() {
@@ -59,7 +59,9 @@ pub fn import_manifest_entries(entries: js_sys::Array) -> Result<(), JsValue> {
 
 fn require_js_field<'a>(value: &'a JsValue, field: &str) -> Result<&'a JsValue, JsValue> {
     if value.is_null() || value.is_undefined() {
-        return Err(JsValue::from_str(&format!("Batch item missing '{field}' field")));
+        return Err(JsValue::from_str(&format!(
+            "Batch item missing '{field}' field"
+        )));
     }
     Ok(value)
 }
@@ -82,8 +84,9 @@ pub fn register_js_call_batch(items: js_sys::Array) -> Result<(), JsValue> {
             .map_err(|_| JsValue::from_str("Batch item missing 'callback' field"))?;
         require_js_field(&entry_val, "entry")?;
         let callback = require_js_function(callback_val, "callback")?;
-        let entry: web_js_core::api_docs::JsManifestEntry = serde_wasm_bindgen::from_value(entry_val)
-            .map_err(|e| JsValue::from_str(&format!("Invalid manifest entry: {}", e)))?;
+        let entry: web_js_core::api_docs::JsManifestEntry =
+            serde_wasm_bindgen::from_value(entry_val)
+                .map_err(|e| JsValue::from_str(&format!("Invalid manifest entry: {}", e)))?;
         let spec = web_js_core::api_docs::ApiManifestEntry::try_from(entry)
             .map_err(|e| JsValue::from_str(&format!("Failed to convert manifest entry: {}", e)))?;
         batch.push((
@@ -97,7 +100,5 @@ pub fn register_js_call_batch(items: js_sys::Array) -> Result<(), JsValue> {
 
 #[wasm_bindgen(js_name = freezeManifest)]
 pub fn freeze_manifest() -> Result<(), JsValue> {
-    web_js_core::api_docs::freeze_manifest()
-        .map_err(|e| JsValue::from_str(&e.to_string()))
+    web_js_core::api_docs::freeze_manifest().map_err(|e| JsValue::from_str(&e.to_string()))
 }
-
