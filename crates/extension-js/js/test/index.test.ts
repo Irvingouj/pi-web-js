@@ -146,6 +146,43 @@ describe("ExtensionSession fs namespace e2e", () => {
 		}
 	}
 
+	it("serializes concurrent cell runs before posting to the worker", async () => {
+		const [session, , worker] = await initSession();
+
+		const first = session.runCellAsync('await web.sleep(200); print("first");');
+		const second = session.runCellAsync('print("second");');
+		await Promise.resolve();
+
+		let runMessages = postMessages.filter(
+			(m): m is PostMessage =>
+				typeof m === "object" &&
+				m !== null &&
+				(m as PostMessage).type === "runCell",
+		);
+		expect(runMessages).toHaveLength(1);
+
+		sendWorkerResult(worker, runMessages[0].id ?? "", {
+			status: "ok",
+			stdout: ["first"],
+		});
+		await first;
+		await Promise.resolve();
+
+		runMessages = postMessages.filter(
+			(m): m is PostMessage =>
+				typeof m === "object" &&
+				m !== null &&
+				(m as PostMessage).type === "runCell",
+		);
+		expect(runMessages).toHaveLength(2);
+
+		sendWorkerResult(worker, runMessages[1].id ?? "", {
+			status: "ok",
+			stdout: ["second"],
+		});
+		await second;
+	});
+
 	const fsTestCases = [
 		{ action: "exists", params: { path: "/test" }, result: { exists: true } },
 		{ action: "read", params: { path: "/test" }, result: { data: "base64" } },

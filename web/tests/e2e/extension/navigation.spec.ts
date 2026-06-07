@@ -6,6 +6,59 @@ import type { ContractResult } from "./lib/types.ts";
 test.describe.serial("navigation stability", () => {
 	test.setTimeout(20_000);
 
+	test("concurrent public run requests are serialized", async ({ harness }) => {
+		const results = await harness.sidepanel.evaluate(async () => {
+			const session = (
+				window as Window & {
+					__extensionSession?: {
+						runCellAsync(code: string, stdin?: string): Promise<unknown>;
+					};
+				}
+			).__extensionSession;
+			if (!session) throw new Error("Extension session not exposed");
+
+			return Promise.all([
+				session.runCellAsync(
+					'await web.sleep(200); print("first");',
+				),
+				session.runCellAsync('print("second");'),
+			]);
+		});
+
+		expect(results).toHaveLength(2);
+		expect(results[0]).toMatchObject({ status: "ok", stdout: ["first"] });
+		expect(results[1]).toMatchObject({ status: "ok", stdout: ["second"] });
+	});
+
+	test("goto positional URL -> extract positional fields", async ({ harness }) => {
+		const source = `
+var RESULT_PREFIX = "${RESULT_PREFIX}";
+
+const tabs = await chrome.tabs.query({ url: "https://extension-js.test/fixture" });
+if (tabs.length === 0) {
+  throw new Error("Fixture tab not found");
+}
+await chrome.tabs.update(tabs[0].id, { active: true });
+
+await page.goto("https://extension-js.test/next");
+let result = await page.extract(["title", "url"]);
+print(RESULT_PREFIX + JSON.stringify({ ok: true, value: result }));
+`;
+
+		const exec = await executeCell<
+			ContractResult<{ title: string; url: string }>
+		>(harness.sidepanel, source, 20_000);
+
+		expect(exec.status, `${exec.stderr}\n${exec.stdout}`).toBe("success");
+		expect(exec.result).toEqual({
+			ok: true,
+			value: {
+				title: "Next page",
+				url: "https://extension-js.test/next",
+			},
+		});
+	});
+
 	test("goto -> url -> title -> snapshot without manual sleep", async ({ harness }) => {
 		const source = `
 var RESULT_PREFIX = "${RESULT_PREFIX}";
