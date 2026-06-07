@@ -60,9 +60,98 @@ pub(crate) fn clean_error_message(msg: &str) -> String {
         || trimmed == "RangeError"
     {
         format!("{}: <no details available>", trimmed)
+    } else if trimmed == "TypeError: )"
+        || trimmed == "TypeError: <no message>"
+        || trimmed.ends_with(": )")
+    {
+        format!(
+            "{} (likely null/undefined property access or corrupted async resume — enable debug logs with setLogLevel('debug'))",
+            trimmed
+        )
     } else {
         trimmed.to_string()
     }
+}
+
+/// Attach recent cell output to a runtime error for easier diagnosis.
+pub(crate) fn format_runtime_error_with_context(
+    msg: &str,
+    stdout: &[String],
+    stderr: &[String],
+) -> String {
+    let mut parts = vec![clean_error_message(msg)];
+    if !stdout.is_empty() {
+        parts.push(format!(
+            "\nCell output before error:\n{}",
+            stdout.join("\n")
+        ));
+    }
+    if !stderr.is_empty() {
+        parts.push(format!("\nStderr:\n{}", stderr.join("\n")));
+    }
+    parts.join("")
+}
+
+/// Resolve or reject a pending async call without embedding payloads in eval().
+pub(crate) fn resume_async_pending<'js>(
+    ctx: &Ctx<'js>,
+    call_id: u32,
+    response: &crate::types::AsyncResponse,
+) -> rquickjs::Result<()> {
+    use rquickjs::{Error, Function, Object, String as JsString, Value};
+
+    let pending: Object = ctx.globals().get("__webJsPending")?;
+    let key = call_id.to_string();
+    let entry: Object = pending.get(key.as_str()).map_err(|_| {
+        Error::new_from_js_message(
+            "resume",
+            "pending",
+            format!("no pending async entry for call_id {}", call_id),
+        )
+    })?;
+
+    let action = entry
+        .get::<_, JsString>("action")
+        .ok()
+        .and_then(|s| s.to_string().ok())
+        .unwrap_or_else(|| "unknown".to_string());
+
+    let resolve: Function = entry.get("resolve")?;
+    let reject: Function = entry.get("reject")?;
+
+    let resume_result = if response.ok {
+        let value_json = serde_json::to_string(
+            response.value.as_ref().unwrap_or(&serde_json::Value::Null),
+        )
+        .map_err(|e| {
+            rquickjs::Error::new_from_js_message("json", "stringify", e.to_string())
+        })?;
+        let js_value = ctx.json_parse(value_json)?;
+        tracing::debug!(call_id, action = %action, "async_pending_resolved");
+        resolve.call::<_, ()>((js_value,))
+    } else {
+        let (code, message) = response
+            .error
+            .as_ref()
+            .map(|e| (e.code.as_str(), e.message.as_str()))
+            .unwrap_or(("E_UNKNOWN", "unknown async error"));
+        let text = format!("[{}] ({}) {}", action, code, message);
+        tracing::error!(call_id, action = %action, code = %code, message = %message, "async_pending_rejected");
+        let msg_json = serde_json::to_string(&text).map_err(|e| {
+            rquickjs::Error::new_from_js_message("json", "stringify", e.to_string())
+        })?;
+        let error_obj = ctx.eval::<Value, _>(format!("new Error({})", msg_json))?;
+        reject.call::<_, ()>((error_obj,))
+    };
+
+    resume_result?;
+
+    ctx.eval::<(), _>(format!(
+        "Reflect.deleteProperty(__webJsPending, '{}');",
+        call_id
+    ))?;
+
+    Ok(())
 }
 
 /// Convert a rquickjs `Value` to a `serde_json::Value` by round-tripping through JSON.stringify.
@@ -139,8 +228,46 @@ pub(crate) fn exception_to_string<'js>(value: &Value<'js>) -> String {
         .map(|s| s.replace('\0', "").trim().to_string())
         .filter(|s| !s.is_empty());
 
+    let stack = obj
+        .get::<_, rquickjs::String>("stack")
+        .ok()
+        .and_then(|s| s.to_string().ok())
+        .map(|s| s.replace('\0', "").trim().to_string())
+        .filter(|s| !s.is_empty());
+
+    let action = obj
+        .get::<_, rquickjs::String>("action")
+        .ok()
+        .and_then(|s| s.to_string().ok())
+        .map(|s| s.replace('\0', "").trim().to_string())
+        .filter(|s| !s.is_empty());
+
+    let code = obj
+        .get::<_, rquickjs::String>("code")
+        .ok()
+        .and_then(|s| s.to_string().ok())
+        .map(|s| s.replace('\0', "").trim().to_string())
+        .filter(|s| !s.is_empty());
+
+    let prefix = match (action.as_deref(), code.as_deref()) {
+        (Some(a), Some(c)) => format!("[{}] ({}) ", a, c),
+        (Some(a), None) => format!("[{}] ", a),
+        (None, Some(c)) => format!("({}) ", c),
+        (None, None) => String::new(),
+    };
+
     match (name, message) {
-        (Some(n), Some(m)) => format!("{}: {}", n, m),
+        (Some(n), Some(m)) => {
+            let mut out = format!("{}{}: {}", prefix, n, m);
+            if let Some(stack) = stack {
+                if let Some(first_line) = stack.lines().next() {
+                    if !first_line.is_empty() && !m.contains(first_line) {
+                        out.push_str(&format!(" ({})", first_line.trim()));
+                    }
+                }
+            }
+            out
+        }
         (Some(n), None) => {
             // Try toString() as a last resort before falling back to bare name
             if let Ok(to_string) = obj.get::<_, rquickjs::Function>("toString") {
@@ -148,15 +275,20 @@ pub(crate) fn exception_to_string<'js>(value: &Value<'js>) -> String {
                     if let Ok(s) = val.to_string() {
                         let s = s.replace('\0', "").trim().to_string();
                         if !s.is_empty() && s != "[object Object]" && s != n {
-                            return s;
+                            return format!("{}{}", prefix, s);
                         }
                     }
                 }
             }
-            format!("{}: <no message>", n)
+            if let Some(stack) = stack {
+                if let Some(first_line) = stack.lines().next() {
+                    return format!("{}{}: {}", prefix, n, first_line.trim());
+                }
+            }
+            format!("{}{}: <no message>", prefix, n)
         }
-        (None, Some(m)) => m,
-        (None, None) => format_js_value(value),
+        (None, Some(m)) => format!("{}{}", prefix, m),
+        (None, None) => format!("{}{}", prefix, format_js_value(value)),
     }
 }
 

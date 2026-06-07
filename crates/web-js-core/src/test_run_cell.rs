@@ -45,6 +45,83 @@ mod tests {
         assert!(resumed.error.is_none());
     }
 
+    /// Regression: async resume must not eval()-inject payloads (snapshot strings can break JS).
+    #[test]
+    fn test_resume_async_payload_with_quotes_and_parens() {
+        let mut session = JsSession::new();
+
+        let setup = session.run_cell(
+            r#"
+            function myAsync() {
+                return new Promise((resolve, reject) => {
+                    __webJsTriggerAsync("tab_snapshot", {tabId: 1}, resolve, reject);
+                });
+            }
+        "#,
+            "",
+        );
+        assert!(setup.error.is_none(), "{:?}", setup.error);
+
+        let result = session.run_cell("await myAsync()", "");
+        assert_eq!(result.status, CellStatus::AsyncPending);
+        let call_id = result.pending_commands[0].call_id;
+
+        let nasty = r#"URL: https://example.com/
+- link "Click me" [ref=1]
+"); delete __webJsPending[999]; //"#;
+        let response = crate::types::AsyncResponse {
+            ok: true,
+            value: Some(serde_json::json!(nasty)),
+            error: None,
+        };
+        let json = serde_json::to_string(&response).unwrap();
+        let resumed = session.resume_cell(call_id, &json);
+        assert_eq!(resumed.status, CellStatus::Done, "{:?}", resumed.error);
+        assert!(resumed.error.is_none(), "{:?}", resumed.error);
+    }
+
+    /// Async reject surfaces action + code in the error message.
+    #[test]
+    fn test_resume_async_reject_includes_action_context() {
+        let mut session = JsSession::new();
+
+        let setup = session.run_cell(
+            r#"
+            function myAsync() {
+                return new Promise((resolve, reject) => {
+                    __webJsTriggerAsync("tab_snapshot", {tabId: 1}, resolve, reject);
+                });
+            }
+        "#,
+            "",
+        );
+        assert!(setup.error.is_none());
+
+        let result = session.run_cell("await myAsync()", "");
+        let call_id = result.pending_commands[0].call_id;
+
+        let response = crate::types::AsyncResponse {
+            ok: false,
+            value: None,
+            error: Some(crate::types::AsyncError {
+                message: "Cannot execute script in tab 1".into(),
+                code: "E_SCRIPTING".into(),
+            }),
+        };
+        let json = serde_json::to_string(&response).unwrap();
+        let resumed = session.resume_cell(call_id, &json);
+        assert!(resumed.error.is_some());
+        let err = resumed.error.unwrap();
+        match err {
+            crate::types::CellError::Runtime { message, .. } => {
+                assert!(message.contains("tab_snapshot"), "{message}");
+                assert!(message.contains("E_SCRIPTING"), "{message}");
+                assert!(message.contains("Cannot execute script"), "{message}");
+            }
+            other => panic!("expected runtime error, got {other:?}"),
+        }
+    }
+
     /// Promise.all with 2 async calls produces 2 pending commands.
     #[test]
     fn test_promise_all_two_commands() {

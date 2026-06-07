@@ -118,7 +118,7 @@ pub(crate) fn register_host_globals<'js>(
 
                 let command = crate::types::AsyncCommand {
                     call_id,
-                    action: action_str,
+                    action: action_str.clone(),
                     params,
                     run_id: None,
                 };
@@ -129,6 +129,7 @@ pub(crate) fn register_host_globals<'js>(
                 let entry = Object::new(ctx.clone())?;
                 entry.set("resolve", resolve)?;
                 entry.set("reject", reject)?;
+                entry.set("action", action_str)?;
                 pending.set(call_id.to_string(), entry)?;
 
                 Ok(())

@@ -8,6 +8,34 @@ import { INJECTION_DELAY_MS, RETRY_DELAY_MS } from "../lib/constants.js";
 
 // ─── Tab script execution ──────────────────────────────────────
 
+/** Fail fast with a readable message when a tab URL cannot be scripted/snapshotted. */
+export async function preflightScriptableTab(
+	tabId: number,
+): Promise<AsyncResponse | null> {
+	throwIfAborted();
+	const chrome = window.chrome;
+	if (!chrome?.tabs?.get) return null;
+	try {
+		const tab = await chrome.tabs.get(tabId);
+		const url = tab.url ?? "";
+		const title = tab.title ?? "";
+		const label = `tab ${tabId} "${title}" (${url || "unknown url"})`;
+		if (!url.startsWith("http:") && !url.startsWith("https:")) {
+			return {
+				ok: false,
+				error: {
+					message: `Cannot snapshot ${label}. Snapshots require an http(s) page tab — use tabs.find(t => t.url?.startsWith("http")) instead of tabs[0].`,
+					code: "E_PERMISSION_DENIED",
+					category: "permission",
+				},
+			};
+		}
+		return null;
+	} catch (err: unknown) {
+		return normalizeChromeError(err);
+	}
+}
+
 export async function executeInTab(
 	tabId: number | null,
 	func: (...args: unknown[]) => unknown,
@@ -59,21 +87,38 @@ export async function executeInTab(
 			world: "MAIN",
 		});
 		if (chrome.runtime.lastError) {
+			const message =
+				chrome.runtime.lastError.message || "Chrome scripting failed";
 			log.error("executeInTab_lastError", {
 				tabId: targetTab,
-				error: chrome.runtime.lastError.message,
+				error: message,
 			});
+			return {
+				ok: false,
+				error: {
+					message: `Cannot execute script in tab ${targetTab}: ${message}`,
+					code: "E_SCRIPTING",
+					category: "extension",
+				},
+			};
 		}
-		if (results?.[0]) {
-			log.debug("executeInTab_result", { tabId: targetTab, result: "ok" });
-			return { ok: true, value: results[0].result };
+		if (!results?.[0]) {
+			log.debug("executeInTab_result", {
+				tabId: targetTab,
+				result: "error",
+				reason: "no_result",
+			});
+			return {
+				ok: false,
+				error: {
+					message: `No result from script execution in tab ${targetTab}`,
+					code: "E_SCRIPTING",
+					category: "extension",
+				},
+			};
 		}
-		log.debug("executeInTab_result", {
-			tabId: targetTab,
-			result: "ok",
-			value: null,
-		});
-		return { ok: true, value: null };
+		log.debug("executeInTab_result", { tabId: targetTab, result: "ok" });
+		return { ok: true, value: results[0].result };
 	} catch (err: unknown) {
 		log.debug("executeInTab_result", {
 			tabId: targetTab,

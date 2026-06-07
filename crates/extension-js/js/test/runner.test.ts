@@ -292,6 +292,11 @@ describe("normalizeParams", () => {
 		expect(result).toEqual({ tabId: 42, timeout: 30000n });
 	});
 
+	it("tab_snapshot array normalizer produces correct shape", () => {
+		const result = normalizeParams("tab_snapshot", [42]);
+		expect(result).toEqual({ tabId: 42, options: {} });
+	});
+
 	it("tab_back scalar normalizer converts number to object", () => {
 		const result = normalizeParams("tab_back", 42);
 		expect(result).toEqual({ tabId: 42 });
@@ -686,6 +691,11 @@ describe("chrome passthrough", () => {
 	it("chrome_bookmarks_search forwards string query unchanged", async () => {
 		await dispatchTool("chrome_bookmarks_search", ["term"]);
 		expect(mockChrome.bookmarks.search).toHaveBeenCalledWith("term");
+	});
+
+	it("chrome_bookmarks_search defaults empty args to {}", async () => {
+		await dispatchTool("chrome_bookmarks_search", []);
+		expect(mockChrome.bookmarks.search).toHaveBeenCalledWith({});
 	});
 
 	it("bookmarks_search alias forwards the same argument array", async () => {

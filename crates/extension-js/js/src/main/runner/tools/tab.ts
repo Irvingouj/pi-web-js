@@ -19,6 +19,7 @@ import {
 	getActiveTabId,
 	resolveActiveTabId,
 	executeInTab,
+	preflightScriptableTab,
 	waitForTabLoad,
 	handleFetch,
 	handleHostCallAction,
@@ -40,14 +41,25 @@ import {
 
 registerJsCall({
 	action: "tab_query",
-	namespace: "tab",
+	namespace: "web.tab",
 	name: "query",
 	description: "Query tabs",
 	params: schemas.TabQueryParamsSchema,
 	returns: schemas.ChromeTabArraySchema,
 	owner: "main-thread",
 	handler: async (params, _ctx) => {
-		return unwrapResult(await dispatchTool("chrome_tabs_query", [params]));
+		const result = unwrapResult(
+			await dispatchTool("chrome_tabs_query", [params]),
+		);
+		if (result == null) return [];
+		if (!Array.isArray(result)) {
+			throw makeError(
+				`tab.query returned unexpected type: ${typeof result}`,
+				"E_TAB_QUERY",
+				"extension",
+			);
+		}
+		return result;
 	},
 	paramTypes: [
 		{
@@ -64,7 +76,7 @@ registerJsCall({
 
 registerJsCall({
 	action: "tab_current",
-	namespace: "tab",
+	namespace: "web.tab",
 	name: "current",
 	description: "Get the active tab in the current window",
 	params: z.object({}),
@@ -88,7 +100,7 @@ registerJsCall({
 
 registerJsCall({
 	action: "tab_get",
-	namespace: "tab",
+	namespace: "web.tab",
 	name: "get",
 	description: "Get a tab by id",
 	params: schemas.ChromeTabsGetParamsSchema,
@@ -114,7 +126,7 @@ registerJsCall({
 
 registerJsCall({
 	action: "tab_find",
-	namespace: "tab",
+	namespace: "web.tab",
 	name: "find",
 	description: "Find tabs matching a query",
 	params: schemas.TabQueryParamsSchema,
@@ -138,7 +150,7 @@ registerJsCall({
 
 registerJsCall({
 	action: "tab_list",
-	namespace: "tab",
+	namespace: "web.tab",
 	name: "list",
 	description: "List all tabs",
 	params: z.object({}),
@@ -155,7 +167,7 @@ registerJsCall({
 
 registerJsCall({
 	action: "tab_create",
-	namespace: "tab",
+	namespace: "web.tab",
 	name: "create",
 	description: "Create a tab",
 	params: schemas.TabCreateParamsSchema,
@@ -185,7 +197,7 @@ registerJsCall({
 
 registerJsCall({
 	action: "tab_activate",
-	namespace: "tab",
+	namespace: "web.tab",
 	name: "activate",
 	description: "Activate a tab",
 	params: schemas.TabActivateParamsSchema,
@@ -214,7 +226,7 @@ registerJsCall({
 
 registerJsCall({
 	action: "tab_close",
-	namespace: "tab",
+	namespace: "web.tab",
 	name: "close",
 	description: "Close a tab",
 	params: schemas.TabCloseParamsSchema,
@@ -241,7 +253,7 @@ registerJsCall({
 
 registerJsCall({
 	action: "tab_execute_script",
-	namespace: "tab",
+	namespace: "web.tab",
 	name: "execute_script",
 	description: "Execute script in a tab",
 	params: schemas.TabExecuteScriptParamsSchema,
@@ -267,7 +279,7 @@ registerJsCall({
 
 registerContentScriptJsCall({
 	action: "tab_click",
-	namespace: "tab",
+	namespace: "web.tab",
 	name: "click",
 	description: "Click in a tab",
 	params: schemas.TabClickParamsSchema,
@@ -293,7 +305,7 @@ registerContentScriptJsCall({
 
 registerContentScriptJsCall({
 	action: "tab_fill",
-	namespace: "tab",
+	namespace: "web.tab",
 	name: "fill",
 	description: "Fill in a tab",
 	params: schemas.TabFillParamsSchema,
@@ -325,7 +337,7 @@ registerContentScriptJsCall({
 
 registerContentScriptJsCall({
 	action: "tab_scroll_to",
-	namespace: "tab",
+	namespace: "web.tab",
 	name: "scroll_to",
 	description: "Scroll to position in a tab",
 	params: schemas.TabScrollToParamsSchema,
@@ -347,7 +359,7 @@ registerContentScriptJsCall({
 
 registerContentScriptJsCall({
 	action: "tab_type",
-	namespace: "tab",
+	namespace: "web.tab",
 	name: "type",
 	description: "Type in a tab",
 	params: schemas.TabTypeParamsSchema,
@@ -379,7 +391,7 @@ registerContentScriptJsCall({
 
 registerContentScriptJsCall({
 	action: "tab_press",
-	namespace: "tab",
+	namespace: "web.tab",
 	name: "press",
 	description: "Press a key in a tab",
 	params: schemas.TabPressParamsSchema,
@@ -399,7 +411,7 @@ registerContentScriptJsCall({
 
 registerContentScriptJsCall({
 	action: "tab_select",
-	namespace: "tab",
+	namespace: "web.tab",
 	name: "select",
 	description: "Select an option in a tab",
 	params: schemas.TabSelectParamsSchema,
@@ -425,7 +437,7 @@ registerContentScriptJsCall({
 
 registerContentScriptJsCall({
 	action: "tab_check",
-	namespace: "tab",
+	namespace: "web.tab",
 	name: "check",
 	description: "Check/uncheck in a tab",
 	params: schemas.TabCheckParamsSchema,
@@ -451,7 +463,7 @@ registerContentScriptJsCall({
 
 registerContentScriptJsCall({
 	action: "tab_hover",
-	namespace: "tab",
+	namespace: "web.tab",
 	name: "hover",
 	description: "Hover in a tab",
 	params: schemas.TabHoverParamsSchema,
@@ -471,7 +483,7 @@ registerContentScriptJsCall({
 
 registerContentScriptJsCall({
 	action: "tab_unhover",
-	namespace: "tab",
+	namespace: "web.tab",
 	name: "unhover",
 	description: "Unhover in a tab",
 	params: schemas.TabUnhoverParamsSchema,
@@ -485,7 +497,7 @@ registerContentScriptJsCall({
 
 registerContentScriptJsCall({
 	action: "tab_scroll",
-	namespace: "tab",
+	namespace: "web.tab",
 	name: "scroll",
 	description: "Scroll in a tab",
 	params: schemas.TabScrollParamsSchema,
@@ -511,7 +523,7 @@ registerContentScriptJsCall({
 
 registerContentScriptJsCall({
 	action: "tab_dblclick",
-	namespace: "tab",
+	namespace: "web.tab",
 	name: "dblclick",
 	description: "Double-click in a tab",
 	params: schemas.TabDblClickParamsSchema,
@@ -531,7 +543,7 @@ registerContentScriptJsCall({
 
 registerJsCall({
 	action: "tab_evaluate",
-	namespace: "tab",
+	namespace: "web.tab",
 	name: "evaluate",
 	description: "Evaluate script in a tab",
 	params: schemas.TabEvaluateParamsSchema,
@@ -582,7 +594,7 @@ registerJsCall({
 
 registerContentScriptJsCall({
 	action: "tab_back",
-	namespace: "tab",
+	namespace: "web.tab",
 	name: "back",
 	description: "Go back in a tab",
 	params: schemas.TabBackParamsSchema,
@@ -596,7 +608,7 @@ registerContentScriptJsCall({
 
 registerJsCall({
 	action: "tab_wait_for_load",
-	namespace: "tab",
+	namespace: "web.tab",
 	name: "wait_for_load",
 	description: "Wait for tab to load",
 	params: schemas.TabWaitForLoadParamsSchema,
@@ -623,7 +635,7 @@ registerJsCall({
 
 registerJsCall({
 	action: "tab_fetch",
-	namespace: "tab",
+	namespace: "web.tab",
 	name: "fetch",
 	description: "Fetch from a tab",
 	params: schemas.TabFetchParamsSchema,
@@ -673,36 +685,50 @@ registerJsCall({
 
 registerJsCall({
 	action: "tab_snapshot",
-	namespace: "tab",
+	namespace: "web.tab",
 	name: "snapshot",
 	description: "Get tab snapshot",
 	params: schemas.TabSnapshotParamsSchema,
 	returns: z.string(),
+	fields: ["tabId"],
 	owner: "main-thread",
 	handler: async (params, _ctx) => {
-		const activeTab = await resolveActiveTabId();
-		if (activeTab === null) {
-			throw makeError("No active tab", "E_NO_TAB");
+		const tabId = extractTabId(params);
+		if (tabId === null) {
+			throw makeError("No tab ID provided", "E_NO_TAB");
 		}
 		const obj = asRecord(params);
 		const opts = asRecord(obj.options ?? obj);
 		const maxNodes =
 			typeof opts.max_nodes === "number" ? opts.max_nodes : DEFAULT_MAX_NODES;
-		const result = await executeInTab(activeTab, buildSnapshotInTab, [
+		const blocked = await preflightScriptableTab(tabId);
+		if (blocked && !blocked.ok) {
+			throw makeError(
+				blocked.error.message,
+				blocked.error.code,
+				blocked.error.category,
+			);
+		}
+		const result = await executeInTab(tabId, buildSnapshotInTab, [
 			maxNodes,
 		]);
 		if (!result.ok) {
 			throw makeError(
-				result.error.message,
+				`tab.snapshot failed for tab ${tabId}: ${result.error.message}`,
 				result.error.code,
 				result.error.category,
 			);
 		}
 		if (result.value && typeof result.value === "object") {
 			const val = result.value as Record<string, unknown>;
-			return val.text as string;
+			if (typeof val.text === "string") {
+				return val.text;
+			}
 		}
-		throw makeError("Failed to get tab snapshot", "E_SNAPSHOT");
+		throw makeError(
+			`tab.snapshot returned no text for tab ${tabId}`,
+			"E_SNAPSHOT",
+		);
 	},
 	paramTypes: [
 		{ name: "tabId", type: "number", required: true, description: "Tab ID" },
@@ -725,36 +751,50 @@ registerJsCall({
 
 registerJsCall({
 	action: "tab_snapshot_text",
-	namespace: "tab",
+	namespace: "web.tab",
 	name: "snapshot_text",
 	description: "Get tab snapshot text",
 	params: schemas.TabSnapshotTextParamsSchema,
 	returns: z.string(),
+	fields: ["tabId"],
 	owner: "main-thread",
 	handler: async (params, _ctx) => {
-		const activeTab = await resolveActiveTabId();
-		if (activeTab === null) {
-			throw makeError("No active tab", "E_NO_TAB");
+		const tabId = extractTabId(params);
+		if (tabId === null) {
+			throw makeError("No tab ID provided", "E_NO_TAB");
 		}
 		const obj = asRecord(params);
 		const opts = asRecord(obj.options ?? obj);
 		const maxNodes =
 			typeof opts.max_nodes === "number" ? opts.max_nodes : DEFAULT_MAX_NODES;
-		const result = await executeInTab(activeTab, buildSnapshotInTab, [
+		const blocked = await preflightScriptableTab(tabId);
+		if (blocked && !blocked.ok) {
+			throw makeError(
+				blocked.error.message,
+				blocked.error.code,
+				blocked.error.category,
+			);
+		}
+		const result = await executeInTab(tabId, buildSnapshotInTab, [
 			maxNodes,
 		]);
 		if (!result.ok) {
 			throw makeError(
-				result.error.message,
+				`tab.snapshot_text failed for tab ${tabId}: ${result.error.message}`,
 				result.error.code,
 				result.error.category,
 			);
 		}
 		if (result.value && typeof result.value === "object") {
 			const val = result.value as Record<string, unknown>;
-			return val.text as string;
+			if (typeof val.text === "string") {
+				return val.text;
+			}
 		}
-		throw makeError("Failed to get tab snapshot", "E_SNAPSHOT");
+		throw makeError(
+			`tab.snapshot_text returned no text for tab ${tabId}`,
+			"E_SNAPSHOT",
+		);
 	},
 	paramTypes: [
 		{ name: "tabId", type: "number", required: true, description: "Tab ID" },
@@ -777,27 +817,36 @@ registerJsCall({
 
 registerJsCall({
 	action: "tab_snapshot_data",
-	namespace: "tab",
+	namespace: "web.tab",
 	name: "snapshot_data",
 	description: "Get tab snapshot data",
 	params: schemas.TabSnapshotDataParamsSchema,
 	returns: schemas.SnapshotResultSchema,
+	fields: ["tabId"],
 	owner: "main-thread",
 	handler: async (params, _ctx) => {
-		const activeTab = await resolveActiveTabId();
-		if (activeTab === null) {
-			throw makeError("No active tab", "E_NO_TAB");
+		const tabId = extractTabId(params);
+		if (tabId === null) {
+			throw makeError("No tab ID provided", "E_NO_TAB");
 		}
 		const obj = asRecord(params);
 		const opts = asRecord(obj.options ?? obj);
 		const maxNodes =
 			typeof opts.max_nodes === "number" ? opts.max_nodes : DEFAULT_MAX_NODES;
-		const result = await executeInTab(activeTab, buildSnapshotInTab, [
+		const blocked = await preflightScriptableTab(tabId);
+		if (blocked && !blocked.ok) {
+			throw makeError(
+				blocked.error.message,
+				blocked.error.code,
+				blocked.error.category,
+			);
+		}
+		const result = await executeInTab(tabId, buildSnapshotInTab, [
 			maxNodes,
 		]);
 		if (!result.ok) {
 			throw makeError(
-				result.error.message,
+				`tab.snapshot_data failed for tab ${tabId}: ${result.error.message}`,
 				result.error.code,
 				result.error.category,
 			);
@@ -805,7 +854,10 @@ registerJsCall({
 		if (result.value && typeof result.value === "object") {
 			return result.value;
 		}
-		throw makeError("Failed to get tab snapshot", "E_SNAPSHOT");
+		throw makeError(
+			`tab.snapshot_data returned no data for tab ${tabId}`,
+			"E_SNAPSHOT",
+		);
 	},
 	paramTypes: [
 		{ name: "tabId", type: "number", required: true, description: "Tab ID" },

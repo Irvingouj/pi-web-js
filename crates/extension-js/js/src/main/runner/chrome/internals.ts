@@ -10,6 +10,7 @@ import type { AsyncError } from "../../../shared/tool-registry.js";
 import { makeError } from "../lib/types.js";
 import {
 	invokeNative,
+	normalizeParityArgs,
 	requireArgumentArray,
 	resolveChromeMethod,
 } from "./native.js";
@@ -17,6 +18,7 @@ import {
 export {
 	invokeNative,
 	isNativeParityAction,
+	normalizeParityArgs,
 	requireArgumentArray,
 	resolveChromeMethod,
 	type NativeArgs,
@@ -105,7 +107,10 @@ export function registerChromePassthrough(
 					"permission",
 				);
 			}
-			const args = requireArgumentArray(params, action);
+			const args = normalizeParityArgs(
+				action,
+				requireArgumentArray(params, action),
+			);
 			const method = resolveChromeMethod(chrome, apiPath, name);
 			log.debug("chrome_passthrough", { action, argCount: args.length });
 

@@ -5,7 +5,7 @@ use crate::types::{
 };
 use crate::utils::{
     classify_js_error, clean_error_message, exception_to_string, extract_line_number,
-    format_js_value,
+    format_js_value, format_runtime_error_with_context, resume_async_pending,
 };
 use rquickjs::context::EvalOptions;
 use rquickjs::promise::PromiseState as QjsPromiseState;
@@ -407,14 +407,18 @@ impl JsSession {
                     PromiseState::Rejected(err) => {
                         let msg = exception_to_string(&err);
                         let line = extract_line_number(&msg);
-                        tracing::error!(execution_count = exec_count, "top_level_promise_rejected");
+                        tracing::error!(execution_count = exec_count, error = %msg, "top_level_promise_rejected");
                         let hs = host_state.borrow();
                         return RunResult::with_partial_output(
                             hs.stdout.clone(),
                             hs.stderr.clone(),
                             hs.commands.clone(),
                             CellError::Runtime {
-                                message: clean_error_message(&msg),
+                                message: format_runtime_error_with_context(
+                                    &msg,
+                                    &hs.stdout,
+                                    &hs.stderr,
+                                ),
                                 line,
                             },
                             false,
@@ -515,41 +519,18 @@ impl JsSession {
         })));
 
         let result = self.context.with(|ctx| {
-            let mut resume_opts = EvalOptions::default();
-            resume_opts.global = true;
-            resume_opts.strict = false;
-            resume_opts.promise = true;
-            let js = if response.ok {
-                let value_json = serde_json::to_string(&response.value.unwrap_or(serde_json::Value::Null))
-                    .unwrap_or_else(|_| "null".to_string());
-                format!(
-                    "__webJsPending[{}].resolve({}); delete __webJsPending[{}];",
-                    call_id, value_json, call_id
-                )
-            } else {
-                let msg = response
-                    .error
-                    .as_ref()
-                    .map(|e| e.message.clone())
-                    .unwrap_or_else(|| "unknown async error".into());
-                let msg_literal = serde_json::to_string(&msg)
-                    .unwrap_or_else(|_| "\"unknown async error\"".to_string());
-                format!(
-                    r#"__webJsPending[{}].reject(new Error({})); delete __webJsPending[{}];"#,
-                    call_id, msg_literal, call_id
-                )
-            };
-            if let Err(e) = ctx.eval_with_options::<Value, _>(js.as_str(), resume_opts) {
+            let resume_result = resume_async_pending(&ctx, call_id, &response);
+            if let Err(e) = resume_result {
                 reset_after_internal_resume_error_for_ctx.set(true);
                 let hs = host_state.borrow();
                 let msg = if let rquickjs::Error::Exception = &e {
                     let exc = ctx.catch();
                     let m = exception_to_string(&exc);
-                    tracing::error!(call_id, "resume_eval_exception");
+                    tracing::error!(call_id, error = %m, "resume_pending_exception");
                     m
                 } else {
                     let m = e.to_string();
-                    tracing::error!(call_id, "resume_eval_error");
+                    tracing::error!(call_id, error = %m, "resume_pending_error");
                     m
                 };
                 let line = extract_line_number(&msg);
@@ -558,7 +539,11 @@ impl JsSession {
                     hs.stderr.clone(),
                     hs.commands.clone(),
                     CellError::Runtime {
-                        message: clean_error_message(&msg),
+                        message: format_runtime_error_with_context(
+                            &msg,
+                            &hs.stdout,
+                            &hs.stderr,
+                        ),
                         line,
                     },
                     false,
@@ -586,14 +571,18 @@ impl JsSession {
                     if let PromiseState::Rejected(err) = check_promise_state(ctx, &promise) {
                         let msg = exception_to_string(&err);
                         let line = extract_line_number(&msg);
-                        tracing::error!(call_id, "resume_top_level_promise_rejected");
+                        tracing::error!(call_id, error = %msg, "resume_top_level_promise_rejected");
                         let hs = host_state.borrow();
                         return RunResult::with_partial_output(
                             hs.stdout.clone(),
                             hs.stderr.clone(),
                             hs.commands.clone(),
                             CellError::Runtime {
-                                message: clean_error_message(&msg),
+                                message: format_runtime_error_with_context(
+                                    &msg,
+                                    &hs.stdout,
+                                    &hs.stderr,
+                                ),
                                 line,
                             },
                             false,

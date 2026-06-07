@@ -28,6 +28,26 @@ export function invokeNative(
 	return method(...args);
 }
 
+/** Chrome query/search APIs require a first argument; no-arg JS calls become `{}`. */
+const CHROME_QUERY_ACTIONS = new Set([
+	"chrome_bookmarks_search",
+	"bookmarks_search",
+	"chrome_history_search",
+	"history_search",
+	"chrome_downloads_search",
+	"chrome_tabs_query",
+	"tab_query",
+]);
+
+export function normalizeParityArgs(
+	action: string,
+	args: NativeArgs,
+): NativeArgs {
+	if (args.length > 0) return args;
+	if (CHROME_QUERY_ACTIONS.has(action)) return [{}];
+	return args;
+}
+
 export function requireArgumentArray(
 	value: unknown,
 	action: string,

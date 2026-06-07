@@ -51,6 +51,20 @@ export async function dispatchValidated<P, R>(
 			typeof err.code === "string"
 				? err.code
 				: "E_HANDLER";
-		return { ok: false, error: { message, code } };
+		const category =
+			typeof err === "object" &&
+			err !== null &&
+			"category" in err &&
+			typeof err.category === "string"
+				? err.category
+				: undefined;
+		return {
+			ok: false,
+			error: {
+				message: `${action}: ${message}`,
+				code,
+				category,
+			},
+		};
 	}
 }
