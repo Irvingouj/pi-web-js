@@ -6,11 +6,13 @@ import { fileURLToPath } from "url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "../..");
 const publicDir = path.join(rootDir, "web", "public");
+fs.mkdirSync(publicDir, { recursive: true });
 
 const assets = [
   { name: "content-script.js", srcDir: "crates/extension-js/js" },
   { name: "manifest.json", srcDir: "crates/extension-js/js" },
   { name: "background.js", srcDir: "crates/extension-js/js" },
+  { name: "icon.svg", srcDir: "crates/extension-js/js" },
   { name: "dom_semantic_tree.js", srcDir: "crates/dom-semantic-tree/js" },
 ];
 

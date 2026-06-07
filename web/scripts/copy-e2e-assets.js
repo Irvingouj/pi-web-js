@@ -58,4 +58,7 @@ fs.writeFileSync(
 );
 fs.writeFileSync(path.join(publicE2eDir, "contract-batch-runner.js"), runner);
 
+const returnOneSrc = path.join(rootDir, "tests/e2e/extension/fixtures/return-one.js");
+fs.copyFileSync(returnOneSrc, path.join(publicE2eDir, "return-one.js"));
+
 console.log("Copied e2e contract assets → public/e2e/");

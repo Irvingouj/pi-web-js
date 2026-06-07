@@ -143,7 +143,7 @@ function copyExtensionAssets() {
     }
   }
 
-  for (const file of ["content-script.js", "manifest.json", "background.js"]) {
+  for (const file of ["content-script.js", "manifest.json", "background.js", "icon.svg"]) {
     const pkgCandidate = path.join(srcDir, "pkg", file);
     const distCandidate =
       file === "content-script.js"

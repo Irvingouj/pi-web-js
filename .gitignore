@@ -32,11 +32,11 @@ crates/extension-js/js/pkg/
 crates/dom-semantic-tree/js/dom_semantic_tree.js
 crates/dom-semantic-tree/js/dom_semantic_tree.d.ts
 
-# Generated extension assets copied to web/public/ by copy-ext-assets.js
-web/public/content-script.js
-web/public/dom_semantic_tree.js
-web/public/background.js
-web/public/manifest.json
+# Extension package zips from `npm run package:extension`
+web/package/
+
+# Generated extension assets copied to web/public/ by build and copy scripts
+web/public/
 
 # Stale copied WASM artifacts
 web/src/wasm/
