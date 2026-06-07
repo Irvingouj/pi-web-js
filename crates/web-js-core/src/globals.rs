@@ -119,6 +119,7 @@ pub(crate) fn register_host_globals<'js>(
                 let mut hs = hs.borrow_mut();
                 hs.async_call_counter += 1;
                 let call_id = hs.async_call_counter;
+                tracing::trace!(call_id, action = %action_str, "trigger_async");
 
                 let command = crate::types::AsyncCommand {
                     call_id,

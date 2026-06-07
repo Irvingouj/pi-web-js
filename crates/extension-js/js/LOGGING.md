@@ -2,30 +2,27 @@
 
 ## Quick Start
 
-Enable debug logs from the browser console:
+Enable verbose logs from the browser console:
 
 ```js
 // In the extension sidepanel or popup console
-__jsNotebookSetLogLevel("debug");
+__jsNotebookSetLogLevel("trace");
 ```
 
-Or via the Worker API:
+Or open the notebook with `?log=trace`.
 
-```js
-worker.postMessage({ type: "setLogLevel", level: 0 }); // 0 = debug
-```
+**Default:** `trace` (0) — maximum verbosity for debugging async/resume flows.
 
 ## Log Levels
 
 | Level   | Numeric | Description                              |
 |---------|---------|------------------------------------------|
-| debug   | 0       | Everything including internal flow         |
-| info    | 1       | Major lifecycle events and correlations  |
-| warn    | 2       | Recoverable issues                       |
-| error   | 3       | Errors only (default)                    |
-| none    | 4       | Silence everything                       |
-
-**Default:** `error` (3). The system starts quiet and must be explicitly made verbose.
+| trace   | 0       | Every call boundary (async loop, relay, eval) |
+| debug   | 1       | Internal flow details                    |
+| info    | 2       | Major lifecycle events                   |
+| warn    | 3       | Recoverable issues                       |
+| error   | 4       | Errors only                              |
+| none    | 5       | Silence everything                       |
 
 ## How to Enable Logs
 
@@ -33,110 +30,62 @@ worker.postMessage({ type: "setLogLevel", level: 0 }); // 0 = debug
 
 ```js
 import { setLogLevel } from "@pi-oxide/extension-js";
-setLogLevel("debug");  // or "info", "warn", "error", "none"
+setLogLevel("trace");  // or "debug", "info", "warn", "error", "none"
 ```
 
-This controls both the JS logger and the Rust WASM tracing layer simultaneously.
-
-### From Browser Console (Content Script)
+In the sidepanel console:
 
 ```js
-// Content script context only
-__jsNotebookSetLogLevel("debug");
+__jsNotebookSetLogLevel("trace");
 ```
 
-Note: This only affects the content-script logger, not the main extension runtime.
+Or URL: `?log=trace` (E2E: `?e2e_log=trace`).
 
-### Advanced: Worker Direct Control
+### Worker Direct Control
 
 ```js
-// If you have direct access to the Worker instance
-worker.postMessage({ type: "setLogLevel", level: 0 }); // 0 = debug
+worker.postMessage({ type: "setLogLevel", level: 0 }); // 0 = trace
 ```
 
 ### WASM Bridge
 
-When the Worker initializes, it calls:
+Worker init sets `setWasmLogLevel(0)` (trace). JS `setLogLevel` / `ExtensionSession.setLogLevel()` syncs to Rust so `tracing::trace!` and coarser levels share the same gate.
 
-```js
-setWasmLogLevel(3);           // default error level
-registerWasmSetLogLevel(setWasmLogLevel);  // bridge JS → Rust
-```
+## What Gets Logged at Trace
 
-Changing the JS log level automatically syncs to Rust via this bridge, so `tracing::info!` events are gated by the same numeric level.
+| Layer | Examples |
+|-------|----------|
+| JS main | `runCell_start`, `postAndWait`, `asyncRelay`, `executeContextCommand` |
+| JS worker | `onmessage`, `sessionQueue_enqueue`, `runCell_start`, `extensionDispatch` |
+| Rust WASM | `run_cell_async_loop_*`, `eval_start`, `trigger_async`, `resume_*`, `handle_command_*` |
 
 ## Correlation IDs
 
-Four IDs trace a single execution end-to-end:
-
-| ID         | Generated In | Propagation Path                                      |
-|------------|--------------|-------------------------------------------------------|
-| `sessionId`| `ExtensionSession::new()` (Rust) | Lives for the session lifetime                        |
-| `runId`    | `ExtensionSession.runCellAsync()` (JS) | `index.ts` → Worker `runCell` message → callback context → `asyncRelay` → `runner.ts` |
-| `commandId`| `Command.call_id` (JS/WASM) | Attached to every relayed command                     |
-| `batchId`  | `web-js-base` loop (Rust) | Per-iteration batch identifier inside `run_cell_async_loop` |
-
-Example span hierarchy in Rust:
-
-```
-run_cell_async { session_id=sess_0, run_id=abc123 }
-  └── handle_command { command_id=42, action=dom.snapshot, run_id=abc123 }
-      └── run_cell_async_loop { batch_id=batch_1 }
-```
+| ID         | Source |
+|------------|--------|
+| `runId`    | `ExtensionSession.runCellAsync()` (JS) |
+| `callId`   | Worker message / pending call map |
+| `batch_id` | `run_cell_async_loop` (Rust) |
 
 ## Log Format
 
-### JavaScript Logger
+### JavaScript
 
 ```
-[extension-js][namespace] event key=value key2=value2
+[extension-js][namespace] event key=value
 ```
 
-Example:
-```
-[extension-js][runner] command_dispatch action=dom.snapshot commandId=42 runId=abc123 duration_ms=15
-```
-
-### Rust Tracing (WASMLayer)
+### Rust (WASMLayer)
 
 ```
-INFO crates/extension-js/src/session.rs:126 handle_command_start: call_id=42 action="dom.snapshot"
+TRACE crates/web-js-core/src/session.rs:345 eval_start: code_len=42 execution_count=1
 ```
 
-**Note:** The formats differ. JS uses flat `key=value` strings; Rust uses `tracing-subscriber` structured fields. Both are gated by the same numeric level, but they look different in the console.
+## Warning
 
-## Example Output (Debug Level)
-
-```
-[extension-js][root] set_log_level level=0
-[extension-js][runner] command_dispatch action=dom.snapshot commandId=42 runId=abc123
-INFO  extension-js/src/session.rs:126 handle_command_start: call_id=42 action="dom.snapshot"
-[extension-js][runner] command_dispatch action=dom.snapshot commandId=42 runId=abc123 duration_ms=15 ok=true
-INFO  extension-js/src/session.rs:177 handle_command_relay_done: call_id=42 action="dom.snapshot" ok=true
-```
+Trace logging on cells with many sequential `await`s can be **very noisy** and may contribute to wasm32 stack pressure. Use `error` or `none` for normal use; use `trace` only while debugging.
 
 ## Known Limitations
 
-1. **background.js and content-script.ts are independent**
-   - Both use hardcoded `error` level (`__LOG_LEVEL = 3`).
-   - They do NOT participate in the JS/Rust level bridge.
-   - To change their level, edit the source or add a message-passing mechanism.
-
-2. **Rust tracing and JS logger formats differ**
-   - JS: `[extension-js][namespace] event key=value`
-   - Rust: `INFO path:line event: field=value`
-   - Unified level gating is the goal; unified formatting is not.
-
-3. **Worker call context**
-   - `runId` is passed through the callback context object (`{ callId, runId, signal }`) from Rust to JS.
-   - No module-level mutable state tracks the current run; each async relay carries its own context.
-   - This makes concurrent runs safe without a `Map<call_id, runId>`.
-
-4. **web-js WASM unconditional startup log**
-   - `web-js` (non-extension) uses `tracing_wasm::set_as_global_default()` without a filter layer.
-   - Its `tracing::info!("web-js WASM initialized...")` always prints on startup.
-   - Extension-js uses `LogLevelFilterLayer`, so its startup log is properly gated.
-
-5. **No `tracing::trace!` support**
-   - `LogLevelFilterLayer` returns `false` for `Level::TRACE` regardless of setting.
-   - The system only supports debug/info/warn/error/none.
+1. **background.js / content-script** — independent hardcoded levels unless updated separately.
+2. **web-js playground WASM** — lazy-loaded; its startup log is separate from extension worker tracing.

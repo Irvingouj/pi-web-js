@@ -26,7 +26,7 @@ describe("Logger", () => {
 		vi.restoreAllMocks();
 		vi.unstubAllGlobals();
 		registerWasmSetLogLevel(() => {});
-		setLogLevel("error");
+		setLogLevel("trace");
 	});
 
 	it("TM-1: debug level logging works", () => {
@@ -92,7 +92,14 @@ describe("Logger", () => {
 		const wasmFn = vi.fn();
 		registerWasmSetLogLevel(wasmFn);
 		setLogLevel("info");
-		expect(wasmFn).toHaveBeenCalledWith(1);
+		expect(wasmFn).toHaveBeenCalledWith(2);
+	});
+
+	it("TM-7b: trace level maps to numeric 0", () => {
+		const wasmFn = vi.fn();
+		registerWasmSetLogLevel(wasmFn);
+		setLogLevel("trace");
+		expect(wasmFn).toHaveBeenCalledWith(0);
 	});
 
 	it("TM-8: no throw on invalid metadata (function value)", () => {
@@ -175,7 +182,7 @@ describe("Logger", () => {
 		setLogLevel("info");
 		const wasmFn = vi.fn();
 		registerWasmSetLogLevel(wasmFn);
-		expect(wasmFn).toHaveBeenCalledWith(1);
+		expect(wasmFn).toHaveBeenCalledWith(2);
 	});
 
 	it("TM-16: none level blocks all output", () => {
@@ -216,6 +223,15 @@ describe("Logger", () => {
 			expect.stringContaining("id=1"),
 		);
 	});
+
+	it("TM-21: trace level emits console.log", () => {
+		setLogLevel("trace");
+		const log = new Logger("test");
+		log.trace("trace_event", { n: 1 });
+		expect(consoleLogSpy).toHaveBeenCalledWith(
+			expect.stringContaining("trace_event"),
+		);
+	});
 });
 
 describe("Logger default state", () => {
@@ -223,6 +239,7 @@ describe("Logger default state", () => {
 	let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
 
 	beforeEach(() => {
+		setLogLevel("trace");
 		consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 		consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 	});
@@ -230,19 +247,19 @@ describe("Logger default state", () => {
 	afterEach(() => {
 		vi.restoreAllMocks();
 		vi.unstubAllGlobals();
-		// Ensure level is reset for outer describe block
-		setLogLevel("error");
+		// Reset to default trace for other suites
+		setLogLevel("trace");
 	});
 
-	it("TM-20: level rests at error after cleanup", () => {
-		// After outer afterEach, level should be 'error'
-		expect(getLogLevel()).toBe("error");
+	it("TM-20: level rests at trace after cleanup", () => {
+		expect(getLogLevel()).toBe("trace");
 		const log = new Logger("test");
-		log.debug("should_not_appear");
-		expect(consoleLogSpy).not.toHaveBeenCalled();
-		log.error("should_appear");
-		expect(consoleErrorSpy).toHaveBeenCalledWith(
+		log.trace("should_appear");
+		expect(consoleLogSpy).toHaveBeenCalledWith(
 			expect.stringContaining("should_appear"),
 		);
+		setLogLevel("error");
+		log.trace("should_not_appear");
+		expect(consoleLogSpy).toHaveBeenCalledTimes(1);
 	});
 });

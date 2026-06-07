@@ -18,7 +18,7 @@ export const test = base.extend<{}, WorkerFixtures>({
 			const harness = await launchExtension();
 			const warmup = await executeCell(
 				harness.sidepanel,
-				'print("extension-e2e-warmup");',
+				'await web.sleep(1); print("extension-e2e-warmup");',
 			);
 			if (
 				warmup.status !== "success" ||

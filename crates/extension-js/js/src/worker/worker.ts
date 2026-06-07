@@ -8,7 +8,7 @@ import init, {
 } from "../../pkg/extension_js.js";
 import type { FsAction, FsActionMap } from "../shared/fs-types.js";
 import type { LogLevel } from "../shared/logger.js";
-import { logger, registerWasmSetLogLevel, setLogLevel } from "../shared/logger.js";
+import { logger, registerWasmSetLogLevel, setLogLevel, numericToLogLevel } from "../shared/logger.js";
 import type { DispatchContext } from "../shared/registry/types.js";
 import { getRoute } from "../shared/registry/routes.js";
 import { populateRoutesFromManifest } from "../shared/registry/routes.js";
@@ -76,6 +76,50 @@ export function settleAllPendingRelays(code: string, message: string): void {
 // Worker-local registry for handlers that execute in the same worker as the VM
 const workerHandlerRegistry = new Map<string, (params: unknown, context?: unknown) => Promise<unknown>>();
 const runAbortControllers = new Map<string, AbortController>();
+let sessionQueue: Promise<void> = Promise.resolve();
+let activeRunCell: { id: string; runId?: string } | null = null;
+
+function enqueueSessionWork<T>(work: () => Promise<T>): Promise<T> {
+  logger.trace("sessionQueue_enqueue");
+  const job = sessionQueue.then(work);
+  sessionQueue = job.then(
+    () => undefined,
+    () => undefined,
+  );
+  return job;
+}
+
+function reportActiveRunFailure(error: string): void {
+  if (!activeRunCell) return;
+  logger.error("runCell_worker_failure", {
+    runId: activeRunCell.runId,
+    callId: activeRunCell.id,
+    error,
+  });
+  self.postMessage({
+    type: "error",
+    id: activeRunCell.id,
+    error,
+    runId: activeRunCell.runId,
+  });
+  activeRunCell = null;
+}
+
+self.addEventListener("error", (event) => {
+  const message =
+    event.message ||
+    (event.error instanceof Error ? event.error.message : "Worker uncaught error");
+  logger.error("worker_uncaught_error", { error: message });
+  reportActiveRunFailure(message);
+});
+
+self.addEventListener("unhandledrejection", (event) => {
+  const reason = event.reason;
+  const message =
+    reason instanceof Error ? reason.message : String(reason ?? "Unhandled rejection");
+  logger.error("worker_unhandled_rejection", { error: message });
+  reportActiveRunFailure(message);
+});
 
 export function registerWorkerHandler(
   action: string,
@@ -91,11 +135,7 @@ function generateId(): string {
 }
 
 function mapNumericLevel(level: number): LogLevel {
-  if (level <= 0) return "debug";
-  if (level === 1) return "info";
-  if (level === 2) return "warn";
-  if (level === 3) return "error";
-  return "none";
+  return numericToLogLevel(level);
 }
 
 const workerPortRegistry = new Map<string, RelayPort>();
@@ -178,6 +218,7 @@ export function registerWorkerPort(owner: string, port: RelayPort): void {
 }
 
 export function resolveAsyncRelayResult(id: string, result: unknown): boolean {
+  logger.trace("resolveAsyncRelayResult", { id });
   const pending = pendingRelays.get(id);
   if (pending) {
     pending.settle(result);
@@ -208,6 +249,7 @@ export function safePostAsCall(options: {
   const { owner, action, tabPolicy, resolveTimeoutMs } = options;
   const baseTimeoutMs = options.timeoutMs ?? DEFAULT_RELAY_TIMEOUT_MS;
   return (params: unknown, context?) => {
+    logger.trace("safePostAsCall_invoke", { owner, action, callId: context?.callId, runId: context?.runId });
     const timeoutMs = resolveTimeoutMs?.(params) ?? baseTimeoutMs;
     return new Promise((resolve, reject) => {
       if (context?.signal?.aborted) {
@@ -356,6 +398,7 @@ export function extensionDispatch(
 ): Promise<unknown> {
   params = coerceWasmParams(params);
   const action = context?.action;
+  logger.trace("extensionDispatch", { action, callId: context?.callId, runId: context?.runId });
   if (!action) {
     return Promise.resolve({
       ok: false,
@@ -478,9 +521,10 @@ async function initWasm(
 	if (initialized) return;
 	await init();
 	session = new ExtensionSession();
-	const DEFAULT_WASM_LOG_LEVEL = 3;
+	const DEFAULT_WASM_LOG_LEVEL = 0; // trace
 	setWasmLogLevel(DEFAULT_WASM_LOG_LEVEL);
 	registerWasmSetLogLevel(setWasmLogLevel);
+	logger.trace("initWasm_start");
 	initFsRegistry(session);
 
 	populateRoutesFromManifest(manifest);
@@ -516,6 +560,7 @@ async function initWasm(
 		);
 	}
 	initialized = true;
+	logger.trace("initWasm_done");
 }
 
 export type WorkerMessage =
@@ -534,8 +579,10 @@ export type WorkerMessage =
 
 self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
   const msg = e.data;
+  logger.trace("onmessage", { type: msg.type, id: "id" in msg ? msg.id : undefined });
 
   if (msg.type === "asyncRelayResult") {
+    logger.trace("asyncRelayResult", { id: msg.id });
     resolveAsyncRelayResult(msg.id, msg.result);
     return;
   }
@@ -565,7 +612,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
   if (msg.type === "setLogLevel") {
     setWasmLogLevel(msg.level);
     setLogLevel(mapNumericLevel(msg.level));
-    logger.debug("set_log_level", { level: msg.level });
+    logger.trace("set_log_level", { level: msg.level });
     return;
   }
 
@@ -578,17 +625,23 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
     return;
   }
 
+  const activeSession = session;
+
+  await enqueueSessionWork(async () => {
   switch (msg.type) {
     case "runCell": {
       const runId = msg.runId;
       const runAbortController = new AbortController();
       if (runId) runAbortControllers.set(runId, runAbortController);
+      activeRunCell = { id: msg.id, runId };
+      logger.trace("runCell_start", { runId, callId: msg.id, codeLen: msg.code.length });
       try {
-        const result = await session.runCellAsync(
+        const result = await activeSession.runCellAsync(
           msg.code,
           msg.stdin || "",
-          runId || "", // propagate correlation ID to WASM so trace spans can be linked end-to-end
+          runId || "",
         );
+        logger.trace("runCell_done", { runId, callId: msg.id, status: result.status });
         self.postMessage({
           type: "result",
           id: msg.id,
@@ -605,17 +658,20 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
           runId,
         });
       } finally {
+        if (activeRunCell?.id === msg.id) {
+          activeRunCell = null;
+        }
         if (runId) runAbortControllers.delete(runId);
       }
       break;
     }
     case "reset": {
-      session.setAborted(true);
+      activeSession.setAborted(true);
       for (const controller of runAbortControllers.values()) controller.abort();
       runAbortControllers.clear();
       settleAllPendingRelays("E_RESET", "Worker reset");
       try {
-        session.reset();
+        activeSession.reset();
         self.postMessage({ type: "result", id: msg.id, data: { ok: true } });
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
@@ -624,7 +680,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
       break;
     }
     case "stop": {
-      session.setAborted(true);
+      activeSession.setAborted(true);
       for (const controller of runAbortControllers.values()) controller.abort();
       runAbortControllers.clear();
       settleAllPendingRelays("E_STOPPED", "Worker stopped");
@@ -633,7 +689,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
     }
     case "setFuelLimit": {
       try {
-        session.set_fuel_limit(msg.limit);
+        activeSession.set_fuel_limit(msg.limit);
         if (msg.id) {
           self.postMessage({ type: "result", id: msg.id, data: { ok: true } });
         }
@@ -647,7 +703,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
     }
     case "inspectGlobals": {
       try {
-        const snap = session.inspect_globals();
+        const snap = activeSession.inspect_globals();
         self.postMessage({ type: "result", id: msg.id, data: snap });
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
@@ -657,7 +713,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
     }
     case "apiDocs": {
       try {
-        const result = session.apiDocs(msg.format);
+        const result = activeSession.apiDocs(msg.format);
         self.postMessage({ type: "result", id: msg.id, data: result });
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
@@ -667,7 +723,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
     }
     case "loadLibrary": {
       try {
-        const result = session.load_library(msg.source);
+        const result = activeSession.load_library(msg.source);
         self.postMessage({ type: "result", id: msg.id, data: result });
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
@@ -700,4 +756,5 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
       break;
     }
   }
+  });
 };

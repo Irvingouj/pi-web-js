@@ -34,7 +34,7 @@ pub(crate) fn resume_async_pending<'js>(
                     rquickjs::Error::new_from_js_message("json", "stringify", e.to_string())
                 })?;
         let js_value = ctx.json_parse(value_json)?;
-        tracing::debug!(call_id, action = %action, "async_pending_resolved");
+        tracing::trace!(call_id, action = %action, "async_pending_resolved");
         resolve.call::<_, ()>((js_value,))
     } else {
         let (code, message) = response

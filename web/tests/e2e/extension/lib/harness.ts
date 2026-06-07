@@ -294,6 +294,8 @@ export async function waitForKernelReady(
 	await el.waitFor({ state: "visible", timeout });
 	await page.waitForFunction(
 		() => {
+			const w = window as Window & { __extensionSession?: unknown };
+			if (!w.__extensionSession) return false;
 			const status = document.querySelector(
 				'[data-testid="kernel-status"]',
 			) as HTMLElement | null;

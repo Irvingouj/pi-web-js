@@ -16,7 +16,7 @@ mod tests {
     fn test_single_async() {
         let mut session = JsSession::new();
 
-        let setup = session.run_cell(
+        let setup = session.run_cell_unwrapped(
             r#"
             function myAsync(x) {
                 return new Promise((resolve, reject) => {
@@ -50,7 +50,7 @@ mod tests {
     fn test_resume_async_payload_with_quotes_and_parens() {
         let mut session = JsSession::new();
 
-        let setup = session.run_cell(
+        let setup = session.run_cell_unwrapped(
             r#"
             function myAsync() {
                 return new Promise((resolve, reject) => {
@@ -85,7 +85,7 @@ mod tests {
     fn test_resume_async_reject_includes_action_context() {
         let mut session = JsSession::new();
 
-        let setup = session.run_cell(
+        let setup = session.run_cell_unwrapped(
             r#"
             function myAsync() {
                 return new Promise((resolve, reject) => {
@@ -145,7 +145,7 @@ mod tests {
     fn test_promise_all_two_commands() {
         let mut session = JsSession::new();
 
-        session.run_cell(
+        session.run_cell_unwrapped(
             r#"
             function myAsync(x) {
                 return new Promise((resolve, reject) => {
@@ -170,7 +170,7 @@ mod tests {
     fn test_resume_promise_all() {
         let mut session = JsSession::new();
 
-        session.run_cell(
+        session.run_cell_unwrapped(
             r#"
             function myAsync(x) {
                 return new Promise((resolve, reject) => {
@@ -221,7 +221,7 @@ mod tests {
     fn test_resume_promise_all_reverse_order() {
         let mut session = JsSession::new();
 
-        session.run_cell(
+        session.run_cell_unwrapped(
             r#"
             function myAsync(x) {
                 return new Promise((resolve, reject) => {
@@ -268,7 +268,7 @@ mod tests {
     fn test_chained_async() {
         let mut session = JsSession::new();
 
-        session.run_cell(
+        session.run_cell_unwrapped(
             r#"
             function myAsync(x) {
                 return new Promise((resolve, reject) => {
@@ -317,7 +317,7 @@ mod tests {
     fn test_sequential_async_with_print() {
         let mut session = JsSession::new();
 
-        session.run_cell(
+        session.run_cell_unwrapped(
             r#"
             function myAsync(x) {
                 return new Promise((resolve, reject) => {
@@ -368,7 +368,7 @@ mod tests {
     fn test_promise_all_reject() {
         let mut session = JsSession::new();
 
-        session.run_cell(
+        session.run_cell_unwrapped(
             r#"
             function myAsync(x) {
                 return new Promise((resolve, reject) => {
@@ -430,7 +430,7 @@ mod tests {
         let mut session = JsSession::new();
 
         // Define async helper that uses a registered action string
-        let setup = session.run_cell(
+        let setup = session.run_cell_unwrapped(
             r#"
             function testRegistry(x) {
                 return new Promise((resolve, reject) => {
@@ -555,7 +555,7 @@ mod tests {
     fn test_promise_race() {
         let mut session = JsSession::new();
 
-        session.run_cell(
+        session.run_cell_unwrapped(
             r#"
             function myAsync(x) {
                 return new Promise((resolve, reject) => {
@@ -608,7 +608,7 @@ mod tests {
     fn test_fire_and_forget_pending() {
         let mut session = JsSession::new();
 
-        session.run_cell(
+        session.run_cell_unwrapped(
             r#"
             function myAsync(x) {
                 return new Promise((resolve, reject) => {
@@ -620,7 +620,7 @@ mod tests {
         );
 
         // Start an async call but DON'T await it, return a synchronous value
-        let result = session.run_cell("var p = myAsync(99); 'sync_result'", "");
+        let result = session.run_cell("globalThis.p = myAsync(99); 'sync_result'", "");
         // The cell should be AsyncPending because there's a pending async command
         // (even though the eval returned 'sync_result')
         assert_eq!(result.status, CellStatus::AsyncPending);
@@ -638,7 +638,7 @@ mod tests {
         assert_eq!(resumed.status, CellStatus::Done);
 
         // The promise resolved (p holds a Promise object; verify via await)
-        let check = session.run_cell("print(JSON.stringify(await p))", "");
+        let check = session.run_cell("print(JSON.stringify(await globalThis.p))", "");
         assert_eq!(check.stdout[0], r#""resolved""#);
     }
 
@@ -698,9 +698,7 @@ mod tests {
     fn test_promise_value() {
         let mut session = JsSession::new();
         let result = session.run_cell("1 + 1", "");
-        println!("1+1 result: {:?}", result);
         assert!(result.error.is_none());
-        // Promise unwrapping extracts the actual value
         assert_eq!(result.result, Some("2".to_string()));
     }
 
@@ -724,10 +722,9 @@ mod tests {
     #[test]
     fn test_await_promise_resolve() {
         let mut session = JsSession::new();
-        let result = session.run_cell("await Promise.resolve(2)", "");
-        println!("await Promise.resolve(2) result: {:?}", result);
-        assert!(result.error.is_none());
-        assert_eq!(result.result, Some("2".to_string()));
+        let result = session.run_cell("const v = await Promise.resolve(2); print(String(v))", "");
+        assert!(result.error.is_none(), "{:?}", result.error);
+        assert_eq!(result.stdout, vec!["2"]);
     }
 
     #[test]
@@ -821,7 +818,7 @@ mod tests {
         }
 
         let mut session = JsSession::new();
-        let setup = session.run_cell(&generate_js_bindings_code(), "");
+        let setup = session.run_cell_unwrapped(&generate_js_bindings_code(), "");
         assert!(setup.error.is_none(), "{:?}", setup.error);
 
         let code = r#"await page.goto("https://example.com");
@@ -889,7 +886,7 @@ console.log(result)"#;
     fn test_async_error_message_escaping_does_not_poison_next_cell() {
         let mut session = JsSession::new();
 
-        let setup = session.run_cell(
+        let setup = session.run_cell_unwrapped(
             r#"
             function myAsync() {
                 return new Promise((resolve, reject) => {
@@ -975,7 +972,7 @@ console.log(result)"#;
             bindings.contains("parity:true"),
             "chrome_cookies_get binding should use native parity"
         );
-        let setup = session.run_cell(&bindings, "");
+        let setup = session.run_cell_unwrapped(&bindings, "");
         assert!(setup.error.is_none(), "{:?}", setup.error);
 
         let result = session.run_cell(
@@ -1045,7 +1042,7 @@ console.log(result)"#;
         );
 
         let mut session = JsSession::new();
-        let setup = session.run_cell(&generate_js_bindings_code(), "");
+        let setup = session.run_cell_unwrapped(&generate_js_bindings_code(), "");
         assert!(setup.error.is_none(), "{:?}", setup.error);
 
         let result = session.run_cell(r#"await page.extract(["title", "url"])"#, "");
@@ -1072,7 +1069,7 @@ console.log(result)"#;
     #[test]
     fn test_parity_async_params_preserve_cookie_details() {
         let mut session = JsSession::new();
-        let setup = session.run_cell(
+        let setup = session.run_cell_unwrapped(
             r#"
             function cookieGet(details) {
                 return new Promise((resolve, reject) => {
@@ -1144,7 +1141,7 @@ console.log(result)"#;
 
         let mut session = JsSession::new();
         let bindings = crate::api_docs::generate_js_bindings_code();
-        let setup = session.run_cell(&bindings, "");
+        let setup = session.run_cell_unwrapped(&bindings, "");
         assert!(setup.error.is_none(), "{:?}", setup.error);
         let result = session.run_cell(
             "const tab = await chrome.tabs.create({url: \"https://example.com\"})",
@@ -1177,6 +1174,51 @@ console.log(result)"#;
         );
         assert_eq!(result.status, CellStatus::Done);
         assert!(result.error.is_none());
+    }
+
+    #[test]
+    fn test_bare_await_sleep_cell_after_wrap() {
+        let mut session = JsSession::new();
+
+        let setup = session.run_cell_unwrapped(
+            r#"
+            function sleepMs(ms) {
+                return new Promise((resolve, reject) => {
+                    __webJsTriggerAsync("sleep", { duration: ms }, resolve, reject);
+                });
+            }
+            globalThis.web = { sleep: sleepMs };
+        "#,
+            "",
+        );
+        assert!(setup.error.is_none(), "{:?}", setup.error);
+
+        let code = "await web.sleep(1)\nprint(\"done\")";
+        let result = session.run_cell(code, "");
+        assert_eq!(
+            result.status,
+            CellStatus::AsyncPending,
+            "{:?}",
+            result.error
+        );
+        assert_eq!(result.pending_commands.len(), 1);
+        assert_eq!(result.pending_commands[0].action, "sleep");
+
+        let call_id = result.pending_commands[0].call_id;
+        let response = crate::types::AsyncResponse {
+            ok: true,
+            value: Some(serde_json::Value::Null),
+            error: None,
+        };
+        let json = serde_json::to_string(&response).unwrap();
+        let resumed = session.resume_cell(call_id, &json);
+        assert_eq!(resumed.status, CellStatus::Done, "{:?}", resumed.error);
+        assert!(resumed.error.is_none(), "{:?}", resumed.error);
+        assert!(
+            resumed.stdout.iter().any(|line| line.contains("done")),
+            "{:?}",
+            resumed.stdout
+        );
     }
 
     #[test]
@@ -1446,7 +1488,7 @@ console.log(result)"#;
     #[test]
     fn test_fuel_exhausted_after_await_on_resume() {
         let mut session = JsSession::build().fuel_limit(200).finish();
-        let setup = session.run_cell(
+        let setup = session.run_cell_unwrapped(
             r#"
             function myAsync() {
                 return new Promise((resolve, reject) => {

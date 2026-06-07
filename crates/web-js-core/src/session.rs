@@ -1,5 +1,5 @@
 use crate::async_resume::resume_async_pending;
-use crate::cell_wrap::{cell_needs_isolation_wrap, wrap_user_cell_code};
+use crate::cell_wrap::wrap_user_cell_code;
 use crate::error::{
     cell_error_from_exception, cell_error_from_rquickjs_error, drain_pending_jobs,
     exception_to_string, fuel_depleted, fuel_exhausted_flag_for,
@@ -287,14 +287,17 @@ impl JsSession {
         tracing::info!("perform_reset_done");
     }
 
-    /// Run a user cell. Cells that declare top-level `let`/`const` are wrapped in a
-    /// per-run async function scope so the same cell can be re-run safely.
+    /// Run a user cell. Every user cell is wrapped in `(async function __webJsCell(){...})()`
+    /// so eval never uses QuickJS top-level-await (`promise: true`), which recursively
+    /// resumes async on wasm32 until the host stack overflows. The wrapper also keeps
+    /// top-level `let`/`const` in a fresh scope so cells can be re-run safely.
     pub fn run_cell(&mut self, code: &str, stdin: &str) -> RunResult {
-        let wrapped = if cell_needs_isolation_wrap(code) {
-            wrap_user_cell_code(code)
-        } else {
-            code.to_string()
-        };
+        let wrapped = wrap_user_cell_code(code);
+        tracing::trace!(
+            code_len = code.len(),
+            wrapped_len = wrapped.len(),
+            "run_cell_wrapped"
+        );
         self.run_cell_unwrapped(&wrapped, stdin)
     }
 
@@ -316,6 +319,7 @@ impl JsSession {
             hs.fuel_exhausted = false;
             hs.cell_errors.clear();
             hs.pending_async_commands.clear();
+            hs.async_call_counter = 0;
         }
 
         self.execution_count += 1;
@@ -339,7 +343,7 @@ impl JsSession {
         let host_state = self.host_state.clone();
 
         let result = self.context.with(|ctx| {
-            tracing::info!(code_len = code.len(), execution_count = exec_count, "eval_start");
+            tracing::trace!(code_len = code.len(), execution_count = exec_count, "eval_start");
             // Clear stale pending async from previous runs
             if ctx.eval::<Value, _>("if (typeof __webJsPending !== 'undefined') { Object.keys(__webJsPending).forEach(k => delete __webJsPending[k]); } if (typeof __webJsTopPromise !== 'undefined') { delete __webJsTopPromise; }").is_err() {
                 let _ = ctx.catch();
@@ -348,9 +352,11 @@ impl JsSession {
             let mut eval_opts = EvalOptions::default();
             eval_opts.global = true;
             eval_opts.strict = false;
-            eval_opts.promise = true;
+            // Do NOT set promise=true. User async runs inside __webJsCell wrapper;
+            // TLA eval flag recursively drives async resume on wasm32 until stack overflow.
+            eval_opts.promise = false;
             let eval_result = ctx.eval_with_options::<Value, _>(code, eval_opts);
-            tracing::info!(is_ok = eval_result.is_ok(), "eval_with_options_done");
+            tracing::trace!(is_ok = eval_result.is_ok(), "eval_with_options_done");
 
             let result_val = match eval_result {
                 Ok(val) => val,
@@ -371,7 +377,7 @@ impl JsSession {
 
             // Store the top-level result for Promise state checking in resume_cell
             let _ = ctx.globals().set("__webJsTopPromise", result_val.clone());
-            tracing::info!("stored_top_promise");
+            tracing::trace!("stored_top_promise");
 
             if let Some(fuel_err) = drain_pending_jobs(&ctx, &fuel_counter) {
                 let hs = host_state.borrow();
@@ -384,23 +390,17 @@ impl JsSession {
                     exec_count,
                 );
             }
-            tracing::info!("execute_pending_job_done");
+            tracing::trace!("execute_pending_job_done");
 
-            // Check for host async first
-            let pending: Vec<AsyncCommand> = host_state.borrow_mut().pending_async_commands.drain(..).collect();
-            tracing::info!(pending_count = pending.len(), "pending_async_count");
-            if !pending.is_empty() {
-                let hs = host_state.borrow();
-                tracing::info!(execution_count = exec_count, "returning_async_pending");
-                return RunResult::async_pending(hs.stdout.clone(), pending, exec_count);
-            }
-
-            // Unwrap Promise result if needed
+            const MAX_PROMISE_SETTLE: u32 = 4096;
             let mut final_val = result_val;
-            if final_val.is_promise() {
-                match check_promise_state(ctx, &final_val) {
+            let mut settle_iters = 0u32;
+            while final_val.is_promise() && settle_iters < MAX_PROMISE_SETTLE {
+                settle_iters += 1;
+                match check_promise_state(ctx.clone(), &final_val) {
                     PromiseState::Fulfilled(val) => {
                         final_val = val;
+                        break;
                     }
                     PromiseState::Rejected(err) => {
                         let msg = exception_to_string(&err);
@@ -417,36 +417,79 @@ impl JsSession {
                         );
                     }
                     PromiseState::Pending => {
-                        let hs = host_state.borrow();
-                        if fuel_depleted(&fuel_counter) {
+                        let pending: Vec<AsyncCommand> = host_state
+                            .borrow_mut()
+                            .pending_async_commands
+                            .drain(..)
+                            .collect();
+                        if !pending.is_empty() {
+                            let hs = host_state.borrow();
+                            tracing::trace!(
+                                execution_count = exec_count,
+                                pending_count = pending.len(),
+                                "returning_async_pending_from_top_promise"
+                            );
+                            return RunResult::async_pending(hs.stdout.clone(), pending, exec_count);
+                        }
+                        if !ctx.execute_pending_job() {
+                            break;
+                        }
+                        if let Some(fuel_err) = drain_pending_jobs(&ctx, &fuel_counter) {
+                            let hs = host_state.borrow();
                             return RunResult::with_partial_output(
                                 hs.stdout.clone(),
                                 hs.stderr.clone(),
                                 hs.commands.clone(),
-                                CellError::FuelExhausted,
+                                fuel_err,
                                 true,
                                 exec_count,
                             );
                         }
-                        return RunResult::with_partial_output(
-                            hs.stdout.clone(),
-                            hs.stderr.clone(),
-                            hs.commands.clone(),
-                            CellError::Runtime {
-                                name: None,
-                                message: "Promise is still pending after execution".into(),
-                                line: None,
-                                action: None,
-                                code: None,
-                            },
-                            false,
-                            exec_count,
-                        );
                     }
                 }
             }
 
-            // QuickJS async eval wraps the completion value in {value: ...}
+            let pending: Vec<AsyncCommand> = host_state
+                .borrow_mut()
+                .pending_async_commands
+                .drain(..)
+                .collect();
+            tracing::trace!(pending_count = pending.len(), "pending_async_count");
+            if !pending.is_empty() {
+                let hs = host_state.borrow();
+                tracing::trace!(execution_count = exec_count, "returning_async_pending");
+                return RunResult::async_pending(hs.stdout.clone(), pending, exec_count);
+            }
+
+            if final_val.is_promise() {
+                let hs = host_state.borrow();
+                if fuel_depleted(&fuel_counter) {
+                    return RunResult::with_partial_output(
+                        hs.stdout.clone(),
+                        hs.stderr.clone(),
+                        hs.commands.clone(),
+                        CellError::FuelExhausted,
+                        true,
+                        exec_count,
+                    );
+                }
+                return RunResult::with_partial_output(
+                    hs.stdout.clone(),
+                    hs.stderr.clone(),
+                    hs.commands.clone(),
+                    CellError::Runtime {
+                        name: None,
+                        message: "Promise is still pending after execution".into(),
+                        line: None,
+                        action: None,
+                        code: None,
+                    },
+                    false,
+                    exec_count,
+                );
+            }
+
+            // Unwrap Promise result if needed
             if let Some(obj) = final_val.as_object() {
                 if let Ok(val) = obj.get::<_, Value>("value") {
                     final_val = val;
@@ -467,7 +510,7 @@ impl JsSession {
                 None
             };
 
-            tracing::info!(has_result = result_str.is_some(), execution_count = exec_count, "run_cell_done");
+            tracing::debug!(has_result = result_str.is_some(), execution_count = exec_count, "run_cell_done");
             RunResult {
                 stdout: hs.stdout.clone(),
                 stderr: hs.stderr.clone(),
@@ -490,7 +533,7 @@ impl JsSession {
     /// Resume a yielded cell with an async response.
     pub fn resume_cell(&mut self, call_id: u32, result_json: &str) -> RunResult {
         let exec_count = self.execution_count;
-        tracing::info!(call_id, execution_count = exec_count, "resume_start");
+        tracing::trace!(call_id, execution_count = exec_count, "resume_enter");
 
         // Parse the async response
         let response: AsyncResponse = match serde_json::from_str(result_json) {
@@ -570,23 +613,57 @@ impl JsSession {
                 return RunResult::async_pending(hs.stdout.clone(), new_pending, exec_count);
             }
 
-            // Check top-level Promise state for unhandled rejections
+            // Check top-level Promise state for unhandled rejections / in-flight wrapper
             let top_promise = ctx.globals().get::<_, Value>("__webJsTopPromise").ok();
             if let Some(promise) = top_promise {
                 if promise.is_promise() {
-                    if let PromiseState::Rejected(err) = check_promise_state(ctx, &promise) {
-                        let msg = exception_to_string(&err);
-                        tracing::error!(call_id, error = %msg, "resume_top_level_promise_rejected");
-                        let hs = host_state.borrow();
-                        let cell_err = cell_error_from_exception(&err);
-                        return RunResult::with_partial_output(
-                            hs.stdout.clone(),
-                            hs.stderr.clone(),
-                            hs.commands.clone(),
-                            cell_err.clone(),
-                            fuel_exhausted_flag_for(&cell_err, &fuel_counter),
-                            exec_count,
-                        );
+                    match check_promise_state(ctx.clone(), &promise) {
+                        PromiseState::Rejected(err) => {
+                            let msg = exception_to_string(&err);
+                            tracing::error!(call_id, error = %msg, "resume_top_level_promise_rejected");
+                            let hs = host_state.borrow();
+                            let cell_err = cell_error_from_exception(&err);
+                            return RunResult::with_partial_output(
+                                hs.stdout.clone(),
+                                hs.stderr.clone(),
+                                hs.commands.clone(),
+                                cell_err.clone(),
+                                fuel_exhausted_flag_for(&cell_err, &fuel_counter),
+                                exec_count,
+                            );
+                        }
+                        PromiseState::Pending => {
+                            if let Some(fuel_err) = drain_pending_jobs(&ctx, &fuel_counter) {
+                                let hs = host_state.borrow();
+                                return RunResult::with_partial_output(
+                                    hs.stdout.clone(),
+                                    hs.stderr.clone(),
+                                    hs.commands.clone(),
+                                    fuel_err,
+                                    true,
+                                    exec_count,
+                                );
+                            }
+                            let pending_after_drain: Vec<AsyncCommand> = host_state
+                                .borrow_mut()
+                                .pending_async_commands
+                                .drain(..)
+                                .collect();
+                            let has_js_pending: bool = ctx
+                                .eval::<bool, _>(
+                                    "typeof __webJsPending !== 'undefined' && Object.keys(__webJsPending).length > 0",
+                                )
+                                .unwrap_or(false);
+                            if has_js_pending || !pending_after_drain.is_empty() {
+                                let hs = host_state.borrow();
+                                return RunResult::async_pending(
+                                    hs.stdout.clone(),
+                                    pending_after_drain,
+                                    exec_count,
+                                );
+                            }
+                        }
+                        PromiseState::Fulfilled(_) => {}
                     }
                 }
             }
@@ -618,7 +695,7 @@ impl JsSession {
             self.needs_reset = true;
         }
 
-        tracing::info!(call_id, status = ?result.status, "resume_end");
+        tracing::trace!(call_id, status = ?result.status, "resume_exit");
         result
     }
 }

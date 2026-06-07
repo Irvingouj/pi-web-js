@@ -1,4 +1,3 @@
-import { WebSession } from "@pi-oxide/web-js";
 import { useCallback, useRef, useState } from "preact/hooks";
 import type { WorkerRunResult } from "../types";
 
@@ -14,18 +13,23 @@ export interface KernelHandle {
 type ResultHandler = (cellId: string, data: WorkerRunResult) => void;
 type ErrorHandler = (error: string) => void;
 
-let globalSession: WebSession | null = null;
-let globalRunner: Promise<void> | null = null;
-let initPromise: Promise<WebSession> | null = null;
+type WebSessionModule = typeof import("@pi-oxide/web-js");
+type WebSession = WebSessionModule["WebSession"];
 
-async function ensureSession(): Promise<WebSession> {
+let globalSession: InstanceType<WebSession> | null = null;
+let globalRunner: Promise<void> | null = null;
+let initPromise: Promise<InstanceType<WebSession>> | null = null;
+
+async function ensureSession(): Promise<InstanceType<WebSession>> {
 	if (globalSession) return globalSession;
 	if (!initPromise) {
-		initPromise = WebSession.init().then(([session, runner]) => {
-			globalSession = session;
-			globalRunner = runner;
-			return session;
-		});
+		initPromise = import("@pi-oxide/web-js").then(({ WebSession }) =>
+			WebSession.init().then(([session, runner]) => {
+				globalSession = session;
+				globalRunner = runner;
+				return session;
+			}),
+		);
 	}
 	return initPromise;
 }

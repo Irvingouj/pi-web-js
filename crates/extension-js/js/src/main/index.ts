@@ -1,7 +1,7 @@
 // Public extension-js main-thread API.
 
 export type { LogLevel } from "../shared/logger.js";
-export { setLogLevel } from "../shared/logger.js";
+export { setLogLevel, LOG_LEVEL_NUMERIC } from "../shared/logger.js";
 export type {
 	CellResult as JsRunResult,
 	WasmGlobalsSnapshot as JsGlobalsSnapshot,

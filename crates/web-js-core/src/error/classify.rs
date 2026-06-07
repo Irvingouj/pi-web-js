@@ -39,7 +39,16 @@ pub(crate) fn drain_pending_jobs<'js>(
     ctx: &Ctx<'js>,
     fuel_counter: &Arc<AtomicU64>,
 ) -> Option<CellError> {
+    const MAX_PENDING_JOB_DRAIN: u32 = 4096;
+    let mut drained = 0u32;
     while ctx.execute_pending_job() {
+        drained += 1;
+        tracing::trace!(drained, "drain_pending_job");
+        if drained >= MAX_PENDING_JOB_DRAIN {
+            return Some(CellError::Internal {
+                message: "QuickJS pending job queue exceeded safe drain limit".into(),
+            });
+        }
         if fuel_depleted(fuel_counter) {
             return Some(CellError::FuelExhausted);
         }

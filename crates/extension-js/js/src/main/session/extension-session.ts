@@ -11,7 +11,8 @@ import type {
   WasmGlobalsSnapshot,
 } from "../../../pkg/extension_js.js";
 import type { FsAction, FsActionMap } from "../../shared/fs-types.js";
-import { logger } from "../../shared/logger.js";
+import type { LogLevel } from "../../shared/logger.js";
+import { logger, setLogLevel as setMainLogLevel, LOG_LEVEL_NUMERIC } from "../../shared/logger.js";
 import type { Command } from "../../shared/registry/manifest.js";
 import {
   executeMainThreadCommand,
@@ -80,6 +81,7 @@ export class ExtensionSession {
    * page is fully safe. Concurrent sessions race on the same abort signal.
    */
   static async init(): Promise<[ExtensionSession, Promise<void>]> {
+    logger.trace("init_start");
     setRunnerAbortController(new AbortController());
     if (typeof chrome !== "undefined" && chrome.runtime?.id) {
       initTabContext(chrome);
@@ -99,6 +101,7 @@ export class ExtensionSession {
     const session = new ExtensionSession();
     const [ready, runner] = session.startWorker(manifest);
     await ready;
+    logger.trace("init_ready");
     return [session, runner];
   }
 
@@ -153,12 +156,14 @@ export class ExtensionSession {
         ? chrome.runtime.id
         : undefined;
     w.postMessage({ type: "init", manifest, extensionId });
+    logger.trace("startWorker_posted_init", { extensionId: extensionId ?? null });
 
     return [readyPromise, runnerPromise];
   }
 
   private handleWorkerMessage(e: MessageEvent<WorkerResponse>) {
     const msg = e.data;
+    logger.trace("worker_message", { type: msg.type, id: "id" in msg ? msg.id : undefined });
     switch (msg.type) {
       case "result": {
         const callId = msg.id;
@@ -166,14 +171,16 @@ export class ExtensionSession {
         const pending = this.pendingCalls.get(callId);
         if (pending) {
           this.pendingCalls.delete(callId);
-          // Intentionally omit msg.data from logs to avoid leaking large or sensitive cell outputs.
-          logger.debug("result", { callId, runId: msg.runId });
+          logger.trace("result", { callId, runId: msg.runId });
           pending.resolve(msg.data);
+        } else {
+          logger.trace("result_no_pending", { callId, runId: msg.runId });
         }
         break;
       }
       case "error": {
         const callId = msg.id;
+        logger.trace("error", { callId, error: msg.error, runId: msg.runId });
         if (callId) {
           const pending = this.pendingCalls.get(callId);
           if (pending) {
@@ -192,6 +199,7 @@ export class ExtensionSession {
       }
       case "relayCancel": {
         if (!msg.id) break;
+        logger.trace("relayCancel", { id: msg.id });
         this.inFlightRelays.get(msg.id)?.abort();
         break;
       }
@@ -213,7 +221,7 @@ export class ExtensionSession {
         const relayId = msg.id;
         const relayAbort = new AbortController();
         this.inFlightRelays.set(relayId, relayAbort);
-        logger.debug("asyncRelay", { action, owner, id: relayId, runId: msg.runId, tabPolicy });
+        logger.trace("asyncRelay", { action, owner, id: relayId, runId: msg.runId, tabPolicy });
         const cmd = cmdObj as Command;
         // Mutate the relayed command in-place to attach the correlation ID.
         // The command object originates from WASM and is discarded after this call.
@@ -223,7 +231,7 @@ export class ExtensionSession {
             if (relayAbort.signal.aborted) {
               return;
             }
-            logger.debug("asyncRelayResult", {
+            logger.trace("asyncRelayResult", {
               action,
               id: relayId,
               resultType: typeof result,
@@ -283,6 +291,14 @@ export class ExtensionSession {
     relayId?: string,
     signal?: AbortSignal,
   ): Promise<unknown> {
+    logger.trace("executeContextCommand", {
+      owner,
+      action: cmd.action,
+      relayId,
+      tabPolicy,
+      callId: cmd.call_id,
+      runId: cmd.runId,
+    });
     if (signal?.aborted) {
       return Promise.resolve({
         ok: false,
@@ -398,6 +414,7 @@ export class ExtensionSession {
   }
 
   private postAndWait<T>(msg: WorkerRequest & { id: string }): Promise<T> {
+    logger.trace("postAndWait", { type: msg.type, id: msg.id, runId: "runId" in msg ? msg.runId : undefined });
     const worker = this.worker;
     if (!worker || this.disposed) {
       return Promise.reject(
@@ -416,20 +433,36 @@ export class ExtensionSession {
   async runCellAsync(code: string, stdin?: string): Promise<CellResult> {
     const id = this.generateId();
     const runId = this.generateId();
-    const run = this.runQueue.then(() =>
-      this.postAndWait<CellResult>({
-        type: "runCell",
-        id,
-        code,
-        stdin: stdin || "",
-        runId,
-      }),
-    );
+    const run = this.runQueue.then(async () => {
+      logger.trace("runCell_start", { runId, callId: id, codeLen: code.length });
+      try {
+        const result = await this.postAndWait<CellResult>({
+          type: "runCell",
+          id,
+          code,
+          stdin: stdin || "",
+          runId,
+        });
+        logger.trace("runCell_done", { runId, callId: id, status: result.status });
+        return result;
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        logger.error("runCell_failed", { runId, callId: id, error: message });
+        throw err;
+      }
+    });
     this.runQueue = run.then(
       () => undefined,
       () => undefined,
     );
     return run;
+  }
+
+  setLogLevel(level: LogLevel): void {
+    logger.trace("setLogLevel", { level });
+    setMainLogLevel(level);
+    if (!this.worker || this.disposed) return;
+    this.worker.postMessage({ type: "setLogLevel", level: LOG_LEVEL_NUMERIC[level] });
   }
 
   reset(): Promise<void> {

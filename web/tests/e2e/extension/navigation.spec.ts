@@ -59,14 +59,38 @@ print(RESULT_PREFIX + JSON.stringify({ ok: true, value: result }));
 		});
 	});
 
+	test("bare top-level await without let/const is wrapped safely", async ({ harness }) => {
+		const source = `
+var RESULT_PREFIX = "${RESULT_PREFIX}";
+
+const tabs = await chrome.tabs.query({ url: "https://extension-js.test/*" });
+if (tabs.length === 0) {
+  throw new Error("Test tab not found");
+}
+await chrome.tabs.update(tabs[0].id, { active: true });
+
+await page.goto("https://extension-js.test/next");
+print(RESULT_PREFIX + JSON.stringify({ ok: true, value: "bare-await" }));
+`;
+
+		const exec = await executeCell<ContractResult<string>>(
+			harness.sidepanel,
+			source,
+			20_000,
+		);
+
+		expect(exec.status, `${exec.stderr}\n${exec.stdout}`).toBe("success");
+		expect(exec.result).toEqual({ ok: true, value: "bare-await" });
+	});
+
 	test("goto -> url -> title -> snapshot without manual sleep", async ({ harness }) => {
 		const source = `
 var RESULT_PREFIX = "${RESULT_PREFIX}";
 
-// Find the fixture tab and make it active
-const tabs = await chrome.tabs.query({ url: "https://extension-js.test/fixture" });
+// Find any extension test tab (prior cells may have navigated away from /fixture)
+const tabs = await chrome.tabs.query({ url: "https://extension-js.test/*" });
 if (tabs.length === 0) {
-  throw new Error("Fixture tab not found");
+  throw new Error("Test tab not found");
 }
 const fixtureTabId = tabs[0].id;
 await chrome.tabs.update(fixtureTabId, { active: true });
@@ -111,6 +135,33 @@ print(RESULT_PREFIX + JSON.stringify({
 			expect(exec.result.value.nodeCount).toBeGreaterThan(0);
 			expect(exec.result.value.refId).toMatch(/^e\d+$/);
 			expect(exec.result.value.clicked).toBe(true);
+		}
+	});
+
+	test("goto then extract matches user notebook snippet", async ({ harness }) => {
+		const source = `
+var RESULT_PREFIX = "${RESULT_PREFIX}";
+
+const tabs = await chrome.tabs.query({ url: "https://extension-js.test/*" });
+if (tabs.length === 0) {
+  throw new Error("Test tab not found");
+}
+await chrome.tabs.update(tabs[0].id, { active: true });
+
+await page.goto("https://extension-js.test/next");
+let result = await page.extract(["title", "url"]);
+print(RESULT_PREFIX + JSON.stringify({ ok: true, value: result }));
+`;
+
+		const exec = await executeCell<
+			ContractResult<{ title: string; url: string }>
+		>(harness.sidepanel, source, 20_000);
+
+		expect(exec.status, `${exec.stderr}\n${exec.stdout}`).toBe("success");
+		expect(exec.result?.ok).toBe(true);
+		if (exec.result?.ok) {
+			expect(exec.result.value.title).toBe("Next page");
+			expect(exec.result.value.url).toContain("/next");
 		}
 	});
 

@@ -1,6 +1,5 @@
 use crate::browser_api::init_fs_registry;
 use std::sync::atomic::{AtomicU64, Ordering};
-use tracing::Instrument;
 use wasm_bindgen::prelude::*;
 use web_js_base::types::*;
 use web_js_base::BaseSession;
@@ -107,9 +106,8 @@ impl ExtensionSession {
         stdin: String,
         run_id: String,
     ) -> CellResult {
-        let span =
-            tracing::info_span!("run_cell_async", session_id = %self.session_id, run_id = %run_id);
         self.aborted.set(false);
+        tracing::trace!(code_len = code.len(), run_id = %run_id, "run_cell_async_enter");
         let result = web_js_base::run_cell_async_loop(
             &mut self.base,
             &code,
@@ -118,28 +116,27 @@ impl ExtensionSession {
                 let run_id_for_cmd = run_id.clone();
                 async move {
                     cmd.run_id = Some(run_id_for_cmd);
-                    let span = tracing::info_span!("handle_command", command_id = cmd.call_id, action = %cmd.action, run_id = ?cmd.run_id);
-                    async {
-                        match ExtensionSession::handle_command(&cmd).await {
-                            Ok(r) => Ok(r),
-                            Err(e) => Err(WasmAsyncError {
-                                message: e,
-                                code: "E_DISPATCH_ERROR".into(),
-                            }),
-                        }
-                    }.instrument(span).await
+                    match ExtensionSession::handle_command(&cmd).await {
+                        Ok(r) => Ok(r),
+                        Err(e) => Err(WasmAsyncError {
+                            message: e,
+                            code: "E_DISPATCH_ERROR".into(),
+                        }),
+                    }
                 }
             },
             Some(&self.aborted),
-        ).instrument(span).await;
+        )
+        .await;
 
+        tracing::trace!(run_id = %run_id, status = ?result.status(), "run_cell_async_exit");
         result.into()
     }
 }
 
 impl ExtensionSession {
     async fn handle_command(cmd: &WasmAsyncCommand) -> Result<WasmAsyncResponse, String> {
-        tracing::info!(call_id = cmd.call_id, action = %cmd.action, run_id = ?cmd.run_id, "handle_command_start");
+        tracing::trace!(call_id = cmd.call_id, action = %cmd.action, run_id = ?cmd.run_id, "handle_command_enter");
 
         let core_cmd = web_js_core::AsyncCommand {
             call_id: cmd.call_id,
@@ -159,7 +156,7 @@ impl ExtensionSession {
                         code: e.code,
                     }),
                 };
-                tracing::info!(call_id = cmd.call_id, action = %cmd.action, ok = wasm_resp.ok, "handle_command_done");
+                tracing::trace!(call_id = cmd.call_id, action = %cmd.action, ok = wasm_resp.ok, "handle_command_exit");
                 Ok(wasm_resp)
             }
             None => {

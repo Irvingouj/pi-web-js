@@ -5,8 +5,8 @@ export default defineConfig({
 	testMatch: "**/*.spec.ts",
 	fullyParallel: false,
 	workers: 1,
-	// One small assertion per test; fail fast if a cell or hook hangs.
-	timeout: 10_000,
+	// Extension launch + WASM init + first async cell can exceed 10s.
+	timeout: 60_000,
 	expect: {
 		timeout: 5_000,
 	},

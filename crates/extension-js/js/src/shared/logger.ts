@@ -1,20 +1,16 @@
-export type LogLevel = "debug" | "info" | "warn" | "error" | "none";
+export type LogLevel = "trace" | "debug" | "info" | "warn" | "error" | "none";
 
-const LEVEL_ORDER: Record<LogLevel, number> = {
-	debug: 0,
-	info: 1,
-	warn: 2,
-	error: 3,
-	none: 4,
-};
+import { LOG_LEVEL_NUMERIC } from "./log-levels.js";
 
-let currentLevel: LogLevel = "error";
+export { LOG_LEVEL_NUMERIC, numericToLogLevel } from "./log-levels.js";
+
+let currentLevel: LogLevel = "trace";
 let wasmSetLogLevel: ((level: number) => void) | null = null;
 
 export function setLogLevel(level: LogLevel) {
 	currentLevel = level;
 	if (wasmSetLogLevel) {
-		wasmSetLogLevel(LEVEL_ORDER[level]);
+		wasmSetLogLevel(LOG_LEVEL_NUMERIC[level]);
 	}
 }
 
@@ -24,14 +20,11 @@ export function getLogLevel(): LogLevel {
 
 export function registerWasmSetLogLevel(fn: (level: number) => void) {
 	wasmSetLogLevel = fn;
-	// Sync current level to WASM immediately so the bridge doesn't miss the active level before registration.
-	if (currentLevel !== "error") {
-		fn(LEVEL_ORDER[currentLevel]);
-	}
+	fn(LOG_LEVEL_NUMERIC[currentLevel]);
 }
 
 function shouldLog(level: LogLevel): boolean {
-	return LEVEL_ORDER[level] >= LEVEL_ORDER[currentLevel];
+	return LOG_LEVEL_NUMERIC[level] >= LOG_LEVEL_NUMERIC[currentLevel];
 }
 
 function safeStringify(value: unknown, logLevel: LogLevel = "info"): string {
@@ -43,7 +36,9 @@ function safeStringify(value: unknown, logLevel: LogLevel = "info"): string {
 	if (typeof value === "bigint") return `${value}n`;
 	if (value instanceof Error) {
 		const stack =
-			logLevel === "debug" ? value.stack : value.stack?.split("\n")[0];
+			logLevel === "debug" || logLevel === "trace"
+				? value.stack
+				: value.stack?.split("\n")[0];
 		return JSON.stringify({ message: value.message, name: value.name, stack });
 	}
 	if (typeof value === "function") return "[Function]";
@@ -96,7 +91,6 @@ function normalizeArgs(
 	) {
 		return { event, metadata: rest[0] as Record<string, unknown> };
 	}
-	// Legacy multi-arg calling convention: join all extra args
 	return {
 		event,
 		metadata: { _args: rest.map((v) => safeStringify(v)).join(" ") },
@@ -117,9 +111,8 @@ export class Logger {
 			const meta = formatMetadata(metadata, level);
 			const message = `${prefix} ${event}${meta}`;
 			switch (level) {
+				case "trace":
 				case "debug":
-					console.log(message);
-					break;
 				case "info":
 					console.log(message);
 					break;
@@ -141,6 +134,10 @@ export class Logger {
 		}
 	}
 
+	trace(event: string, ...rest: unknown[]) {
+		const { event: ev, metadata } = normalizeArgs(event, rest);
+		this.log("trace", ev, metadata);
+	}
 	debug(event: string, ...rest: unknown[]) {
 		const { event: ev, metadata } = normalizeArgs(event, rest);
 		this.log("debug", ev, metadata);
@@ -174,7 +171,6 @@ export class Logger {
 			try {
 				const end = usePerformance ? performance.now() : Date.now();
 				const duration = Math.round(end - start);
-				// finishMetadata overrides metadata keys, but duration_ms is always the computed timer value
 				const combined = {
 					...metadata,
 					...finishMetadata,

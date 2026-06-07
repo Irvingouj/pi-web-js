@@ -1,5 +1,6 @@
-import { ExtensionSession, setLogLevel } from "@pi-oxide/extension-js";
-import { useCallback, useRef, useState } from "preact/hooks";
+import { ExtensionSession } from "@pi-oxide/extension-js";
+import type { LogLevel } from "@pi-oxide/extension-js";
+import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 import type { WorkerRunResult } from "../types";
 
 export type KernelStatus = "ready" | "running" | "stopped" | "error";
@@ -29,19 +30,23 @@ async function ensureSession(): Promise<ExtensionSession> {
 					__jsNotebookSetLogLevel?: (level: string) => void;
 					__extensionSession?: ExtensionSession;
 				};
-				w.__jsNotebookSetLogLevel = setLogLevel;
+				w.__jsNotebookSetLogLevel = (level: string) => {
+					const normalized = level as LogLevel;
+					session.setLogLevel(normalized);
+				};
 				w.__extensionSession = session;
-				setLogLevel("info");
-				const e2eLog = new URLSearchParams(window.location.search).get(
-					"e2e_log",
-				);
+				session.setLogLevel("trace");
+				const params = new URLSearchParams(window.location.search);
+				const logLevel =
+					params.get("e2e_log") ?? params.get("log");
 				if (
-					e2eLog === "debug" ||
-					e2eLog === "info" ||
-					e2eLog === "warn" ||
-					e2eLog === "error"
+					logLevel === "trace" ||
+					logLevel === "debug" ||
+					logLevel === "info" ||
+					logLevel === "warn" ||
+					logLevel === "error"
 				) {
-					setLogLevel(e2eLog);
+					session.setLogLevel(logLevel);
 				}
 			}
 			return session;
@@ -59,6 +64,14 @@ export function useExtensionKernel(
 	const onErrorRef = useRef(onError);
 	onResultRef.current = onResult;
 	onErrorRef.current = onError;
+
+	useEffect(() => {
+		ensureSession().catch((err: unknown) => {
+			const message = err instanceof Error ? err.message : String(err);
+			onErrorRef.current(message);
+			setStatus("error");
+		});
+	}, []);
 
 	const runCell = useCallback((cellId: string, code: string, stdin: string) => {
 		const w = typeof window !== "undefined" ? (window as any) : null;

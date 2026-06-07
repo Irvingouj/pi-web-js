@@ -622,7 +622,7 @@ pub fn dispatch_handler(action: &str, cmd: AsyncCommand) -> Option<AsyncHandlerF
                         as Pin<Box<dyn Future<Output = Result<AsyncResponse, String>>>>);
                 }
             };
-            tracing::debug!(action = %cmd.action, "dispatch_handler_js_callback_call");
+            tracing::trace!(action = %cmd.action, "dispatch_handler_js_callback_call");
             // Build context object with action, call_id and run_id for the JS callback
             let context_js = js_sys::Object::new();
             let _ = js_sys::Reflect::set(
@@ -687,7 +687,7 @@ pub fn dispatch_handler(action: &str, cmd: AsyncCommand) -> Option<AsyncHandlerF
                             tracing::warn!(action = %action_for_timeout, error = %e, "dispatch_handler_js_callback_deserialize_failed");
                             format!("Failed to deserialize JS callback response: {}", e)
                         })?;
-                tracing::info!(action = %action_for_timeout, ok = resp.ok, "dispatch_handler_js_callback_done");
+                tracing::trace!(action = %action_for_timeout, ok = resp.ok, "dispatch_handler_js_callback_done");
                 Ok(resp)
             })
                 as Pin<

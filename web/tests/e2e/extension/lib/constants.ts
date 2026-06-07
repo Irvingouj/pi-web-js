@@ -39,7 +39,7 @@ export const EXT_E2E_ATTACH_ALWAYS = process.env.EXT_E2E_ATTACH_ALWAYS === "1";
  * Default "error" avoids info/debug log storms that overflow the stack on contract cells.
  * Playwright still captures browser console via EXT_E2E_VERBOSE.
  */
-const E2E_LOG_LEVELS = ["debug", "info", "warn", "error"] as const;
+const E2E_LOG_LEVELS = ["trace", "debug", "info", "warn", "error"] as const;
 export const EXT_E2E_LOG_LEVEL: (typeof E2E_LOG_LEVELS)[number] =
 	E2E_LOG_LEVELS.includes(
 		process.env.EXT_E2E_LOG_LEVEL as (typeof E2E_LOG_LEVELS)[number],
