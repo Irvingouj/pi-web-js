@@ -154,6 +154,30 @@ export class ExtensionSession {
 	inspect_globals(): WasmGlobalsSnapshot {
 		return { variables: [], execution_count: 0 };
 	}
+	apiDocs(_format: string): string {
+		return JSON.stringify([
+			{
+				public_name: "fs.exists",
+				namespace: "fs",
+				name: "exists",
+				action: "fs_exists",
+				description: "Check if a path exists.",
+				params: [],
+				returns: { js_type: "boolean", description: "Whether the path exists." },
+				source: "rust_core",
+			},
+			{
+				public_name: "page.goto",
+				namespace: "page",
+				name: "goto",
+				action: "page_goto",
+				description: "Navigate to a URL.",
+				params: [{ name: "url", js_type: "string", required: true, description: "The URL to navigate to." }],
+				returns: { js_type: "object", description: "Navigation result." },
+				source: "extension",
+			},
+		]);
+	}
 	load_library(_source: string): CellResult {
 		return {
 			status: "ok",

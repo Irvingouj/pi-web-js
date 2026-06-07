@@ -117,6 +117,8 @@ mod tests {
                 assert!(message.contains("tab_snapshot"), "{message}");
                 assert!(message.contains("E_SCRIPTING"), "{message}");
                 assert!(message.contains("Cannot execute script"), "{message}");
+                assert!(!message.contains("<no message>"), "{message}");
+                assert!(!message.contains("<no details available>"), "{message}");
             }
             other => panic!("expected runtime error, got {other:?}"),
         }
@@ -397,9 +399,9 @@ mod tests {
         let r2 = session.resume_cell(id2, &serde_json::to_string(&resp2).unwrap());
         assert_eq!(r2.status, CellStatus::Done);
 
-        // Check caught error
+        // Check caught error — resume_async_pending wraps action+code+message
         let check = session.run_cell("print(__caught)", "");
-        assert_eq!(check.stdout[0], "boom");
+        assert_eq!(check.stdout[0], "[test_action] (E_TEST) boom");
     }
 
     /// String-based action dispatch works (registry path)
@@ -696,6 +698,135 @@ mod tests {
     }
 
     #[test]
+    fn test_let_redeclaration_on_second_identical_cell_run() {
+        let mut session = JsSession::new();
+        let code = r#"let result = 1; result"#;
+        let first = session.run_cell(code, "");
+        assert!(first.error.is_none(), "{:?}", first.error);
+        let second = session.run_cell(code, "");
+        println!("second identical let cell: {:?}", second);
+        assert!(
+            second.error.is_none(),
+            "second run should not fail on let redeclaration: {:?}",
+            second.error
+        );
+    }
+
+    #[test]
+    fn test_page_goto_extract_cell_runs_twice() {
+        use crate::api_docs::{
+            clear_docs, clear_handlers, generate_js_bindings_code, register,
+            register_handler, ApiHandler, JsApiDoc, ReturnDoc, ToolSource, ToolTransport,
+        };
+        use std::future::Future;
+        use std::pin::Pin;
+        use std::rc::Rc;
+
+        clear_docs();
+        clear_handlers();
+
+        for (name, action, fields) in [
+            ("goto", "page_goto", None),
+            ("extract", "page_extract", Some(vec!["fields".to_string()])),
+        ] {
+            register(JsApiDoc {
+                namespace: "page".into(),
+                name: name.into(),
+                action: Some(action.into()),
+                description: "test".into(),
+                params: vec![],
+                returns: ReturnDoc {
+                    js_type: "object".into(),
+                    description: "ok".into(),
+                },
+                public_name: format!("page.{name}"),
+                local_name: None,
+                transport: ToolTransport::Async,
+                tool_source: ToolSource::Extension,
+                fields: fields.clone(),
+                aliases: vec![],
+                permission: None,
+                example: None,
+            });
+            let action_name = action.to_string();
+            let _ = register_handler(
+                action,
+                ApiHandler::Rust(Rc::new(move |_cmd| {
+                    let action_name = action_name.clone();
+                    Box::pin(async move {
+                        let value = if action_name == "page_extract" {
+                            Some(serde_json::json!({
+                                "title": "Example",
+                                "url": "https://example.com/"
+                            }))
+                        } else {
+                            None
+                        };
+                        Ok(crate::types::AsyncResponse {
+                            ok: true,
+                            value,
+                            error: None,
+                        })
+                    })
+                        as Pin<
+                            Box<dyn Future<Output = Result<crate::types::AsyncResponse, String>>>,
+                        >
+                })),
+            );
+        }
+
+        let mut session = JsSession::new();
+        let setup = session.run_cell(&generate_js_bindings_code(), "");
+        assert!(setup.error.is_none(), "{:?}", setup.error);
+
+        let code = r#"await page.goto("https://example.com");
+let result = await page.extract(["title", "url"]);
+console.log(result)"#;
+
+        for run in 1..=2 {
+            let mut result = session.run_cell(code, "");
+            while result.status == CellStatus::AsyncPending {
+                assert!(
+                    !result.pending_commands.is_empty(),
+                    "run {run} stuck pending without commands"
+                );
+                let pending = result.pending_commands.clone();
+                for cmd in pending {
+                    let response = crate::types::AsyncResponse {
+                        ok: true,
+                        value: if cmd.action == "page_extract" {
+                            Some(serde_json::json!({
+                                "title": "Example",
+                                "url": "https://example.com/"
+                            }))
+                        } else {
+                            None
+                        },
+                        error: None,
+                    };
+                    result = session.resume_cell(
+                        cmd.call_id,
+                        &serde_json::to_string(&response).unwrap(),
+                    );
+                }
+            }
+            assert!(
+                result.error.is_none(),
+                "run {run} failed: {:?}",
+                result.error
+            );
+            assert!(
+                result.stdout.iter().any(|line| line.contains("example.com")),
+                "run {run} stdout missing extract output: {:?}",
+                result.stdout
+            );
+        }
+
+        clear_handlers();
+        clear_docs();
+    }
+
+    #[test]
     fn test_syntax_error_does_not_poison_next_cell() {
         let mut session = JsSession::new();
         let first = session.run_cell("if (", "");
@@ -775,6 +906,8 @@ mod tests {
             tool_source: ToolSource::Extension,
             fields: None,
             aliases: vec![],
+            permission: None,
+            example: None,
         });
         let _ = register_handler(
             "chrome_cookies_get",
@@ -819,6 +952,77 @@ mod tests {
     }
 
     #[test]
+    fn test_page_extract_array_positional_binding() {
+        use crate::api_docs::{
+            clear_docs, clear_handlers, generate_js_bindings_code, register,
+            register_handler, ApiHandler, JsApiDoc, ReturnDoc, ToolSource, ToolTransport,
+        };
+        use std::future::Future;
+        use std::pin::Pin;
+        use std::rc::Rc;
+
+        clear_docs();
+        clear_handlers();
+
+        register(JsApiDoc {
+            namespace: "page".into(),
+            name: "extract".into(),
+            action: Some("page_extract".into()),
+            description: "Extract page data.".into(),
+            params: vec![],
+            returns: ReturnDoc {
+                js_type: "object".into(),
+                description: "Extracted fields.".into(),
+            },
+            public_name: "page.extract".into(),
+            local_name: None,
+            transport: ToolTransport::Async,
+            tool_source: ToolSource::Extension,
+            fields: Some(vec!["fields".into()]),
+            aliases: vec![],
+            permission: None,
+            example: None,
+        });
+        let _ = register_handler(
+            "page_extract",
+            ApiHandler::Rust(Rc::new(|_cmd| {
+                Box::pin(async move {
+                    Ok(crate::types::AsyncResponse {
+                        ok: true,
+                        value: None,
+                        error: None,
+                    })
+                })
+                    as Pin<Box<dyn Future<Output = Result<crate::types::AsyncResponse, String>>>>
+            })),
+        );
+
+        let mut session = JsSession::new();
+        let setup = session.run_cell(&generate_js_bindings_code(), "");
+        assert!(setup.error.is_none(), "{:?}", setup.error);
+
+        let result = session.run_cell(r#"await page.extract(["title", "url"])"#, "");
+        assert_eq!(result.status, CellStatus::AsyncPending, "{:?}", result);
+        assert_eq!(result.pending_commands.len(), 1);
+        assert_eq!(result.pending_commands[0].action, "page_extract");
+        assert_eq!(
+            result.pending_commands[0].params,
+            serde_json::json!({ "fields": ["title", "url"] }),
+            "page.extract array positional call must map to fields array"
+        );
+
+        let invalid = session.run_cell(r#"await page.extract(["title", 1])"#, "");
+        assert!(
+            invalid.error.is_some(),
+            "mixed-type fields array must reject: {:?}",
+            invalid
+        );
+
+        clear_handlers();
+        clear_docs();
+    }
+
+    #[test]
     fn test_parity_async_params_preserve_cookie_details() {
         let mut session = JsSession::new();
         let setup = session.run_cell(
@@ -851,7 +1055,47 @@ mod tests {
 
     #[test]
     fn test_chrome_tabs_create_pending() {
+        use crate::api_docs::{register, register_handler, ApiHandler, JsApiDoc, ReturnDoc, ToolSource, ToolTransport};
+        use std::future::Future;
+        use std::pin::Pin;
+        use std::rc::Rc;
+
+        register(JsApiDoc {
+            namespace: "chrome.tabs".into(),
+            name: "create".into(),
+            action: Some("chrome_tabs_create".into()),
+            description: "Create a tab.".into(),
+            params: vec![],
+            returns: ReturnDoc {
+                js_type: "object".into(),
+                description: "Tab object.".into(),
+            },
+            public_name: "chrome.tabs.create".into(),
+            local_name: None,
+            transport: ToolTransport::Async,
+            tool_source: ToolSource::Extension,
+            fields: None,
+            aliases: vec![],
+            permission: None,
+            example: None,
+        });
+        let _ = register_handler(
+            "chrome_tabs_create",
+            ApiHandler::Rust(Rc::new(|_cmd| {
+                Box::pin(async move {
+                    Ok(crate::types::AsyncResponse {
+                        ok: true,
+                        value: None,
+                        error: None,
+                    })
+                }) as Pin<Box<dyn Future<Output = Result<crate::types::AsyncResponse, String>>>>
+            })),
+        );
+
         let mut session = JsSession::new();
+        let bindings = crate::api_docs::generate_js_bindings_code();
+        let setup = session.run_cell(&bindings, "");
+        assert!(setup.error.is_none(), "{:?}", setup.error);
         let result = session.run_cell(
             "const tab = await chrome.tabs.create({url: \"https://example.com\"})",
             "",
@@ -860,6 +1104,9 @@ mod tests {
         assert_eq!(result.status, CellStatus::AsyncPending);
         assert_eq!(result.pending_commands.len(), 1);
         assert_eq!(result.pending_commands[0].action, "chrome_tabs_create");
+
+        crate::api_docs::clear_docs();
+        crate::api_docs::clear_handlers();
     }
 
     #[test]
@@ -880,5 +1127,131 @@ mod tests {
         );
         assert_eq!(result.status, CellStatus::Done);
         assert!(result.error.is_none());
+    }
+
+    #[test]
+    fn test_const_cell_can_be_rerun_after_isolation_wrap() {
+        let mut session = JsSession::new();
+        let code = "const x = 1; x";
+        let first = session.run_cell(code, "");
+        assert!(first.error.is_none(), "{:?}", first.error);
+        let second = session.run_cell(code, "");
+        assert!(
+            second.error.is_none(),
+            "wrapped const cells should be re-runnable: {:?}",
+            second.error
+        );
+    }
+
+    #[test]
+    fn test_const_redeclare_error_message() {
+        let mut session = JsSession::new();
+        let first = session.run_cell_unwrapped("const x = 1", "");
+        assert!(first.error.is_none(), "{:?}", first.error);
+
+        let second = session.run_cell_unwrapped("const x = 2", "");
+        println!("second error: {:?}", second.error);
+        assert!(second.error.is_some(), "Expected error for redeclaring const");
+        let err = second.error.unwrap();
+        let msg = format!("{}", err);
+        println!("error message: {}", msg);
+        assert!(
+            msg.contains("redeclaration") || msg.contains("already been declared"),
+            "Expected redeclaration error in: {}",
+            msg
+        );
+        assert!(!msg.contains("<no message>"), "Message must not contain '<no message>': {}", msg);
+        assert!(!msg.contains("<no details available>"), "Message must not contain '<no details available>': {}", msg);
+    }
+
+    #[test]
+    fn test_const_assignment_caught_error() {
+        let mut session = JsSession::new();
+        let result = session.run_cell_unwrapped(
+            r#"
+            const x = 1;
+            var __caught;
+            try {
+                x = 2;
+            } catch(e) {
+                __caught = e.message;
+            }
+            __caught
+        "#,
+            "",
+        );
+        println!("caught assignment result: {:?}", result);
+        assert!(result.error.is_none(), "{:?}", result.error);
+        let msg = result.result.expect("expected caught message");
+        assert!(!msg.is_empty(), "Caught error message must not be empty: {}", msg);
+        assert!(
+            msg.contains("constant") || msg.contains("read-only") || msg.contains("immutable"),
+            "Expected 'constant' or similar in caught error message: {}",
+            msg
+        );
+    }
+
+    #[test]
+    fn test_const_assignment_uncaught_error() {
+        let mut session = JsSession::new();
+        let result = session.run_cell_unwrapped(
+            r#"
+            const x = 1;
+            x = 2;
+        "#,
+            "",
+        );
+        println!("uncaught assignment result: {:?}", result);
+        assert!(result.error.is_some(), "Expected uncaught error for assignment to const");
+        let msg = format!("{}", result.error.unwrap());
+        assert!(
+            msg.contains("read-only") || msg.contains("constant") || msg.contains("immutable"),
+            "Expected read-only/constant in: {}",
+            msg
+        );
+    }
+
+    #[test]
+    fn test_empty_error_message() {
+        let mut session = JsSession::new();
+        let result = session.run_cell(r#"throw new Error()"#, "");
+        println!("empty error result: {:?}", result);
+        assert!(result.error.is_some(), "Expected error for throw new Error()");
+        let err = result.error.unwrap();
+        let msg = format!("{}", err);
+        println!("empty error: {}", msg);
+        assert!(!msg.contains("<no message>"), "Should not contain '<no message>': {}", msg);
+        assert!(!msg.contains("<no details available>"), "Should not contain '<no details available>': {}", msg);
+    }
+
+    /// Bare SyntaxError must not be rewritten to `<no details available>`.
+    #[test]
+    fn test_bare_syntax_error_not_rewritten() {
+        let mut session = JsSession::new();
+        let result = session.run_cell(r#"throw new SyntaxError()"#, "");
+        println!("bare syntax error result: {:?}", result);
+        assert!(result.error.is_some(), "Expected error for throw new SyntaxError()");
+        let err = result.error.unwrap();
+        let msg = format!("{}", err);
+        println!("bare syntax error: {}", msg);
+        assert!(!msg.contains("<no details available>"), "Bare SyntaxError must not be rewritten to '<no details available>': {}", msg);
+        assert!(!msg.contains("<no message>"), "Message must not contain '<no message>': {}", msg);
+        // Should still mention SyntaxError somewhere
+        assert!(msg.contains("SyntaxError"), "Message should mention SyntaxError: {}", msg);
+    }
+
+    #[test]
+    fn test_undefined_error() {
+        let mut session = JsSession::new();
+        let result = session.run_cell(r#"throw undefined"#, "");
+        println!("undefined error result: {:?}", result);
+        if let Some(err) = &result.error {
+            let msg = format!("{}", err);
+            println!("undefined error: {}", msg);
+            assert!(!msg.contains("<no message>"), "Message must not contain '<no message>': {}", msg);
+            assert!(!msg.contains("<no details available>"), "Message must not contain '<no details available>': {}", msg);
+        } else {
+            panic!("Expected error for throw undefined");
+        }
     }
 }

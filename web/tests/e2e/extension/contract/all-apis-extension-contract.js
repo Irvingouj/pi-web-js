@@ -35,10 +35,19 @@ function isTypedError(value) {
 }
 
 const EXPECTED_UNAVAILABLE_RE =
-	/permission|not available|not supported|disabled|unavailable|denied|requires.*permission|no access|prohibited|not a function|Unimplemented|Cannot read properties of undefined|is not defined|does not exist/i;
+	/permission|not available|not supported|disabled|unavailable|denied|requires.*permission|no access|prohibited|Unimplemented|does not exist/i;
 
 const EXPECTED_UNAVAILABLE_TEARDOWN_RE =
-	/permission|not available|not supported|disabled|unavailable|denied|requires.*permission|no access|prohibited|not a function|Unimplemented|Cannot read properties of undefined|is not defined|does not exist|No tab with id|No window with id|not found/i;
+	/permission|not available|not supported|disabled|unavailable|denied|requires.*permission|no access|prohibited|Unimplemented|does not exist|No tab with id|No window with id|not found/i;
+
+function isPhantomImplementationError(error) {
+	if (!error) return false;
+	if (error.code === "E_UNKNOWN") return true;
+	return (
+		typeof error.message === "string" &&
+		error.message.includes("Unknown main-thread action")
+	);
+}
 
 function unavailableMessage(err) {
 	const raw = err?.message ? err.message : String(err);
@@ -256,6 +265,18 @@ api("tab.create", "sidepanel", async () => tab.create(TEST_URL), {
 	expected: "success",
 });
 api("tab.list", "sidepanel", async () => tab.list(), { expected: "success" });
+
+// page tab aliases.
+api("page.tabs", "sidepanel", async () => page.tabs({}), { expected: "success" });
+api("page.switch", "sidepanel", async ({ active }) => page.switch(active.tabId), {
+	expected: "success",
+});
+api(
+	"page.new_tab",
+	"sidepanel",
+	async () => page.new_tab({ url: TEST_URL, active: false }),
+	{ destructive: true, expected: "success" },
+);
 
 // chrome.tabs.
 api(
@@ -1368,7 +1389,7 @@ class TabHandle {
 		return web.tab.type({ ...params, tabId: this.tabId });
 	}
 	append(params) {
-		return page.append(params.refId, params.text);
+		return page.append({ refId: params.refId, text: params.text });
 	}
 	press(params) {
 		return web.tab.press({ ...params, tabId: this.tabId });
@@ -1406,8 +1427,9 @@ class TabHandle {
 	title() {
 		return page.title();
 	}
-	goto(url) {
-		return chrome.tabs.update(this.tabId, { url });
+	async goto(url) {
+		await chrome.tabs.update(this.tabId, { url });
+		return web.tab.wait_for_load({ tabId: this.tabId });
 	}
 	back() {
 		return web.tab.back({ tabId: this.tabId });
@@ -1419,7 +1441,7 @@ class TabHandle {
 		return chrome.tabs.reload(this.tabId);
 	}
 	find(params) {
-		return page.find(params.selector);
+		return page.find({ selector: params.selector });
 	}
 	waitFor(params) {
 		return page.wait_for(params.selector, params.timeout);
@@ -1635,6 +1657,9 @@ const MANIFEST = [
 	"tab.find",
 	"tab.get",
 	"tab.list",
+	"page.tabs",
+	"page.switch",
+	"page.new_tab",
 	"web.clipboard.read",
 	"web.clipboard.write",
 	"web.fetch",
@@ -1869,6 +1894,10 @@ async function runAllApisExtensionContract(
 				passed = false;
 				const msg = err?.message ? err.message : String(err);
 				error = { message: msg, code: "E_UNEXPECTED" };
+			}
+
+			if (isPhantomImplementationError(error)) {
+				passed = false;
 			}
 
 			results.push({

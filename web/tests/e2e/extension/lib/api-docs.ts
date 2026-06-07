@@ -27,6 +27,7 @@ export type RuntimeApiDocEntry = {
 	tool_source?: string;
 	fields?: string[] | null;
 	aliases?: RuntimeApiDocAlias[];
+	permission?: string;
 };
 
 const KNOWN_TOOL_SOURCES = new Set(["rust_core", "js_prelude", "extension"]);

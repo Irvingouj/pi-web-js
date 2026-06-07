@@ -101,7 +101,7 @@ describe("ExtensionSession fs namespace e2e", () => {
 					tabPolicy: options?.tabPolicy,
 					command: {
 						action,
-						params: options?.params ?? { refId: "1" },
+						params: options?.params ?? { refId: "e1" },
 					},
 				},
 			} as MessageEvent);
@@ -274,6 +274,70 @@ describe("ExtensionSession fs namespace e2e", () => {
 		await expect(existsPromise).rejects.toThrow("Unknown fs action: exists");
 	});
 
+	it("apiDocs('json') sends apiDocs message and returns parsed catalog", async () => {
+		const [session, , worker] = await initSession();
+
+		const promise = session.apiDocs("json");
+
+		const apiDocsMsg = postMessages.find(
+			(m): m is PostMessage => typeof m === "object" && m !== null && (m as PostMessage).type === "apiDocs",
+		);
+		expect(apiDocsMsg).toBeDefined();
+		expect(apiDocsMsg).toMatchObject({
+			type: "apiDocs",
+			format: "json",
+		});
+
+		sendWorkerResult(worker, apiDocsMsg?.id ?? "", JSON.stringify([
+			{ public_name: "fs.exists", namespace: "fs", name: "exists", action: "fs_exists" },
+			{ public_name: "page.goto", namespace: "page", name: "goto", action: "page_goto" },
+		]));
+		const result = await promise;
+		expect(Array.isArray(result)).toBe(true);
+		expect(result).toHaveLength(2);
+		expect((result as unknown[])[0]).toMatchObject({ public_name: "fs.exists" });
+		expect((result as unknown[])[1]).toMatchObject({ public_name: "page.goto" });
+	});
+
+	it("apiDocs('markdown') sends apiDocs message and returns markdown string", async () => {
+		const [session, , worker] = await initSession();
+
+		const promise = session.apiDocs("markdown");
+
+		const apiDocsMsg = postMessages.find(
+			(m): m is PostMessage => typeof m === "object" && m !== null && (m as PostMessage).type === "apiDocs",
+		);
+		expect(apiDocsMsg).toBeDefined();
+		expect(apiDocsMsg).toMatchObject({
+			type: "apiDocs",
+			format: "markdown",
+		});
+
+		sendWorkerResult(worker, apiDocsMsg?.id ?? "", "## `page` module\n\npage.goto\n");
+		const result = await promise;
+		expect(typeof result).toBe("string");
+		expect(result).toContain("## `page` module");
+	});
+
+	it("apiDocs defaults to json format", async () => {
+		const [session, , worker] = await initSession();
+
+		const promise = session.apiDocs();
+
+		const apiDocsMsg = postMessages.find(
+			(m): m is PostMessage => typeof m === "object" && m !== null && (m as PostMessage).type === "apiDocs",
+		);
+		expect(apiDocsMsg).toBeDefined();
+		expect(apiDocsMsg).toMatchObject({
+			type: "apiDocs",
+			format: "json",
+		});
+
+		sendWorkerResult(worker, apiDocsMsg?.id ?? "", "[]");
+		const result = await promise;
+		expect(Array.isArray(result)).toBe(true);
+	});
+
 	it("preserves structured content-script error codes in asyncRelayResult", async () => {
 		globalThis.chrome = {
 			runtime: { id: "extension-test" },
@@ -298,7 +362,7 @@ describe("ExtensionSession fs namespace e2e", () => {
 		setActiveTabId(1);
 
 		sendWorkerAsyncRelay(worker, "relay-err", "page_click", "content-script", {
-			params: { refId: "ref-1" },
+			params: { refId: "e1" },
 		});
 		await new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -373,7 +437,7 @@ describe("ExtensionSession fs namespace e2e", () => {
 
 		sendWorkerAsyncRelay(worker, "relay-tab", "tab_click", "content-script", {
 			tabPolicy: "required",
-			params: { tabId: 1n, refId: "ref-1" },
+				params: { tabId: 1n, refId: "e1" },
 		});
 		await new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -382,7 +446,7 @@ describe("ExtensionSession fs namespace e2e", () => {
 			expect.objectContaining({
 				type: "registryCall",
 				action: "tab_click",
-				params: { tabId: 1n, refId: "ref-1" },
+			params: { tabId: 1n, refId: "e1" },
 			}),
 		);
 	});
@@ -480,7 +544,11 @@ describe("ExtensionSession fs namespace e2e", () => {
 					type: expect.any(String),
 					description: expect.any(String),
 				},
+				example: expect.any(String),
 			});
+			expect(
+				entry.permission === undefined || typeof entry.permission === "string",
+			).toBe(true);
 		}
 	});
 

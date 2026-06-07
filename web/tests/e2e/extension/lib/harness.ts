@@ -46,7 +46,7 @@ export async function installFixtureRoutes(context: BrowserContext): Promise<voi
 			return route.fulfill({
 				status: 200,
 				contentType: "text/html; charset=utf-8",
-				body: "<html><body><div id='next'>Next page</div></body></html>",
+				body: "<html><title>Next page</title><body><button id='btn'>Click me</button><a href='/fixture'>Back</a></body></html>",
 			});
 		}
 		if (url.pathname === "/api/json") {

@@ -108,6 +108,9 @@ export function mapContextToGroup(api: string, context: string): ApiGroup {
 function getChromeNamespace(api: string): string | null {
 	if (!api.startsWith("chrome.")) return null;
 	const parts = api.split(".");
+	if (parts.length >= 3 && parts[1] === "system") {
+		return `${parts[0]}.${parts[1]}.${parts[2]}`;
+	}
 	return parts.length >= 2 ? `${parts[0]}.${parts[1]}` : null;
 }
 

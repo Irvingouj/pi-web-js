@@ -27,8 +27,10 @@ async function ensureSession(): Promise<ExtensionSession> {
 			if (typeof window !== "undefined") {
 				const w = window as Window & {
 					__jsNotebookSetLogLevel?: (level: string) => void;
+					__extensionSession?: ExtensionSession;
 				};
 				w.__jsNotebookSetLogLevel = setLogLevel;
+				w.__extensionSession = session;
 				setLogLevel("info");
 				const e2eLog = new URLSearchParams(window.location.search).get(
 					"e2e_log",

@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { inlineSnapshot } from "../src/content-script/snapshot.js";
+import { getElementByRefId } from "../src/content-script/dom-utils.js";
 
 const mockAddListener = vi.fn();
 
@@ -25,6 +27,13 @@ globalThis.chrome = {
 	},
 };
 
+// Polyfill CSS.escape for jsdom test environments where it is unavailable
+if (typeof globalThis.CSS === "undefined" || !globalThis.CSS.escape) {
+	(globalThis as unknown as Record<string, unknown>).CSS = {
+		escape: (s: string) => s.replace(/([.*+?^${}()|[\]\\])/g, "\\$1"),
+	};
+}
+
 // Import content-script to register the onMessage listener
 await import("../src/content-script/index.js");
 
@@ -33,7 +42,7 @@ describe("content-script onMessage handler", () => {
 		const sendResponse = vi.fn();
 		const listener = mockAddListener.mock.calls[0][0];
 		listener(
-			{ action: "click", params: { refId: "1" } },
+			{ action: "click", params: { refId: "e1" } },
 			{ id: "malicious-extension" },
 			sendResponse,
 		);
@@ -148,5 +157,65 @@ describe("content-script onMessage handler", () => {
 		expect(response.ok).toBe(true);
 		expect(response.value.nodes).toBeDefined();
 		expect(Array.isArray(response.value.nodes)).toBe(true);
+	});
+});
+
+describe("snapshot refId contract", () => {
+	beforeEach(() => {
+		document.body.innerHTML = "";
+	});
+
+	it("inlineSnapshot emits string refIds in e{N} format", () => {
+		const btn1 = document.createElement("button");
+		btn1.textContent = "First";
+		const btn2 = document.createElement("button");
+		btn2.textContent = "Second";
+		document.body.appendChild(btn1);
+		document.body.appendChild(btn2);
+
+		const result = inlineSnapshot(500);
+		expect(result.nodes).toHaveLength(2);
+		expect(result.nodes[0].refId).toBe("e1");
+		expect(result.nodes[1].refId).toBe("e2");
+		expect(typeof result.nodes[0].refId).toBe("string");
+		expect(result.nodes[0].refId).toMatch(/^e\d+$/);
+	});
+
+	it("inlineSnapshot sets data-ref-id attributes on DOM", () => {
+		const btn = document.createElement("button");
+		btn.textContent = "Click me";
+		document.body.appendChild(btn);
+
+		inlineSnapshot(500);
+		expect(btn.getAttribute("data-ref-id")).toBe("e1");
+	});
+
+	it("inlineSnapshot snapshot text uses [e1] not [ref=", () => {
+		const btn = document.createElement("button");
+		btn.textContent = "Click me";
+		document.body.appendChild(btn);
+
+		const result = inlineSnapshot(500);
+		expect(result.text).toContain("[e1]");
+		expect(result.text).not.toContain("[ref=");
+	});
+
+	it("snapshot → extract refId → click round-trip works", () => {
+		const btn = document.createElement("button");
+		btn.textContent = "Click me";
+		let clicked = false;
+		btn.addEventListener("click", () => {
+			clicked = true;
+		});
+		document.body.appendChild(btn);
+
+		const snapshot = inlineSnapshot(500);
+		const refId = snapshot.nodes[0].refId;
+		expect(refId).toMatch(/^e\d+$/);
+
+		const el = getElementByRefId(refId);
+		expect(el).toBe(btn);
+		(el as HTMLElement).click();
+		expect(clicked).toBe(true);
 	});
 });

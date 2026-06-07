@@ -1,5 +1,6 @@
 import { test, expect } from "./fixtures.ts";
-import { executeCell } from "./lib/harness.ts";
+import { FIXTURE_URL } from "./lib/constants.ts";
+import { executeCell, restartKernel } from "./lib/harness.ts";
 
 /** Exact sidepanel snippet reported by user — reproduces tab.query + snapshot flow. */
 const USER_TAB_SNIPPET = `
@@ -48,22 +49,40 @@ if (typeof tab !== "undefined") {
 	test("runs exact web.tab.query + snapshot snippet from sidepanel", async ({
 		harness,
 	}, testInfo) => {
-		// Persistent Chrome profile opens with a stray about:blank tab at index 0.
-		// The user's snippet uses tabs[0], so close blank tabs and focus the https fixture.
+		// The user's snippet uses tabs[0]; after a long suite many stray tabs exist.
+		// Keep only the fixture page and sidepanel so tabs[0] is deterministic.
 		for (const page of harness.context.pages()) {
-			if (
-				page !== harness.fixtureTab &&
-				page !== harness.sidepanel &&
-				page.url() === "about:blank"
-			) {
+			if (page !== harness.fixtureTab && page !== harness.sidepanel) {
 				await page.close().catch(() => {});
 			}
 		}
+		await harness.fixtureTab.goto(FIXTURE_URL, { waitUntil: "domcontentloaded" });
 		await harness.fixtureTab.bringToFront();
+		await restartKernel(harness.sidepanel);
 
 		const logStart = harness.runtimeLogs.length;
 
-		const exec = await executeCell(harness.sidepanel, USER_TAB_SNIPPET, 30_000);
+		const exec = await executeCell(
+			harness.sidepanel,
+			`
+const keep = ${JSON.stringify(FIXTURE_URL)};
+let fixtureTabs = await chrome.tabs.query({ url: keep + "*" });
+if (fixtureTabs.length === 0) {
+  await chrome.tabs.create({ url: keep, active: true });
+  fixtureTabs = await chrome.tabs.query({ url: keep + "*" });
+}
+const stray = await chrome.tabs.query({});
+for (const t of stray) {
+  if (!t.url || t.url.startsWith(keep) || t.url.includes("chrome-extension://")) continue;
+  if (t.id != null) await chrome.tabs.remove(t.id);
+}
+if (fixtureTabs[0]?.id != null) {
+  await chrome.tabs.update(fixtureTabs[0].id, { active: true });
+}
+${USER_TAB_SNIPPET}
+`,
+			30_000,
+		);
 
 		const runtimeTail = harness.runtimeLogs.slice(logStart).join("\n");
 		const diagnostic = [

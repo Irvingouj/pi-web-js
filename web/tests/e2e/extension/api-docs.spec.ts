@@ -112,4 +112,41 @@ print(RESULT_PREFIX + JSON.stringify({ ok: true, value: md }));
 		const docs = await readRuntimeApiDocs(harness.sidepanel);
 		assertRuntimeApiDocsComplete(docs, DOCUMENTED_CONTRACT_APIS);
 	});
+
+	test("host session.apiDocs('json') returns same catalog as runtime.apiDocs('json')", async ({
+		harness,
+	}) => {
+		const hostDocs = await harness.sidepanel.evaluate(async () => {
+			const session = (window as any).__extensionSession;
+			if (!session || typeof session.apiDocs !== "function") {
+				throw new Error("session.apiDocs is not available");
+			}
+			return session.apiDocs("json");
+		});
+		expect(Array.isArray(hostDocs)).toBe(true);
+		expect(hostDocs.length).toBeGreaterThan(0);
+		assertRuntimeApiDocsComplete(hostDocs as RuntimeApiDocEntry[], DOCUMENTED_CONTRACT_APIS);
+
+		const runtimeDocs = await readRuntimeApiDocs(harness.sidepanel);
+		expect(hostDocs.length).toBe(runtimeDocs.length);
+		const hostNames = collectRuntimePublicNames(hostDocs as RuntimeApiDocEntry[]);
+		const runtimeNames = collectRuntimePublicNames(runtimeDocs);
+		expect(hostNames).toEqual(runtimeNames);
+	});
+
+	test("host session.apiDocs('markdown') returns markdown string", async ({
+		harness,
+	}) => {
+		const markdown = await harness.sidepanel.evaluate(async () => {
+			const session = (window as any).__extensionSession;
+			if (!session || typeof session.apiDocs !== "function") {
+				throw new Error("session.apiDocs is not available");
+			}
+			return session.apiDocs("markdown");
+		});
+		expect(typeof markdown).toBe("string");
+		expect(markdown).toContain("## `page` module");
+		expect(markdown).toContain("page.goto");
+		expect(markdown).toContain("**Returns**");
+	});
 });

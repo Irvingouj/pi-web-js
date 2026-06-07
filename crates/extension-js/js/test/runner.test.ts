@@ -126,11 +126,74 @@ const mockChrome = {
 			getInfo: vi.fn(() => Promise.resolve([])),
 		},
 	},
+	permissions: {
+		getAll: vi.fn(() => Promise.resolve({ permissions: [] })),
+	},
 };
 
 // Extend existing tabs mock with group/ungroup
 (mockChrome.tabs as any).group = vi.fn(() => Promise.resolve(1));
 (mockChrome.tabs as any).ungroup = vi.fn(() => Promise.resolve());
+
+function clearTestLocalStorage(): void {
+	if (
+		typeof localStorage !== "undefined" &&
+		typeof localStorage.clear === "function"
+	) {
+		localStorage.clear();
+		return;
+	}
+	if (typeof localStorage !== "undefined") {
+		for (const key of Object.keys(localStorage)) {
+			localStorage.removeItem(key);
+		}
+	}
+}
+
+const ALL_MANIFEST_PERMISSIONS = [
+	"alarms",
+	"bookmarks",
+	"browsingData",
+	"contextMenus",
+	"cookies",
+	"declarativeNetRequest",
+	"desktopCapture",
+	"downloads",
+	"history",
+	"identity",
+	"idle",
+	"management",
+	"notifications",
+	"offscreen",
+	"pageCapture",
+	"scripting",
+	"sessions",
+	"sidePanel",
+	"storage",
+	"system.cpu",
+	"tabGroups",
+	"tabs",
+	"topSites",
+	"tts",
+	"windows",
+];
+
+function chromeWithGrantedPermissions() {
+	return {
+		...mockChrome,
+		permissions: {
+			getAll: vi.fn(() =>
+				Promise.resolve({ permissions: [...ALL_MANIFEST_PERMISSIONS] }),
+			),
+		},
+	};
+}
+
+async function stubChromeWithGrantedPermissions(): Promise<void> {
+	resetCapabilities();
+	vi.stubGlobal("chrome", chromeWithGrantedPermissions());
+	await initCapabilities();
+}
 
 // ─── Imports ─────────────────────────────────────────────────────
 
@@ -144,6 +207,15 @@ import {
 	registerHostHandler,
 	registerHostHandlers,
 } from "../src/main/runner/index.js";
+import {
+	pingTabContentScript,
+	waitForTabLoad,
+} from "../src/main/runner/runtime.js";
+import { buildSnapshotInTab } from "../src/main/runner/dom/snapshot.js";
+import {
+	initCapabilities,
+	resetCapabilities,
+} from "../src/main/runner/tools/chrome/capability.js";
 
 import {
 	clearJsRegistry,
@@ -244,20 +316,13 @@ function registerTestTool(tool: ReturnType<typeof makeTestTool>): void {
 // ─── 1. normalizeParams tests ──────────────────────────────────
 
 describe("normalizeParams", () => {
+	// Element actions no longer have array normalizers (WU-5)
 	const arrayActions = [
-		"tab_click",
-		"tab_fill",
-		"tab_type",
 		"tab_press",
-		"tab_select",
-		"tab_check",
-		"tab_hover",
 		"tab_unhover",
 		"tab_scroll",
-		"tab_dblclick",
 		"tab_back",
 		"tab_wait_for_load",
-		"tab_scroll_to",
 		"tab_evaluate",
 		"tab_fetch",
 		"tab_snapshot",
@@ -266,20 +331,10 @@ describe("normalizeParams", () => {
 	];
 
 	it.each(arrayActions)("%s converts array params to object", (action) => {
-		const result = normalizeParams(action, [42, "ref-1", "extra"]);
+		const result = normalizeParams(action, [42, "e1", "extra"]);
 		expect(result).toBeDefined();
 		expect(typeof result).toBe("object");
 		expect(Array.isArray(result)).toBe(false);
-	});
-
-	it("tab_click array normalizer produces correct shape", () => {
-		const result = normalizeParams("tab_click", [42, "ref-1"]);
-		expect(result).toEqual({ tabId: 42, refId: "ref-1" });
-	});
-
-	it("tab_fill array normalizer produces correct shape", () => {
-		const result = normalizeParams("tab_fill", [42, "ref-1", "hello"]);
-		expect(result).toEqual({ tabId: 42, refId: "ref-1", value: "hello" });
 	});
 
 	it("tab_scroll array normalizer uses defaults", () => {
@@ -317,10 +372,68 @@ describe("normalizeParams", () => {
 		expect(result).toEqual({ tabId: 42 });
 	});
 
+	it("tab_create string normalizer converts url string to object", () => {
+		expect(normalizeParams("tab_create", "https://example.com")).toEqual({
+			url: "https://example.com",
+		});
+		expect(normalizeParams("page_new_tab", "https://example.com")).toEqual({
+			url: "https://example.com",
+		});
+	});
+
+	it("element action arrays pass through unchanged (rejected by schema)", () => {
+		expect(normalizeParams("tab_click", [42, "e1"])).toEqual([42, "e1"]);
+		expect(normalizeParams("tab_fill", [42, "e1", "hello"])).toEqual([
+			42,
+			"e1",
+			"hello",
+		]);
+		expect(normalizeParams("tab_type", [42, "e1", "hi"])).toEqual([
+			42,
+			"e1",
+			"hi",
+		]);
+	});
+
 	it("non-array/non-scalar params pass through unchanged", () => {
 		const obj = { foo: "bar" };
-		expect(normalizeParams("tab_click", obj)).toBe(obj);
+		expect(normalizeParams("tab_press", obj)).toBe(obj);
 		expect(normalizeParams("some_other_action", [1, 2])).toEqual([1, 2]);
+	});
+
+	it("page_find string normalizer maps selector", () => {
+		expect(normalizeParams("page_find", "h1")).toEqual({ selector: "h1" });
+	});
+
+	it("page_wait_for array normalizer maps selector and timeout", () => {
+		expect(normalizeParams("page_wait_for", ["#submit", 5000])).toEqual({
+			selector: "#submit",
+			timeout: 5000,
+		});
+	});
+
+	it("page_extract array normalizer maps fields", () => {
+		expect(normalizeParams("page_extract", ["title", "url"])).toEqual({
+			fields: ["title", "url"],
+		});
+	});
+
+	it("sidepanel_press string normalizer maps key", () => {
+		expect(normalizeParams("sidepanel_press", "Enter")).toEqual({
+			key: "Enter",
+		});
+	});
+
+	it("sidepanel_wait scalar normalizer maps duration", () => {
+		expect(normalizeParams("sidepanel_wait", 1000)).toEqual({
+			duration: 1000,
+		});
+	});
+
+	it("storage_get_many array normalizer maps keys", () => {
+		expect(normalizeParams("storage_get_many", ["a", "b"])).toEqual({
+			keys: ["a", "b"],
+		});
 	});
 });
 
@@ -403,6 +516,10 @@ describe("error code preservation", () => {
 // ─── 4. Schema validation tests ──────────────────────────────────
 
 describe("schema validation", () => {
+	beforeEach(async () => {
+		await stubChromeWithGrantedPermissions();
+	});
+
 	it("valid params pass zod validation", async () => {
 		const result = await dispatchTool("storage_set", {
 			key: "valid_key",
@@ -418,9 +535,11 @@ describe("schema validation", () => {
 		});
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
-			// The error message should mention the field and issue, but should NOT
-			// contain the raw invalid value in a way that leaks sensitive data.
-			expect(result.error.message).toContain("invalid value for field");
+			// The error message should mention the API name, field path, and issue,
+			// but should NOT contain the raw invalid value in a way that leaks sensitive data.
+			expect(result.error.message).toContain("Invalid parameters for storage_set");
+			expect(result.error.message).toContain("at 'value'");
+			expect(result.error.message).toContain("Expected string, received number");
 			expect(result.error.message).not.toContain("12345");
 		}
 	});
@@ -459,11 +578,62 @@ describe("schema validation", () => {
 	});
 });
 
+// ─── 4b. WU-9: Actionable validation errors ────────────────────────
+
+describe("WU-9: actionable validation errors", () => {
+	beforeEach(() => {
+		vi.stubGlobal("chrome", mockChrome);
+		vi.clearAllMocks();
+		for (const spec of buildContentScriptSpecs()) {
+			registerContentScriptSpec(spec);
+		}
+	});
+
+	it("page_unhover with string param shows API name and expected shape", async () => {
+		const result = await dispatchContentScriptCall(
+			"page_unhover",
+			"unhover",
+			handlers.unhover,
+			"x",
+		);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.message).toContain("Invalid parameters for page_unhover");
+			expect(result.error.message).toContain("expected { } or no args");
+			expect(result.error.message).toContain("received string");
+		}
+	});
+
+	it("mock_async with number param shows accepted union alternatives", async () => {
+		const result = await dispatchTool("mock_async", 123);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.message).toContain("Invalid parameters for mock_async");
+			expect(result.error.message).toContain("expected string or { label?: string }");
+			expect(result.error.message).toContain("received number");
+		}
+	});
+
+	it("nested path errors show actual path instead of empty string", async () => {
+		const result = await dispatchTool("page_extract", {
+			fields: [123],
+		});
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.message).toContain("Invalid parameters for page_extract");
+			expect(result.error.message).toContain("at 'fields.0'");
+			expect(result.error.message).toContain("Expected string, received number");
+		}
+	});
+});
+
 // ─── 5. Integration tests ────────────────────────────────────────
 
 describe("integration", () => {
-	beforeEach(() => {
-		vi.stubGlobal("chrome", mockChrome);
+	beforeEach(async () => {
+		vi.clearAllMocks();
+		await stubChromeWithGrantedPermissions();
+		clearTestLocalStorage();
 	});
 
 	it("executeMainThreadCommand dispatches through registry for a real action", async () => {
@@ -530,8 +700,10 @@ describe("integration", () => {
 describe("storage", () => {
 	const testKey = `runner_test_key_${Date.now()}`;
 
-	beforeEach(() => {
-		localStorage.clear();
+	beforeEach(async () => {
+		vi.clearAllMocks();
+		await stubChromeWithGrantedPermissions();
+		clearTestLocalStorage();
 	});
 
 	it("storage_set + storage_get roundtrip", async () => {
@@ -656,11 +828,21 @@ describe("sidepanel", () => {
 
 	it("sidepanel_click throws ENOTFOUND when target element missing", async () => {
 		const result = await dispatchTool("sidepanel_click", {
-			refId: "nonexistent",
+			refId: "e999",
 		});
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.code).toBe("ENOTFOUND");
+		}
+	});
+
+	it("sidepanel_click returns E_INVALID_PARAMS for invalid refId formats", async () => {
+		for (const badRefId of [2, "2", "btn"]) {
+			const result = await dispatchTool("sidepanel_click", { refId: badRefId });
+			expect(result.ok).toBe(false);
+			if (!result.ok) {
+				expect(result.error.code).toBe("E_INVALID_PARAMS");
+			}
 		}
 	});
 });
@@ -668,9 +850,9 @@ describe("sidepanel", () => {
 // ─── 10. Chrome passthrough tests ────────────────────────────────
 
 describe("chrome passthrough", () => {
-	beforeEach(() => {
-		vi.stubGlobal("chrome", mockChrome);
+	beforeEach(async () => {
 		vi.clearAllMocks();
+		await stubChromeWithGrantedPermissions();
 	});
 
 	it("rejects non-array transport with E_INVALID_ARGUMENT_TRANSPORT", async () => {
@@ -786,14 +968,257 @@ describe("chrome passthrough", () => {
 		}
 		expect(mockChrome.system.cpu.getInfo).toHaveBeenCalledWith();
 	});
+
+	it("history_delete alias normalizes string url to chrome object arg", async () => {
+		const result = await dispatchTool("history_delete", ["https://example.com"]);
+		expect(result.ok).toBe(true);
+		expect(mockChrome.history.deleteUrl).toHaveBeenCalledWith({
+			url: "https://example.com",
+		});
+	});
+
+	it("history_delete alias normalizes via executeMainThreadCommand", async () => {
+		const result = await executeMainThreadCommand({
+			action: "history_delete",
+			params: ["https://example.com"],
+			call_id: 1,
+		});
+		expect(result.ok).toBe(true);
+		expect(mockChrome.history.deleteUrl).toHaveBeenCalledWith({
+			url: "https://example.com",
+		});
+	});
+
+	it("bookmarks_search alias normalizes string query", async () => {
+		const result = await dispatchTool("bookmarks_search", ["example"]);
+		expect(result.ok).toBe(true);
+		expect(mockChrome.bookmarks.search).toHaveBeenCalledWith({
+			query: "example",
+		});
+	});
+
+	it("notifications_create alias normalizes wrapper object to native args", async () => {
+		const options = { type: "basic", title: "Hello", message: "World" };
+		const result = await dispatchTool("notifications_create", [
+			{ id: "test-id", options },
+		]);
+		expect(result.ok).toBe(true);
+		expect(mockChrome.notifications.create).toHaveBeenCalledWith(
+			"test-id",
+			options,
+		);
+	});
+
+	it("notifications_create alias normalizes via executeMainThreadCommand", async () => {
+		const options = { type: "basic", title: "Hello", message: "World" };
+		const result = await executeMainThreadCommand({
+			action: "notifications_create",
+			params: [{ id: "test-id", options }],
+			call_id: 1,
+		});
+		expect(result.ok).toBe(true);
+		expect(mockChrome.notifications.create).toHaveBeenCalledWith(
+			"test-id",
+			options,
+		);
+	});
+});
+
+// ─── 10b. Capability gating tests ────────────────────────────────
+
+describe("capability gating", () => {
+	beforeEach(() => {
+		resetCapabilities();
+	});
+
+	afterEach(() => {
+		resetCapabilities();
+		vi.unstubAllGlobals();
+	});
+
+	it("missing chrome namespace returns E_PERMISSION when permission not granted", async () => {
+		const minimalChrome = {
+			...mockChrome,
+			notifications: undefined,
+			permissions: {
+				getAll: vi.fn(() => Promise.resolve({ permissions: [] })),
+			},
+		};
+		vi.stubGlobal("chrome", minimalChrome);
+		await initCapabilities();
+		const result = await dispatchTool("chrome_notifications_create", ["", { title: "Test" }]);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_PERMISSION");
+			expect(result.error.message).toContain("notifications");
+		}
+	});
+
+	it("missing chrome namespace returns E_UNAVAILABLE when permission is granted", async () => {
+		const minimalChrome = {
+			...mockChrome,
+			notifications: undefined,
+			permissions: {
+				getAll: vi.fn(() => Promise.resolve({ permissions: ["notifications"] })),
+			},
+		};
+		vi.stubGlobal("chrome", minimalChrome);
+		await initCapabilities();
+		const result = await dispatchTool("chrome_notifications_create", ["", { title: "Test" }]);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_UNAVAILABLE");
+			expect(result.error.message).toContain("chrome.notifications");
+		}
+	});
+
+	it("manifestPermissionForApiPath maps system sub-apis", async () => {
+		const { manifestPermissionForApiPath } = await import(
+			"../src/main/runner/tools/chrome/capability.js"
+		);
+		expect(manifestPermissionForApiPath(["system", "cpu"])).toBe("system.cpu");
+		expect(manifestPermissionForApiPath(["system", "memory"])).toBe(
+			"system.memory",
+		);
+		expect(manifestPermissionForApiPath(["system", "storage"])).toBe(
+			"system.storage",
+		);
+	});
+
+	it("refreshCapabilities runs after chrome.permissions.request", async () => {
+		const getAllFn = vi
+			.fn()
+			.mockResolvedValueOnce({ permissions: [] })
+			.mockResolvedValue({ permissions: ["notifications"] });
+		const requestFn = vi.fn(() => Promise.resolve(true));
+		const chrome = {
+			...mockChrome,
+			permissions: {
+				getAll: getAllFn,
+				request: requestFn,
+			},
+			runtime: {
+				...mockChrome.runtime,
+				getManifest: vi.fn(() => ({ permissions: [] })),
+			},
+		};
+		vi.stubGlobal("chrome", chrome);
+		await initCapabilities();
+		const blocked = await dispatchTool("notifications_create", [
+			"",
+			{ title: "Test" },
+		]);
+		expect(blocked.ok).toBe(false);
+		const result = await dispatchTool("chrome_permissions_request", [
+			{ permissions: ["notifications"] },
+		]);
+		expect(result.ok).toBe(true);
+		expect(requestFn).toHaveBeenCalled();
+		expect(getAllFn.mock.calls.length).toBeGreaterThanOrEqual(2);
+		const allowed = await dispatchTool("notifications_create", [
+			"",
+			{ title: "Test" },
+		]);
+		expect(allowed.ok).toBe(true);
+	});
+
+	it("web alias returns E_PERMISSION via cached path when underlying API is unavailable", async () => {
+		const minimalChrome = {
+			...mockChrome,
+			notifications: undefined,
+			permissions: {
+				getAll: vi.fn(() => Promise.resolve({ permissions: [] })),
+			},
+		};
+		vi.stubGlobal("chrome", minimalChrome);
+		await initCapabilities();
+		const result = await dispatchTool("notifications_create", ["", { title: "Test" }]);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_PERMISSION");
+			expect(result.error.message).toContain("notifications");
+		}
+	});
+
+	it("web alias succeeds when permission is granted via cache", async () => {
+		const fullChrome = {
+			...mockChrome,
+			permissions: {
+				getAll: vi.fn(() => Promise.resolve({ permissions: ["notifications"] })),
+			},
+		};
+		vi.stubGlobal("chrome", fullChrome);
+		await initCapabilities();
+		const result = await dispatchTool("notifications_create", ["", { title: "Test" }]);
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.value).toBe("notif-id");
+		}
+	});
+
+	it("normalizeChromeError maps permission messages to E_PERMISSION", async () => {
+		const { normalizeChromeError } = await import("../src/main/runner/chrome/internals.js");
+		const result = normalizeChromeError(new Error("User denied permission"));
+		expect(result.error.code).toBe("E_PERMISSION");
+		expect(result.error.category).toBe("permission");
+	});
+
+	it("APIs without manifest permissions work when cache is empty", async () => {
+		const chromeWithRuntime = {
+			...mockChrome,
+			permissions: {
+				getAll: vi.fn(() => Promise.resolve({ permissions: [] })),
+			},
+		};
+		vi.stubGlobal("chrome", chromeWithRuntime);
+		await initCapabilities();
+		const result = await dispatchTool("chrome_runtime_getURL", ["/test"]);
+		if (!result.ok) {
+			expect(result.error.code).not.toBe("E_PERMISSION");
+		}
+	});
+
+	it("chrome.action APIs work without manifest permission when cache is empty", async () => {
+		const chromeWithAction = {
+			...mockChrome,
+			permissions: {
+				getAll: vi.fn(() => Promise.resolve({ permissions: [] })),
+			},
+		};
+		vi.stubGlobal("chrome", chromeWithAction);
+		await initCapabilities();
+		const result = await dispatchTool("chrome_action_setBadgeText", [
+			{ text: "1" },
+		]);
+		expect(result.ok).toBe(true);
+	});
+
+	it("initCapabilities merges manifest permissions when getAll omits them", async () => {
+		const chromeWithManifestOnly = {
+			...mockChrome,
+			runtime: {
+				...mockChrome.runtime,
+				getManifest: vi.fn(() => ({ permissions: ["windows", "bookmarks"] })),
+			},
+			permissions: {
+				getAll: vi.fn(() => Promise.resolve({ permissions: ["bookmarks"] })),
+			},
+		};
+		vi.stubGlobal("chrome", chromeWithManifestOnly);
+		await initCapabilities();
+		const result = await dispatchTool("chrome_windows_getAll", [
+			{ populate: false },
+		]);
+		expect(result.ok).toBe(true);
+	});
 });
 
 // ─── 11. Page action tests ───────────────────────────────────────
 
 describe("page actions", () => {
-	beforeEach(() => {
-		vi.stubGlobal("chrome", mockChrome);
+	beforeEach(async () => {
 		vi.clearAllMocks();
+		await stubChromeWithGrantedPermissions();
 		for (const spec of buildContentScriptSpecs()) {
 			registerContentScriptSpec(spec);
 		}
@@ -803,6 +1228,55 @@ describe("page actions", () => {
 		const manifest = getSerializableJsManifest();
 		const entry = manifest.find((e) => e.action === "page_url");
 		expect(entry?.owner).toBe("content-script");
+	});
+
+	it("page_find accepts positional selector string", async () => {
+		mockChrome.scripting.executeScript.mockResolvedValue([
+			{ result: [{ tag: "H1", refId: null, text: "Hi" }] },
+		]);
+		const result = await executeMainThreadCommand({
+			action: "page_find",
+			params: "h1",
+			call_id: 1,
+		});
+		expect(result.ok).toBe(true);
+	});
+
+	it("page_wait_for accepts positional selector and timeout", async () => {
+		mockChrome.scripting.executeScript.mockResolvedValue([{ result: true }]);
+		const result = await executeMainThreadCommand({
+			action: "page_wait_for",
+			params: ["#submit", 50n],
+			call_id: 1,
+		});
+		expect(result.ok).toBe(true);
+	});
+
+	it("storage_get_many accepts positional keys array", async () => {
+		const result = await executeMainThreadCommand({
+			action: "storage_get_many",
+			params: ["key1", "key2"],
+			call_id: 1,
+		});
+		expect(result.ok).toBe(true);
+	});
+
+	it("page_extract accepts positional fields array", async () => {
+		mockChrome.scripting.executeScript.mockResolvedValue([
+			{ result: { title: "Fixture", url: "https://example.com" } },
+		]);
+		const result = await executeMainThreadCommand({
+			action: "page_extract",
+			params: ["title", "url"],
+			call_id: 1,
+		});
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.value).toEqual({
+				title: "Fixture",
+				url: "https://example.com",
+			});
+		}
 	});
 
 	it("page_wait_for timeout returns E_TIMEOUT with category timeout", async () => {
@@ -857,17 +1331,223 @@ describe("page actions", () => {
 			expect(result.error.code).toBe("E_INVALID_PARAMS");
 		}
 	});
+
+	it("page_click returns E_INVALID_PARAMS for invalid refId formats", async () => {
+		for (const badRefId of [2, "2", "btn"]) {
+			const result = await dispatchContentScriptCall(
+				"page_click",
+				"click",
+				handlers.click,
+				{ refId: badRefId },
+			);
+			expect(result.ok).toBe(false);
+			if (!result.ok) {
+				expect(result.error.code).toBe("E_INVALID_PARAMS");
+			}
+		}
+	});
+
+	it("page_goto awaits tab complete and ping success", async () => {
+		mockChrome.tabs.get
+			.mockResolvedValueOnce({ id: 1, status: "complete", url: "https://old.example" })
+			.mockResolvedValueOnce({ id: 1, status: "loading", url: "https://example.com" })
+			.mockResolvedValue({ id: 1, status: "complete", url: "https://example.com" });
+		mockChrome.tabs.sendMessage.mockResolvedValue({ ok: true });
+		const onUpdatedListeners: Array<
+			(tabId: number, changeInfo: { status?: string }) => void
+		> = [];
+		mockChrome.tabs.onUpdated.addListener.mockImplementation((fn: any) => {
+			onUpdatedListeners.push(fn);
+		});
+		mockChrome.tabs.onUpdated.removeListener.mockImplementation((fn: any) => {
+			const idx = onUpdatedListeners.indexOf(fn);
+			if (idx !== -1) onUpdatedListeners.splice(idx, 1);
+		});
+
+		const dispatchPromise = dispatchTool("page_goto", { url: "https://example.com" });
+
+		setTimeout(() => {
+			mockChrome.tabs.get.mockResolvedValue({
+				id: 1,
+				status: "complete",
+				url: "https://example.com",
+			});
+			for (const listener of onUpdatedListeners) {
+				listener(1, { status: "loading" });
+				listener(1, { status: "complete" });
+			}
+		}, 150);
+
+		const result = await dispatchPromise;
+		expect(result.ok).toBe(true);
+		expect(mockChrome.tabs.update).toHaveBeenCalledWith(1, {
+			url: "https://example.com",
+		});
+		expect(mockChrome.tabs.sendMessage).toHaveBeenCalledWith(1, {
+			action: "ping",
+		});
+		expect(mockChrome.tabs.onUpdated.removeListener).toHaveBeenCalled();
+	}, 10_000);
+
+	it("page_goto returns E_NAVIGATION on tab load timeout", async () => {
+		mockChrome.tabs.get.mockResolvedValue({ id: 1, status: "loading" });
+		mockChrome.tabs.onUpdated.addListener.mockImplementation(() => {});
+		mockChrome.tabs.onUpdated.removeListener.mockImplementation(() => {});
+
+		const result = await dispatchTool("page_goto", {
+			url: "https://example.com",
+			timeout: 100n,
+		});
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_NAVIGATION");
+			expect(result.error.category).toBe("navigation");
+			expect(result.error.message).toContain("timeout");
+			expect(result.error.message).toContain("1");
+		}
+	});
+
+	it("page_goto returns E_NAVIGATION for non-http(s) URLs", async () => {
+		const result = await dispatchTool("page_goto", {
+			url: "chrome://settings",
+		});
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_NAVIGATION");
+			expect(result.error.category).toBe("navigation");
+			expect(result.error.message).toContain("Navigation blocked");
+			expect(result.error.message).toContain("URL scheme not supported");
+			expect(result.error.message).toContain("chrome://settings");
+		}
+	});
+
+	it("page_goto succeeds when final URL differs after redirect", async () => {
+		mockChrome.tabs.get
+			.mockResolvedValueOnce({ id: 1, status: "complete", url: "https://old.example" })
+			.mockResolvedValue({ id: 1, status: "complete", url: "https://redirected.com/" });
+		mockChrome.tabs.sendMessage.mockResolvedValue({ ok: true });
+		const onUpdatedListeners: Array<
+			(tabId: number, changeInfo: { status?: string }) => void
+		> = [];
+		mockChrome.tabs.onUpdated.addListener.mockImplementation((fn: any) => {
+			onUpdatedListeners.push(fn);
+		});
+		mockChrome.tabs.onUpdated.removeListener.mockImplementation((fn: any) => {
+			const idx = onUpdatedListeners.indexOf(fn);
+			if (idx !== -1) onUpdatedListeners.splice(idx, 1);
+		});
+
+		const dispatchPromise = dispatchTool("page_goto", {
+			url: "https://example.com",
+			timeout: 2000n,
+		});
+
+		setTimeout(() => {
+			for (const listener of onUpdatedListeners) {
+				listener(1, { status: "loading" });
+				listener(1, { status: "complete" });
+			}
+		}, 150);
+
+		const result = await dispatchPromise;
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.value).toMatchObject({ url: "https://redirected.com/" });
+		}
+	}, 10_000);
+
+	it("page_goto succeeds on same-URL navigation after loading events", async () => {
+		const url = "https://example.com";
+		let onUpdatedListener:
+			| ((tabId: number, changeInfo: { status?: string }) => void)
+			| undefined;
+		mockChrome.tabs.onUpdated.addListener.mockImplementation((fn) => {
+			onUpdatedListener = fn;
+		});
+		mockChrome.tabs.onUpdated.removeListener.mockImplementation(() => {});
+		mockChrome.tabs.get
+			.mockResolvedValueOnce({ id: 1, status: "complete", url })
+			.mockResolvedValue({ id: 1, status: "complete", url });
+		mockChrome.tabs.sendMessage.mockResolvedValue({ ok: true });
+
+		const dispatchPromise = dispatchTool("page_goto", { url, timeout: 2000n });
+		setTimeout(() => {
+			onUpdatedListener?.(1, { status: "loading" });
+			onUpdatedListener?.(1, { status: "complete" });
+		}, 10);
+
+		const result = await dispatchPromise;
+		expect(result.ok).toBe(true);
+		expect(mockChrome.tabs.update).toHaveBeenCalledWith(1, { url });
+		expect(mockChrome.tabs.sendMessage).toHaveBeenCalled();
+	});
+
+	it("waitForTabLoad does not settle on same-URL complete without loading", async () => {
+		const url = "https://example.com";
+		mockChrome.tabs.get.mockResolvedValue({
+			id: 1,
+			status: "complete",
+			url,
+		});
+		mockChrome.tabs.onUpdated.addListener.mockImplementation(() => {});
+		mockChrome.tabs.onUpdated.removeListener.mockImplementation(() => {});
+
+		const result = await waitForTabLoad(1, 200, {
+			preNavigationUrl: url,
+		});
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_NAVIGATION");
+		}
+	});
+
+	it("waitForTabLoad settles on same-URL when loading was observed", async () => {
+		const url = "https://example.com";
+		mockChrome.tabs.get.mockResolvedValue({
+			id: 1,
+			status: "complete",
+			url,
+		});
+		mockChrome.tabs.onUpdated.addListener.mockImplementation(() => {});
+		mockChrome.tabs.onUpdated.removeListener.mockImplementation(() => {});
+
+		const result = await waitForTabLoad(1, 1000, {
+			preNavigationUrl: url,
+			getNavSawLoading: () => true,
+		});
+		expect(result.ok).toBe(true);
+	});
+
+	it("pingTabContentScript retries transient receiving-end errors", async () => {
+		mockChrome.tabs.sendMessage
+			.mockRejectedValueOnce(new Error("Receiving end does not exist."))
+			.mockResolvedValue({ ok: true });
+
+		const result = await pingTabContentScript(1, 2000);
+		expect(result.ok).toBe(true);
+		expect(mockChrome.tabs.sendMessage).toHaveBeenCalledTimes(2);
+	});
 });
 
 // ─── 12. Tab action tests ────────────────────────────────────────
 
 describe("tab actions", () => {
-	beforeEach(() => {
-		vi.stubGlobal("chrome", mockChrome);
-		vi.clearAllMocks();
+	beforeEach(async () => {
+		await stubChromeWithGrantedPermissions();
 		for (const spec of buildContentScriptSpecs()) {
 			registerContentScriptSpec(spec);
 		}
+	});
+
+	it("tab_create accepts positional url string", async () => {
+		const result = await dispatchTool(
+			"tab_create",
+			"https://extension-js.test/fixture",
+		);
+		expect(result.ok).toBe(true);
+		expect(mockChrome.tabs.create).toHaveBeenCalledWith({
+			url: "https://extension-js.test/fixture",
+		});
 	});
 
 	it("tab_click returns E_INVALID_PARAMS when refId missing", async () => {
@@ -961,6 +1641,21 @@ describe("tab actions", () => {
 		}
 	});
 
+	it("tab_click returns E_INVALID_PARAMS for invalid refId formats", async () => {
+		for (const badRefId of [2, "2", "btn"]) {
+			const result = await dispatchContentScriptCall(
+				"tab_click",
+				"click",
+				handlers.click,
+				{ tabId: 1, refId: badRefId },
+			);
+			expect(result.ok).toBe(false);
+			if (!result.ok) {
+				expect(result.error.code).toBe("E_INVALID_PARAMS");
+			}
+		}
+	});
+
 	it("tab_scroll is registered for content-script execution", () => {
 		const manifest = getSerializableJsManifest();
 		expect(manifest.find((e) => e.action === "tab_scroll")?.owner).toBe(
@@ -973,6 +1668,498 @@ describe("tab actions", () => {
 		expect(manifest.find((e) => e.action === "tab_back")?.owner).toBe(
 			"content-script",
 		);
+	});
+});
+
+// ─── 12b. WU-5: Unambiguous element action arguments ─────────────
+
+describe("WU-5: unambiguous element action arguments", () => {
+	beforeEach(() => {
+		vi.stubGlobal("chrome", mockChrome);
+		vi.clearAllMocks();
+		for (const spec of buildContentScriptSpecs()) {
+			registerContentScriptSpec(spec);
+		}
+	});
+
+	// ── Positional args rejected ──────────────────────────────────
+
+	it("page_click rejects positional string with E_INVALID_PARAMS", async () => {
+		const result = await dispatchContentScriptCall(
+			"page_click",
+			"click",
+			handlers.click,
+			"Learn more",
+		);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_INVALID_PARAMS");
+			expect(result.error.message).toContain("object form");
+			expect(result.error.message).toContain("refId");
+		}
+	});
+
+	it("page_click rejects positional number with E_INVALID_PARAMS", async () => {
+		const result = await dispatchContentScriptCall(
+			"page_click",
+			"click",
+			handlers.click,
+			2,
+		);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_INVALID_PARAMS");
+			expect(result.error.message).toContain("object form");
+		}
+	});
+
+	it("tab_click rejects positional array with E_INVALID_PARAMS", async () => {
+		const result = await dispatchContentScriptCall(
+			"tab_click",
+			"click",
+			handlers.click,
+			[1, "e2"],
+		);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_INVALID_PARAMS");
+		}
+	});
+
+	it("tab_fill rejects positional array with E_INVALID_PARAMS", async () => {
+		const result = await dispatchContentScriptCall(
+			"tab_fill",
+			"fill",
+			handlers.fill,
+			[1, "e2", "hello"],
+		);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_INVALID_PARAMS");
+		}
+	});
+
+	it.each([
+		["tab_type", "type", handlers.type, [1, "e2", "hello"]],
+		["tab_select", "select", handlers.select, [1, "e2", "opt"]],
+		["tab_check", "check", handlers.check, [1, "e2", true]],
+		["tab_hover", "hover", handlers.hover, [1, "e2"]],
+		["tab_dblclick", "dblclick", handlers.dblclick, [1, "e2"]],
+		["tab_scroll_to", "scroll_to", handlers.scroll_to, [1, "e2"]],
+	])("%s rejects positional array with E_INVALID_PARAMS", async (action, handlerKey, handler, args) => {
+		const result = await dispatchContentScriptCall(
+			action,
+			handlerKey,
+			handler,
+			args,
+		);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_INVALID_PARAMS");
+		}
+	});
+
+	// ── refId path works ──────────────────────────────────────────
+
+	it("page_click resolves element by refId", async () => {
+		const btn = document.createElement("button");
+		btn.setAttribute("data-ref-id", "e2");
+		document.body.appendChild(btn);
+		const result = await dispatchContentScriptCall(
+			"page_click",
+			"click",
+			handlers.click,
+			{ refId: "e2" },
+		);
+		expect(result.ok).toBe(true);
+		document.body.removeChild(btn);
+	});
+
+	it("page_fill resolves element by refId", async () => {
+		const input = document.createElement("input");
+		input.setAttribute("data-ref-id", "e3");
+		document.body.appendChild(input);
+		const result = await dispatchContentScriptCall(
+			"page_fill",
+			"fill",
+			handlers.fill,
+			{ refId: "e3", value: "hello" },
+		);
+		expect(result.ok).toBe(true);
+		expect((input as HTMLInputElement).value).toBe("hello");
+		document.body.removeChild(input);
+	});
+
+	it("page_select resolves element by refId", async () => {
+		const select = document.createElement("select");
+		select.setAttribute("data-ref-id", "e4");
+		const opt = document.createElement("option");
+		opt.value = "a";
+		select.appendChild(opt);
+		document.body.appendChild(select);
+		const result = await dispatchContentScriptCall(
+			"page_select",
+			"select",
+			handlers.select,
+			{ refId: "e4", value: "a" },
+		);
+		expect(result.ok).toBe(true);
+		document.body.removeChild(select);
+	});
+
+	it("page_check resolves element by refId", async () => {
+		const cb = document.createElement("input");
+		cb.type = "checkbox";
+		cb.setAttribute("data-ref-id", "e5");
+		document.body.appendChild(cb);
+		const result = await dispatchContentScriptCall(
+			"page_check",
+			"check",
+			handlers.check,
+			{ refId: "e5", checked: false },
+		);
+		expect(result.ok).toBe(true);
+		expect((cb as HTMLInputElement).checked).toBe(false);
+		document.body.removeChild(cb);
+	});
+
+	it("page_hover resolves element by refId", async () => {
+		const btn = document.createElement("button");
+		btn.setAttribute("data-ref-id", "e6");
+		document.body.appendChild(btn);
+		const result = await dispatchContentScriptCall(
+			"page_hover",
+			"hover",
+			handlers.hover,
+			{ refId: "e6" },
+		);
+		expect(result.ok).toBe(true);
+		document.body.removeChild(btn);
+	});
+
+	it("page_scroll_to resolves element by refId", async () => {
+		const btn = document.createElement("button");
+		btn.setAttribute("data-ref-id", "e7");
+		btn.scrollIntoView = vi.fn();
+		document.body.appendChild(btn);
+		const result = await dispatchContentScriptCall(
+			"page_scroll_to",
+			"scroll_to",
+			handlers.scroll_to,
+			{ refId: "e7" },
+		);
+		expect(result.ok).toBe(true);
+		document.body.removeChild(btn);
+	});
+
+	it("page_scroll_to accepts coordinate-only params", async () => {
+		const scrollTo = vi.fn();
+		Object.defineProperty(window, "scrollTo", { value: scrollTo, configurable: true });
+		const result = await dispatchContentScriptCall(
+			"page_scroll_to",
+			"scroll_to",
+			handlers.scroll_to,
+			{ x: 0, y: 100 },
+		);
+		expect(result.ok).toBe(true);
+		expect(scrollTo).toHaveBeenCalledWith({
+			left: 0,
+			top: 100,
+			behavior: "smooth",
+		});
+	});
+
+	it("page_dblclick resolves element by refId", async () => {
+		const btn = document.createElement("button");
+		btn.setAttribute("data-ref-id", "e8");
+		document.body.appendChild(btn);
+		const result = await dispatchContentScriptCall(
+			"page_dblclick",
+			"dblclick",
+			handlers.dblclick,
+			{ refId: "e8" },
+		);
+		expect(result.ok).toBe(true);
+		document.body.removeChild(btn);
+	});
+
+	it("page_type resolves element by refId", async () => {
+		const input = document.createElement("input");
+		input.setAttribute("data-ref-id", "e20");
+		document.body.appendChild(input);
+		const result = await dispatchContentScriptCall(
+			"page_type",
+			"type",
+			handlers.type,
+			{ refId: "e20", text: "hello" },
+		);
+		expect(result.ok).toBe(true);
+		expect((input as HTMLInputElement).value).toBe("hello");
+		document.body.removeChild(input);
+	});
+
+	it("page_append resolves element by refId", async () => {
+		const input = document.createElement("input");
+		input.setAttribute("data-ref-id", "e21");
+		input.value = "pre";
+		document.body.appendChild(input);
+		const result = await dispatchContentScriptCall(
+			"page_append",
+			"append",
+			handlers.append,
+			{ refId: "e21", text: "fix" },
+		);
+		expect(result.ok).toBe(true);
+		expect((input as HTMLInputElement).value).toBe("prefix");
+		document.body.removeChild(input);
+	});
+
+	it("tab_click resolves element by refId", async () => {
+		const btn = document.createElement("button");
+		btn.setAttribute("data-ref-id", "e30");
+		document.body.appendChild(btn);
+		const result = await dispatchContentScriptCall(
+			"tab_click",
+			"click",
+			handlers.click,
+			{ tabId: 1, refId: "e30" },
+		);
+		expect(result.ok).toBe(true);
+		document.body.removeChild(btn);
+	});
+
+	// ── label path works ────────────────────────────────────────
+
+	it("page_click resolves element by label", async () => {
+		const btn = document.createElement("button");
+		btn.textContent = "Learn more";
+		document.body.appendChild(btn);
+		const result = await dispatchContentScriptCall(
+			"page_click",
+			"click",
+			handlers.click,
+			{ label: "Learn more" },
+		);
+		expect(result.ok).toBe(true);
+		document.body.removeChild(btn);
+	});
+
+	it("page_fill resolves element by label", async () => {
+		const input = document.createElement("input");
+		input.setAttribute("aria-label", "Search");
+		document.body.appendChild(input);
+		const result = await dispatchContentScriptCall(
+			"page_fill",
+			"fill",
+			handlers.fill,
+			{ label: "Search", value: "query" },
+		);
+		expect(result.ok).toBe(true);
+		expect((input as HTMLInputElement).value).toBe("query");
+		document.body.removeChild(input);
+	});
+
+	it("page_select resolves element by label", async () => {
+		const select = document.createElement("select");
+		select.setAttribute("aria-label", "Country");
+		const opt = document.createElement("option");
+		opt.value = "us";
+		select.appendChild(opt);
+		document.body.appendChild(select);
+		const result = await dispatchContentScriptCall(
+			"page_select",
+			"select",
+			handlers.select,
+			{ label: "Country", value: "us" },
+		);
+		expect(result.ok).toBe(true);
+		document.body.removeChild(select);
+	});
+
+	it("page_check resolves element by label", async () => {
+		const cb = document.createElement("input");
+		cb.type = "checkbox";
+		cb.setAttribute("aria-label", "Accept terms");
+		document.body.appendChild(cb);
+		const result = await dispatchContentScriptCall(
+			"page_check",
+			"check",
+			handlers.check,
+			{ label: "Accept terms", checked: true },
+		);
+		expect(result.ok).toBe(true);
+		expect((cb as HTMLInputElement).checked).toBe(true);
+		document.body.removeChild(cb);
+	});
+
+	it("page_hover resolves element by label", async () => {
+		const btn = document.createElement("button");
+		btn.textContent = "Submit";
+		document.body.appendChild(btn);
+		const result = await dispatchContentScriptCall(
+			"page_hover",
+			"hover",
+			handlers.hover,
+			{ label: "Submit" },
+		);
+		expect(result.ok).toBe(true);
+		document.body.removeChild(btn);
+	});
+
+	it("page_scroll_to resolves element by label", async () => {
+		const btn = document.createElement("button");
+		btn.textContent = "Footer";
+		btn.scrollIntoView = vi.fn();
+		document.body.appendChild(btn);
+		const result = await dispatchContentScriptCall(
+			"page_scroll_to",
+			"scroll_to",
+			handlers.scroll_to,
+			{ label: "Footer" },
+		);
+		expect(result.ok).toBe(true);
+		document.body.removeChild(btn);
+	});
+
+	it("page_dblclick resolves element by label", async () => {
+		const btn = document.createElement("button");
+		btn.textContent = "Open";
+		document.body.appendChild(btn);
+		const result = await dispatchContentScriptCall(
+			"page_dblclick",
+			"dblclick",
+			handlers.dblclick,
+			{ label: "Open" },
+		);
+		expect(result.ok).toBe(true);
+		document.body.removeChild(btn);
+	});
+
+	it("page_type resolves element by label", async () => {
+		const input = document.createElement("input");
+		input.setAttribute("aria-label", "Username");
+		document.body.appendChild(input);
+		const result = await dispatchContentScriptCall(
+			"page_type",
+			"type",
+			handlers.type,
+			{ label: "Username", text: "world" },
+		);
+		expect(result.ok).toBe(true);
+		expect((input as HTMLInputElement).value).toBe("world");
+		document.body.removeChild(input);
+	});
+
+	it("page_append resolves element by label", async () => {
+		const input = document.createElement("input");
+		input.setAttribute("aria-label", "Notes");
+		input.value = "pre";
+		document.body.appendChild(input);
+		const result = await dispatchContentScriptCall(
+			"page_append",
+			"append",
+			handlers.append,
+			{ label: "Notes", text: "fix" },
+		);
+		expect(result.ok).toBe(true);
+		expect((input as HTMLInputElement).value).toBe("prefix");
+		document.body.removeChild(input);
+	});
+
+	it("tab_click resolves element by label", async () => {
+		const btn = document.createElement("button");
+		btn.textContent = "TabBtn";
+		document.body.appendChild(btn);
+		const result = await dispatchContentScriptCall(
+			"tab_click",
+			"click",
+			handlers.click,
+			{ tabId: 1, label: "TabBtn" },
+		);
+		expect(result.ok).toBe(true);
+		document.body.removeChild(btn);
+	});
+
+	// ── Error messages state lookup mode ──────────────────────────
+
+	it("not-found error mentions refId when refId was used", async () => {
+		const result = await dispatchContentScriptCall(
+			"page_click",
+			"click",
+			handlers.click,
+			{ refId: "e999" },
+		);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.message).toContain('by refId "e999"');
+		}
+	});
+
+	it("not-found error mentions label when label was used", async () => {
+		const result = await dispatchContentScriptCall(
+			"page_click",
+			"click",
+			handlers.click,
+			{ label: "Nonexistent" },
+		);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.message).toContain('by label "Nonexistent"');
+		}
+	});
+
+	it("tab_click not-found error mentions refId", async () => {
+		const result = await dispatchContentScriptCall(
+			"tab_click",
+			"click",
+			handlers.click,
+			{ tabId: 1, refId: "e999" },
+		);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.message).toContain('by refId "e999"');
+		}
+	});
+
+	it("tab_click not-found error mentions label", async () => {
+		const result = await dispatchContentScriptCall(
+			"tab_click",
+			"click",
+			handlers.click,
+			{ tabId: 1, label: "Nonexistent" },
+		);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.message).toContain('by label "Nonexistent"');
+		}
+	});
+
+	// ── Sidepanel positional rejection ────────────────────────────
+
+	it("sidepanel_click rejects positional string with E_INVALID_PARAMS", async () => {
+		const result = await dispatchTool("sidepanel_click", "e1");
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_INVALID_PARAMS");
+		}
+	});
+
+	it("sidepanel_click resolves by refId", async () => {
+		const btn = document.createElement("button");
+		btn.setAttribute("data-ref-id", "e10");
+		document.body.appendChild(btn);
+		const result = await dispatchTool("sidepanel_click", { refId: "e10" });
+		expect(result.ok).toBe(true);
+		document.body.removeChild(btn);
+	});
+
+	it("sidepanel_click resolves by label", async () => {
+		const btn = document.createElement("button");
+		btn.textContent = "SidepanelBtn";
+		document.body.appendChild(btn);
+		const result = await dispatchTool("sidepanel_click", { label: "SidepanelBtn" });
+		expect(result.ok).toBe(true);
+		document.body.removeChild(btn);
 	});
 });
 
@@ -1041,7 +2228,71 @@ describe("sleep", () => {
 	});
 });
 
-// ─── 15. Acceptance criteria verification ────────────────────────
+// ─── 15. Snapshot refId contract tests ───────────────────────────
+
+describe("snapshot refId contract", () => {
+	beforeEach(() => {
+		document.body.innerHTML = "";
+	});
+
+	it("buildSnapshotInTab emits string refIds in e{N} format", () => {
+		const btn1 = document.createElement("button");
+		btn1.textContent = "First";
+		const btn2 = document.createElement("button");
+		btn2.textContent = "Second";
+		document.body.appendChild(btn1);
+		document.body.appendChild(btn2);
+
+		const result = buildSnapshotInTab(500);
+		expect(result.nodes).toHaveLength(2);
+		expect(result.nodes[0].refId).toBe("e1");
+		expect(result.nodes[1].refId).toBe("e2");
+		expect(typeof result.nodes[0].refId).toBe("string");
+		expect(result.nodes[0].refId).toMatch(/^e\d+$/);
+	});
+
+	it("buildSnapshotInTab sets data-ref-id attributes on DOM", () => {
+		const btn = document.createElement("button");
+		btn.textContent = "Click me";
+		document.body.appendChild(btn);
+
+		buildSnapshotInTab(500);
+		expect(btn.getAttribute("data-ref-id")).toBe("e1");
+	});
+
+	it("buildSnapshotInTab snapshot text uses [e1] not [ref=", () => {
+		const btn = document.createElement("button");
+		btn.textContent = "Click me";
+		document.body.appendChild(btn);
+
+		const result = buildSnapshotInTab(500);
+		expect(result.text).toContain("[e1]");
+		expect(result.text).not.toContain("[ref=");
+	});
+
+	it("snapshot_data → click round-trip works without manual conversion", () => {
+		const btn = document.createElement("button");
+		btn.textContent = "Click me";
+		let clicked = false;
+		btn.addEventListener("click", () => {
+			clicked = true;
+		});
+		document.body.appendChild(btn);
+
+		const snapshot = buildSnapshotInTab(500);
+		const refId = snapshot.nodes[0].refId;
+		expect(refId).toMatch(/^e\d+$/);
+
+		const el = document.querySelector(
+			`[data-ref-id='${CSS.escape(refId)}']`,
+		);
+		expect(el).toBe(btn);
+		(el as HTMLElement).click();
+		expect(clicked).toBe(true);
+	});
+});
+
+// ─── 16. Acceptance criteria verification ────────────────────────
 
 describe("acceptance criteria verification", () => {
 	const commandPath = path.resolve(__dirname, "../src/main/runner/command.ts");
@@ -1122,7 +2373,7 @@ describe("acceptance criteria verification", () => {
 	});
 });
 
-// ─── 16. Registry contract with runner tools ─────────────────────
+// ─── 17. Registry contract with runner tools ─────────────────────
 // These must run BEFORE the isolated registry contract block because
 // they depend on the runner.ts module-level registrations.
 
@@ -1186,7 +2437,7 @@ describe("registry contract with runner tools", () => {
 	});
 });
 
-// ─── 17. Registry contract tests (isolated) ──────────────────────
+// ─── 18. Registry contract tests (isolated) ──────────────────────
 
 describe("registry contract", () => {
 	beforeEach(() => {
@@ -1337,7 +2588,7 @@ describe("registry contract", () => {
 	});
 });
 
-// ─── 18. Registry core tests ─────────────────────────────────────
+// ─── 19. Registry core tests ─────────────────────────────────────
 // These go LAST because clearRegistry() removes all tools and we
 // do not attempt to re-register the full runner.ts suite.
 
@@ -1422,7 +2673,7 @@ describe("registry core", () => {
 	});
 });
 
-// ─── 17. Logging tests ───────────────────────────────────────────
+// ─── 20. Logging tests ───────────────────────────────────────────
 
 describe("logging", () => {
 	it("logs command dispatch with runId on success", async () => {

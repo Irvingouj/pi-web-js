@@ -12,7 +12,7 @@ describe("dispatchContentScriptCall", () => {
 		registerContentScriptSpec({
 			registryAction: "page_click",
 			handlerKey: "click",
-			params: z.object({ refId: z.string() }),
+			params: z.object({ refId: z.string().regex(/^e\d+$/) }),
 			returns: z.null(),
 		});
 
@@ -32,6 +32,34 @@ describe("dispatchContentScriptCall", () => {
 			expect(result.error.code).toBe("E_INVALID_PARAMS");
 		}
 		expect(invoked).toBe(false);
+	});
+
+	it("rejects invalid refId formats", async () => {
+		registerContentScriptSpec({
+			registryAction: "page_click",
+			handlerKey: "click",
+			params: z.object({ refId: z.string().regex(/^e\d+$/) }),
+			returns: z.null(),
+		});
+
+		for (const badRefId of [2, "2", "btn"]) {
+			let invoked = false;
+			const result = await dispatchContentScriptCall(
+				"page_click",
+				"click",
+				async () => {
+					invoked = true;
+					return null;
+				},
+				{ refId: badRefId },
+			);
+
+			expect(result.ok).toBe(false);
+			if (!result.ok) {
+				expect(result.error.code).toBe("E_INVALID_PARAMS");
+			}
+			expect(invoked).toBe(false);
+		}
 	});
 
 	it("rejects actions without registered schemas", async () => {

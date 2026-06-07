@@ -1,4 +1,5 @@
 import { expect, type TestInfo } from "@playwright/test";
+import { CHROME_PROPERTY_ONLY } from "./chrome-handler-audit.ts";
 import { chromeRunnerAction } from "./chrome-apis.ts";
 import { parseChromeApiSentinel } from "./chrome-fixture.ts";
 import { executeCell } from "./harness.ts";
@@ -119,15 +120,21 @@ function assertTransportLogs(
 		`${apiCase.api} must not hit argument transport rejection`,
 	).not.toContain("E_INVALID_ARGUMENT_TRANSPORT");
 
+	if (CHROME_PROPERTY_ONLY.has(apiCase.api)) {
+		return;
+	}
+
+	if (apiCase.contractExpected !== "success") {
+		return;
+	}
+
 	const action = chromeRunnerAction(apiCase.api);
 	const haystack = runtimeSlice.join("\n");
-	if (haystack.includes("command_dispatch") || haystack.includes("handle_command")) {
-		expect(
-			haystack.includes(`action=${action}`) ||
-				haystack.includes(`action="${action}"`),
-			`${apiCase.api}: expected runner log for action=${action}\nlogs:\n${haystack.slice(-4000)}`,
-		).toBe(true);
-	}
+	expect(
+		haystack.includes(`action=${action}`) ||
+			haystack.includes(`action="${action}"`),
+		`${apiCase.api}: expected runner log for action=${action}\nlogs:\n${haystack.slice(-4000)}`,
+	).toBe(true);
 }
 
 export async function runChromeApiTest(

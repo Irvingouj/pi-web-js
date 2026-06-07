@@ -6,7 +6,12 @@ import {
 	API_CASES,
 	CONTRACT_MANIFEST,
 } from "./lib/contract-metadata.ts";
-import { assertNoHarnessErrors, inspectPublicApis, executeCell } from "./lib/harness.ts";
+import {
+	assertNoHarnessErrors,
+	inspectPublicApis,
+	executeCell,
+	restartKernel,
+} from "./lib/harness.ts";
 import { auditChromeHandlerCoverage } from "./lib/chrome-handler-audit.ts";
 import { RESULT_PREFIX } from "./lib/constants.ts";
 import { parseAllSentinels } from "./lib/sentinels.ts";
@@ -81,7 +86,11 @@ globalThis.__webJsTriggerAsync = function(action, params, resolve, reject) {
   if (action === "chrome_cookies_get") triggerParams = params;
   return orig(action, params, resolve, reject);
 };
-await runContractBatch(contractRes.body, ["chrome.cookies.get"], false, RESULT_PREFIX);
+try {
+  await runContractBatch(contractRes.body, ["chrome.cookies.get"], false, RESULT_PREFIX);
+} finally {
+  globalThis.__webJsTriggerAsync = orig;
+}
 print(RESULT_PREFIX + JSON.stringify({ ok: true, value: { triggerParams, triggerJson: JSON.stringify(triggerParams) } }));
 `,
 			15_000,
@@ -114,6 +123,8 @@ print(RESULT_PREFIX + JSON.stringify({ ok: true, value: { triggerParams, trigger
 			expect(details?.url).toBe("https://extension-js.test/fixture");
 			expect(details?.name).toBe("web_js_contract");
 		}
+		// eval + __webJsTriggerAsync monkeypatch leaves the shared kernel in a bad state.
+		await restartKernel(harness.sidepanel);
 	});
 
 	test("runtime.inspect indexes catalog namespaces", async ({ harness }) => {

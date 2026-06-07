@@ -7,6 +7,7 @@ import {
 	registerWorkerHandler,
 	registerWorkerPort,
 	resolveAsyncRelayResult,
+	resolveRelayTimeoutMs,
 	safePostAsCall,
 	settleAllPendingRelays,
 } from "../src/worker/worker.js";
@@ -44,6 +45,37 @@ describe("coerceWasmParams", () => {
 		expect(coerceWasmParams([details])).toEqual([
 			{ url: "https://extension-js.test/fixture", name: "web_js_contract" },
 		]);
+	});
+});
+
+describe("resolveRelayTimeoutMs", () => {
+	it("uses compound default budget for page_goto when params omit timeout", () => {
+		expect(resolveRelayTimeoutMs("page_goto", { url: "https://example.com" })).toBe(
+			65_500,
+		);
+	});
+
+	it("extends page_goto relay for load + ping + grace phases", () => {
+		expect(
+			resolveRelayTimeoutMs("page_goto", {
+				url: "https://example.com",
+				timeout: 60_000n,
+			}),
+		).toBe(125_500);
+	});
+
+	it("uses single-phase budget for page_wait_for", () => {
+		expect(
+			resolveRelayTimeoutMs("page_wait_for", {
+				selector: "#x",
+				timeout: 60_000n,
+			}),
+		).toBe(65_000);
+	});
+
+	it("uses duration field for sleep", () => {
+		expect(resolveRelayTimeoutMs("sleep", { duration: 10_000n })).toBe(30_000);
+		expect(resolveRelayTimeoutMs("sleep", { duration: 30_000n })).toBe(35_000);
 	});
 });
 
@@ -86,7 +118,7 @@ describe("extensionDispatch", () => {
 
 	it("relays through the routing table for content-script endpoints", async () => {
 		setRoute("page_click", { endpoint: "content-script", tabPolicy: "active" });
-		const promise = extensionDispatch({ refId: "1" }, { action: "page_click", runId: "run-1" });
+		const promise = extensionDispatch({ refId: "e1" }, { action: "page_click", runId: "run-1" });
 		const message = sentMessages[0] as { id: string; owner: string; tabPolicy: string };
 		expect(message.owner).toBe("content-script");
 		expect(message.tabPolicy).toBe("active");
@@ -120,10 +152,10 @@ describe("worker executable callbacks", () => {
 
 	it("cross-context content-script callback posts owner, action, params, and resolves response", async () => {
 		const callback = createExecutableCallback(makeEntry("page_click", "content-script"));
-		const promise = callback({ refId: "7" }, { runId: "run-1" });
+		const promise = callback({ refId: "e7" }, { runId: "run-1" });
 		const message = sentMessages[0] as { id: string; owner: string; command: unknown; runId: string };
 		expect(message.owner).toBe("content-script");
-		expect(message.command).toEqual({ action: "page_click", params: { refId: "7" }, runId: "run-1", callId: undefined });
+		expect(message.command).toEqual({ action: "page_click", params: { refId: "e7" }, runId: "run-1", callId: undefined });
 		resolveAsyncRelayResult(message.id, { ok: true, value: "clicked" });
 		await expect(promise).resolves.toEqual({ ok: true, value: "clicked" });
 	});
@@ -251,5 +283,20 @@ describe("worker executable callbacks", () => {
 		await expect(promise).rejects.toThrow("Relay aborted for action: page_click");
 		// No message should have been posted because the relay was rejected immediately
 		expect(sentMessages.filter((m) => (m as { command?: unknown }).command?.action === "page_click")).toHaveLength(0);
+	});
+
+	it("resolveTimeoutMs callback controls relay deadline", async () => {
+		const callback = safePostAsCall({
+			owner: "main-thread",
+			action: "page_goto",
+			resolveTimeoutMs: (params) => resolveRelayTimeoutMs("page_goto", params),
+		});
+		const promise = callback({ url: "https://example.com", timeout: 60_000n });
+		const expected = expect(promise).rejects.toThrow(
+			"Relay timeout for action: page_goto",
+		);
+		await vi.advanceTimersByTimeAsync(125_499);
+		await vi.advanceTimersByTimeAsync(2);
+		await expected;
 	});
 });
