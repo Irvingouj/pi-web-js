@@ -386,7 +386,7 @@ describe("error code preservation", () => {
 		// Remove chrome stub so runner.ts sees no extension context
 		const originalChrome = globalThis.chrome;
 		vi.stubGlobal("chrome", undefined);
-		const result = await dispatchTool("chrome_tabs_query", {});
+		const result = await dispatchTool("chrome_tabs_query", [{}]);
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.code).toBe("E_NO_EXTENSION");
@@ -487,7 +487,7 @@ describe("integration", () => {
 		// cookies_get is an alias for chrome_cookies_get
 		const result = await executeMainThreadCommand({
 			action: "cookies_get",
-			params: { url: "https://example.com", name: "session" },
+			params: [{ url: "https://example.com", name: "session" }],
 		});
 		expect(result.ok).toBe(true);
 		if (result.ok) {
@@ -668,90 +668,113 @@ describe("chrome passthrough", () => {
 		vi.clearAllMocks();
 	});
 
+	it("rejects non-array transport with E_INVALID_ARGUMENT_TRANSPORT", async () => {
+		const result = await dispatchTool("chrome_bookmarks_search", "query");
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_INVALID_ARGUMENT_TRANSPORT");
+		}
+		expect(mockChrome.bookmarks.search).not.toHaveBeenCalled();
+	});
+
+	it("chrome_bookmarks_search forwards empty object unchanged", async () => {
+		const result = await dispatchTool("chrome_bookmarks_search", [{}]);
+		expect(result.ok).toBe(true);
+		expect(mockChrome.bookmarks.search).toHaveBeenCalledWith({});
+	});
+
+	it("chrome_bookmarks_search forwards string query unchanged", async () => {
+		await dispatchTool("chrome_bookmarks_search", ["term"]);
+		expect(mockChrome.bookmarks.search).toHaveBeenCalledWith("term");
+	});
+
+	it("bookmarks_search alias forwards the same argument array", async () => {
+		await dispatchTool("bookmarks_search", [{}]);
+		expect(mockChrome.bookmarks.search).toHaveBeenCalledWith({});
+	});
+
 	it("chrome_tabs_query returns tab array", async () => {
-		const result = await dispatchTool("chrome_tabs_query", { active: true });
+		const result = await dispatchTool("chrome_tabs_query", [{ active: true }]);
 		expect(result.ok).toBe(true);
 		if (result.ok) {
 			expect(Array.isArray(result.value)).toBe(true);
 		}
-		expect(mockChrome.tabs.query).toHaveBeenCalled();
+		expect(mockChrome.tabs.query).toHaveBeenCalledWith({ active: true });
+	});
+
+	it("chrome_tabs_update preserves argument order and falsey values", async () => {
+		await dispatchTool("chrome_tabs_update", [0, { active: false }]);
+		expect(mockChrome.tabs.update).toHaveBeenCalledWith(0, { active: false });
 	});
 
 	it("chrome_cookies_get returns cookie", async () => {
-		const result = await dispatchTool("chrome_cookies_get", {
-			url: "https://example.com",
-			name: "session",
-		});
+		const details = { url: "https://example.com", name: "session" };
+		const result = await dispatchTool("chrome_cookies_get", [details]);
 		expect(result.ok).toBe(true);
 		if (result.ok) {
 			expect(result.value).toEqual({ name: "test", value: "value" });
 		}
-	});
-
-	it("chrome_bookmarks_search returns bookmarks", async () => {
-		const result = await dispatchTool("chrome_bookmarks_search", "query");
-		expect(result.ok).toBe(true);
-		if (result.ok) {
-			expect(Array.isArray(result.value)).toBe(true);
-		}
+		expect(mockChrome.cookies.get).toHaveBeenCalledWith(details);
 	});
 
 	it("chrome_history_search returns history", async () => {
-		const result = await dispatchTool("chrome_history_search", {
-			text: "query",
-		});
+		const query = { text: "query" };
+		const result = await dispatchTool("chrome_history_search", [query]);
 		expect(result.ok).toBe(true);
 		if (result.ok) {
 			expect(Array.isArray(result.value)).toBe(true);
 		}
+		expect(mockChrome.history.search).toHaveBeenCalledWith(query);
 	});
 
-	it("chrome_notifications_create returns notification id", async () => {
-		const result = await dispatchTool("chrome_notifications_create", {
-			options: { title: "Test" },
-		});
+	it("chrome_notifications_create preserves empty notification id", async () => {
+		const options = { title: "Test" };
+		const result = await dispatchTool("chrome_notifications_create", [
+			"",
+			options,
+		]);
 		expect(result.ok).toBe(true);
 		if (result.ok) {
 			expect(result.value).toBe("notif-id");
 		}
+		expect(mockChrome.notifications.create).toHaveBeenCalledWith("", options);
 	});
 
 	it("chrome_tabGroups_query returns array", async () => {
-		const result = await dispatchTool("chrome_tabGroups_query", {});
+		const result = await dispatchTool("chrome_tabGroups_query", [{}]);
 		expect(result.ok).toBe(true);
 		if (result.ok) {
 			expect(Array.isArray(result.value)).toBe(true);
 		}
-		expect(mockChrome.tabGroups.query).toHaveBeenCalled();
+		expect(mockChrome.tabGroups.query).toHaveBeenCalledWith({});
 	});
 
-	it("chrome_sessions_getRecentlyClosed returns array", async () => {
-		const result = await dispatchTool("chrome_sessions_getRecentlyClosed", {});
+	it("chrome_sessions_getRecentlyClosed invokes zero-arg form", async () => {
+		const result = await dispatchTool("chrome_sessions_getRecentlyClosed", []);
 		expect(result.ok).toBe(true);
 		if (result.ok) {
 			expect(Array.isArray(result.value)).toBe(true);
 		}
-		expect(mockChrome.sessions.getRecentlyClosed).toHaveBeenCalled();
+		expect(mockChrome.sessions.getRecentlyClosed).toHaveBeenCalledWith();
 	});
 
 	it("chrome_downloads_download returns id", async () => {
-		const result = await dispatchTool("chrome_downloads_download", {
-			url: "https://example.com/file.zip",
-		});
+		const options = { url: "https://example.com/file.zip" };
+		const result = await dispatchTool("chrome_downloads_download", [options]);
 		expect(result.ok).toBe(true);
 		if (result.ok) {
 			expect(result.value).toBe(1);
 		}
-		expect(mockChrome.downloads.download).toHaveBeenCalled();
+		expect(mockChrome.downloads.download).toHaveBeenCalledWith(options);
 	});
 
 	it("chrome_system_cpu_getInfo returns object", async () => {
-		const result = await dispatchTool("chrome_system_cpu_getInfo", {});
+		const result = await dispatchTool("chrome_system_cpu_getInfo", []);
 		expect(result.ok).toBe(true);
 		if (result.ok) {
 			expect(typeof result.value).toBe("object");
 		}
-		expect(mockChrome.system.cpu.getInfo).toHaveBeenCalled();
+		expect(mockChrome.system.cpu.getInfo).toHaveBeenCalledWith();
 	});
 });
 
@@ -1046,6 +1069,31 @@ describe("acceptance criteria verification", () => {
 		}
 	});
 
+	it("AC-14: chrome passthrough has no firstRec heuristics", () => {
+		const internalsPath = path.resolve(
+			__dirname,
+			"../src/main/runner/chrome/internals.ts",
+		);
+		const content = fs.readFileSync(internalsPath, "utf-8");
+		expect(content).not.toContain("firstRec");
+		expect(content).not.toContain("chromePassthroughHandlers");
+	});
+
+	it("AC-15: native spread only appears in invokeNative", () => {
+		const nativePath = path.resolve(
+			__dirname,
+			"../src/main/runner/chrome/native.ts",
+		);
+		const internalsPath = path.resolve(
+			__dirname,
+			"../src/main/runner/chrome/internals.ts",
+		);
+		const nativeContent = fs.readFileSync(nativePath, "utf-8");
+		const internalsContent = fs.readFileSync(internalsPath, "utf-8");
+		expect(nativeContent).toContain("method(...args)");
+		expect(internalsContent).not.toContain("method(...");
+	});
+
 	it("AC-13: normalizeParams uses Maps, no switch", () => {
 		const paramsPath = path.resolve(
 			__dirname,
@@ -1098,6 +1146,33 @@ describe("registry contract with runner tools", () => {
 		const tabClick = manifest.find((entry) => entry.action === "tab_click");
 		expect(pageClick?.owner).toBe("content-script");
 		expect(tabClick?.owner).toBe("content-script");
+	});
+
+	it("chrome passthrough manifest entries must not set fields", () => {
+		const manifest = getSerializableJsManifest();
+		const offenders = manifest.filter(
+			(e) =>
+				e.action.startsWith("chrome_") &&
+				Array.isArray(e.fields) &&
+				e.fields.length > 0,
+		);
+		expect(
+			offenders.map((e) => `${e.action}:${JSON.stringify(e.fields)}`),
+		).toEqual([]);
+	});
+
+	it("chrome cookies manifest entries compare get vs getAll", () => {
+		const manifest = getSerializableJsManifest();
+		const get = manifest.find((e) => e.action === "chrome_cookies_get");
+		const getAll = manifest.find((e) => e.action === "chrome_cookies_getAll");
+		const alias = manifest.find((e) => e.action === "cookies_get");
+		expect(get).toBeDefined();
+		expect(getAll).toBeDefined();
+		expect(get?.fields ?? null).toBeNull();
+		expect(getAll?.fields ?? null).toBeNull();
+		expect(get?.namespace).toBe("chrome.cookies");
+		expect(getAll?.namespace).toBe("chrome.cookies");
+		expect(alias?.namespace).toBe("web.cookies");
 	});
 });
 

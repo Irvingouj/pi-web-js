@@ -2,14 +2,14 @@
 import { z } from "zod";
 import * as schemas from "../../../../shared/schemas.js";
 import { registerChromePassthrough } from "../../chrome/internals.js";
+import { zChromeVoid } from "./register-helpers.js";
 
 registerChromePassthrough(
 	"chrome_alarms_create",
 	"chrome",
 	"Create an alarm",
 	["alarms"],
-	schemas.ChromeAlarmsCreateParamsSchema,
-	z.null(),
+	zChromeVoid,
 	"ECHROME",
 	"extension",
 	[
@@ -25,15 +25,13 @@ registerChromePassthrough(
 			required: false,
 			description: "Alarm info",
 		},
-	],
-	["name", "alarmInfo"],
+	]
 );
 registerChromePassthrough(
 	"chrome_alarms_clear",
 	"chrome",
 	"Clear an alarm",
 	["alarms"],
-	schemas.ChromeAlarmsClearParamsSchema,
 	schemas.ChromeAlarmsClearSchema,
 	"ECHROME",
 	"extension",
@@ -44,6 +42,23 @@ registerChromePassthrough(
 			required: false,
 			description: "Alarm name to clear",
 		},
-	],
-	["name"],
+	]
+);
+registerChromePassthrough(
+	"chrome_alarms_clearAll",
+	"chrome",
+	"Clear all alarms",
+	["alarms"],
+	zChromeVoid,
+	"ECHROME",
+	"extension"
+);
+registerChromePassthrough(
+	"chrome_alarms_getAll",
+	"chrome",
+	"Get all alarms",
+	["alarms"],
+	z.array(z.record(z.unknown())),
+	"ECHROME",
+	"extension"
 );

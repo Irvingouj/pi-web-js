@@ -2,28 +2,23 @@
 import { z } from "zod";
 import * as schemas from "../../../../shared/schemas.js";
 import { registerChromePassthrough } from "../../chrome/internals.js";
+import { zChromeVoid } from "./register-helpers.js";
 
 registerChromePassthrough(
 	"chrome_sidePanel_setOptions",
 	"chrome",
 	"Set sidepanel options",
 	["sidePanel"],
-	schemas.ChromeSidePanelSetOptionsParamsSchema,
-	z.null(),
+	zChromeVoid,
 	"ECHROME",
-	"extension",
-	[
-		{
-			name: "path",
-			type: "string",
-			required: false,
-			description: "Panel path",
-		},
-		{
-			name: "enabled",
-			type: "boolean",
-			required: false,
-			description: "Whether enabled",
-		},
-	],
+	"extension"
+);
+registerChromePassthrough(
+	"chrome_sidePanel_setPanelBehavior",
+	"chrome",
+	"Set sidepanel behavior",
+	["sidePanel"],
+	zChromeVoid,
+	"ECHROME",
+	"extension"
 );

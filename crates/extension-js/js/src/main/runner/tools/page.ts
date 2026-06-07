@@ -76,10 +76,10 @@ registerJsCall({
 		if (activeTab === null) {
 			throw makeError("No active tab", "E_NO_TAB");
 		}
-		const result = await dispatchTool("chrome_tabs_update", {
-			tabId: activeTab,
-			update: { url: params.url },
-		});
+		const result = await dispatchTool("chrome_tabs_update", [
+			activeTab,
+			{ url: params.url },
+		]);
 		return unwrapResult(result);
 	},
 	paramTypes: [
@@ -145,7 +145,7 @@ registerJsCall({
 			throw makeError("No active tab", "E_NO_TAB");
 		}
 		return unwrapResult(
-			await dispatchTool("chrome_tabs_reload", { tabId: activeTab }),
+			await dispatchTool("chrome_tabs_reload", [activeTab]),
 		);
 	},
 	paramTypes: [],
@@ -643,7 +643,7 @@ registerJsCall({
 		if (tabId === null) {
 			throw makeError("page_close requires a tabId", "E_MISSING_PARAM");
 		}
-		return unwrapResult(await dispatchTool("chrome_tabs_remove", { tabId }));
+		return unwrapResult(await dispatchTool("chrome_tabs_remove", [tabId]));
 	},
 	paramTypes: [
 		{
@@ -667,10 +667,9 @@ registerJsCall({
 	owner: "main-thread",
 	handler: async (_params, _ctx) => {
 		return unwrapResult(
-			await dispatchTool("chrome_tabs_query", {
-				active: true,
-				currentWindow: true,
-			}),
+			await dispatchTool("chrome_tabs_query", [
+				{ active: true, currentWindow: true },
+			]),
 		);
 	},
 	paramTypes: [],

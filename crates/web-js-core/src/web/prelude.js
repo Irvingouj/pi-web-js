@@ -98,21 +98,35 @@ var navigator = globalThis.navigator;
 var crypto = globalThis.crypto;
 
 var __makeAsyncCache = {};
-function makeAsync(action, fields) {
-  var cacheKey = action + (fields ? '|' + fields.join(',') : '');
+function makeAsync(action, fields, parity) {
+  var cacheKey = action + (fields ? '|' + fields.join(',') : '') + (parity ? '|parity' : '');
   if (__makeAsyncCache[cacheKey]) return __makeAsyncCache[cacheKey];
   var fn = function(...args) {
     return new Promise((resolve, reject) => {
-      let params;
-      if (args.length === 0) params = {};
-      else if (args.length === 1) params = args[0];
-      else params = args;
-      if (fields && Array.isArray(params)) {
-        var obj = {};
-        for (var i = 0; i < fields.length && i < params.length; i++) obj[fields[i]] = params[i];
-        params = obj;
-      } else if (fields && (typeof params === 'string' || typeof params === 'number')) {
-        var obj = {}; obj[fields[0]] = params; params = obj;
+      for (var i = 0; i < args.length; i++) {
+        if (args[i] === undefined) {
+          reject(new Error('E_INVALID_ARGUMENT_TRANSPORT: undefined arguments cannot be transported'));
+          return;
+        }
+      }
+      var params;
+      if (parity) {
+        params = args;
+      } else if (fields) {
+        if (args.length === 0) params = {};
+        else if (args.length === 1) params = args[0];
+        else params = args;
+        if (Array.isArray(params)) {
+          var obj = {};
+          for (var j = 0; j < fields.length && j < params.length; j++) obj[fields[j]] = params[j];
+          params = obj;
+        } else if (typeof params === 'string' || typeof params === 'number') {
+          var named = {}; named[fields[0]] = params; params = named;
+        }
+      } else {
+        if (args.length === 0) params = {};
+        else if (args.length === 1) params = args[0];
+        else params = args;
       }
       __webJsTriggerAsync(action, params, resolve, reject);
     });
@@ -130,7 +144,7 @@ function __webJsSetupAsyncBindings(specs) {
       ns = ns[part];
     }
     if (typeof ns[spec.name] === 'undefined') {
-      ns[spec.name] = makeAsync(spec.action, spec.fields);
+      ns[spec.name] = makeAsync(spec.action, spec.fields, spec.parity);
     }
   }
   if (typeof globalThis.fetch === 'undefined' && typeof web !== 'undefined' && typeof web.fetch === 'function') {

@@ -562,8 +562,19 @@ pub fn dispatch_handler(
         ApiHandler::Rust(handler_fn) => Some(handler_fn(cmd)),
         ApiHandler::JsCallback(js_value) => {
                 let cb = js_sys::Function::from(js_value);
-                let params_js = match serde_wasm_bindgen::to_value(&cmd.params) {
-                    Ok(v) => v,
+                // Round-trip through JSON so nested objects become plain JS objects, not Maps.
+                // serde_wasm_bindgen::to_value maps JSON objects to JS Map, which breaks
+                // native-parity chrome APIs (JSON.stringify(Map) => "{}" inside arg arrays).
+                let params_js = match serde_json::to_string(&cmd.params) {
+                    Ok(params_json) => match js_sys::JSON::parse(&params_json) {
+                        Ok(v) => v,
+                        Err(e) => {
+                            tracing::warn!(action = %cmd.action, error = ?e, "dispatch_handler_params_parse_failed");
+                            return Some(Box::pin(async move {
+                                Err(format!("Failed to parse params JSON: {:?}", e))
+                            }) as Pin<Box<dyn Future<Output = Result<AsyncResponse, String>>>>)
+                        }
+                    },
                     Err(e) => {
                         tracing::warn!(action = %cmd.action, error = %e, "dispatch_handler_params_serialize_failed");
                         return Some(Box::pin(async move {
@@ -816,6 +827,26 @@ fn escape_js_string(s: &str) -> String {
         .replace("</script>", "<\\/script>")
 }
 
+fn is_native_parity_action(action: &str) -> bool {
+    if action.starts_with("chrome_") {
+        return true;
+    }
+    matches!(
+        action,
+        "bookmarks_search"
+            | "bookmarks_create"
+            | "bookmarks_delete"
+            | "history_search"
+            | "history_delete"
+            | "cookies_get"
+            | "cookies_set"
+            | "cookies_delete"
+            | "cookies_list"
+            | "notifications_create"
+            | "notifications_clear"
+    )
+}
+
 pub fn generate_js_bindings_code() -> String {
     let entries = list_manifest_entries();
     let mut specs = Vec::new();
@@ -842,7 +873,13 @@ pub fn generate_js_bindings_code() -> String {
         let action_escaped = escape_js_string(action);
 
         let fields_js = match &entry.fields {
-            Some(fields) if !fields.is_empty() => {
+            Some(fields)
+                if !fields.is_empty()
+                    && !entry
+                        .action
+                        .as_ref()
+                        .is_some_and(|a| is_native_parity_action(a)) =>
+            {
                 let escaped: Vec<String> = fields
                     .iter()
                     .map(|f| escape_js_string(f))
@@ -859,9 +896,15 @@ pub fn generate_js_bindings_code() -> String {
             _ => String::new(),
         };
 
+        let parity_js = if is_native_parity_action(action) {
+            ",parity:true"
+        } else {
+            ""
+        };
+
         specs.push(format!(
-            r#"{{namespace:"{}",name:"{}",action:"{}"{}}}"#,
-            ns, name, action_escaped, fields_js
+            r#"{{namespace:"{}",name:"{}",action:"{}"{}{}}}"#,
+            ns, name, action_escaped, fields_js, parity_js
         ));
 
         // Generate bindings for aliases
@@ -870,7 +913,13 @@ pub fn generate_js_bindings_code() -> String {
             let alias_name = escape_js_string(&alias.name);
 
             let alias_fields_js = match &alias.fields {
-                Some(fields) if !fields.is_empty() => {
+                Some(fields)
+                    if !fields.is_empty()
+                        && !entry
+                            .action
+                            .as_ref()
+                            .is_some_and(|a| is_native_parity_action(a)) =>
+            {
                     let escaped: Vec<String> = fields
                         .iter()
                         .map(|f| escape_js_string(f))
@@ -887,9 +936,15 @@ pub fn generate_js_bindings_code() -> String {
                 _ => String::new(),
             };
 
+            let alias_parity_js = if is_native_parity_action(action) {
+                ",parity:true"
+            } else {
+                ""
+            };
+
             specs.push(format!(
-                r#"{{namespace:"{}",name:"{}",action:"{}"{}}}"#,
-                alias_ns, alias_name, action_escaped, alias_fields_js
+                r#"{{namespace:"{}",name:"{}",action:"{}"{}{}}}"#,
+                alias_ns, alias_name, action_escaped, alias_fields_js, alias_parity_js
             ));
         }
     }
@@ -2053,6 +2108,55 @@ mod tests {
         assert!(result.is_err(), "Expected Err, got: {:?}", result);
         let err = result.unwrap_err();
         assert!(err.contains("timed out"), "Error should mention timeout, got: {}", err);
+
+        clear_handlers();
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    #[wasm_bindgen_test::wasm_bindgen_test]
+    async fn test_js_callback_params_array_elements_are_plain_objects() {
+        clear_handlers();
+
+        let cb = js_sys::Function::new_with_args(
+            "params",
+            r#"
+            const first = params[0];
+            const proto = Object.getPrototypeOf(first);
+            const isPlainObject = proto === Object.prototype || proto === null;
+            const isMap = typeof Map !== 'undefined' && first instanceof Map;
+            return Promise.resolve({
+                ok: true,
+                value: { isPlainObject, isMap, url: first.url, name: first.name },
+                error: null
+            });
+            "#,
+        );
+        assert!(register_handler(
+            "js_params_shape",
+            ApiHandler::JsCallback(JsValue::from(cb))
+        ));
+
+        let cmd = AsyncCommand {
+            call_id: 1,
+            action: "js_params_shape".to_string(),
+            params: serde_json::json!([{
+                "url": "https://extension-js.test/fixture",
+                "name": "web_js_contract"
+            }]),
+            run_id: None,
+        };
+
+        let fut = dispatch_handler("js_params_shape", cmd);
+        assert!(fut.is_some());
+        let result = fut.unwrap().await;
+        assert!(result.is_ok(), "Expected Ok, got: {:?}", result);
+        let resp = result.unwrap();
+        assert!(resp.ok);
+        let value = resp.value.expect("expected value");
+        assert_eq!(value["isPlainObject"], serde_json::json!(true));
+        assert_eq!(value["isMap"], serde_json::json!(false));
+        assert_eq!(value["url"], serde_json::json!("https://extension-js.test/fixture"));
+        assert_eq!(value["name"], serde_json::json!("web_js_contract"));
 
         clear_handlers();
     }

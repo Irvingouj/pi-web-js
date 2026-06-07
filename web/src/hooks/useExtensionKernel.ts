@@ -1,4 +1,4 @@
-import { ExtensionSession } from "@pi-oxide/extension-js";
+import { ExtensionSession, setLogLevel } from "@pi-oxide/extension-js";
 import { useCallback, useRef, useState } from "preact/hooks";
 import type { WorkerRunResult } from "../types";
 
@@ -24,6 +24,14 @@ async function ensureSession(): Promise<ExtensionSession> {
 		initPromise = ExtensionSession.init().then(([session, runner]) => {
 			globalSession = session;
 			globalRunner = runner;
+			if (typeof window !== "undefined") {
+				const e2eLog = new URLSearchParams(window.location.search).get(
+					"e2e_log",
+				);
+				if (e2eLog === "debug" || e2eLog === "info") {
+					setLogLevel(e2eLog);
+				}
+			}
 			return session;
 		});
 	}

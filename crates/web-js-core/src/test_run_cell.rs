@@ -670,6 +670,108 @@ mod tests {
     }
 
     #[test]
+    fn test_chrome_cookies_get_parity_binding_preserves_pending_params() {
+        use crate::api_docs::{
+            clear_docs, clear_handlers, generate_js_bindings_code, register,
+            register_handler, ApiHandler, JsApiDoc, ReturnDoc, ToolSource, ToolTransport,
+        };
+        use std::future::Future;
+        use std::pin::Pin;
+        use std::rc::Rc;
+
+        clear_docs();
+        clear_handlers();
+
+        register(JsApiDoc {
+            namespace: "chrome.cookies".into(),
+            name: "get".into(),
+            action: Some("chrome_cookies_get".into()),
+            description: "Get a cookie.".into(),
+            params: vec![],
+            returns: ReturnDoc {
+                js_type: "object".into(),
+                description: "Cookie object.".into(),
+            },
+            public_name: "chrome.cookies.get".into(),
+            local_name: None,
+            transport: ToolTransport::Async,
+            tool_source: ToolSource::Extension,
+            fields: None,
+        });
+        let _ = register_handler(
+            "chrome_cookies_get",
+            ApiHandler::Rust(Rc::new(|_cmd| {
+                Box::pin(async move {
+                    Ok(crate::types::AsyncResponse {
+                        ok: true,
+                        value: None,
+                        error: None,
+                    })
+                }) as Pin<Box<dyn Future<Output = Result<crate::types::AsyncResponse, String>>>>
+            })),
+        );
+
+        let mut session = JsSession::new();
+        let bindings = generate_js_bindings_code();
+        assert!(
+            bindings.contains("parity:true"),
+            "chrome_cookies_get binding should use native parity"
+        );
+        let setup = session.run_cell(&bindings, "");
+        assert!(setup.error.is_none(), "{:?}", setup.error);
+
+        let result = session.run_cell(
+            r#"await chrome.cookies.get({ url: "https://extension-js.test/fixture", name: "web_js_contract" })"#,
+            "",
+        );
+        assert_eq!(result.status, CellStatus::AsyncPending, "{:?}", result);
+        assert_eq!(result.pending_commands.len(), 1);
+        assert_eq!(result.pending_commands[0].action, "chrome_cookies_get");
+        assert_eq!(
+            result.pending_commands[0].params,
+            serde_json::json!([{
+                "url": "https://extension-js.test/fixture",
+                "name": "web_js_contract"
+            }]),
+            "parity makeAsync binding must preserve cookie details in pending params"
+        );
+
+        clear_handlers();
+        clear_docs();
+    }
+
+    #[test]
+    fn test_parity_async_params_preserve_cookie_details() {
+        let mut session = JsSession::new();
+        let setup = session.run_cell(
+            r#"
+            function cookieGet(details) {
+                return new Promise((resolve, reject) => {
+                    __webJsTriggerAsync("chrome_cookies_get", [details], resolve, reject);
+                });
+            }
+        "#,
+            "",
+        );
+        assert!(setup.error.is_none(), "{:?}", setup.error);
+
+        let result = session.run_cell(
+            r#"await cookieGet({ url: "https://extension-js.test/fixture", name: "web_js_contract" })"#,
+            "",
+        );
+        assert_eq!(result.status, CellStatus::AsyncPending, "{:?}", result);
+        assert_eq!(result.pending_commands.len(), 1);
+        assert_eq!(result.pending_commands[0].action, "chrome_cookies_get");
+        assert_eq!(
+            result.pending_commands[0].params,
+            serde_json::json!([{
+                "url": "https://extension-js.test/fixture",
+                "name": "web_js_contract"
+            }])
+        );
+    }
+
+    #[test]
     fn test_chrome_tabs_create_pending() {
         let mut session = JsSession::new();
         let result = session.run_cell(

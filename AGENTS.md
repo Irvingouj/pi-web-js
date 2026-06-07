@@ -34,9 +34,14 @@
 - Load `web/dist/` as unpacked extension in Chrome
 - Test through the sidepanel UI
 
+### Native-Parity API Transport
+- `chrome.*` and parity aliases (`bookmarks_search`, `history_search`, etc.) transport opaque `NativeArgs` arrays end-to-end
+- Chrome invocation goes through `invokeNative(method, args)` only — the bridge must not reshape arguments
+- Project-owned APIs (`page.*`, `tab.*`, `dom.*`) keep their existing normalization
+
 ### When Fixing Bugs
 1. Check if bug reproduces in extension context
-2. Fix extension-js runner (`crates/extension-js/js/runner.ts`)
+2. Fix extension-js runner (`crates/extension-js/js/src/main/runner/` — `runtime.ts` + `tools/`)
 3. Fix prelude if needed (`crates/web-js-core/src/web/prelude.js`)
 4. Rebuild WASM (`npm run wasm`)
 5. Test in extension build

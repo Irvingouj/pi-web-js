@@ -102,13 +102,19 @@ export type SerializableJsCallManifestEntry = {
 	errorCategory?: string;
 };
 
-/** Rust/WASM often passes BTreeMap params as a JS Map; Zod object schemas need plain objects. */
+/** Rust/WASM often passes BTreeMap params as a JS Map; Zod object schemas need plain objects.
+ *  Native-parity chrome actions also JSON-round-trip in dispatch_handler; this covers relay paths. */
 export function coerceWasmParams(params: unknown): unknown {
 	if (params === null || params === undefined) {
 		return {};
 	}
 	if (params instanceof Map) {
-		return Object.fromEntries(params);
+		return Object.fromEntries(
+			[...params.entries()].map(([key, value]) => [key, coerceWasmParams(value)]),
+		);
+	}
+	if (Array.isArray(params)) {
+		return params.map(coerceWasmParams);
 	}
 	return params;
 }

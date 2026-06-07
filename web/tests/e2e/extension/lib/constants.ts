@@ -25,7 +25,27 @@ export const EXT_CONTRACT_APIS = process.env.EXT_CONTRACT_APIS === "1";
 export const LAUNCH_SW_TIMEOUT_MS = 30_000;
 export const LAUNCH_KERNEL_TIMEOUT_MS = 30_000;
 export const LAUNCH_EDITOR_TIMEOUT_MS = 15_000;
-export const CELL_TIMEOUT_MS = 60_000;
+export const CELL_TIMEOUT_MS = 8_000;
+
+export const CHROME_FIXTURE_PREFIX = "__CHROME_FIXTURE__";
+
+/** Default on: capture sidepanel/sw/fixture console for chrome E2E diagnostics. */
+export const EXT_E2E_VERBOSE = process.env.EXT_E2E_VERBOSE !== "0";
+
+export const EXT_E2E_ATTACH_ALWAYS = process.env.EXT_E2E_ATTACH_ALWAYS === "1";
+
+/**
+ * Optional extension-js log level via ?e2e_log= URL param.
+ * Default "error" avoids info/debug log storms that overflow the stack on contract cells.
+ * Playwright still captures browser console via EXT_E2E_VERBOSE.
+ */
+const E2E_LOG_LEVELS = ["debug", "info", "warn", "error"] as const;
+export const EXT_E2E_LOG_LEVEL: (typeof E2E_LOG_LEVELS)[number] =
+	E2E_LOG_LEVELS.includes(
+		process.env.EXT_E2E_LOG_LEVEL as (typeof E2E_LOG_LEVELS)[number],
+	)
+		? (process.env.EXT_E2E_LOG_LEVEL as (typeof E2E_LOG_LEVELS)[number])
+		: "error";
 
 export const EXTENSION_MANIFEST = JSON.parse(
 	readFileSync(EXTENSION_MANIFEST_PATH, "utf8"),

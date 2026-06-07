@@ -8,6 +8,7 @@ export type ExtensionHarness = {
 	userDataDir: string;
 	serviceWorkerErrors: string[];
 	browserConsoleErrors: string[];
+	runtimeLogs: string[];
 };
 
 export type CellExecution<T> = {

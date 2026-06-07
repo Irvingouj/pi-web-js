@@ -22,6 +22,7 @@ import {
 	handleFetch,
 	handleHostCallAction,
 	registerChromePassthrough,
+	requireArgumentArray,
 	getElementByRefId,
 	extractRefId,
 	handleDomSnapshot,
@@ -47,19 +48,20 @@ function registerAlias(
 	const parts = action.split("_");
 	const name = parts[parts.length - 1];
 	const category = parts.length > 1 ? parts[0] : "";
-	const namespace = category ? `chrome.${category}` : "chrome";
+	const namespace = category ? `web.${category}` : "web";
 	registerJsCall({
 		action,
 		namespace,
 		name,
 		description,
-		params: z.record(z.unknown()),
+		params: z.unknown(),
 		returns: returnsSchema,
 		owner: "main-thread",
 		handler: async (params, _ctx) => {
 			const log = logger.child("alias");
-			log.debug("alias_dispatch", { action, target });
-			return unwrapResult(await dispatchTool(target, params));
+			const args = requireArgumentArray(params, action);
+			log.debug("alias_dispatch", { action, target, argCount: args.length });
+			return unwrapResult(await dispatchTool(target, args));
 		},
 		paramTypes,
 		returnDoc: "Alias result",

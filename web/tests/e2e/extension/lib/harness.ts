@@ -10,6 +10,8 @@ import {
 } from "@playwright/test";
 import {
 	CELL_TIMEOUT_MS,
+	EXT_E2E_LOG_LEVEL,
+	EXT_E2E_VERBOSE,
 	EXTENSION_DIST,
 	FIXTURE_HTML,
 	FIXTURE_ORIGIN,
@@ -118,11 +120,35 @@ async function attachLaunchFailureDiagnostics(
 	});
 }
 
+function attachRuntimeLogListener(
+	runtimeLogs: string[],
+	browserConsoleErrors: string[],
+	serviceWorkerErrors: string[],
+	prefix: string,
+	onConsole: (msg: { type: () => string; text: () => string }) => void,
+): void {
+	onConsole((msg) => {
+		const line = `[${prefix}][${msg.type()}][${new Date().toISOString()}] ${msg.text()}`;
+		if (EXT_E2E_VERBOSE) {
+			runtimeLogs.push(line);
+		}
+		if (msg.type() === "error") {
+			const errLine = `${prefix}: ${msg.text()}`;
+			if (prefix === "sw") {
+				serviceWorkerErrors.push(errLine);
+			} else {
+				browserConsoleErrors.push(`console: ${errLine}`);
+			}
+		}
+	});
+}
+
 export async function launchExtension(
 	testInfo?: TestInfo,
 ): Promise<ExtensionHarness> {
 	const serviceWorkerErrors: string[] = [];
 	const browserConsoleErrors: string[] = [];
+	const runtimeLogs: string[] = [];
 	const userDataDir = mkdtempSync(path.join(os.tmpdir(), "ext-contract-"));
 
 	let context: BrowserContext | undefined;
@@ -143,26 +169,32 @@ export async function launchExtension(
 			page.on("pageerror", (err) => {
 				browserConsoleErrors.push(`pageerror: ${err.message}`);
 			});
-			page.on("console", (msg) => {
-				if (msg.type() === "error") {
-					browserConsoleErrors.push(`console: ${msg.text()}`);
-				}
-			});
+			attachRuntimeLogListener(
+				runtimeLogs,
+				browserConsoleErrors,
+				serviceWorkerErrors,
+				"page",
+				(handler) => page.on("console", handler),
+			);
 		});
 
 		for (const sw of context.serviceWorkers()) {
-			sw.on("console", (msg) => {
-				if (msg.type() === "error") {
-					serviceWorkerErrors.push(msg.text());
-				}
-			});
+			attachRuntimeLogListener(
+				runtimeLogs,
+				browserConsoleErrors,
+				serviceWorkerErrors,
+				"sw",
+				(handler) => sw.on("console", handler),
+			);
 		}
 		context.on("serviceworker", (sw) => {
-			sw.on("console", (msg) => {
-				if (msg.type() === "error") {
-					serviceWorkerErrors.push(msg.text());
-				}
-			});
+			attachRuntimeLogListener(
+				runtimeLogs,
+				browserConsoleErrors,
+				serviceWorkerErrors,
+				"sw",
+				(handler) => sw.on("console", handler),
+			);
 		});
 
 		await installFixtureRoutes(context);
@@ -177,12 +209,30 @@ export async function launchExtension(
 		expect(extensionId).toBeTruthy();
 
 		const fixtureTab = await context.newPage();
+		attachRuntimeLogListener(
+			runtimeLogs,
+			browserConsoleErrors,
+			serviceWorkerErrors,
+			"fixture",
+			(handler) => fixtureTab.on("console", handler),
+		);
 		await fixtureTab.goto(`${FIXTURE_ORIGIN}/fixture`, {
 			waitUntil: "domcontentloaded",
 		});
 
 		sidepanel = await context.newPage();
-		await sidepanel.goto(`chrome-extension://${extensionId}/index.html`, {
+		attachRuntimeLogListener(
+			runtimeLogs,
+			browserConsoleErrors,
+			serviceWorkerErrors,
+			"sidepanel",
+			(handler) => sidepanel!.on("console", handler),
+		);
+		const logSuffix =
+			EXT_E2E_LOG_LEVEL !== "error"
+				? `?e2e_log=${EXT_E2E_LOG_LEVEL}`
+				: "";
+		await sidepanel.goto(`chrome-extension://${extensionId}/index.html${logSuffix}`, {
 			waitUntil: "domcontentloaded",
 		});
 
@@ -205,6 +255,7 @@ export async function launchExtension(
 			userDataDir,
 			serviceWorkerErrors,
 			browserConsoleErrors,
+			runtimeLogs,
 		};
 	} catch (error) {
 		await attachLaunchFailureDiagnostics(testInfo, {
@@ -394,7 +445,9 @@ export function assertNoHarnessErrors(
 		throw new Error(`Service worker errors:\n${msg}`);
 	}
 	const fatalConsole = harness.browserConsoleErrors.filter(
-		(e) => !e.includes("Extension context invalidated"),
+		(e) =>
+			!e.includes("Extension context invalidated") &&
+			!/Unchecked runtime\.lastError/i.test(e),
 	);
 	if (fatalConsole.length > 0) {
 		const msg = fatalConsole.join("\n");

@@ -6,7 +6,10 @@ import {
 	API_CASES,
 	CONTRACT_MANIFEST,
 } from "./lib/contract-metadata.ts";
-import { assertNoHarnessErrors, inspectPublicApis } from "./lib/harness.ts";
+import { assertNoHarnessErrors, inspectPublicApis, executeCell } from "./lib/harness.ts";
+import { auditChromeHandlerCoverage } from "./lib/chrome-handler-audit.ts";
+import { RESULT_PREFIX } from "./lib/constants.ts";
+import { parseAllSentinels } from "./lib/sentinels.ts";
 import { test, expect } from "./fixtures.ts";
 
 test.describe.serial("extension catalog", () => {
@@ -51,6 +54,66 @@ test.describe.serial("extension catalog", () => {
 		expect(catalogSet.size).toBe(CONTRACT_MANIFEST.length);
 		expect(CONTRACT_MANIFEST.filter((a) => !catalogSet.has(a))).toEqual([]);
 		expect(catalog.filter((a) => !CONTRACT_MANIFEST.includes(a))).toEqual([]);
+	});
+
+	test("every chrome contract API has a runner handler", () => {
+		const { missing, registeredCount, chromeApiCount } =
+			auditChromeHandlerCoverage();
+		expect(
+			missing,
+			`missing chrome handlers (${registeredCount}/${chromeApiCount} registered): ${missing.join(", ")}`,
+		).toEqual([]);
+	});
+
+	test("chrome cookies trigger vs callback params", async ({ harness }) => {
+		const exec = await executeCell(
+			harness.sidepanel,
+			`
+var RESULT_PREFIX = "${RESULT_PREFIX}";
+const runnerUrl = "chrome-extension://${harness.extensionId}/e2e/contract-batch-runner.js";
+const contractUrl = "chrome-extension://${harness.extensionId}/e2e/all-apis-extension-contract.js";
+const runnerRes = await web.fetch(runnerUrl);
+eval(runnerRes.body);
+const contractRes = await web.fetch(contractUrl);
+let triggerParams = null;
+const orig = globalThis.__webJsTriggerAsync;
+globalThis.__webJsTriggerAsync = function(action, params, resolve, reject) {
+  if (action === "chrome_cookies_get") triggerParams = params;
+  return orig(action, params, resolve, reject);
+};
+await runContractBatch(contractRes.body, ["chrome.cookies.get"], false, RESULT_PREFIX);
+print(RESULT_PREFIX + JSON.stringify({ ok: true, value: { triggerParams, triggerJson: JSON.stringify(triggerParams) } }));
+`,
+			15_000,
+		);
+		expect(exec.status).toBe("success");
+		const parsed = parseAllSentinels(exec.stdout);
+		const entry = parsed.find(
+			(p) => p.ok && p.value && (p.value as { triggerParams?: unknown }).triggerParams,
+		);
+		expect(entry?.ok).toBe(true);
+		if (entry?.ok) {
+			const value = entry.value as {
+				triggerParams?: unknown[];
+				triggerJson?: string;
+			};
+			expect(Array.isArray(value.triggerParams)).toBe(true);
+			expect(value.triggerParams).toHaveLength(1);
+			expect(value.triggerJson).toBe(
+				JSON.stringify([
+					{
+						url: "https://extension-js.test/fixture",
+						name: "web_js_contract",
+					},
+				]),
+			);
+			const details = (value.triggerParams as unknown[])[0] as Record<
+				string,
+				unknown
+			>;
+			expect(details?.url).toBe("https://extension-js.test/fixture");
+			expect(details?.name).toBe("web_js_contract");
+		}
 	});
 
 	test("runtime.inspect indexes catalog namespaces", async ({ harness }) => {

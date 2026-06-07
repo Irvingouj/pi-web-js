@@ -8,58 +8,34 @@ registerChromePassthrough(
 	"chrome",
 	"Query tab groups",
 	["tabGroups"],
-	schemas.ChromeTabGroupsQueryParamsSchema,
 	schemas.ChromeTabGroupArraySchema,
 	"ECHROME",
-	"extension",
-	[
-		{
-			name: "query",
-			type: "object",
-			required: false,
-			description: "Tab group query",
-		},
-	],
+	"extension"
 );
 registerChromePassthrough(
 	"chrome_tabGroups_get",
 	"chrome",
 	"Get a tab group",
 	["tabGroups"],
-	schemas.ChromeTabGroupsGetParamsSchema,
 	schemas.ChromeTabGroupSchema,
 	"ECHROME",
-	"extension",
-	[
-		{
-			name: "groupId",
-			type: "number",
-			required: false,
-			description: "Tab group ID",
-		},
-	],
+	"extension"
 );
 registerChromePassthrough(
 	"chrome_tabGroups_update",
 	"chrome",
 	"Update a tab group",
 	["tabGroups"],
-	schemas.ChromeTabGroupsUpdateParamsSchema,
 	schemas.ChromeTabGroupSchema,
 	"ECHROME",
-	"extension",
-	[
-		{
-			name: "groupId",
-			type: "number",
-			required: false,
-			description: "Tab group ID",
-		},
-		{
-			name: "update",
-			type: "object",
-			required: false,
-			description: "Update properties",
-		},
-	],
+	"extension"
+);
+registerChromePassthrough(
+	"chrome_tabGroups_move",
+	"chrome",
+	"Move a tab group",
+	["tabGroups"],
+	schemas.ChromeTabGroupSchema,
+	"ECHROME",
+	"extension"
 );

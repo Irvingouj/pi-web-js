@@ -8,16 +8,34 @@ registerChromePassthrough(
 	"chrome",
 	"Send a runtime message",
 	["runtime"],
-	schemas.ChromeRuntimeSendMessageParamsSchema,
 	z.unknown(),
 	"ECHROME",
-	"extension",
-	[
-		{
-			name: "message",
-			type: "object",
-			required: false,
-			description: "Message to send",
-		},
-	],
+	"extension"
+);
+registerChromePassthrough(
+	"chrome_runtime_connect",
+	"chrome",
+	"Connect to extension runtime",
+	["runtime"],
+	z.record(z.unknown()),
+	"ECHROME",
+	"extension"
+);
+registerChromePassthrough(
+	"chrome_runtime_getURL",
+	"chrome",
+	"Get extension resource URL",
+	["runtime"],
+	z.string(),
+	"ECHROME",
+	"extension"
+);
+registerChromePassthrough(
+	"chrome_runtime_getManifest",
+	"chrome",
+	"Get extension manifest",
+	["runtime"],
+	z.record(z.unknown()),
+	"ECHROME",
+	"extension"
 );

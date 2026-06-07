@@ -69,6 +69,31 @@ describe("content-script onMessage handler", () => {
 		});
 	});
 
+	it("acks contract-ping messages without an action field", async () => {
+		const sendResponse = vi.fn();
+		const listener = mockAddListener.mock.calls[0][0];
+		listener(
+			{ type: "contract-ping" },
+			{ id: globalThis.chrome.runtime.id },
+			sendResponse,
+		);
+		expect(sendResponse).toHaveBeenCalledWith({ ok: true });
+	});
+
+	it("rejects messages with no action and no contract-ping type", async () => {
+		const sendResponse = vi.fn();
+		const listener = mockAddListener.mock.calls[0][0];
+		listener(
+			{ type: "other" },
+			{ id: globalThis.chrome.runtime.id },
+			sendResponse,
+		);
+		expect(sendResponse).toHaveBeenCalledWith({
+			ok: false,
+			error: "Missing action",
+		});
+	});
+
 	it("routes registryCall messages to handlers", async () => {
 		const sendResponse = vi.fn();
 		const listener = mockAddListener.mock.calls[0][0];

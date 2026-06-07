@@ -44,4 +44,11 @@ export {
 	buildSnapshotInTab,
 } from "./dom/snapshot.js";
 export { handleHostCallAction } from "./host.js";
+export {
+	invokeNative,
+	isNativeParityAction,
+	requireArgumentArray,
+	resolveChromeMethod,
+	type NativeArgs,
+} from "./chrome/native.js";
 export { registerChromePassthrough } from "./chrome/internals.js";

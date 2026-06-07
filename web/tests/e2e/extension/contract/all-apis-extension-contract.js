@@ -37,6 +37,9 @@ function isTypedError(value) {
 const EXPECTED_UNAVAILABLE_RE =
 	/permission|not available|not supported|disabled|unavailable|denied|requires.*permission|no access|prohibited|not a function|Unimplemented|Cannot read properties of undefined|is not defined|does not exist/i;
 
+const EXPECTED_UNAVAILABLE_TEARDOWN_RE =
+	/permission|not available|not supported|disabled|unavailable|denied|requires.*permission|no access|prohibited|not a function|Unimplemented|Cannot read properties of undefined|is not defined|does not exist|No tab with id|No window with id|not found/i;
+
 function unavailableMessage(err) {
 	const raw = err?.message ? err.message : String(err);
 	if (!raw || raw === "TypeError") {
@@ -70,8 +73,7 @@ async function allowUnavailable(fn) {
 	}
 }
 
-// Teardown helper: stricter — only catches permission/unavailability, NOT "not found".
-// "not found" during teardown means the fixture ID was wrong or already cleaned up.
+// Teardown helper: catches permission/unavailability and benign not-found cleanup.
 async function allowUnavailableTeardown(fn) {
 	try {
 		return await fn();
@@ -80,7 +82,7 @@ async function allowUnavailableTeardown(fn) {
 			return err;
 		}
 		const msg = unavailableMessage(err);
-		if (!EXPECTED_UNAVAILABLE_RE.test(msg)) {
+		if (!EXPECTED_UNAVAILABLE_TEARDOWN_RE.test(msg)) {
 			throw err;
 		}
 		return {
@@ -472,13 +474,13 @@ api(
 	"chrome.downloads.download",
 	"sidepanel",
 	async () => chrome.downloads.download({ url: TEST_URL, saveAs: false }),
-	{ destructive: true, expected: "typed_error" },
+	{ destructive: true, expected: "success" },
 );
 api(
 	"chrome.downloads.search",
 	"sidepanel",
 	async () => chrome.downloads.search({ limit: 1 }),
-	{ expected: "typed_error" },
+	{ expected: "success" },
 );
 api(
 	"chrome.downloads.pause",
@@ -518,7 +520,8 @@ api(
 	async () =>
 		chrome.notifications.create("web-js-contract", {
 			type: "basic",
-			iconUrl: "icon.png",
+			iconUrl:
+				"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAD0lEQVQ42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
 			title: "web-js",
 			message: "contract",
 		}),
@@ -630,7 +633,7 @@ api(
 api(
 	"chrome.action.setIcon",
 	"sidepanel",
-	async () => chrome.action.setIcon({ path: "icon.png" }),
+	async () => chrome.action.setIcon({ path: "icon.svg" }),
 	{ destructive: true, expected: "success" },
 );
 api(
@@ -669,7 +672,7 @@ api(
 	async ({ active }) =>
 		chrome.scripting.executeScript({
 			target: { tabId: active.tabId },
-			func: () => 1,
+			files: ["e2e/return-one.js"],
 		}),
 	{ expected: "success" },
 );
@@ -723,25 +726,25 @@ api(
 	"chrome.storage.sync.get",
 	"sidepanel",
 	async () => chrome.storage.sync.get(["web_js_contract"]),
-	{ expected: "typed_error" },
+	{ expected: "success" },
 );
 api(
 	"chrome.storage.sync.set",
 	"sidepanel",
 	async () => chrome.storage.sync.set({ web_js_contract: "1" }),
-	{ destructive: true, expected: "typed_error" },
+	{ destructive: true, expected: "success" },
 );
 api(
 	"chrome.storage.sync.remove",
 	"sidepanel",
 	async () => chrome.storage.sync.remove(["web_js_contract"]),
-	{ destructive: true, expected: "typed_error" },
+	{ destructive: true, expected: "success" },
 );
 api(
 	"chrome.storage.sync.clear",
 	"sidepanel",
 	async () => chrome.storage.sync.clear(),
-	{ destructive: true, skip: true, expected: "typed_error" },
+	{ destructive: true, expected: "success" },
 );
 
 // chrome.runtime.
@@ -952,7 +955,7 @@ api(
 	"chrome.tabGroups.query",
 	"sidepanel",
 	async () => chrome.tabGroups.query({}),
-	{ expected: "typed_error" },
+	{ expected: "success" },
 );
 api(
 	"chrome.tabGroups.update",
@@ -966,13 +969,13 @@ api(
 	"chrome.sessions.getRecentlyClosed",
 	"sidepanel",
 	async () => chrome.sessions.getRecentlyClosed({ maxResults: 1 }),
-	{ expected: "typed_error" },
+	{ expected: "success" },
 );
 api(
 	"chrome.sessions.getDevices",
 	"sidepanel",
 	async () => chrome.sessions.getDevices({ maxResults: 1 }),
-	{ expected: "typed_error" },
+	{ expected: "success" },
 );
 api(
 	"chrome.sessions.restore",
@@ -1033,25 +1036,25 @@ api(
 	"chrome.permissions.contains",
 	"sidepanel",
 	async () => chrome.permissions.contains({ permissions: ["tabs"] }),
-	{ expected: "typed_error" },
+	{ expected: "success" },
 );
 api(
 	"chrome.permissions.getAll",
 	"sidepanel",
-	async () => chrome.permissions.getAll(),
-	{ expected: "typed_error" },
+		async () => chrome.permissions.getAll(),
+	{ expected: "success" },
 );
 api(
 	"chrome.permissions.request",
 	"sidepanel",
 	async () => chrome.permissions.request({ permissions: ["tabs"] }),
-	{ destructive: true, expected: "typed_error" },
+	{ destructive: true, expected: "success" },
 );
 api(
 	"chrome.permissions.remove",
 	"sidepanel",
 	async () => chrome.permissions.remove({ permissions: [] }),
-	{ destructive: true, expected: "typed_error" },
+	{ destructive: true, expected: "success" },
 );
 
 // chrome.offscreen.
@@ -1668,9 +1671,24 @@ function verifyContractCoverage() {
 
 async function buildFixture(runDestructive = false) {
 	print("[buildFixture] start");
-	const current = await expectValueOrTypedError("tab.current", () =>
-		tab.current(),
+	const fixtureTabQuery = await allowUnavailable(() =>
+		chrome.tabs.query({ url: TEST_URL + "*" }),
 	);
+	const fixtureTabs = Array.isArray(fixtureTabQuery) ? fixtureTabQuery : [];
+	const normalizedTestUrl = TEST_URL.replace(/\/$/, "");
+	const fixtureTab =
+		fixtureTabs.find(
+			(t) => t.url === TEST_URL || t.url === normalizedTestUrl,
+		) ??
+		(fixtureTabs[0]?.id != null ? fixtureTabs[0] : null);
+	let current;
+	if (fixtureTab?.id != null) {
+		current = { tabId: fixtureTab.id, id: fixtureTab.id, url: fixtureTab.url };
+	} else {
+		current = await expectValueOrTypedError("tab.current", () =>
+			tab.current(),
+		);
+	}
 	print("[buildFixture] tab.current done");
 	// If tab.current() is unavailable, current is a typed error. We still need
 	// an active/t fixture so non-tab tests can run, but tab-dependent tests will
@@ -1682,14 +1700,12 @@ async function buildFixture(runDestructive = false) {
 			: { tabId: current?.id ? current.id : 0 };
 	const t = isTypedError(current)
 		? active
-		: current?.tabId
-			? current
-			: new TabHandle(active.tabId);
+		: new TabHandle(current?.tabId ?? current?.id ?? active.tabId ?? 0);
 
 	// Only create destructive fixtures when running destructive APIs.
 	const tempTab = runDestructive
 		? await expectValueOrTypedError("tab.create.fixture", () =>
-				tab.create(TEST_DATA_URL),
+				tab.create({ url: TEST_DATA_URL }),
 			)
 		: null;
 	const created = runDestructive

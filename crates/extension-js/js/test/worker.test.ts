@@ -12,6 +12,7 @@ import {
 } from "../src/worker/worker.js";
 import { clearRoutes, setRoute } from "../src/shared/registry/routes.js";
 import type { SerializableJsCallManifestEntry } from "../src/shared/tool-registry.js";
+import { coerceWasmParams } from "../src/shared/registry/manifest.js";
 
 const sentMessages: unknown[] = [];
 
@@ -34,6 +35,18 @@ function makeEntry(
 	};
 }
 
+describe("coerceWasmParams", () => {
+	it("converts nested Maps inside native-parity argument arrays", () => {
+		const details = new Map([
+			["url", "https://extension-js.test/fixture"],
+			["name", "web_js_contract"],
+		]);
+		expect(coerceWasmParams([details])).toEqual([
+			{ url: "https://extension-js.test/fixture", name: "web_js_contract" },
+		]);
+	});
+});
+
 describe("extensionDispatch", () => {
 	beforeEach(() => {
 		sentMessages.length = 0;
@@ -53,6 +66,22 @@ describe("extensionDispatch", () => {
 			ok: false,
 			error: { message: "No route registered for action: missing_action", code: "E_NO_ROUTE" },
 		});
+	});
+
+	it("relays native-parity argument arrays without mutation", async () => {
+		setRoute("chrome_bookmarks_search", { endpoint: "main-thread" });
+		const params = [0, { active: false }, ""];
+		const promise = extensionDispatch(params, {
+			action: "chrome_bookmarks_search",
+			runId: "run-1",
+		});
+		const message = sentMessages[0] as { command: { params: unknown } };
+		expect(message.command.params).toEqual(params);
+		resolveAsyncRelayResult((sentMessages[0] as { id: string }).id, {
+			ok: true,
+			value: [],
+		});
+		await expect(promise).resolves.toEqual({ ok: true, value: [] });
 	});
 
 	it("relays through the routing table for content-script endpoints", async () => {

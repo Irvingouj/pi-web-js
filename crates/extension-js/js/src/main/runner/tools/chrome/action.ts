@@ -1,76 +1,68 @@
 /// <reference types="chrome" />
 import { z } from "zod";
-import * as schemas from "../../../../shared/schemas.js";
 import { registerChromePassthrough } from "../../chrome/internals.js";
+import { zChromeVoid } from "./register-helpers.js";
 
 registerChromePassthrough(
 	"chrome_action_setBadgeText",
 	"chrome",
 	"Set badge text",
 	["action"],
-	schemas.ChromeActionSetBadgeTextParamsSchema,
-	z.null(),
+	zChromeVoid,
 	"ECHROME",
-	"extension",
-	[
-		{
-			name: "text",
-			type: "string",
-			required: false,
-			description: "Badge text",
-		},
-		{ name: "tabId", type: "number", required: false, description: "Tab ID" },
-	],
+	"extension"
 );
 registerChromePassthrough(
 	"chrome_action_setBadgeBackgroundColor",
 	"chrome",
 	"Set badge background color",
 	["action"],
-	schemas.ChromeActionSetBadgeBackgroundColorParamsSchema,
-	z.null(),
+	zChromeVoid,
 	"ECHROME",
-	"extension",
-	[
-		{
-			name: "color",
-			type: "string",
-			required: false,
-			description: "Badge color",
-		},
-		{ name: "tabId", type: "number", required: false, description: "Tab ID" },
-	],
+	"extension"
 );
 registerChromePassthrough(
 	"chrome_action_setTitle",
 	"chrome",
 	"Set action title",
 	["action"],
-	schemas.ChromeActionSetTitleParamsSchema,
-	z.null(),
+	zChromeVoid,
 	"ECHROME",
-	"extension",
-	[
-		{
-			name: "title",
-			type: "string",
-			required: false,
-			description: "Action title",
-		},
-		{ name: "tabId", type: "number", required: false, description: "Tab ID" },
-	],
+	"extension"
 );
 registerChromePassthrough(
 	"chrome_action_setIcon",
 	"chrome",
 	"Set action icon",
 	["action"],
-	schemas.ChromeActionSetIconParamsSchema,
-	z.null(),
+	zChromeVoid,
 	"ECHROME",
-	"extension",
-	[
-		{ name: "path", type: "string", required: false, description: "Icon path" },
-		{ name: "tabId", type: "number", required: false, description: "Tab ID" },
-	],
+	"extension"
+);
+registerChromePassthrough(
+	"chrome_action_getBadgeText",
+	"chrome",
+	"Get badge text",
+	["action"],
+	z.string(),
+	"ECHROME",
+	"extension"
+);
+registerChromePassthrough(
+	"chrome_action_openPopup",
+	"chrome",
+	"Open action popup",
+	["action"],
+	zChromeVoid,
+	"ECHROME",
+	"extension"
+);
+registerChromePassthrough(
+	"chrome_action_setPopup",
+	"chrome",
+	"Set action popup",
+	["action"],
+	zChromeVoid,
+	"ECHROME",
+	"extension"
 );

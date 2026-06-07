@@ -8,7 +8,6 @@ registerChromePassthrough(
 	"chrome",
 	"Create a notification",
 	["notifications"],
-	schemas.ChromeNotificationsCreateParamsSchema,
 	schemas.ChromeNotificationIdSchema,
 	"ECHROME",
 	"extension",
@@ -25,15 +24,13 @@ registerChromePassthrough(
 			required: false,
 			description: "Notification options",
 		},
-	],
-	["id", "options"],
+	]
 );
 registerChromePassthrough(
 	"chrome_notifications_clear",
 	"chrome",
 	"Clear a notification",
 	["notifications"],
-	schemas.ChromeNotificationsClearParamsSchema,
 	schemas.ChromeNotificationClearSchema,
 	"ECHROME",
 	"extension",
@@ -44,6 +41,23 @@ registerChromePassthrough(
 			required: false,
 			description: "Notification ID to clear",
 		},
-	],
-	["id"],
+	]
+);
+registerChromePassthrough(
+	"chrome_notifications_getAll",
+	"chrome",
+	"Get all notifications",
+	["notifications"],
+	z.record(z.unknown()),
+	"ECHROME",
+	"extension"
+);
+registerChromePassthrough(
+	"chrome_notifications_update",
+	"chrome",
+	"Update a notification",
+	["notifications"],
+	z.boolean(),
+	"ECHROME",
+	"extension"
 );

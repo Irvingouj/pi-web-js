@@ -162,7 +162,11 @@ export class ExtensionSession {
 		};
 
 		// Send init message with manifest so the worker can register JS APIs
-		w.postMessage({ type: "init", manifest });
+		const extensionId =
+			typeof chrome !== "undefined" && chrome.runtime?.id
+				? chrome.runtime.id
+				: undefined;
+		w.postMessage({ type: "init", manifest, extensionId });
 
 		return [readyPromise, runnerPromise];
 	}

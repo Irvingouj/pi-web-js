@@ -356,6 +356,7 @@ export function createExecutableCallback(entry: SerializableJsCallManifestEntry)
       );
     }
     return async (params, context) => {
+      params = coerceWasmParams(params);
       const signal = context?.signal ?? (
         context?.runId ? runAbortControllers.get(context.runId)?.signal : undefined
       );
@@ -378,7 +379,7 @@ export function createExecutableCallback(entry: SerializableJsCallManifestEntry)
       action: entry.action,
       timeoutMs: DEFAULT_RELAY_TIMEOUT_MS,
     });
-    return (params, context) => remoteCall(params, {
+    return (params, context) => remoteCall(coerceWasmParams(params), {
       ...context,
       signal: context?.signal ?? (
         context?.runId ? runAbortControllers.get(context.runId)?.signal : undefined
@@ -409,39 +410,50 @@ function initFsRegistry(s: ExtensionSession) {
   registerWorkerHandler("hash", (p) => s.fsHash(p as FsActionMap["hash"]["params"]));
 }
 
-async function initWasm(manifest: SerializableJsCallManifestEntry[]) {
-  if (initialized) return;
-  await init();
-  session = new ExtensionSession();
-  const DEFAULT_WASM_LOG_LEVEL = 3;
-  setWasmLogLevel(DEFAULT_WASM_LOG_LEVEL);
-  registerWasmSetLogLevel(setWasmLogLevel);
-  initFsRegistry(session);
+async function initWasm(
+	manifest: SerializableJsCallManifestEntry[],
+	extensionId?: string,
+) {
+	if (initialized) return;
+	await init();
+	session = new ExtensionSession();
+	const DEFAULT_WASM_LOG_LEVEL = 3;
+	setWasmLogLevel(DEFAULT_WASM_LOG_LEVEL);
+	registerWasmSetLogLevel(setWasmLogLevel);
+	initFsRegistry(session);
 
-  populateRoutesFromManifest(manifest);
+	populateRoutesFromManifest(manifest);
 
-  const batch = manifest.map((entry) => ({
-    entry: manifestEntryToWasm(entry),
-    callback: createExecutableCallback(entry),
-  }));
-  try {
-    register_js_call_batch(batch);
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    throw new Error(`Registry registration failed: ${message}`);
-  }
+	const batch = manifest.map((entry) => ({
+		entry: manifestEntryToWasm(entry),
+		callback: createExecutableCallback(entry),
+	}));
+	try {
+		register_js_call_batch(batch);
+	} catch (err: unknown) {
+		const message = err instanceof Error ? err.message : String(err);
+		throw new Error(`Registry registration failed: ${message}`);
+	}
 
-  // Freeze the Rust registry before injecting bindings
-  const { freezeManifest } = await import("../../pkg/extension_js.js");
-  freezeManifest();
+	// Freeze the Rust registry before injecting bindings
+	const { freezeManifest } = await import("../../pkg/extension_js.js");
+	freezeManifest();
 
-  // Inject bindings after all manifest entries are registered
-  session.injectRegistryBindings();
-  initialized = true;
+	// Inject bindings after all manifest entries are registered
+	session.injectRegistryBindings();
+	if (extensionId) {
+		const idLiteral = JSON.stringify(extensionId);
+		await session.runCellAsync(
+			`(function(){var r=globalThis.chrome&&globalThis.chrome.runtime;if(!r){r={};if(!globalThis.chrome)globalThis.chrome={};globalThis.chrome.runtime=r;}r.id=${idLiteral};})();`,
+			"",
+			"inject-runtime-id",
+		);
+	}
+	initialized = true;
 }
 
 export type WorkerMessage =
-  | { type: "init"; manifest: SerializableJsCallManifestEntry[] }
+  | { type: "init"; manifest: SerializableJsCallManifestEntry[]; extensionId?: string }
   | { type: "runCell"; id: string; code: string; stdin: string; runId?: string }
   | { type: "reset"; id?: string }
   | { type: "stop"; id: string }
@@ -473,7 +485,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
 
   if (msg.type === "init") {
     try {
-      await initWasm(msg.manifest);
+      await initWasm(msg.manifest, msg.extensionId);
       self.postMessage({ type: "ready" });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);

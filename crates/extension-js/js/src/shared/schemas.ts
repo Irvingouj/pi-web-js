@@ -388,6 +388,9 @@ export const ChromeCookiesSetParamsSchema = z.record(z.unknown());
 export const ChromeCookiesRemoveParamsSchema = z.record(z.unknown());
 export const ChromeCookiesGetAllParamsSchema = z.record(z.unknown());
 
+/** Opaque argument array for native-parity Chrome API transport. */
+export const NativeArgsSchema = z.array(z.unknown());
+
 export const ChromeBookmarksSearchParamsSchema = z.union([
 	z.string(),
 	z.record(z.unknown()),

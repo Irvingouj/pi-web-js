@@ -110,6 +110,16 @@ export function installMessageListener(): void {
 			);
 		}
 
+		// Contract/e2e pings use { type: "contract-ping" } without an action field.
+		if (!action && messageType === "contract-ping") {
+			sendResponse({ ok: true });
+			return false;
+		}
+		if (!action) {
+			sendResponse({ ok: false, error: "Missing action" });
+			return false;
+		}
+
 		return runHandler(action, action, requestRecord.params, sendResponse);
 	});
 }

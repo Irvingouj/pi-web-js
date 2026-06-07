@@ -47,7 +47,7 @@ registerJsCall({
 	returns: schemas.ChromeTabArraySchema,
 	owner: "main-thread",
 	handler: async (params, _ctx) => {
-		return unwrapResult(await dispatchTool("chrome_tabs_query", params));
+		return unwrapResult(await dispatchTool("chrome_tabs_query", [params]));
 	},
 	paramTypes: [
 		{
@@ -76,7 +76,7 @@ registerJsCall({
 			throw new Error("No active tab available");
 		}
 		const tab = unwrapResult(
-			await dispatchTool("chrome_tabs_get", { tabId }),
+			await dispatchTool("chrome_tabs_get", [tabId]),
 		) as Record<string, unknown>;
 		return { ...tab, tabId: tab.id ?? tabId };
 	},
@@ -97,7 +97,7 @@ registerJsCall({
 	owner: "main-thread",
 	handler: async (params, _ctx) => {
 		const tabId = extractTabId(asRecord(params));
-		return unwrapResult(await dispatchTool("chrome_tabs_get", { tabId }));
+		return unwrapResult(await dispatchTool("chrome_tabs_get", [tabId]));
 	},
 	paramTypes: [
 		{
@@ -121,7 +121,7 @@ registerJsCall({
 	returns: schemas.ChromeTabArraySchema,
 	owner: "main-thread",
 	handler: async (params, _ctx) => {
-		return unwrapResult(await dispatchTool("chrome_tabs_query", params));
+		return unwrapResult(await dispatchTool("chrome_tabs_query", [params]));
 	},
 	paramTypes: [
 		{
@@ -145,7 +145,7 @@ registerJsCall({
 	returns: schemas.ChromeTabArraySchema,
 	owner: "main-thread",
 	handler: async (_params, _ctx) => {
-		return unwrapResult(await dispatchTool("chrome_tabs_query", {}));
+		return unwrapResult(await dispatchTool("chrome_tabs_query", [{}]));
 	},
 	paramTypes: [],
 	returnDoc: "All tabs",
@@ -162,7 +162,7 @@ registerJsCall({
 	returns: schemas.ChromeTabSchema,
 	owner: "main-thread",
 	handler: async (params, _ctx) => {
-		return unwrapResult(await dispatchTool("chrome_tabs_create", params));
+		return unwrapResult(await dispatchTool("chrome_tabs_create", [params]));
 	},
 	paramTypes: [
 		{
@@ -197,10 +197,7 @@ registerJsCall({
 			throw makeError("tab_activate requires a tabId", "E_MISSING_PARAM");
 		}
 		return unwrapResult(
-			await dispatchTool("chrome_tabs_update", {
-				tabId,
-				update: { active: true },
-			}),
+			await dispatchTool("chrome_tabs_update", [tabId, { active: true }]),
 		);
 	},
 	paramTypes: [
@@ -228,7 +225,7 @@ registerJsCall({
 		if (tabId === null) {
 			throw makeError("tab_close requires a tabId", "E_MISSING_PARAM");
 		}
-		return unwrapResult(await dispatchTool("chrome_tabs_remove", { tabId }));
+		return unwrapResult(await dispatchTool("chrome_tabs_remove", [tabId]));
 	},
 	paramTypes: [
 		{
@@ -252,7 +249,7 @@ registerJsCall({
 	owner: "main-thread",
 	handler: async (params, _ctx) => {
 		return unwrapResult(
-			await dispatchTool("chrome_scripting_executeScript", params),
+			await dispatchTool("chrome_scripting_executeScript", [params]),
 		);
 	},
 	paramTypes: [

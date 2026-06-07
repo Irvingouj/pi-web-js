@@ -72,7 +72,7 @@ Four IDs trace a single execution end-to-end:
 | ID         | Generated In | Propagation Path                                      |
 |------------|--------------|-------------------------------------------------------|
 | `sessionId`| `ExtensionSession::new()` (Rust) | Lives for the session lifetime                        |
-| `runId`    | `ExtensionSession.runCellAsync()` (JS) | `index.ts` → Worker `runCell` message → `currentRunId` → `asyncRelay` → `runner.ts` |
+| `runId`    | `ExtensionSession.runCellAsync()` (JS) | `index.ts` → Worker `runCell` message → callback context → `asyncRelay` → `runner.ts` |
 | `commandId`| `Command.call_id` (JS/WASM) | Attached to every relayed command                     |
 | `batchId`  | `web-js-base` loop (Rust) | Per-iteration batch identifier inside `run_cell_async_loop` |
 
@@ -127,10 +127,10 @@ INFO  extension-js/src/session.rs:177 handle_command_relay_done: call_id=42 acti
    - Rust: `INFO path:line event: field=value`
    - Unified level gating is the goal; unified formatting is not.
 
-3. **Worker `currentRunId` invariant**
-   - `currentRunId` is a module-level variable in `worker.ts`.
-   - It is safe because the worker processes **one cell at a time**.
-   - If concurrent runs are ever supported, replace it with a `Map<call_id, runId>`.
+3. **Worker call context**
+   - `runId` is passed through the callback context object (`{ callId, runId, signal }`) from Rust to JS.
+   - No module-level mutable state tracks the current run; each async relay carries its own context.
+   - This makes concurrent runs safe without a `Map<call_id, runId>`.
 
 4. **web-js WASM unconditional startup log**
    - `web-js` (non-extension) uses `tracing_wasm::set_as_global_default()` without a filter layer.
