@@ -35,6 +35,7 @@ export interface ToolDoc {
 	};
 	errorCode: string;
 	errorCategory?: string;
+	example?: string;
 }
 
 export interface ToolDefinition<P, R> {
@@ -54,6 +55,7 @@ export interface ToolDefinition<P, R> {
 	returnDoc: string;
 	errorCode: string;
 	errorCategory?: string;
+	example?: string;
 }
 
 export type ExecutionContextId = string;
@@ -81,6 +83,10 @@ export type JsCallSpec<P, R> = {
 	paramTypes?: ToolDocParam[];
 	returnType?: string;
 	returnDoc?: string;
+	/** Chrome permission required to use this API (e.g. "notifications", "cookies"). */
+	permission?: string;
+	/** Runnable example string for this API. */
+	example?: string;
 };
 
 export type SerializableJsCallManifestEntry = {
@@ -100,6 +106,10 @@ export type SerializableJsCallManifestEntry = {
 	returnsDoc: { type: string; description: string };
 	errorCode: string;
 	errorCategory?: string;
+	/** Chrome permission required to use this API (e.g. "notifications", "cookies"). */
+	permission?: string;
+	/** Runnable example string for this API. */
+	example?: string;
 };
 
 /** Rust/WASM often passes BTreeMap params as a JS Map; Zod object schemas need plain objects.
@@ -147,5 +157,7 @@ export function manifestEntryToWasm(
 		},
 		errorCode: entry.errorCode,
 		errorCategory: entry.errorCategory ?? null,
+		permission: entry.permission ?? null,
+		example: entry.example ?? null,
 	};
 }

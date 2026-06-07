@@ -53,6 +53,8 @@ registerJsCall({
 	returnDoc: "Clipboard text",
 	errorCode: "ECLIPBOARD",
 	errorCategory: "permission",
+
+	example: "clipboard.read({ text: \"hello\" })",
 });
 
 registerJsCall({
@@ -85,16 +87,18 @@ registerJsCall({
 			name: "text",
 			type: "string",
 			required: false,
-			description: "Text to write to clipboard",
+			description: "Text to write to clipboard (literal)",
 		},
 		{
 			name: "value",
 			type: "string",
 			required: false,
-			description: "Alternative text value to write",
+			description: "Alternative text value to write (literal)",
 		},
 	],
 	returnDoc: "null",
 	errorCode: "ECLIPBOARD",
 	errorCategory: "permission",
+
+	example: "clipboard.write(\"text\")",
 });

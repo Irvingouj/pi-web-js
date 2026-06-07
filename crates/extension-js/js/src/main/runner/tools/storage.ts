@@ -51,11 +51,13 @@ registerJsCall({
 		return localStorage.getItem(params.key);
 	},
 	paramTypes: [
-		{ name: "key", type: "string", required: true, description: "Storage key" },
+		{ name: "key", type: "string", required: true, description: "Storage key (literal)" },
 	],
 	returnDoc: "Stored value or null",
 	errorCode: "ESTORAGE",
 	errorCategory: "storage",
+
+	example: "storage.get(\"myKey\")",
 });
 
 registerJsCall({
@@ -73,17 +75,19 @@ registerJsCall({
 		return null;
 	},
 	paramTypes: [
-		{ name: "key", type: "string", required: true, description: "Storage key" },
+		{ name: "key", type: "string", required: true, description: "Storage key (literal)" },
 		{
 			name: "value",
 			type: "string",
 			required: true,
-			description: "Value to store",
+			description: "Value to store (literal)",
 		},
 	],
 	returnDoc: "null",
 	errorCode: "ESTORAGE",
 	errorCategory: "storage",
+
+	example: "storage.set(\"myKey\", \"myValue\")",
 });
 
 registerJsCall({
@@ -101,11 +105,13 @@ registerJsCall({
 		return null;
 	},
 	paramTypes: [
-		{ name: "key", type: "string", required: true, description: "Storage key" },
+		{ name: "key", type: "string", required: true, description: "Storage key (literal)" },
 	],
 	returnDoc: "null",
 	errorCode: "ESTORAGE",
 	errorCategory: "storage",
+
+	example: "storage.delete(\"myKey\")",
 });
 
 registerJsCall({
@@ -129,6 +135,8 @@ registerJsCall({
 	returnDoc: "Array of keys",
 	errorCode: "ESTORAGE",
 	errorCategory: "storage",
+
+	example: "storage.list()",
 });
 
 registerJsCall({
@@ -155,12 +163,14 @@ registerJsCall({
 			name: "items",
 			type: "object",
 			required: true,
-			description: "Record of key-value pairs to set",
+			description: "Record of key-value pairs to set (literal)",
 		},
 	],
 	returnDoc: "null",
 	errorCode: "ESTORAGE",
 	errorCategory: "storage",
+
+	example: "storage.set_many({ key1: \"val1\", key2: \"val2\" })",
 });
 
 registerJsCall({
@@ -187,18 +197,19 @@ registerJsCall({
 			name: "keys",
 			type: "array",
 			required: true,
-			description: "Array of keys to retrieve",
+			description: "Array of keys to retrieve (literal)",
 		},
 		{
 			name: "defaults",
 			type: "object",
 			required: false,
-			description: "Default values for missing keys",
+			description: "Default values for missing keys (literal)",
 		},
 	],
 	returnDoc: "Record of values",
 	errorCode: "ESTORAGE",
 	errorCategory: "storage",
+	example: "storage.get_many([\"key1\", \"key2\"])",
 });
 
 registerJsCall({
@@ -224,6 +235,8 @@ registerJsCall({
 	returnDoc: "Record of values",
 	errorCode: "ESTORAGE",
 	errorCategory: "storage",
+
+	example: "storage.get_all()",
 });
 
 registerJsCall({
@@ -246,12 +259,14 @@ registerJsCall({
 			name: "keys",
 			type: "array",
 			required: true,
-			description: "Array of keys to delete",
+			description: "Array of keys to delete (literal)",
 		},
 	],
 	returnDoc: "null",
 	errorCode: "ESTORAGE",
 	errorCategory: "storage",
+
+	example: "storage.delete_many([\"key1\", \"key2\"])",
 });
 
 registerJsCall({
@@ -279,4 +294,6 @@ registerJsCall({
 	returnDoc: "null",
 	errorCode: "ESTORAGE",
 	errorCategory: "storage",
+
+	example: "storage.clear()",
 });

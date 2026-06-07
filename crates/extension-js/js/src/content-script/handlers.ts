@@ -1,11 +1,11 @@
 import { logger } from "./logger.js";
 import {
 	asRecord,
-	findCandidateLabels,
 	findElementByLabel,
 	getElementByRefId,
 	getNumberParam,
 	getStringParam,
+	throwElementNotFound,
 } from "./dom-utils.js";
 import { inlineSnapshot } from "./snapshot.js";
 
@@ -25,11 +25,7 @@ export const handlers: Record<string, Handler> = {
 			el = findElementByLabel(label);
 		}
 		if (!el) {
-			const query = label || refId;
-			const candidates = query ? findCandidateLabels(query) : [];
-			throw new Error(
-				`Element not found${query ? ` by label: "${query}"` : ""}. Candidates: ${candidates.join(", ") || "none"}`,
-			);
+			throwElementNotFound(refId, label, true);
 		}
 		(el as HTMLElement).click();
 		return null;
@@ -44,11 +40,7 @@ export const handlers: Record<string, Handler> = {
 			el = findElementByLabel(label);
 		}
 		if (!el) {
-			const query = label || refId;
-			const candidates = query ? findCandidateLabels(query) : [];
-			throw new Error(
-				`Element not found${query ? ` by label: "${query}"` : ""}. Candidates: ${candidates.join(", ") || "none"}`,
-			);
+			throwElementNotFound(refId, label, true);
 		}
 		if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
 			el.value = value;
@@ -68,11 +60,7 @@ export const handlers: Record<string, Handler> = {
 			el = findElementByLabel(label);
 		}
 		if (!el) {
-			const query = label || refId;
-			const candidates = query ? findCandidateLabels(query) : [];
-			throw new Error(
-				`Element not found${query ? ` by label: "${query}"` : ""}. Candidates: ${candidates.join(", ") || "none"}`,
-			);
+			throwElementNotFound(refId, label, true);
 		}
 		if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
 			el.value = text;
@@ -92,11 +80,7 @@ export const handlers: Record<string, Handler> = {
 			el = findElementByLabel(label);
 		}
 		if (!el) {
-			const query = label || refId;
-			const candidates = query ? findCandidateLabels(query) : [];
-			throw new Error(
-				`Element not found${query ? ` by label: "${query}"` : ""}. Candidates: ${candidates.join(", ") || "none"}`,
-			);
+			throwElementNotFound(refId, label, true);
 		}
 		if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
 			el.value += text;
@@ -118,9 +102,15 @@ export const handlers: Record<string, Handler> = {
 
 	select: (params) => {
 		const refId = getStringParam(params, "refId");
+		const label = getStringParam(params, "label");
 		const value = getStringParam(params, "value");
-		const el = refId ? getElementByRefId(refId) : null;
-		if (!el) throw new Error(`Element ${refId} not found`);
+		let el = refId ? getElementByRefId(refId) : null;
+		if (!el && label) {
+			el = findElementByLabel(label);
+		}
+		if (!el) {
+			throwElementNotFound(refId, label);
+		}
 		if (el instanceof HTMLSelectElement) {
 			el.value = value;
 			return null;
@@ -130,12 +120,18 @@ export const handlers: Record<string, Handler> = {
 
 	check: (params) => {
 		const refId = getStringParam(params, "refId");
+		const label = getStringParam(params, "label");
 		const checked = (() => {
 			const obj = asRecord(params);
 			return typeof obj.checked === "boolean" ? obj.checked : true;
 		})();
-		const el = refId ? getElementByRefId(refId) : null;
-		if (!el) throw new Error(`Element ${refId} not found`);
+		let el = refId ? getElementByRefId(refId) : null;
+		if (!el && label) {
+			el = findElementByLabel(label);
+		}
+		if (!el) {
+			throwElementNotFound(refId, label);
+		}
 		if (el instanceof HTMLInputElement && el.type === "checkbox") {
 			el.checked = checked;
 			return null;
@@ -145,8 +141,14 @@ export const handlers: Record<string, Handler> = {
 
 	hover: (params) => {
 		const refId = getStringParam(params, "refId");
-		const el = refId ? getElementByRefId(refId) : null;
-		if (!el) throw new Error(`Element ${refId} not found`);
+		const label = getStringParam(params, "label");
+		let el = refId ? getElementByRefId(refId) : null;
+		if (!el && label) {
+			el = findElementByLabel(label);
+		}
+		if (!el) {
+			throwElementNotFound(refId, label);
+		}
 		const ev = new MouseEvent("mouseenter", { bubbles: true });
 		el.dispatchEvent(ev);
 		return null;
@@ -171,8 +173,14 @@ export const handlers: Record<string, Handler> = {
 
 	dblclick: (params) => {
 		const refId = getStringParam(params, "refId");
-		const el = refId ? getElementByRefId(refId) : null;
-		if (!el) throw new Error(`Element ${refId} not found`);
+		const label = getStringParam(params, "label");
+		let el = refId ? getElementByRefId(refId) : null;
+		if (!el && label) {
+			el = findElementByLabel(label);
+		}
+		if (!el) {
+			throwElementNotFound(refId, label);
+		}
 		const ev = new MouseEvent("dblclick", { bubbles: true });
 		el.dispatchEvent(ev);
 		return null;
@@ -188,17 +196,21 @@ export const handlers: Record<string, Handler> = {
 		return true;
 	},
 
-	scrollTo: (params) => {
+	scroll_to: (params) => {
 		const refId = getStringParam(params, "refId");
+		const label = getStringParam(params, "label");
 		const x = getNumberParam(params, "x", 0);
 		const y = getNumberParam(params, "y", 0);
-		if (refId) {
-			const el = getElementByRefId(refId);
+		if (refId || label) {
+			let el = refId ? getElementByRefId(refId) : null;
+			if (!el && label) {
+				el = findElementByLabel(label);
+			}
 			if (el) {
 				el.scrollIntoView({ behavior: "smooth" });
 				return true;
 			}
-			throw new Error(`Element ${refId} not found`);
+			throwElementNotFound(refId, label);
 		}
 		window.scrollTo({ top: y, left: x, behavior: "smooth" });
 		return true;

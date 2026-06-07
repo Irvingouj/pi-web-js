@@ -201,11 +201,14 @@ function resolvePort(owner: string): RelayPort | null {
 export function safePostAsCall(options: {
   owner: string;
   action: string;
-  timeoutMs: number;
+  timeoutMs?: number;
+  resolveTimeoutMs?: (params: unknown) => number;
   tabPolicy?: string;
 }): (params: unknown, context?: { callId?: number; runId?: string; signal?: AbortSignal }) => Promise<unknown> {
-  const { owner, action, timeoutMs, tabPolicy } = options;
+  const { owner, action, tabPolicy, resolveTimeoutMs } = options;
+  const baseTimeoutMs = options.timeoutMs ?? DEFAULT_RELAY_TIMEOUT_MS;
   return (params: unknown, context?) => {
+    const timeoutMs = resolveTimeoutMs?.(params) ?? baseTimeoutMs;
     return new Promise((resolve, reject) => {
       if (context?.signal?.aborted) {
         const abortError = new Error(`Relay aborted for action: ${action}`);
@@ -289,7 +292,63 @@ export function safePostAsCall(options: {
 }
 
 const WORKER_CONTEXT_ID = "worker";
-const DEFAULT_RELAY_TIMEOUT_MS = 30_000;
+export const DEFAULT_RELAY_TIMEOUT_MS = 30_000;
+const RELAY_TIMEOUT_MARGIN_MS = 5_000;
+/** Must match CONTENT_SCRIPT_GRACE_MS in main/runner/lib/constants.ts */
+const CONTENT_SCRIPT_GRACE_MS = 500;
+
+const TIMEOUT_PARAM_FIELD_BY_ACTION: Record<string, "timeout" | "duration"> = {
+  page_goto: "timeout",
+  page_wait_for: "timeout",
+  tab_wait_for_load: "timeout",
+  fetch: "timeout",
+  sleep: "duration",
+  page_wait: "duration",
+  sidepanel_wait: "duration",
+};
+
+/** Actions whose handlers may consume multiple timeout-sized phases. */
+const COMPOUND_TIMEOUT_ACTIONS = new Set(["page_goto"]);
+
+function extractParamTimeoutMs(
+  params: unknown,
+  field: "timeout" | "duration",
+): number | null {
+  if (params === null || typeof params !== "object" || Array.isArray(params)) {
+    return null;
+  }
+  const value = (params as Record<string, unknown>)[field];
+  if (typeof value === "bigint") return Number(value);
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  return null;
+}
+
+function relayBudgetForParamTimeout(action: string, paramTimeout: number): number {
+  if (COMPOUND_TIMEOUT_ACTIONS.has(action)) {
+    // page_goto: waitForTabLoad(timeout) + pingTabContentScript(timeout) + grace
+    return (
+      paramTimeout * 2 + CONTENT_SCRIPT_GRACE_MS + RELAY_TIMEOUT_MARGIN_MS
+    );
+  }
+  return paramTimeout + RELAY_TIMEOUT_MARGIN_MS;
+}
+
+export function resolveRelayTimeoutMs(
+  action: string,
+  params: unknown,
+): number {
+  const field = TIMEOUT_PARAM_FIELD_BY_ACTION[action];
+  if (!field) return DEFAULT_RELAY_TIMEOUT_MS;
+  let paramTimeout = extractParamTimeoutMs(params, field);
+  if (paramTimeout === null && COMPOUND_TIMEOUT_ACTIONS.has(action)) {
+    paramTimeout = DEFAULT_RELAY_TIMEOUT_MS;
+  }
+  if (paramTimeout === null) return DEFAULT_RELAY_TIMEOUT_MS;
+  return Math.max(
+    DEFAULT_RELAY_TIMEOUT_MS,
+    relayBudgetForParamTimeout(action, paramTimeout),
+  );
+}
 
 export function extensionDispatch(
   params: unknown,
@@ -335,7 +394,8 @@ export function extensionDispatch(
   const remoteCall = safePostAsCall({
     owner: route.endpoint,
     action,
-    timeoutMs: DEFAULT_RELAY_TIMEOUT_MS,
+    resolveTimeoutMs: (relayParams) =>
+      resolveRelayTimeoutMs(action, relayParams),
     tabPolicy: route.tabPolicy,
   });
   return remoteCall(params, {
@@ -377,7 +437,8 @@ export function createExecutableCallback(entry: SerializableJsCallManifestEntry)
     const remoteCall = safePostAsCall({
       owner: entry.owner,
       action: entry.action,
-      timeoutMs: DEFAULT_RELAY_TIMEOUT_MS,
+      resolveTimeoutMs: (relayParams) =>
+        resolveRelayTimeoutMs(entry.action, relayParams),
     });
     return (params, context) => remoteCall(coerceWasmParams(params), {
       ...context,
@@ -437,7 +498,12 @@ async function initWasm(
 
 	// Freeze the Rust registry before injecting bindings
 	const { freezeManifest } = await import("../../pkg/extension_js.js");
-	freezeManifest();
+	try {
+		freezeManifest();
+	} catch (err: unknown) {
+		const message = err instanceof Error ? err.message : String(err);
+		throw new Error(`Manifest freeze failed: ${message}`);
+	}
 
 	// Inject bindings after all manifest entries are registered
 	session.injectRegistryBindings();
@@ -459,6 +525,7 @@ export type WorkerMessage =
   | { type: "stop"; id: string }
   | { type: "setFuelLimit"; id?: string; limit: number }
   | { type: "inspectGlobals"; id: string }
+  | { type: "apiDocs"; id: string; format: string }
   | { type: "loadLibrary"; id: string; source: string }
   | { type: "fsCall"; id: string; action: string; params: unknown }
   | { type: "setLogLevel"; level: number }
@@ -582,6 +649,16 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
       try {
         const snap = session.inspect_globals();
         self.postMessage({ type: "result", id: msg.id, data: snap });
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        self.postMessage({ type: "error", id: msg.id, error: message });
+      }
+      break;
+    }
+    case "apiDocs": {
+      try {
+        const result = session.apiDocs(msg.format);
+        self.postMessage({ type: "result", id: msg.id, data: result });
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
         self.postMessage({ type: "error", id: msg.id, error: message });

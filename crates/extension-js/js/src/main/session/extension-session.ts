@@ -27,30 +27,13 @@ import {
 import type { TabPolicy } from "../../shared/registry/types.js";
 import type { SerializableJsCallManifestEntry } from "../../shared/tool-registry.js";
 
-export interface JsApiDoc {
-	namespace: string;
-	name: string;
-	action: string | null;
-	description: string;
-	params: {
-		name: string;
-		js_type: string;
-		required: boolean;
-		description: string;
-	}[];
-	returns: {
-		js_type: string;
-		description: string;
-	};
-	source: string;
-}
-
 type WorkerRequest =
 	| { type: "runCell"; id: string; code: string; stdin: string; runId?: string }
 	| { type: "reset"; id?: string }
 	| { type: "stop"; id: string }
 	| { type: "setFuelLimit"; id?: string; limit: number }
 	| { type: "inspectGlobals"; id: string }
+	| { type: "apiDocs"; id: string; format: string }
 	| { type: "loadLibrary"; id: string; source: string }
 	| { type: "setLogLevel"; level: number }
 	| { type: "asyncRelayResult"; id: string; result: unknown }
@@ -99,6 +82,8 @@ export class ExtensionSession {
 		setRunnerAbortController(new AbortController());
 		if (typeof chrome !== "undefined" && chrome.runtime?.id) {
 			initTabContext(chrome);
+			const { initCapabilities } = await import("../runner/tools/chrome/capability.js");
+			await initCapabilities();
 		}
 
 		// 2. Freeze registry
@@ -447,6 +432,16 @@ export class ExtensionSession {
 	inspectGlobals(): Promise<WasmGlobalsSnapshot> {
 		const id = this.generateId();
 		return this.postAndWait({ type: "inspectGlobals", id });
+	}
+
+	apiDocs(format: "json" | "markdown" = "json"): Promise<unknown[] | string> {
+		const id = this.generateId();
+		return this.postAndWait<string>({ type: "apiDocs", id, format }).then((result) => {
+			if (format === "json") {
+				return JSON.parse(result) as unknown[];
+			}
+			return result;
+		});
 	}
 
 	setFuelLimit(limit: number): void {

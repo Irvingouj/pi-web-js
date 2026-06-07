@@ -5,7 +5,7 @@ import {
 } from "./dom-utils.js";
 
 interface SnapshotNode {
-	refId: number;
+	refId: string;
 	role: string;
 	tag: string;
 	name?: string;
@@ -40,8 +40,9 @@ export function inlineSnapshot(maxNodes: number): SnapshotResult {
 		let currentDepth = depth;
 
 		if (included) {
-			const refId = nextRefId++;
-			el.setAttribute("data-ref-id", String(refId));
+			// Opaque element reference ID. Format 'e{N}' aligns with dom-semantic-tree and schema regex ^e\d+$.
+			const refId = "e" + nextRefId++;
+			el.setAttribute("data-ref-id", refId);
 			const role = getAccessibleRole(el);
 			const name = getAccessibleName(el);
 			const node: SnapshotNode = { refId, role, tag };
@@ -51,7 +52,7 @@ export function inlineSnapshot(maxNodes: number): SnapshotResult {
 			const indent = "  ".repeat(depth);
 			const parts = [`${indent}- ${role}`];
 			if (name) parts.push(`"${name.replace(/"/g, '\\"')}"`);
-			parts.push(`[ref=${refId}]`);
+			parts.push(`[${refId}]`);
 			lines.push(parts.join(" "));
 
 			currentDepth = depth + 1;

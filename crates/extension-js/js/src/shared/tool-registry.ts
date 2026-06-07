@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { logger } from "./logger.js";
 import { dispatchValidated } from "./registry/dispatch.js";
-import { inferOwner } from "./registry/routes.js";
+import { getRoute, inferOwner } from "./registry/routes.js";
+import { isContentScriptAction } from "./registry/content-script-actions.js";
 import {
 	type AsyncError,
 	type AsyncResponse,
@@ -163,6 +164,7 @@ export function registerJsCall<P, R>(spec: JsCallSpec<P, R>): void {
 		returnDoc: spec.returnDoc ?? "Result",
 		errorCode: spec.errorCode,
 		errorCategory: spec.errorCategory,
+		example: spec.example,
 	};
 	toolRegistry.set(spec.action, toolDef);
 }
@@ -173,6 +175,11 @@ export function getTool(
 	return toolRegistry.get(action);
 }
 
+/** Test-only helper: remove a tool from the tool registry without touching the JS registry. */
+export function removeToolForTest(action: string): boolean {
+	return toolRegistry.delete(action);
+}
+
 export function clearRegistry(): void {
 	toolRegistry.clear();
 	jsRegistry.clear();
@@ -181,6 +188,37 @@ export function clearRegistry(): void {
 
 export function freezeJsRegistry(): void {
 	jsRegistryFrozen = true;
+
+	// Validate every manifest entry has an executable route + handler.
+	const manifest = getSerializableJsManifest();
+	const orphans: string[] = [];
+
+	for (const entry of manifest) {
+		if (entry.owner === "main-thread") {
+			if (!getTool(entry.action)) {
+				orphans.push(`${entry.action} (main-thread: no tool handler)`);
+			}
+		} else if (entry.owner === "content-script") {
+			if (!isContentScriptAction(entry.action)) {
+				orphans.push(
+					`${entry.action} (content-script: missing from CONTENT_SCRIPT_ACTIONS)`,
+				);
+			}
+		} else {
+			// Unknown owner type — every manifest entry must have a known owner
+			// so that freeze validation can verify its executable handler.
+			// Worker entries are registered and validated on the WASM side;
+			// they do not appear in the JS registry.
+			orphans.push(`${entry.action} (unknown owner: ${entry.owner})`);
+		}
+	}
+
+	if (orphans.length > 0) {
+		throw new Error(
+			`Manifest integrity failure: ${orphans.length} orphan entries lack executable handlers:\n` +
+				orphans.map((o) => `  - ${o}`).join("\n"),
+		);
+	}
 }
 
 export function clearJsRegistry(): void {
@@ -214,10 +252,12 @@ export function getSerializableJsManifest(): SerializableJsCallManifestEntry[] {
 				})) ?? null,
 			owner: spec.owner,
 			paramsDoc,
-			returnsDoc,
-			errorCode: spec.errorCode,
-			errorCategory: spec.errorCategory,
-		});
+		returnsDoc,
+		errorCode: spec.errorCode,
+		errorCategory: spec.errorCategory,
+		permission: spec.permission,
+		example: spec.example,
+	});
 	}
 	return entries;
 }
@@ -300,6 +340,7 @@ export function listTools(): ToolDoc[] {
 			},
 			errorCode: tool.errorCode,
 			errorCategory: tool.errorCategory,
+			example: tool.example,
 		});
 	}
 	return docs;

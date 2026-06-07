@@ -4,7 +4,7 @@ use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::atomic::{AtomicBool, Ordering};
+
 use tsify::Tsify;
 use wasm_bindgen::prelude::*;
 
@@ -52,6 +52,10 @@ pub struct JsApiDoc {
     pub fields: Option<Vec<String>>,
     /// Alternate public names that route to the same action.
     pub aliases: Vec<ApiAlias>,
+    /// Chrome permission required to use this API (e.g. "notifications", "cookies").
+    pub permission: Option<String>,
+    /// Runnable example string for this API.
+    pub example: Option<String>,
 }
 
 impl Serialize for JsApiDoc {
@@ -59,7 +63,7 @@ impl Serialize for JsApiDoc {
     where
         S: serde::Serializer,
     {
-        let mut state = serializer.serialize_struct("JsApiDoc", 13)?;
+        let mut state = serializer.serialize_struct("JsApiDoc", 15)?;
         state.serialize_field("namespace", &self.namespace)?;
         state.serialize_field("name", &self.name)?;
         state.serialize_field("action", &self.action)?;
@@ -78,6 +82,8 @@ impl Serialize for JsApiDoc {
         state.serialize_field("tool_source", &self.tool_source)?;
         state.serialize_field("fields", &self.fields)?;
         state.serialize_field("aliases", &self.aliases)?;
+        state.serialize_field("permission", &self.permission)?;
+        state.serialize_field("example", &self.example)?;
         state.end()
     }
 }
@@ -137,6 +143,8 @@ pub struct ApiManifestEntry {
     pub tool_source: ToolSource,
     pub fields: Option<Vec<String>>,
     pub aliases: Vec<ApiAlias>,
+    pub permission: Option<String>,
+    pub example: Option<String>,
 }
 
 impl From<JsApiDoc> for ApiManifestEntry {
@@ -154,6 +162,8 @@ impl From<JsApiDoc> for ApiManifestEntry {
             tool_source: doc.tool_source,
             fields: doc.fields,
             aliases: doc.aliases,
+            permission: doc.permission,
+            example: doc.example,
         }
     }
 }
@@ -173,6 +183,8 @@ impl From<ApiManifestEntry> for JsApiDoc {
             tool_source: entry.tool_source,
             fields: entry.fields,
             aliases: entry.aliases,
+            permission: entry.permission,
+            example: entry.example,
         }
     }
 }
@@ -222,6 +234,8 @@ pub struct JsManifestEntry {
     pub returns_doc: JsReturnDoc,
     pub error_code: String,
     pub error_category: Option<String>,
+    pub permission: Option<String>,
+    pub example: Option<String>,
 }
 
 impl From<JsApiAlias> for ApiAlias {
@@ -270,6 +284,8 @@ impl TryFrom<JsManifestEntry> for ApiManifestEntry {
             tool_source: ToolSource::Extension,
             fields: entry.fields,
             aliases: entry.aliases.into_iter().map(Into::into).collect(),
+            permission: entry.permission,
+            example: entry.example,
         })
     }
 }
@@ -303,7 +319,15 @@ impl std::fmt::Display for RegistryError {
     }
 }
 
-static FROZEN: AtomicBool = AtomicBool::new(false);
+thread_local! {
+    // WARNING: This global freeze flag is thread-local in WASM (single-threaded),
+    // but in native test builds it is shared across test threads when tests run
+    // in parallel. One test calling freeze_manifest() sets FROZEN=true, causing
+    // register()/register_handler() in other threads to silently return early.
+    // This can produce flaky test failures in CI. If flakiness appears, run
+    // api_docs tests sequentially (e.g. with cargo test -- --test-threads=1).
+    static FROZEN: RefCell<bool> = const { RefCell::new(false) };
+}
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct RegistryRecord {
@@ -403,7 +427,7 @@ fn validate_batch_entries(
 pub fn register_executable_entries_batch(
     entries: Vec<(ApiManifestEntry, ApiHandler)>,
 ) -> Result<(), RegistryError> {
-    if FROZEN.load(Ordering::SeqCst) {
+    if FROZEN.with(|f| *f.borrow()) {
         return Err(RegistryError::Frozen);
     }
 
@@ -473,7 +497,7 @@ pub fn register_executable_entry(
     entry: ApiManifestEntry,
     handler: ApiHandler,
 ) -> Result<(), RegistryError> {
-    if FROZEN.load(Ordering::SeqCst) {
+    if FROZEN.with(|f| *f.borrow()) {
         return Err(RegistryError::Frozen);
     }
 
@@ -508,7 +532,7 @@ pub fn register_executable_entry(
 /// Register a handler for the given action in the separate handler registry.
 /// Returns `true` if newly registered, `false` if duplicate or frozen.
 pub fn register_handler(action: &str, handler: ApiHandler) -> bool {
-    if FROZEN.load(Ordering::SeqCst) {
+    if FROZEN.with(|f| *f.borrow()) {
         return false;
     }
     REGISTRY.with(|reg| {
@@ -652,7 +676,7 @@ pub fn clear_handlers() {
 /// Register a doc entry for backward compatibility.
 /// Respects freeze flag and dedupes by namespace+name.
 pub fn register(doc: JsApiDoc) {
-    if FROZEN.load(Ordering::SeqCst) {
+    if FROZEN.with(|f| *f.borrow()) {
         return;
     }
     REGISTRY.with(|reg| {
@@ -675,7 +699,7 @@ pub fn register(doc: JsApiDoc) {
 
 /// Register a manifest entry with strict duplicate and freeze checks.
 pub fn register_manifest_entry(entry: ApiManifestEntry) -> Result<(), RegistryError> {
-    if FROZEN.load(Ordering::SeqCst) {
+    if FROZEN.with(|f| *f.borrow()) {
         return Err(RegistryError::Frozen);
     }
     let action = entry.action.clone().unwrap_or_default();
@@ -726,22 +750,49 @@ pub fn remove_manifest_entry(action: &str) -> bool {
 /// Primarily useful in tests.
 pub fn clear_manifest_entries() {
     REGISTRY.with(|reg| reg.borrow_mut().clear());
-    FROZEN.store(false, Ordering::SeqCst);
+    FROZEN.with(|f| *f.borrow_mut() = false);
 }
 
 /// Freeze the manifest so no further entries can be registered.
-pub fn freeze_manifest() {
-    FROZEN.store(true, Ordering::SeqCst);
+/// Validates that every manifest entry has a corresponding executable handler.
+/// Sync APIs are exempt from handler validation because they are bound directly
+/// to QuickJS globals and do not use the async handler dispatch path.
+pub fn freeze_manifest() -> Result<(), RegistryError> {
+    let orphans: Vec<String> = REGISTRY.with(|reg| {
+        reg.borrow()
+            .iter()
+            .filter(|(_, record)| {
+                let Some(manifest) = &record.manifest else {
+                    return false;
+                };
+                // Sync APIs are bound directly to QuickJS globals and don't use async handlers
+                if manifest.transport == ToolTransport::Sync {
+                    return false;
+                }
+                record.handler.is_none()
+            })
+            .map(|(action, _)| action.clone())
+            .collect()
+    });
+    if !orphans.is_empty() {
+        return Err(RegistryError::InvalidManifest(format!(
+            "{} orphan entries lack executable handlers: {}",
+            orphans.len(),
+            orphans.join(", ")
+        )));
+    }
+    FROZEN.with(|f| *f.borrow_mut() = true);
+    Ok(())
 }
 
 /// Unfreeze the manifest to allow internal re-registration (e.g. during reset).
 pub fn unfreeze_manifest() {
-    FROZEN.store(false, Ordering::SeqCst);
+    FROZEN.with(|f| *f.borrow_mut() = false);
 }
 
 /// Check whether the manifest is frozen.
 pub fn is_manifest_frozen() -> bool {
-    FROZEN.load(Ordering::SeqCst)
+    FROZEN.with(|f| *f.borrow())
 }
 
 /// Clear all registered API docs. Primarily useful in tests.
@@ -799,6 +850,15 @@ pub fn generate_markdown() -> String {
                 "**Returns** `{}`: {}\n\n",
                 api.returns.js_type, api.returns.description
             ));
+            if let Some(example) = &api.example {
+                md.push_str(&format!("**Example**\n\n```js\n{}\n```\n\n", example));
+            }
+            if let Some(permission) = &api.permission {
+                md.push_str(&format!(
+                    "**Permission required:** `{}`\n\n",
+                    permission
+                ));
+            }
             if !api.aliases.is_empty() {
                 md.push_str("**Aliases**\n\n");
                 for alias in &api.aliases {
@@ -1067,6 +1127,8 @@ mod tests {
             tool_source: ToolSource::RustCore,
             fields: None,
             aliases: vec![],
+            permission: None,
+            example: None,
         });
 
         let json = generate_json().unwrap();
@@ -1097,6 +1159,8 @@ mod tests {
             tool_source: ToolSource::JsPrelude,
             fields: None,
             aliases: vec![],
+            permission: None,
+            example: None,
         };
 
         register(doc.clone());
@@ -1131,6 +1195,8 @@ mod tests {
             tool_source: ToolSource::RustCore,
             fields: None,
             aliases: vec![],
+            permission: None,
+            example: None,
         });
 
         let md = generate_markdown();
@@ -1141,6 +1207,71 @@ mod tests {
         assert!(md.contains("**Parameters**"));
         assert!(md.contains("`url` (`string`, required): The URL to navigate to."));
         assert!(md.contains("**Returns** `null`: None"));
+    }
+
+    #[test]
+    fn test_generate_markdown_includes_example() {
+        clear_docs();
+
+        register(JsApiDoc {
+            namespace: "browser".into(),
+            name: "navigate".into(),
+            action: Some("browser_navigate".into()),
+            description: "Navigate to a URL.".into(),
+            params: vec![ParamDoc {
+                name: "url".into(),
+                js_type: "string".into(),
+                required: true,
+                description: "The URL to navigate to.".into(),
+            }],
+            returns: ReturnDoc {
+                js_type: "null".into(),
+                description: "None".into(),
+            },
+            public_name: "browser.navigate".into(),
+            local_name: None,
+            transport: ToolTransport::Async,
+            tool_source: ToolSource::RustCore,
+            fields: None,
+            aliases: vec![],
+            permission: None,
+            example: Some("browser.navigate(\"https://example.com\")".into()),
+        });
+
+        let md = generate_markdown();
+        assert!(md.contains("**Example**"));
+        assert!(md.contains("```js"));
+        assert!(md.contains("browser.navigate(\"https://example.com\")"));
+    }
+
+    #[test]
+    fn test_generate_markdown_includes_permission() {
+        clear_docs();
+
+        register(JsApiDoc {
+            namespace: "chrome.notifications".into(),
+            name: "create".into(),
+            action: Some("chrome_notifications_create".into()),
+            description: "Create a notification.".into(),
+            params: vec![],
+            returns: ReturnDoc {
+                js_type: "string".into(),
+                description: "Notification ID.".into(),
+            },
+            public_name: "chrome.notifications.create".into(),
+            local_name: None,
+            transport: ToolTransport::Async,
+            tool_source: ToolSource::Extension,
+            fields: None,
+            aliases: vec![],
+            permission: Some("notifications".into()),
+            example: None,
+        });
+
+        let md = generate_markdown();
+        assert!(md.contains("## `chrome.notifications` module"));
+        assert!(md.contains("chrome.notifications.create"));
+        assert!(md.contains("**Permission required:** `notifications`"));
     }
 
     #[test]
@@ -1163,6 +1294,8 @@ mod tests {
             tool_source: ToolSource::Extension,
             fields: None,
             aliases: vec![],
+            permission: None,
+            example: None,
         });
 
         let json = generate("json").unwrap();
@@ -1200,6 +1333,8 @@ mod tests {
             tool_source: ToolSource::JsPrelude,
             fields: None,
             aliases: vec![],
+            permission: None,
+            example: None,
         });
 
         let md = generate("markdown").unwrap();
@@ -1232,6 +1367,8 @@ mod tests {
             tool_source: ToolSource::RustCore,
             fields: None,
             aliases: vec![],
+            permission: None,
+            example: None,
         });
         // Register a handler so the binding is generated
         let _ = register_handler("fetch", ApiHandler::Rust(std::rc::Rc::new(|_cmd| {
@@ -1255,6 +1392,8 @@ mod tests {
             tool_source: ToolSource::Extension,
             fields: None,
             aliases: vec![],
+            permission: None,
+            example: None,
         });
         // Register a handler so the binding is generated
         let _ = register_handler("chrome_tabs_query", ApiHandler::Rust(std::rc::Rc::new(|_cmd| {
@@ -1278,6 +1417,8 @@ mod tests {
             tool_source: ToolSource::JsPrelude,
             fields: None,
             aliases: vec![],
+            permission: None,
+            example: None,
         });
 
         let js = generate_js_bindings_code();
@@ -1332,6 +1473,8 @@ mod tests {
             tool_source: ToolSource::JsPrelude,
             fields: None,
             aliases: vec![],
+            permission: None,
+            example: None,
         });
 
         let js = generate_js_bindings_code();
@@ -1362,6 +1505,8 @@ mod tests {
             tool_source: ToolSource::RustCore,
             fields: None,
             aliases: vec![],
+            permission: None,
+            example: None,
         });
         // Register a handler so the binding is generated
         let _ = register_handler(r#"test_"quote""#, ApiHandler::Rust(std::rc::Rc::new(|_cmd| {
@@ -1398,6 +1543,8 @@ mod tests {
             tool_source: ToolSource::RustCore,
             fields: Some(vec!["duration".into()]),
             aliases: vec![],
+            permission: None,
+            example: None,
         });
         // Register a handler so the binding is generated
         let _ = register_handler("sleep", ApiHandler::Rust(std::rc::Rc::new(|_cmd| {
@@ -1434,6 +1581,8 @@ mod tests {
             tool_source: ToolSource::Extension,
             fields: None,
             aliases: vec![],
+            permission: None,
+            example: None,
         });
         // Register a handler so the binding is generated
         let _ = register_handler("chrome_sessions_getRecentlyClosed", ApiHandler::Rust(std::rc::Rc::new(|_cmd| {
@@ -1457,6 +1606,8 @@ mod tests {
             tool_source: ToolSource::Extension,
             fields: None,
             aliases: vec![],
+            permission: None,
+            example: None,
         });
         // Register a handler so the binding is generated
         let _ = register_handler("chrome_windows_getCurrent", ApiHandler::Rust(std::rc::Rc::new(|_cmd| {
@@ -1499,6 +1650,8 @@ mod tests {
             tool_source: ToolSource::RustCore,
             fields: None,
             aliases: vec![],
+            permission: None,
+            example: None,
         };
 
         assert!(register_manifest_entry(entry).is_ok());
@@ -1527,6 +1680,8 @@ mod tests {
             tool_source: ToolSource::RustCore,
             fields: None,
             aliases: vec![],
+            permission: None,
+            example: None,
         };
 
         let entry2 = ApiManifestEntry {
@@ -1545,6 +1700,8 @@ mod tests {
             tool_source: ToolSource::RustCore,
             fields: None,
             aliases: vec![],
+            permission: None,
+            example: None,
         };
 
         assert!(register_manifest_entry(entry1).is_ok());
@@ -1575,6 +1732,8 @@ mod tests {
             tool_source: ToolSource::RustCore,
             fields: None,
             aliases: vec![],
+            permission: None,
+            example: None,
         };
 
         let entry2 = ApiManifestEntry {
@@ -1593,6 +1752,8 @@ mod tests {
             tool_source: ToolSource::RustCore,
             fields: None,
             aliases: vec![],
+            permission: None,
+            example: None,
         };
 
         assert!(register_manifest_entry(entry1).is_ok());
@@ -1624,6 +1785,8 @@ mod tests {
             tool_source: ToolSource::Extension,
             fields: None,
             aliases: vec![],
+            permission: None,
+            example: None,
         };
 
         let second = ApiManifestEntry {
@@ -1646,6 +1809,8 @@ mod tests {
                 name: "click".into(),
                 fields: None,
             }],
+            permission: None,
+            example: None,
         };
 
         assert!(
@@ -1708,6 +1873,8 @@ mod tests {
                     fields: None,
                 },
             ],
+            permission: None,
+            example: None,
         };
 
         let result = register_executable_entry(
@@ -1752,6 +1919,8 @@ mod tests {
                 name: "click".into(),
                 fields: None,
             }],
+            permission: None,
+            example: None,
         };
 
         let result = register_executable_entry(
@@ -1792,6 +1961,8 @@ mod tests {
             tool_source: ToolSource::Extension,
             fields: None,
             aliases: vec![],
+            permission: None,
+            example: None,
         };
 
         let duplicate_alias_entry = ApiManifestEntry {
@@ -1821,6 +1992,8 @@ mod tests {
                     fields: None,
                 },
             ],
+            permission: None,
+            example: None,
         };
 
         let handler = ApiHandler::Rust(std::rc::Rc::new(|_cmd| {
@@ -1846,8 +2019,9 @@ mod tests {
     #[test]
     fn test_freeze_manifest_prevents_registration() {
         clear_manifest_entries();
+        clear_handlers();
         // Reset freeze flag for this test
-        FROZEN.store(false, Ordering::SeqCst);
+        FROZEN.with(|f| *f.borrow_mut() = false);
 
         let entry = ApiManifestEntry {
             namespace: "test".into(),
@@ -1865,16 +2039,62 @@ mod tests {
             tool_source: ToolSource::RustCore,
             fields: None,
             aliases: vec![],
+            permission: None,
+            example: None,
         };
 
-        assert!(register_manifest_entry(entry.clone()).is_ok());
-        freeze_manifest();
+        // Register both manifest and handler atomically so freeze validation passes.
+        use std::rc::Rc;
+        assert!(register_executable_entry(entry.clone(), ApiHandler::Rust(Rc::new(|_| Box::pin(async { Ok(AsyncResponse { ok: true, value: Some(serde_json::Value::Null), error: None }) })))).is_ok());
+        assert!(freeze_manifest().is_ok());
         assert!(is_manifest_frozen());
 
         let result = register_manifest_entry(entry);
         assert_eq!(result, Err(RegistryError::Frozen));
 
         // Clean up freeze flag so subsequent tests can register
+        clear_manifest_entries();
+    }
+
+    #[test]
+    fn test_freeze_manifest_fails_on_orphans() {
+        clear_manifest_entries();
+        clear_handlers();
+
+        let entry = ApiManifestEntry {
+            namespace: "test".into(),
+            name: "orphan".into(),
+            action: Some("test_orphan".into()),
+            description: "Orphan API.".into(),
+            params: vec![],
+            returns: ReturnDoc {
+                js_type: "null".into(),
+                description: "None".into(),
+            },
+            public_name: "test.orphan".into(),
+            local_name: None,
+            transport: ToolTransport::Async,
+            tool_source: ToolSource::RustCore,
+            fields: None,
+            aliases: vec![],
+            permission: None,
+            example: None,
+        };
+
+        // Register manifest entry WITHOUT handler to create an orphan
+        assert!(register_manifest_entry(entry).is_ok());
+        let result = freeze_manifest();
+        assert!(
+            result.is_err(),
+            "freeze_manifest should fail when manifest entries lack handlers"
+        );
+        assert_eq!(
+            result,
+            Err(RegistryError::InvalidManifest(
+                "1 orphan entries lack executable handlers: test_orphan".into()
+            ))
+        );
+
         clear_manifest_entries();
     }
 
@@ -1903,6 +2123,8 @@ mod tests {
                 name: "read_text".into(),
                 fields: None,
             }],
+            permission: None,
+            example: None,
         };
 
         let _ = register_manifest_entry(entry);
@@ -1937,6 +2159,8 @@ mod tests {
             tool_source: ToolSource::RustCore,
             fields: None,
             aliases: vec![],
+            permission: None,
+            example: None,
         };
 
         let _ = register_manifest_entry(entry);
@@ -1952,7 +2176,7 @@ mod tests {
     fn test_register_handler_respects_freeze() {
         clear_handlers();
         clear_manifest_entries();
-        FROZEN.store(false, Ordering::SeqCst);
+        FROZEN.with(|f| *f.borrow_mut() = false);
 
         let handler = ApiHandler::Rust(std::rc::Rc::new(|_cmd| {
             Box::pin(async move { Ok(AsyncResponse { ok: true, value: None, error: None }) })
@@ -1962,7 +2186,7 @@ mod tests {
         assert!(register_handler("test_action", handler.clone()));
         assert!(has_handler("test_action"));
 
-        freeze_manifest();
+        assert!(freeze_manifest().is_ok());
         assert!(!register_handler("test_action2", handler));
         assert!(!has_handler("test_action2"));
 

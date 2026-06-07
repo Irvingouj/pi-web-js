@@ -37,6 +37,43 @@ import {
 	DEFAULT_POLL_INTERVAL_MS,
 } from "../runtime.js";
 
+async function runTabSnapshot(
+	params: unknown,
+	actionLabel: string,
+): Promise<Record<string, unknown>> {
+	const tabId = extractTabId(params);
+	if (tabId === null) {
+		throw makeError("No tab ID provided", "E_NO_TAB");
+	}
+	const obj = asRecord(params);
+	const opts = asRecord(obj.options ?? obj);
+	const maxNodes =
+		typeof opts.max_nodes === "number" ? opts.max_nodes : DEFAULT_MAX_NODES;
+	const blocked = await preflightScriptableTab(tabId);
+	if (blocked && !blocked.ok) {
+		throw makeError(
+			blocked.error.message,
+			blocked.error.code,
+			blocked.error.category,
+		);
+	}
+	const result = await executeInTab(tabId, buildSnapshotInTab, [maxNodes]);
+	if (!result.ok) {
+		throw makeError(
+			`${actionLabel} failed for tab ${tabId}: ${result.error.message}`,
+			result.error.code,
+			result.error.category,
+		);
+	}
+	if (result.value && typeof result.value === "object") {
+		return result.value as Record<string, unknown>;
+	}
+	throw makeError(
+		`${actionLabel} returned no data for tab ${tabId}`,
+		"E_SNAPSHOT",
+	);
+}
+
 // ─── Tab actions ─────────────────────────────────────────────────
 
 registerJsCall({
@@ -66,12 +103,13 @@ registerJsCall({
 			name: "query",
 			type: "object",
 			required: false,
-			description: "Tab query object",
+			description: "Tab query object (literal)",
 		},
 	],
 	returnDoc: "Tab array",
 	errorCode: "ECHROME",
 	errorCategory: "extension",
+	example: "web.tab.query({ active: true })",
 });
 
 registerJsCall({
@@ -97,6 +135,7 @@ registerJsCall({
 	returnDoc: "Active tab object",
 	errorCode: "E_TAB",
 	errorCategory: "extension",
+	example: "web.tab.current()",
 });
 
 registerJsCall({
@@ -118,12 +157,13 @@ registerJsCall({
 			name: "tabId",
 			type: "number",
 			required: true,
-			description: "Tab ID to get",
+			description: "Tab ID to get (literal)",
 		},
 	],
 	returnDoc: "Tab object",
 	errorCode: "ECHROME",
 	errorCategory: "extension",
+	example: "web.tab.get(123)",
 });
 
 registerJsCall({
@@ -143,12 +183,13 @@ registerJsCall({
 			name: "query",
 			type: "object",
 			required: false,
-			description: "Tab query object",
+			description: "Tab query object (literal)",
 		},
 	],
 	returnDoc: "Matching tabs",
 	errorCode: "ECHROME",
 	errorCategory: "extension",
+	example: "web.tab.find({ url: \"*://example.com/*\" })",
 });
 
 registerJsCall({
@@ -167,6 +208,7 @@ registerJsCall({
 	returnDoc: "All tabs",
 	errorCode: "ECHROME",
 	errorCategory: "extension",
+	example: "web.tab.list()",
 });
 
 registerJsCall({
@@ -176,7 +218,8 @@ registerJsCall({
 	description: "Create a tab",
 	params: schemas.TabCreateParamsSchema,
 	returns: schemas.ChromeTabSchema,
-	aliases: [{ namespace: "tab", name: "create" }],
+	fields: ["url"],
+	aliases: [{ namespace: "tab", name: "create", fields: ["url"] }],
 	owner: "main-thread",
 	handler: async (params, _ctx) => {
 		return unwrapResult(await dispatchTool("chrome_tabs_create", [params]));
@@ -186,18 +229,19 @@ registerJsCall({
 			name: "url",
 			type: "string",
 			required: false,
-			description: "URL to open in new tab",
+			description: "URL to open in new tab (url)",
 		},
 		{
 			name: "active",
 			type: "boolean",
 			required: false,
-			description: "Whether to focus the new tab",
+			description: "Whether to focus the new tab (literal)",
 		},
 	],
 	returnDoc: "Created tab",
 	errorCode: "ECHROME",
 	errorCategory: "extension",
+	example: "web.tab.create(\"https://example.com\")",
 });
 
 registerJsCall({
@@ -222,11 +266,12 @@ registerJsCall({
 			name: "tabId",
 			type: "number",
 			required: false,
-			description: "Tab ID to activate",
+			description: "Tab ID to activate (literal)",
 		},
 	],
 	returnDoc: "Updated tab",
 	errorCode: "E_MISSING_PARAM",
+	example: "web.tab.activate(123)",
 });
 
 registerJsCall({
@@ -249,11 +294,12 @@ registerJsCall({
 			name: "tabId",
 			type: "number",
 			required: false,
-			description: "Tab ID to close",
+			description: "Tab ID to close (literal)",
 		},
 	],
 	returnDoc: "null",
 	errorCode: "E_MISSING_PARAM",
+	example: "web.tab.close(123)",
 });
 
 registerJsCall({
@@ -270,16 +316,17 @@ registerJsCall({
 		);
 	},
 	paramTypes: [
-		{ name: "tabId", type: "number", required: false, description: "Tab ID" },
+		{ name: "tabId", type: "number", required: false, description: "Tab ID (literal)" },
 		{
 			name: "script",
 			type: "string",
 			required: false,
-			description: "Script to execute",
+			description: "Script to execute (literal)",
 		},
 	],
 	returnDoc: "Script result",
 	errorCode: "E_NO_TAB",
+	example: "web.tab.execute_script({ tabId: 123, script: \"document.title\" })",
 });
 
 registerContentScriptJsCall({
@@ -290,22 +337,23 @@ registerContentScriptJsCall({
 	params: schemas.TabClickParamsSchema,
 	returns: z.null(),
 	paramTypes: [
-		{ name: "tabId", type: "number", required: true, description: "Tab ID" },
+		{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
 		{
 			name: "refId",
 			type: "string",
-			required: true,
-			description: "Element reference ID",
+			required: false,
+			description: "Element reference ID (refId)",
 		},
 		{
 			name: "label",
 			type: "string",
 			required: false,
-			description: "Element label",
+			description: "Element label (label)",
 		},
 	],
 	returnDoc: "Click result",
 	errorCode: "E_NO_TAB",
+	example: "web.tab.click({ tabId: 123, refId: \"e2\" })",
 });
 
 registerContentScriptJsCall({
@@ -316,28 +364,29 @@ registerContentScriptJsCall({
 	params: schemas.TabFillParamsSchema,
 	returns: z.null(),
 	paramTypes: [
-		{ name: "tabId", type: "number", required: true, description: "Tab ID" },
+		{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
 		{
 			name: "refId",
 			type: "string",
-			required: true,
-			description: "Element reference ID",
+			required: false,
+			description: "Element reference ID (refId)",
 		},
 		{
 			name: "value",
 			type: "string",
 			required: false,
-			description: "Value to fill",
+			description: "Value to fill (literal)",
 		},
 		{
 			name: "label",
 			type: "string",
 			required: false,
-			description: "Element label",
+			description: "Element label (label)",
 		},
 	],
 	returnDoc: "Fill result",
 	errorCode: "E_NO_TAB",
+	example: "web.tab.fill({ tabId: 123, refId: \"e2\", value: \"hello\" })",
 });
 
 registerContentScriptJsCall({
@@ -348,18 +397,25 @@ registerContentScriptJsCall({
 	params: schemas.TabScrollToParamsSchema,
 	returns: z.boolean(),
 	paramTypes: [
-		{ name: "tabId", type: "number", required: true, description: "Tab ID" },
-		{ name: "x", type: "number", required: false, description: "X coordinate" },
-		{ name: "y", type: "number", required: false, description: "Y coordinate" },
+		{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
+		{ name: "x", type: "number", required: false, description: "X coordinate (literal)" },
+		{ name: "y", type: "number", required: false, description: "Y coordinate (literal)" },
 		{
 			name: "refId",
 			type: "string",
-			required: true,
-			description: "Element reference ID",
+			required: false,
+			description: "Element reference ID (refId)",
+		},
+		{
+			name: "label",
+			type: "string",
+			required: false,
+			description: "Element label (label)",
 		},
 	],
 	returnDoc: "Scroll to result",
 	errorCode: "E_NO_TAB",
+	example: "web.tab.scroll_to({ tabId: 123, refId: \"e2\" })",
 });
 
 registerContentScriptJsCall({
@@ -370,28 +426,29 @@ registerContentScriptJsCall({
 	params: schemas.TabTypeParamsSchema,
 	returns: z.null(),
 	paramTypes: [
-		{ name: "tabId", type: "number", required: true, description: "Tab ID" },
+		{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
 		{
 			name: "refId",
 			type: "string",
-			required: true,
-			description: "Element reference ID",
+			required: false,
+			description: "Element reference ID (refId)",
 		},
 		{
 			name: "text",
 			type: "string",
 			required: false,
-			description: "Text to type",
+			description: "Text to type (literal)",
 		},
 		{
 			name: "label",
 			type: "string",
 			required: false,
-			description: "Element label",
+			description: "Element label (label)",
 		},
 	],
 	returnDoc: "Type result",
 	errorCode: "E_NO_TAB",
+	example: "web.tab.type({ tabId: 123, refId: \"e2\", text: \"hello\" })",
 });
 
 registerContentScriptJsCall({
@@ -402,16 +459,17 @@ registerContentScriptJsCall({
 	params: schemas.TabPressParamsSchema,
 	returns: z.null(),
 	paramTypes: [
-		{ name: "tabId", type: "number", required: true, description: "Tab ID" },
+		{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
 		{
 			name: "key",
 			type: "string",
 			required: false,
-			description: "Key to press",
+			description: "Key to press (literal)",
 		},
 	],
 	returnDoc: "Press result",
 	errorCode: "E_NO_TAB",
+	example: "web.tab.press({ tabId: 123, key: \"Enter\" })",
 });
 
 registerContentScriptJsCall({
@@ -422,22 +480,29 @@ registerContentScriptJsCall({
 	params: schemas.TabSelectParamsSchema,
 	returns: z.null(),
 	paramTypes: [
-		{ name: "tabId", type: "number", required: true, description: "Tab ID" },
+		{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
 		{
 			name: "refId",
 			type: "string",
-			required: true,
-			description: "Element reference ID",
+			required: false,
+			description: "Element reference ID (refId)",
+		},
+		{
+			name: "label",
+			type: "string",
+			required: false,
+			description: "Element label (label)",
 		},
 		{
 			name: "value",
 			type: "string",
 			required: false,
-			description: "Option value to select",
+			description: "Option value to select (literal)",
 		},
 	],
 	returnDoc: "Select result",
 	errorCode: "E_NO_TAB",
+	example: "web.tab.select({ tabId: 123, refId: \"e2\", value: \"option1\" })",
 });
 
 registerContentScriptJsCall({
@@ -448,22 +513,29 @@ registerContentScriptJsCall({
 	params: schemas.TabCheckParamsSchema,
 	returns: z.null(),
 	paramTypes: [
-		{ name: "tabId", type: "number", required: true, description: "Tab ID" },
+		{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
 		{
 			name: "refId",
 			type: "string",
-			required: true,
-			description: "Element reference ID",
+			required: false,
+			description: "Element reference ID (refId)",
+		},
+		{
+			name: "label",
+			type: "string",
+			required: false,
+			description: "Element label (label)",
 		},
 		{
 			name: "checked",
 			type: "boolean",
 			required: false,
-			description: "Whether to check or uncheck",
+			description: "Whether to check or uncheck (literal)",
 		},
 	],
 	returnDoc: "Check result",
 	errorCode: "E_NO_TAB",
+	example: "web.tab.check({ tabId: 123, refId: \"e2\", checked: true })",
 });
 
 registerContentScriptJsCall({
@@ -474,16 +546,23 @@ registerContentScriptJsCall({
 	params: schemas.TabHoverParamsSchema,
 	returns: z.null(),
 	paramTypes: [
-		{ name: "tabId", type: "number", required: true, description: "Tab ID" },
+		{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
 		{
 			name: "refId",
 			type: "string",
-			required: true,
-			description: "Element reference ID",
+			required: false,
+			description: "Element reference ID (refId)",
+		},
+		{
+			name: "label",
+			type: "string",
+			required: false,
+			description: "Element label (label)",
 		},
 	],
 	returnDoc: "Hover result",
 	errorCode: "E_NO_TAB",
+	example: "web.tab.hover({ tabId: 123, refId: \"e2\" })",
 });
 
 registerContentScriptJsCall({
@@ -494,10 +573,11 @@ registerContentScriptJsCall({
 	params: schemas.TabUnhoverParamsSchema,
 	returns: z.null(),
 	paramTypes: [
-		{ name: "tabId", type: "number", required: true, description: "Tab ID" },
+		{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
 	],
 	returnDoc: "Unhover result",
 	errorCode: "E_NO_TAB",
+	example: "web.tab.unhover({ tabId: 123 })",
 });
 
 registerContentScriptJsCall({
@@ -508,22 +588,23 @@ registerContentScriptJsCall({
 	params: schemas.TabScrollParamsSchema,
 	returns: z.boolean(),
 	paramTypes: [
-		{ name: "tabId", type: "number", required: true, description: "Tab ID" },
+		{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
 		{
 			name: "direction",
 			type: "string",
 			required: false,
-			description: "Scroll direction (up or down)",
+			description: "Scroll direction (up or down) (literal)",
 		},
 		{
 			name: "amount",
 			type: "number",
 			required: false,
-			description: "Scroll amount in pixels",
+			description: "Scroll amount in pixels (literal)",
 		},
 	],
 	returnDoc: "Scroll result",
 	errorCode: "E_NO_TAB",
+	example: "web.tab.scroll({ tabId: 123, direction: \"down\", amount: 500 })",
 });
 
 registerContentScriptJsCall({
@@ -534,16 +615,23 @@ registerContentScriptJsCall({
 	params: schemas.TabDblClickParamsSchema,
 	returns: z.null(),
 	paramTypes: [
-		{ name: "tabId", type: "number", required: true, description: "Tab ID" },
+		{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
 		{
 			name: "refId",
 			type: "string",
-			required: true,
-			description: "Element reference ID",
+			required: false,
+			description: "Element reference ID (refId)",
+		},
+		{
+			name: "label",
+			type: "string",
+			required: false,
+			description: "Element label (label)",
 		},
 	],
 	returnDoc: "Double-click result",
 	errorCode: "E_NO_TAB",
+	example: "web.tab.dblclick({ tabId: 123, refId: \"e2\" })",
 });
 
 registerJsCall({
@@ -573,28 +661,29 @@ registerJsCall({
 		);
 	},
 	paramTypes: [
-		{ name: "tabId", type: "number", required: true, description: "Tab ID" },
+		{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
 		{
 			name: "script",
 			type: "string",
 			required: false,
-			description: "Script to evaluate",
+			description: "Script to evaluate (literal)",
 		},
 		{
 			name: "code",
 			type: "string",
 			required: false,
-			description: "Alternative script code",
+			description: "Alternative script code (literal)",
 		},
 		{
 			name: "js",
 			type: "string",
 			required: false,
-			description: "Alternative JS code",
+			description: "Alternative JS code (literal)",
 		},
 	],
 	returnDoc: "Evaluation result",
 	errorCode: "E_NO_TAB",
+	example: "web.tab.evaluate({ tabId: 123, script: \"document.title\" })",
 });
 
 registerContentScriptJsCall({
@@ -605,10 +694,11 @@ registerContentScriptJsCall({
 	params: schemas.TabBackParamsSchema,
 	returns: z.boolean(),
 	paramTypes: [
-		{ name: "tabId", type: "number", required: true, description: "Tab ID" },
+		{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
 	],
 	returnDoc: "Back result",
 	errorCode: "E_NO_TAB",
+	example: "web.tab.back({ tabId: 123 })",
 });
 
 registerJsCall({
@@ -626,16 +716,17 @@ registerJsCall({
 		return unwrapResult(await waitForTabLoad(tabId, timeout));
 	},
 	paramTypes: [
-		{ name: "tabId", type: "number", required: true, description: "Tab ID" },
+		{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
 		{
 			name: "timeout",
 			type: "number",
 			required: false,
-			description: "Timeout in milliseconds",
+			description: "Timeout in milliseconds (literal)",
 		},
 	],
 	returnDoc: "true",
 	errorCode: "E_NO_TAB",
+	example: "web.tab.wait_for_load({ tabId: 123, timeout: 5000 })",
 });
 
 registerJsCall({
@@ -670,22 +761,23 @@ registerJsCall({
 		);
 	},
 	paramTypes: [
-		{ name: "tabId", type: "number", required: true, description: "Tab ID" },
+		{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
 		{
 			name: "url",
 			type: "string",
 			required: false,
-			description: "URL to fetch",
+			description: "URL to fetch (url)",
 		},
 		{
 			name: "options",
 			type: "object",
 			required: false,
-			description: "Fetch options",
+			description: "Fetch options (literal)",
 		},
 	],
-	returnDoc: "Response object",
+	returnDoc: "DTO with `{ body, headers, ok, status }` — not a native Response object",
 	errorCode: "E_NO_TAB",
+	example: "web.tab.fetch({ tabId: 123, url: \"https://api.example.com/data\" })",
 });
 
 registerJsCall({
@@ -698,60 +790,34 @@ registerJsCall({
 	fields: ["tabId"],
 	owner: "main-thread",
 	handler: async (params, _ctx) => {
+		const val = await runTabSnapshot(params, "tab.snapshot");
+		if (typeof val.text === "string") {
+			return val.text;
+		}
 		const tabId = extractTabId(params);
-		if (tabId === null) {
-			throw makeError("No tab ID provided", "E_NO_TAB");
-		}
-		const obj = asRecord(params);
-		const opts = asRecord(obj.options ?? obj);
-		const maxNodes =
-			typeof opts.max_nodes === "number" ? opts.max_nodes : DEFAULT_MAX_NODES;
-		const blocked = await preflightScriptableTab(tabId);
-		if (blocked && !blocked.ok) {
-			throw makeError(
-				blocked.error.message,
-				blocked.error.code,
-				blocked.error.category,
-			);
-		}
-		const result = await executeInTab(tabId, buildSnapshotInTab, [
-			maxNodes,
-		]);
-		if (!result.ok) {
-			throw makeError(
-				`tab.snapshot failed for tab ${tabId}: ${result.error.message}`,
-				result.error.code,
-				result.error.category,
-			);
-		}
-		if (result.value && typeof result.value === "object") {
-			const val = result.value as Record<string, unknown>;
-			if (typeof val.text === "string") {
-				return val.text;
-			}
-		}
 		throw makeError(
 			`tab.snapshot returned no text for tab ${tabId}`,
 			"E_SNAPSHOT",
 		);
 	},
 	paramTypes: [
-		{ name: "tabId", type: "number", required: true, description: "Tab ID" },
+		{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
 		{
 			name: "max_nodes",
 			type: "number",
 			required: false,
-			description: "Maximum nodes to include",
+			description: "Maximum nodes to include (literal)",
 		},
 		{
 			name: "options",
 			type: "object",
 			required: false,
-			description: "Snapshot options",
+			description: "Snapshot options (literal)",
 		},
 	],
 	returnDoc: "Snapshot text",
 	errorCode: "E_SNAPSHOT",
+	example: "web.tab.snapshot({ tabId: 123 })",
 });
 
 registerJsCall({
@@ -764,60 +830,34 @@ registerJsCall({
 	fields: ["tabId"],
 	owner: "main-thread",
 	handler: async (params, _ctx) => {
+		const val = await runTabSnapshot(params, "tab.snapshot_text");
+		if (typeof val.text === "string") {
+			return val.text;
+		}
 		const tabId = extractTabId(params);
-		if (tabId === null) {
-			throw makeError("No tab ID provided", "E_NO_TAB");
-		}
-		const obj = asRecord(params);
-		const opts = asRecord(obj.options ?? obj);
-		const maxNodes =
-			typeof opts.max_nodes === "number" ? opts.max_nodes : DEFAULT_MAX_NODES;
-		const blocked = await preflightScriptableTab(tabId);
-		if (blocked && !blocked.ok) {
-			throw makeError(
-				blocked.error.message,
-				blocked.error.code,
-				blocked.error.category,
-			);
-		}
-		const result = await executeInTab(tabId, buildSnapshotInTab, [
-			maxNodes,
-		]);
-		if (!result.ok) {
-			throw makeError(
-				`tab.snapshot_text failed for tab ${tabId}: ${result.error.message}`,
-				result.error.code,
-				result.error.category,
-			);
-		}
-		if (result.value && typeof result.value === "object") {
-			const val = result.value as Record<string, unknown>;
-			if (typeof val.text === "string") {
-				return val.text;
-			}
-		}
 		throw makeError(
 			`tab.snapshot_text returned no text for tab ${tabId}`,
 			"E_SNAPSHOT",
 		);
 	},
 	paramTypes: [
-		{ name: "tabId", type: "number", required: true, description: "Tab ID" },
+		{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
 		{
 			name: "max_nodes",
 			type: "number",
 			required: false,
-			description: "Maximum nodes to include",
+			description: "Maximum nodes to include (literal)",
 		},
 		{
 			name: "options",
 			type: "object",
 			required: false,
-			description: "Snapshot options",
+			description: "Snapshot options (literal)",
 		},
 	],
 	returnDoc: "Snapshot text",
 	errorCode: "E_SNAPSHOT",
+	example: "web.tab.snapshot_text({ tabId: 123 })",
 });
 
 registerJsCall({
@@ -830,55 +870,24 @@ registerJsCall({
 	fields: ["tabId"],
 	owner: "main-thread",
 	handler: async (params, _ctx) => {
-		const tabId = extractTabId(params);
-		if (tabId === null) {
-			throw makeError("No tab ID provided", "E_NO_TAB");
-		}
-		const obj = asRecord(params);
-		const opts = asRecord(obj.options ?? obj);
-		const maxNodes =
-			typeof opts.max_nodes === "number" ? opts.max_nodes : DEFAULT_MAX_NODES;
-		const blocked = await preflightScriptableTab(tabId);
-		if (blocked && !blocked.ok) {
-			throw makeError(
-				blocked.error.message,
-				blocked.error.code,
-				blocked.error.category,
-			);
-		}
-		const result = await executeInTab(tabId, buildSnapshotInTab, [
-			maxNodes,
-		]);
-		if (!result.ok) {
-			throw makeError(
-				`tab.snapshot_data failed for tab ${tabId}: ${result.error.message}`,
-				result.error.code,
-				result.error.category,
-			);
-		}
-		if (result.value && typeof result.value === "object") {
-			return result.value;
-		}
-		throw makeError(
-			`tab.snapshot_data returned no data for tab ${tabId}`,
-			"E_SNAPSHOT",
-		);
+		return runTabSnapshot(params, "tab.snapshot_data");
 	},
 	paramTypes: [
-		{ name: "tabId", type: "number", required: true, description: "Tab ID" },
+		{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
 		{
 			name: "max_nodes",
 			type: "number",
 			required: false,
-			description: "Maximum nodes to include",
+			description: "Maximum nodes to include (literal)",
 		},
 		{
 			name: "options",
 			type: "object",
 			required: false,
-			description: "Snapshot options",
+			description: "Snapshot options (literal)",
 		},
 	],
 	returnDoc: "Snapshot data",
 	errorCode: "E_SNAPSHOT",
+	example: "web.tab.snapshot_data({ tabId: 123 })",
 });

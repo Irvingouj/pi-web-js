@@ -7,6 +7,10 @@
 /// The param_struct type is checked at compile time to ensure it implements
 /// `serde::de::DeserializeOwned`.
 ///
+/// NOTE: RustCore APIs registered via this macro currently set `example: None`.
+/// To add examples to RustCore APIs, register them manually with `api_docs::register`
+/// or extend the macro to accept an `example` field.
+///
 /// # Example
 /// ```ignore
 /// web_api! {
@@ -79,6 +83,8 @@ macro_rules! web_api {
                 tool_source: $crate::api_docs::ToolSource::RustCore,
                 fields: None,
                 aliases: vec![],
+                permission: None,
+                example: None,
             };
             $crate::api_docs::register_executable_entry(
                 __entry,
@@ -142,6 +148,8 @@ macro_rules! web_api {
                 tool_source: $crate::api_docs::ToolSource::RustCore,
                 fields: Some(vec![$($field.to_string()),*]),
                 aliases: vec![],
+                permission: None,
+                example: None,
             };
             $crate::api_docs::register_executable_entry(
                 __entry,
@@ -211,6 +219,8 @@ macro_rules! web_api {
                         fields: None,
                     }),*
                 ],
+                permission: None,
+                example: None,
             };
             $crate::api_docs::register_executable_entry(
                 __entry,
@@ -283,6 +293,8 @@ macro_rules! web_api {
                         fields: __fields.clone(),
                     }),*
                 ],
+                permission: None,
+                example: None,
             };
             $crate::api_docs::register_executable_entry(
                 __entry,
@@ -381,6 +393,8 @@ macro_rules! web_api_sync {
                 tool_source: $crate::api_docs::ToolSource::RustCore,
                 fields: None,
                 aliases: vec![],
+                permission: None,
+                example: None,
             });
 
             // Register rquickjs callback with local_name

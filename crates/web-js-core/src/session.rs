@@ -4,8 +4,9 @@ use crate::types::{
     AsyncCommand, AsyncResponse, CellError, CellStatus, GlobalVariable, GlobalsSnapshot, RunResult,
 };
 use crate::utils::{
-    classify_js_error, clean_error_message, exception_to_string, extract_line_number,
+    cell_needs_isolation_wrap, classify_js_error, exception_to_string, extract_line_number,
     format_js_value, format_runtime_error_with_context, resume_async_pending,
+    wrap_user_cell_code,
 };
 use rquickjs::context::EvalOptions;
 use rquickjs::promise::PromiseState as QjsPromiseState;
@@ -82,9 +83,9 @@ impl SessionBuilder {
             allow_user_eval: self.allow_user_eval,
         };
 
-        // Load JS libraries (uses run_cell, so after session creation)
+        // Load JS libraries into global scope (unwrapped — libraries define shared helpers).
         for (_name, source) in &self.js_libraries {
-            let _ = session.run_cell(source, "");
+            let _ = session.run_cell_unwrapped(source, "");
         }
 
         // Reset execution count after library loading so user cells start at 1
@@ -284,8 +285,19 @@ impl JsSession {
         tracing::info!("perform_reset_done");
     }
 
-    /// Run a cell of code.
+    /// Run a user cell. Cells that declare top-level `let`/`const` are wrapped in a
+    /// per-run async function scope so the same cell can be re-run safely.
     pub fn run_cell(&mut self, code: &str, stdin: &str) -> RunResult {
+        let wrapped = if cell_needs_isolation_wrap(code) {
+            wrap_user_cell_code(code)
+        } else {
+            code.to_string()
+        };
+        self.run_cell_unwrapped(&wrapped, stdin)
+    }
+
+    /// Run code directly in the global QuickJS scope (library load, binding injection).
+    pub fn run_cell_unwrapped(&mut self, code: &str, stdin: &str) -> RunResult {
         if self.needs_reset {
             self.perform_reset();
         }
@@ -341,7 +353,7 @@ impl JsSession {
                 Ok(val) => val,
                 Err(e) => {
                     let hs = host_state.borrow();
-                    let (msg, line) = if let rquickjs::Error::Exception = &e {
+                    let (msg, _line) = if let rquickjs::Error::Exception = &e {
                         let exc_msg = {
                             let exc = ctx.catch();
                             let m = exception_to_string(&exc);
@@ -359,12 +371,7 @@ impl JsSession {
                     let cell_err = if msg.contains("interrupted") {
                         CellError::FuelExhausted
                     } else {
-                        let err = classify_js_error(&msg);
-                        match err {
-                            CellError::Runtime { message: _, line: _ } => CellError::Runtime { message: clean_error_message(&msg), line },
-                            CellError::Compile { message: _, line: _ } => CellError::Compile { message: clean_error_message(&msg), line },
-                            other => other,
-                        }
+                        classify_js_error(&msg)
                     };
                     return RunResult::with_partial_output(
                         hs.stdout.clone(),

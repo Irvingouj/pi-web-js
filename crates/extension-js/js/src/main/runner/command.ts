@@ -13,26 +13,22 @@ function parityParamsForDispatch(action: string, params: unknown): unknown {
 	return normalizeParityArgs(action, args);
 }
 
-export async function executeMainThreadCommand(
-	command: Command,
-	relaySignal?: AbortSignal,
-): Promise<AsyncResponse> {
+function unknownActionResponse(action: string): AsyncResponse {
+	return {
+		ok: false,
+		error: { message: `Unknown action: ${action}`, code: "E_UNKNOWN" },
+	};
+}
+
+export async function executeMainThreadCommand(command: Command, relaySignal?: AbortSignal): Promise<AsyncResponse> {
 	const signal = relaySignal ?? getRunnerSignal();
-	if (signal?.aborted) {
-		throw new Error("Runner aborted: ExtensionSession stopped");
-	}
+	if (signal?.aborted) throw new Error("Runner aborted: ExtensionSession stopped");
 	const logger = logModule.child("runner");
 	const finish = logger.timer("command_dispatch", { action: command.action, commandId: command.call_id, runId: command.runId });
-	if (!isValidMainThreadAction(command.action)) { finish({ ok: false }); return { ok: false, error: { message: `Unknown action: ${command.action}`, code: "E_UNKNOWN" } }; }
+	if (!isValidMainThreadAction(command.action)) { finish({ ok: false }); return unknownActionResponse(command.action); }
 	if (command.action.startsWith("host_")) { const r = await handleHostCallAction(command.action.slice(5), command.params); finish({ ok: r.ok, handler: "host" }); return r; }
-	const r = await dispatchTool(
-		command.action,
-		isNativeParityAction(command.action)
-			? parityParamsForDispatch(command.action, command.params)
-			: normalizeParams(command.action, command.params),
-		command.call_id,
-		command.runId,
-		signal,
-	);
-	finish({ ok: r.ok }); return r;
+	const params = isNativeParityAction(command.action) ? parityParamsForDispatch(command.action, command.params) : normalizeParams(command.action, command.params);
+	const r = await dispatchTool(command.action, params, command.call_id, command.runId, signal);
+	finish({ ok: r.ok });
+	return r;
 }

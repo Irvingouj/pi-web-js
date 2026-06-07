@@ -61,17 +61,19 @@ registerJsCall({
 			name: "interactive_only",
 			type: "boolean",
 			required: false,
-			description: "Only include interactive elements",
+			description: "Only include interactive elements (literal)",
 		},
 		{
 			name: "max_nodes",
 			type: "number",
 			required: false,
-			description: "Maximum nodes to include",
+			description: "Maximum nodes to include (literal)",
 		},
 	],
 	returnDoc: "Snapshot data",
 	errorCode: "E_SNAPSHOT",
+
+	example: "dom.snapshot({ tabId: 123, script: \"document.title\" })",
 });
 
 registerJsCall({
@@ -90,15 +92,17 @@ registerJsCall({
 			name: "snapshot",
 			type: "object",
 			required: true,
-			description: "DOM snapshot data",
+			description: "DOM snapshot data (literal)",
 		},
 		{
 			name: "format",
 			type: "string",
 			required: false,
-			description: "Output format (compact-text, json, json-pretty)",
+			description: "Output format (compact-text, json, json-pretty) (literal)",
 		},
 	],
 	returnDoc: "Formatted snapshot",
 	errorCode: "E_FORMAT",
+
+	example: "dom.format({ text: \"hello\" })",
 });

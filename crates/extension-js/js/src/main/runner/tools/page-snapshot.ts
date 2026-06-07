@@ -75,17 +75,19 @@ registerJsCall({
 			name: "max_nodes",
 			type: "number",
 			required: false,
-			description: "Maximum nodes to include",
+			description: "Maximum nodes to include (literal)",
 		},
 		{
 			name: "options",
 			type: "object",
 			required: false,
-			description: "Snapshot options",
+			description: "Snapshot options (literal)",
 		},
 	],
 	returnDoc: "Snapshot text",
 	errorCode: "E_SNAPSHOT",
+
+	example: "page.snapshot({ text: \"hello\" })",
 });
 
 registerJsCall({
@@ -126,17 +128,19 @@ registerJsCall({
 			name: "max_nodes",
 			type: "number",
 			required: false,
-			description: "Maximum nodes to include",
+			description: "Maximum nodes to include (literal)",
 		},
 		{
 			name: "options",
 			type: "object",
 			required: false,
-			description: "Snapshot options",
+			description: "Snapshot options (literal)",
 		},
 	],
 	returnDoc: "Snapshot text",
 	errorCode: "E_SNAPSHOT",
+
+	example: "page.snapshot_text({ text: \"hello\" })",
 });
 
 registerJsCall({
@@ -176,15 +180,17 @@ registerJsCall({
 			name: "max_nodes",
 			type: "number",
 			required: false,
-			description: "Maximum nodes to include",
+			description: "Maximum nodes to include (literal)",
 		},
 		{
 			name: "options",
 			type: "object",
 			required: false,
-			description: "Snapshot options",
+			description: "Snapshot options (literal)",
 		},
 	],
 	returnDoc: "Snapshot data",
 	errorCode: "E_SNAPSHOT",
+
+	example: "page.snapshot_data({ value: \"hello\" })",
 });

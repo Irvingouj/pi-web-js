@@ -1,5 +1,9 @@
-export function getElementByRefId(refId: string | number): Element | null {
-	return document.querySelector(`[data-ref-id='${CSS.escape(String(refId))}']`);
+/**
+ * Find an element by its opaque reference ID.
+ * @param refId — opaque element ref in 'e{N}' format (e.g. 'e2'). Must match schema regex ^e\d+$.
+ */
+export function getElementByRefId(refId: string): Element | null {
+	return document.querySelector(`[data-ref-id='${CSS.escape(refId)}']`);
 }
 
 export function findElementByLabel(query: string): Element | null {
@@ -73,6 +77,24 @@ export function getNumberParam(
 ): number {
 	const val = asRecord(params)[key];
 	return typeof val === "number" ? val : fallback;
+}
+
+export function throwElementNotFound(
+	refId: string | undefined,
+	label: string | undefined,
+	includeCandidates = false,
+	code?: string,
+): never {
+	const mode = refId ? "refId" : label ? "label" : null;
+	const query = refId || label;
+	let msg = `Element not found${mode ? ` by ${mode} "${query}"` : ""}`;
+	if (includeCandidates && query) {
+		const candidates = findCandidateLabels(query);
+		msg += `. Candidates: ${candidates.join(", ") || "none"}`;
+	}
+	const err = new Error(msg) as Error & { code?: string };
+	if (code) err.code = code;
+	throw err;
 }
 
 export function getAccessibleRole(el: Element): string {

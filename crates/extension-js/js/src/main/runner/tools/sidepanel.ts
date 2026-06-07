@@ -34,6 +34,7 @@ import {
 	DEFAULT_SCROLL_AMOUNT,
 	DEFAULT_POLL_INTERVAL_MS,
 } from "../runtime.js";
+import { findElementByLabel, throwElementNotFound } from "../../../content-script/dom-utils.js";
 
 // ─── Sidepanel ───────────────────────────────────────────────────
 
@@ -43,18 +44,30 @@ const sidepanelHandlers = new Map<
 >([
 	[
 		"sidepanel_click",
-		(refId) => {
-			const el = refId ? getElementByRefId(refId) : null;
-			if (!el) throw makeError(`Element ${refId} not found`, "ENOTFOUND");
+		(refId, obj) => {
+			const label = typeof obj.label === "string" ? obj.label : "";
+			let el = refId ? getElementByRefId(refId) : null;
+			if (!el && label) {
+				el = findElementByLabel(label);
+			}
+			if (!el) {
+				throwElementNotFound(refId, label, false, "ENOTFOUND");
+			}
 			(el as HTMLElement).click();
 			return null;
 		},
 	],
 	[
 		"sidepanel_dblclick",
-		(refId) => {
-			const el = refId ? getElementByRefId(refId) : null;
-			if (!el) throw makeError(`Element ${refId} not found`, "ENOTFOUND");
+		(refId, obj) => {
+			const label = typeof obj.label === "string" ? obj.label : "";
+			let el = refId ? getElementByRefId(refId) : null;
+			if (!el && label) {
+				el = findElementByLabel(label);
+			}
+			if (!el) {
+				throwElementNotFound(refId, label, false, "ENOTFOUND");
+			}
 			const ev = new MouseEvent("dblclick", { bubbles: true });
 			el.dispatchEvent(ev);
 			return null;
@@ -63,8 +76,14 @@ const sidepanelHandlers = new Map<
 	[
 		"sidepanel_fill",
 		(refId, obj) => {
-			const el = refId ? getElementByRefId(refId) : null;
-			if (!el) throw makeError(`Element ${refId} not found`, "ENOTFOUND");
+			const label = typeof obj.label === "string" ? obj.label : "";
+			let el = refId ? getElementByRefId(refId) : null;
+			if (!el && label) {
+				el = findElementByLabel(label);
+			}
+			if (!el) {
+				throwElementNotFound(refId, label, false, "ENOTFOUND");
+			}
 			const value = obj.value ?? "";
 			if ("value" in el) (el as HTMLInputElement).value = String(value);
 			return null;
@@ -73,12 +92,18 @@ const sidepanelHandlers = new Map<
 	[
 		"sidepanel_type",
 		(refId, obj) => {
-			const el = refId ? getElementByRefId(refId) : null;
-			if (!el) throw makeError(`Element ${refId} not found`, "ENOTFOUND");
+			const label = typeof obj.label === "string" ? obj.label : "";
+			let el = refId ? getElementByRefId(refId) : null;
+			if (!el && label) {
+				el = findElementByLabel(label);
+			}
+			if (!el) {
+				throwElementNotFound(refId, label, false, "ENOTFOUND");
+			}
 			const text = obj.text ?? "";
 			if ("value" in el) {
 				const input = el as HTMLInputElement;
-				input.value += String(text);
+				input.value = String(text);
 				input.dispatchEvent(new Event("input", { bubbles: true }));
 			}
 			return null;
@@ -87,8 +112,14 @@ const sidepanelHandlers = new Map<
 	[
 		"sidepanel_append",
 		(refId, obj) => {
-			const el = refId ? getElementByRefId(refId) : null;
-			if (!el) throw makeError(`Element ${refId} not found`, "ENOTFOUND");
+			const label = typeof obj.label === "string" ? obj.label : "";
+			let el = refId ? getElementByRefId(refId) : null;
+			if (!el && label) {
+				el = findElementByLabel(label);
+			}
+			if (!el) {
+				throwElementNotFound(refId, label, false, "ENOTFOUND");
+			}
 			const text = obj.text ?? "";
 			if ("value" in el) {
 				const input = el as HTMLInputElement;
@@ -120,8 +151,14 @@ const sidepanelHandlers = new Map<
 	[
 		"sidepanel_select",
 		(refId, obj) => {
-			const el = refId ? getElementByRefId(refId) : null;
-			if (!el) throw makeError(`Element ${refId} not found`, "ENOTFOUND");
+			const label = typeof obj.label === "string" ? obj.label : "";
+			let el = refId ? getElementByRefId(refId) : null;
+			if (!el && label) {
+				el = findElementByLabel(label);
+			}
+			if (!el) {
+				throwElementNotFound(refId, label, false, "ENOTFOUND");
+			}
 			const value = obj.value ?? "";
 			if ("value" in el) {
 				const select = el as HTMLSelectElement;
@@ -134,8 +171,14 @@ const sidepanelHandlers = new Map<
 	[
 		"sidepanel_check",
 		(refId, obj) => {
-			const el = refId ? getElementByRefId(refId) : null;
-			if (!el) throw makeError(`Element ${refId} not found`, "ENOTFOUND");
+			const label = typeof obj.label === "string" ? obj.label : "";
+			let el = refId ? getElementByRefId(refId) : null;
+			if (!el && label) {
+				el = findElementByLabel(label);
+			}
+			if (!el) {
+				throwElementNotFound(refId, label, false, "ENOTFOUND");
+			}
 			const checked = typeof obj.checked === "boolean" ? obj.checked : true;
 			if ("checked" in el) {
 				const cb = el as HTMLInputElement;
@@ -147,9 +190,15 @@ const sidepanelHandlers = new Map<
 	],
 	[
 		"sidepanel_hover",
-		(refId) => {
-			const el = refId ? getElementByRefId(refId) : null;
-			if (!el) throw makeError(`Element ${refId} not found`, "ENOTFOUND");
+		(refId, obj) => {
+			const label = typeof obj.label === "string" ? obj.label : "";
+			let el = refId ? getElementByRefId(refId) : null;
+			if (!el && label) {
+				el = findElementByLabel(label);
+			}
+			if (!el) {
+				throwElementNotFound(refId, label, false, "ENOTFOUND");
+			}
 			const ev = new MouseEvent("mouseenter", { bubbles: true });
 			el.dispatchEvent(ev);
 			return null;
@@ -180,10 +229,16 @@ const sidepanelHandlers = new Map<
 	],
 	[
 		"sidepanel_scroll_to",
-		(refId) => {
-			const el = refId ? getElementByRefId(refId) : null;
-			if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
-			else window.scrollTo({ top: 0, behavior: "smooth" });
+		(refId, obj) => {
+			const label = typeof obj.label === "string" ? obj.label : "";
+			let el = refId ? getElementByRefId(refId) : null;
+			if (!el && label) {
+				el = findElementByLabel(label);
+			}
+			if (!el) {
+				throwElementNotFound(refId, label, false, "ENOTFOUND");
+			}
+			el.scrollIntoView({ behavior: "smooth", block: "center" });
 			return null;
 		},
 	],
@@ -215,12 +270,20 @@ registerJsCall({
 		{
 			name: "refId",
 			type: "string",
-			required: true,
-			description: "Element reference ID",
+			required: false,
+			description: "Element reference ID (refId)",
+		},
+		{
+			name: "label",
+			type: "string",
+			required: false,
+			description: "Element label (label)",
 		},
 	],
 	returnDoc: "null",
 	errorCode: "E_UNKNOWN",
+
+	example: "sidepanel.click({ refId: \"e2\" })",
 });
 
 registerJsCall({
@@ -237,12 +300,20 @@ registerJsCall({
 		{
 			name: "refId",
 			type: "string",
-			required: true,
-			description: "Element reference ID",
+			required: false,
+			description: "Element reference ID (refId)",
+		},
+		{
+			name: "label",
+			type: "string",
+			required: false,
+			description: "Element label (label)",
 		},
 	],
 	returnDoc: "null",
 	errorCode: "E_UNKNOWN",
+
+	example: "sidepanel.dblclick({ refId: \"e2\" })",
 });
 
 registerJsCall({
@@ -258,18 +329,26 @@ registerJsCall({
 		{
 			name: "refId",
 			type: "string",
-			required: true,
-			description: "Element reference ID",
+			required: false,
+			description: "Element reference ID (refId)",
+		},
+		{
+			name: "label",
+			type: "string",
+			required: false,
+			description: "Element label (label)",
 		},
 		{
 			name: "value",
 			type: "string",
 			required: false,
-			description: "Value to fill",
+			description: "Value to fill (literal)",
 		},
 	],
 	returnDoc: "null",
 	errorCode: "E_UNKNOWN",
+
+	example: "sidepanel.fill({ refId: \"e2\" })",
 });
 
 registerJsCall({
@@ -285,18 +364,26 @@ registerJsCall({
 		{
 			name: "refId",
 			type: "string",
-			required: true,
-			description: "Element reference ID",
+			required: false,
+			description: "Element reference ID (refId)",
+		},
+		{
+			name: "label",
+			type: "string",
+			required: false,
+			description: "Element label (label)",
 		},
 		{
 			name: "text",
 			type: "string",
 			required: false,
-			description: "Text to type",
+			description: "Text to type (literal)",
 		},
 	],
 	returnDoc: "null",
 	errorCode: "E_UNKNOWN",
+
+	example: "sidepanel.type({ refId: \"e2\" })",
 });
 
 registerJsCall({
@@ -306,6 +393,7 @@ registerJsCall({
 	description: "Press a key in the sidepanel",
 	params: schemas.SidepanelPressParamsSchema,
 	returns: z.null(),
+	fields: ["key"],
 	owner: "main-thread",
 	handler: async (params, _ctx) => dispatchSidepanelEvent("sidepanel_press", params),
 	paramTypes: [
@@ -313,11 +401,13 @@ registerJsCall({
 			name: "key",
 			type: "string",
 			required: false,
-			description: "Key to press",
+			description: "Key to press (literal)",
 		},
 	],
 	returnDoc: "null",
 	errorCode: "E_UNKNOWN",
+
+	example: "sidepanel.press(\"Enter\")",
 });
 
 registerJsCall({
@@ -333,18 +423,26 @@ registerJsCall({
 		{
 			name: "refId",
 			type: "string",
-			required: true,
-			description: "Element reference ID",
+			required: false,
+			description: "Element reference ID (refId)",
+		},
+		{
+			name: "label",
+			type: "string",
+			required: false,
+			description: "Element label (label)",
 		},
 		{
 			name: "value",
 			type: "string",
 			required: false,
-			description: "Option value to select",
+			description: "Option value to select (literal)",
 		},
 	],
 	returnDoc: "null",
 	errorCode: "E_UNKNOWN",
+
+	example: "sidepanel.select({ refId: \"e2\" })",
 });
 
 registerJsCall({
@@ -360,18 +458,26 @@ registerJsCall({
 		{
 			name: "refId",
 			type: "string",
-			required: true,
-			description: "Element reference ID",
+			required: false,
+			description: "Element reference ID (refId)",
+		},
+		{
+			name: "label",
+			type: "string",
+			required: false,
+			description: "Element label (label)",
 		},
 		{
 			name: "checked",
 			type: "boolean",
 			required: false,
-			description: "Whether to check or uncheck",
+			description: "Whether to check or uncheck (literal)",
 		},
 	],
 	returnDoc: "null",
 	errorCode: "E_UNKNOWN",
+
+	example: "sidepanel.check({ refId: \"e2\" })",
 });
 
 registerJsCall({
@@ -387,12 +493,20 @@ registerJsCall({
 		{
 			name: "refId",
 			type: "string",
-			required: true,
-			description: "Element reference ID",
+			required: false,
+			description: "Element reference ID (refId)",
+		},
+		{
+			name: "label",
+			type: "string",
+			required: false,
+			description: "Element label (label)",
 		},
 	],
 	returnDoc: "null",
 	errorCode: "E_UNKNOWN",
+
+	example: "sidepanel.hover({ refId: \"e2\" })",
 });
 
 registerJsCall({
@@ -408,6 +522,8 @@ registerJsCall({
 	paramTypes: [],
 	returnDoc: "null",
 	errorCode: "E_UNKNOWN",
+
+	example: "sidepanel.unhover()",
 });
 
 registerJsCall({
@@ -424,17 +540,19 @@ registerJsCall({
 			name: "direction",
 			type: "string",
 			required: false,
-			description: "Scroll direction (up or down)",
+			description: "Scroll direction (up or down) (literal)",
 		},
 		{
 			name: "amount",
 			type: "number",
 			required: false,
-			description: "Scroll amount in pixels",
+			description: "Scroll amount in pixels (literal)",
 		},
 	],
 	returnDoc: "null",
 	errorCode: "E_UNKNOWN",
+
+	example: "sidepanel.scroll({ direction: \"down\", amount: 500 })",
 });
 
 registerJsCall({
@@ -452,11 +570,19 @@ registerJsCall({
 			name: "refId",
 			type: "string",
 			required: false,
-			description: "Element reference ID to scroll to",
+			description: "Element reference ID to scroll to (refId)",
+		},
+		{
+			name: "label",
+			type: "string",
+			required: false,
+			description: "Element label to scroll to (label)",
 		},
 	],
 	returnDoc: "null",
 	errorCode: "E_UNKNOWN",
+
+	example: "sidepanel.scroll_to({ refId: \"e2\" })",
 });
 
 registerJsCall({
@@ -472,18 +598,26 @@ registerJsCall({
 		{
 			name: "refId",
 			type: "string",
-			required: true,
-			description: "Element reference ID",
+			required: false,
+			description: "Element reference ID (refId)",
+		},
+		{
+			name: "label",
+			type: "string",
+			required: false,
+			description: "Element label (label)",
 		},
 		{
 			name: "text",
 			type: "string",
 			required: false,
-			description: "Text to append",
+			description: "Text to append (literal)",
 		},
 	],
 	returnDoc: "null",
 	errorCode: "E_UNKNOWN",
+
+	example: "sidepanel.append({ refId: \"e2\" })",
 });
 
 registerJsCall({
@@ -498,6 +632,8 @@ registerJsCall({
 	paramTypes: [],
 	returnDoc: "URL string",
 	errorCode: "E_UNKNOWN",
+
+	example: "sidepanel.url()",
 });
 
 registerJsCall({
@@ -512,6 +648,8 @@ registerJsCall({
 	paramTypes: [],
 	returnDoc: "Title string",
 	errorCode: "E_UNKNOWN",
+
+	example: "sidepanel.title()",
 });
 
 registerJsCall({
@@ -521,6 +659,7 @@ registerJsCall({
 	description: "Wait in the sidepanel",
 	params: schemas.SidepanelWaitParamsSchema,
 	returns: z.boolean(),
+	fields: ["duration"],
 	owner: "main-thread",
 	handler: async (params, _ctx) => {
 		await new Promise((resolve) =>
@@ -533,11 +672,13 @@ registerJsCall({
 			name: "duration",
 			type: "number",
 			required: false,
-			description: "Duration to wait in milliseconds",
+			description: "Duration to wait in milliseconds (literal)",
 		},
 	],
 	returnDoc: "true",
 	errorCode: "E_UNKNOWN",
+
+	example: "sidepanel.wait(1000)",
 });
 
 registerJsCall({
@@ -567,17 +708,19 @@ registerJsCall({
 			name: "interactive_only",
 			type: "boolean",
 			required: false,
-			description: "Only include interactive elements",
+			description: "Only include interactive elements (literal)",
 		},
 		{
 			name: "max_nodes",
 			type: "number",
 			required: false,
-			description: "Maximum nodes to include",
+			description: "Maximum nodes to include (literal)",
 		},
 	],
 	returnDoc: "Snapshot text",
 	errorCode: "E_SNAPSHOT",
+
+	example: "sidepanel.snapshot()",
 });
 
 registerJsCall({
@@ -607,17 +750,19 @@ registerJsCall({
 			name: "interactive_only",
 			type: "boolean",
 			required: false,
-			description: "Only include interactive elements",
+			description: "Only include interactive elements (literal)",
 		},
 		{
 			name: "max_nodes",
 			type: "number",
 			required: false,
-			description: "Maximum nodes to include",
+			description: "Maximum nodes to include (literal)",
 		},
 	],
 	returnDoc: "Snapshot text",
 	errorCode: "E_SNAPSHOT",
+
+	example: "sidepanel.snapshot_text()",
 });
 
 registerJsCall({
@@ -644,15 +789,17 @@ registerJsCall({
 			name: "interactive_only",
 			type: "boolean",
 			required: false,
-			description: "Only include interactive elements",
+			description: "Only include interactive elements (literal)",
 		},
 		{
 			name: "max_nodes",
 			type: "number",
 			required: false,
-			description: "Maximum nodes to include",
+			description: "Maximum nodes to include (literal)",
 		},
 	],
 	returnDoc: "Snapshot data",
 	errorCode: "E_SNAPSHOT",
+
+	example: "sidepanel.snapshot_data()",
 });

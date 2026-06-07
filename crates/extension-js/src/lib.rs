@@ -96,7 +96,8 @@ pub fn register_js_call_batch(items: js_sys::Array) -> Result<(), JsValue> {
 }
 
 #[wasm_bindgen(js_name = freezeManifest)]
-pub fn freeze_manifest() {
-    web_js_core::api_docs::freeze_manifest();
+pub fn freeze_manifest() -> Result<(), JsValue> {
+    web_js_core::api_docs::freeze_manifest()
+        .map_err(|e| JsValue::from_str(&e.to_string()))
 }
 

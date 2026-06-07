@@ -15,6 +15,7 @@ import type {
 	PageGotoParams,
 	PagePressParams,
 	PageScrollParams,
+	PageScrollToParams,
 	PageSelectParams,
 	PageTypeParams,
 	PageWaitForParams,
@@ -45,17 +46,42 @@ export const StorageDeleteParamsSchema = z.object({
 
 export const StorageListParamsSchema = z.object({});
 
-export const StorageSetManyParamsSchema = z.object({
+const storageSetManyShape = z.object({
 	items: z.record(z.unknown()),
 });
-export const StorageGetManyParamsSchema = z.object({
+export type StorageSetManyParams = z.infer<typeof storageSetManyShape>;
+export const StorageSetManyParamsSchema = z.preprocess((val) => {
+	if (
+		val !== null &&
+		typeof val === "object" &&
+		!Array.isArray(val) &&
+		!("items" in (val as Record<string, unknown>))
+	) {
+		return { items: val };
+	}
+	return val;
+}, storageSetManyShape) as z.ZodType<StorageSetManyParams>;
+
+const storageGetManyShape = z.object({
 	keys: z.array(z.string()),
 	defaults: z.record(z.unknown()).optional(),
 });
+export type StorageGetManyParams = z.infer<typeof storageGetManyShape>;
+export const StorageGetManyParamsSchema = z.preprocess(
+	(val) => (Array.isArray(val) ? { keys: val } : val),
+	storageGetManyShape,
+) as z.ZodType<StorageGetManyParams>;
+
 export const StorageGetAllParamsSchema = z.object({});
-export const StorageDeleteManyParamsSchema = z.object({
+
+const storageDeleteManyShape = z.object({
 	keys: z.array(z.string()),
 });
+export type StorageDeleteManyParams = z.infer<typeof storageDeleteManyShape>;
+export const StorageDeleteManyParamsSchema = z.preprocess(
+	(val) => (Array.isArray(val) ? { keys: val } : val),
+	storageDeleteManyShape,
+) as z.ZodType<StorageDeleteManyParams>;
 export const StorageClearParamsSchema = z.object({});
 
 // ─── Clipboard schemas ─────────────────────────────────────────
@@ -83,10 +109,22 @@ export const SleepParamsSchema = z.object({
 
 // ─── DOM interaction helpers ─────────────────────────────────────
 
+export const refIdString = () => z.string().regex(/^e\d+$/);
+
+const POSITIONAL_HINT =
+	'use { refId: "e2" } or { label: "..." } object form, not positional arguments';
+
 const requireRefIdOrLabel = (
-	data: { refId?: string; label?: string },
+	data: { refId?: string; label?: string; __invalidPositional?: unknown },
 	ctx: z.RefinementCtx,
 ) => {
+	if (data.__invalidPositional !== undefined) {
+		ctx.addIssue({
+			code: z.ZodIssueCode.custom,
+			message: POSITIONAL_HINT,
+		});
+		return;
+	}
 	if (!data.refId && !data.label) {
 		ctx.addIssue({
 			code: z.ZodIssueCode.custom,
@@ -95,31 +133,61 @@ const requireRefIdOrLabel = (
 	}
 };
 
-/** click/fill/type/append accept refId or label (runner + content-script). */
-const elementTargetParams = (extra?: z.ZodRawShape) =>
-	z
-		.object({
-			refId: z.string().optional(),
-			label: z.string().optional(),
-			...extra,
-		})
-		.superRefine(requireRefIdOrLabel);
+const requireRefIdLabelOrCoordinates = (
+	data: {
+		refId?: string;
+		label?: string;
+		x?: number;
+		y?: number;
+		__invalidPositional?: unknown;
+	},
+	ctx: z.RefinementCtx,
+) => {
+	if (data.x !== undefined || data.y !== undefined) {
+		return;
+	}
+	requireRefIdOrLabel(data, ctx);
+};
 
-/** select/check/hover/dblclick/scroll_to require refId (runner + content-script). */
-const elementRefIdParams = (extra?: z.ZodRawShape) =>
-	z.object({
-		refId: z.string(),
-		...extra,
-	});
+/** All element actions accept refId or label (runner + content-script). */
+const elementTargetParams = (extra?: z.ZodRawShape) =>
+	z.preprocess(
+		(val) => {
+			if (typeof val === "string" || typeof val === "number") {
+				return { __invalidPositional: val };
+			}
+			return val;
+		},
+		z
+			.object({
+				__invalidPositional: z.union([z.string(), z.number()]).optional(),
+				refId: refIdString().optional(),
+				label: z.string().optional(),
+				...extra,
+			})
+			.superRefine(requireRefIdOrLabel),
+	);
 
 const tabIdField = { tabId: z.union([z.number(), z.bigint()]).optional() };
 
-const tabElementRefIdParams = (extra?: z.ZodRawShape) =>
-	z.object({
-		...tabIdField,
-		refId: z.string(),
-		...extra,
-	});
+const tabElementTargetParams = (extra?: z.ZodRawShape) =>
+	z.preprocess(
+		(val) => {
+			if (typeof val === "string" || typeof val === "number") {
+				return { __invalidPositional: val };
+			}
+			return val;
+		},
+		z
+			.object({
+				__invalidPositional: z.union([z.string(), z.number()]).optional(),
+				...tabIdField,
+				refId: refIdString().optional(),
+				label: z.string().optional(),
+				...extra,
+			})
+			.superRefine(requireRefIdOrLabel),
+	);
 
 // ─── Page action schemas ───────────────────────────────────────
 
@@ -128,6 +196,7 @@ export const PageTitleParamsSchema = z.object({});
 
 export const PageGotoParamsSchema = z.object({
 	url: z.string(),
+	timeout: bigintLike().optional(),
 });
 
 export const PageBackParamsSchema = z.object({});
@@ -147,11 +216,11 @@ export const PagePressParamsSchema = z.object({
 	key: z.string(),
 });
 
-export const PageSelectParamsSchema = elementRefIdParams({ value: z.string() });
-export const PageCheckParamsSchema = elementRefIdParams({
+export const PageSelectParamsSchema = elementTargetParams({ value: z.string() });
+export const PageCheckParamsSchema = elementTargetParams({
 	checked: z.boolean().optional(),
 });
-export const PageHoverParamsSchema = elementRefIdParams();
+export const PageHoverParamsSchema = elementTargetParams();
 export const PageUnhoverParamsSchema = z.object({});
 
 export const PageScrollParamsSchema = z.object({
@@ -159,11 +228,24 @@ export const PageScrollParamsSchema = z.object({
 	amount: z.number().default(300),
 });
 
-export const PageScrollToParamsSchema = elementRefIdParams({
-	x: z.number().optional(),
-	y: z.number().optional(),
-});
-export const PageDblClickParamsSchema = elementRefIdParams();
+export const PageScrollToParamsSchema = z.preprocess(
+	(val) => {
+		if (typeof val === "string" || typeof val === "number") {
+			return { __invalidPositional: val };
+		}
+		return val;
+	},
+	z
+		.object({
+			__invalidPositional: z.union([z.string(), z.number()]).optional(),
+			refId: refIdString().optional(),
+			label: z.string().optional(),
+			x: z.number().optional(),
+			y: z.number().optional(),
+		})
+		.superRefine(requireRefIdLabelOrCoordinates),
+);
+export const PageDblClickParamsSchema = elementTargetParams();
 
 export const PageFindParamsSchema = z.object({
 	selector: z.string(),
@@ -174,9 +256,13 @@ export const PageWaitForParamsSchema = z.object({
 	timeout: bigintLike().default(30000n),
 });
 
-export const PageExtractParamsSchema = z.object({
+const pageExtractShape = z.object({
 	fields: z.array(z.string()),
 });
+export const PageExtractParamsSchema = z.preprocess(
+	(val) => (Array.isArray(val) ? { fields: val } : val),
+	pageExtractShape,
+) as z.ZodType<PageExtractParams>;
 
 export const PageCloseParamsSchema = z.union([
 	z.number(),
@@ -188,7 +274,13 @@ export const PageActiveTabParamsSchema = z.object({});
 // ─── Tab action schemas ────────────────────────────────────────
 
 export const TabQueryParamsSchema = z.record(z.unknown());
-export const TabCreateParamsSchema = z.record(z.unknown());
+export const TabCreateParamsSchema = z.preprocess(
+	(val) => (typeof val === "string" ? { url: val } : val),
+	z.object({
+		url: z.string().optional(),
+		active: z.boolean().optional(),
+	}),
+);
 export const TabActivateParamsSchema = z.union([
 	z.number(),
 	z.array(z.unknown()),
@@ -201,22 +293,36 @@ export const TabCloseParamsSchema = z.union([
 ]);
 export const TabExecuteScriptParamsSchema = z.record(z.unknown());
 
-export const TabClickParamsSchema = tabElementRefIdParams();
-export const TabFillParamsSchema = tabElementRefIdParams({ value: z.string() });
-export const TabScrollToParamsSchema = tabElementRefIdParams({
-	x: z.number().optional(),
-	y: z.number().optional(),
-});
-export const TabTypeParamsSchema = tabElementRefIdParams({ text: z.string() });
+export const TabClickParamsSchema = tabElementTargetParams();
+export const TabFillParamsSchema = tabElementTargetParams({ value: z.string() });
+export const TabScrollToParamsSchema = z.preprocess(
+	(val) => {
+		if (typeof val === "string" || typeof val === "number") {
+			return { __invalidPositional: val };
+		}
+		return val;
+	},
+	z
+		.object({
+			__invalidPositional: z.union([z.string(), z.number()]).optional(),
+			...tabIdField,
+			refId: refIdString().optional(),
+			label: z.string().optional(),
+			x: z.number().optional(),
+			y: z.number().optional(),
+		})
+		.superRefine(requireRefIdLabelOrCoordinates),
+);
+export const TabTypeParamsSchema = tabElementTargetParams({ text: z.string() });
 export const TabPressParamsSchema = z.object({
 	...tabIdField,
 	key: z.string(),
 });
-export const TabSelectParamsSchema = tabElementRefIdParams({ value: z.string() });
-export const TabCheckParamsSchema = tabElementRefIdParams({
+export const TabSelectParamsSchema = tabElementTargetParams({ value: z.string() });
+export const TabCheckParamsSchema = tabElementTargetParams({
 	checked: z.boolean().optional(),
 });
-export const TabHoverParamsSchema = tabElementRefIdParams();
+export const TabHoverParamsSchema = tabElementTargetParams();
 export const TabUnhoverParamsSchema = z.object({
 	...tabIdField,
 });
@@ -225,7 +331,7 @@ export const TabScrollParamsSchema = z.object({
 	direction: z.string().default("down"),
 	amount: z.number().default(300),
 });
-export const TabDblClickParamsSchema = tabElementRefIdParams();
+export const TabDblClickParamsSchema = tabElementTargetParams();
 
 export const TabEvaluateParamsSchema = z.record(z.unknown());
 export const TabBackParamsSchema = z.record(z.unknown());
@@ -238,33 +344,33 @@ export const TabSnapshotDataParamsSchema = z.record(z.unknown());
 
 // ─── Sidepanel action schemas ──────────────────────────────────
 
-export const SidepanelClickParamsSchema = z.union([
-	z.string(),
-	z.record(z.unknown()),
-]);
-export const SidepanelDblClickParamsSchema = z.union([
-	z.string(),
-	z.record(z.unknown()),
-]);
-export const SidepanelFillParamsSchema = z.record(z.unknown());
-export const SidepanelTypeParamsSchema = z.record(z.unknown());
-export const SidepanelPressParamsSchema = z.record(z.unknown());
-export const SidepanelSelectParamsSchema = z.record(z.unknown());
-export const SidepanelCheckParamsSchema = z.record(z.unknown());
-export const SidepanelHoverParamsSchema = z.union([
-	z.string(),
-	z.record(z.unknown()),
-]);
-export const SidepanelUnhoverParamsSchema = z.union([
-	z.string(),
-	z.record(z.unknown()),
-]);
-export const SidepanelScrollParamsSchema = z.record(z.unknown());
-export const SidepanelScrollToParamsSchema = z.union([
-	z.string(),
-	z.record(z.unknown()),
-]);
-export const SidepanelAppendParamsSchema = z.record(z.unknown());
+export const SidepanelClickParamsSchema = elementTargetParams();
+export const SidepanelDblClickParamsSchema = elementTargetParams();
+export const SidepanelFillParamsSchema = elementTargetParams({
+	value: z.string().optional(),
+});
+export const SidepanelTypeParamsSchema = elementTargetParams({
+	text: z.string().optional(),
+});
+export const SidepanelPressParamsSchema = z.object({
+	key: z.string().optional(),
+});
+export const SidepanelSelectParamsSchema = elementTargetParams({
+	value: z.string().optional(),
+});
+export const SidepanelCheckParamsSchema = elementTargetParams({
+	checked: z.boolean().optional(),
+});
+export const SidepanelHoverParamsSchema = elementTargetParams();
+export const SidepanelUnhoverParamsSchema = z.object({});
+export const SidepanelScrollParamsSchema = z.object({
+	direction: z.string().optional(),
+	amount: z.number().optional(),
+});
+export const SidepanelScrollToParamsSchema = elementTargetParams();
+export const SidepanelAppendParamsSchema = elementTargetParams({
+	text: z.string().optional(),
+});
 
 export const SidepanelUrlParamsSchema = z.object({});
 export const SidepanelTitleParamsSchema = z.object({});
@@ -485,7 +591,7 @@ export const DomSnapshotValueSchema = z.object({
 });
 
 export const SnapshotNodeSchema = z.object({
-	refId: z.number(),
+	refId: refIdString(),
 	role: z.string(),
 	tag: z.string(),
 	name: z.string().optional(),
@@ -568,6 +674,15 @@ type _AssertPageScroll =
 		: never;
 type _AssertPageScrollReverse =
 	PageScrollParams extends z.infer<typeof PageScrollParamsSchema>
+		? true
+		: never;
+
+type _AssertPageScrollTo =
+	z.infer<typeof PageScrollToParamsSchema> extends PageScrollToParams
+		? true
+		: never;
+type _AssertPageScrollToReverse =
+	PageScrollToParams extends z.infer<typeof PageScrollToParamsSchema>
 		? true
 		: never;
 

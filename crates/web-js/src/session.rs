@@ -105,7 +105,7 @@ impl WebSession {
     fn inject_registry_bindings(&mut self) {
         let js_code = web_js_core::api_docs::generate_js_bindings_code();
         if !js_code.is_empty() {
-            let _ = self.base.inner.run_cell(&js_code, "");
+            let _ = self.base.inner.run_cell_unwrapped(&js_code, "");
         }
     }
 

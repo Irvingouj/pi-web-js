@@ -56,36 +56,38 @@ registerJsCall({
 			name: "url",
 			type: "string",
 			required: true,
-			description: "URL to fetch",
+			description: "URL to fetch (url)",
 		},
 		{
 			name: "method",
 			type: "string",
 			required: false,
-			description: "HTTP method (GET, POST, etc.)",
+			description: "HTTP method (GET, POST, etc.) (literal)",
 		},
 		{
 			name: "headers",
 			type: "object",
 			required: false,
-			description: "Request headers",
+			description: "Request headers (literal)",
 		},
 		{
 			name: "body",
 			type: "string",
 			required: false,
-			description: "Request body",
+			description: "Request body (literal)",
 		},
 		{
 			name: "timeout",
 			type: "number",
 			required: false,
-			description: "Timeout in milliseconds",
+			description: "Timeout in milliseconds (literal)",
 		},
 	],
-	returnDoc: "Response object",
+	returnDoc: "DTO with `{ body, headers, ok, status }` — not a native Response object",
 	errorCode: "E_UNKNOWN",
 	errorCategory: "network",
+
+	example: "network.fetch(\"https://example.com\")",
 });
 
 registerJsCall({
@@ -109,11 +111,13 @@ registerJsCall({
 			name: "duration",
 			type: "number",
 			required: true,
-			description: "Duration to sleep in milliseconds",
+			description: "Duration to sleep in milliseconds (literal)",
 		},
 	],
 	returnDoc: "null",
 	errorCode: "E_UNKNOWN",
+
+	example: "util.sleep(1000)",
 });
 
 registerJsCall({
@@ -144,9 +148,11 @@ registerJsCall({
 			name: "label",
 			type: "string",
 			required: false,
-			description: "Test label",
+			description: "Test label (label)",
 		},
 	],
 	returnDoc: "Label string",
 	errorCode: "E_UNKNOWN",
+
+	example: "util.mock_async({ tabId: 123, script: \"document.title\" })",
 });

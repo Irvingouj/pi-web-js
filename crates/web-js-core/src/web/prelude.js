@@ -117,9 +117,18 @@ function makeAsync(action, fields, parity) {
         else if (args.length === 1) params = args[0];
         else params = args;
         if (Array.isArray(params)) {
-          var obj = {};
-          for (var j = 0; j < fields.length && j < params.length; j++) obj[fields[j]] = params[j];
-          params = obj;
+          if (fields.length === 1 && fields[0] === 'fields') {
+            if (params.every(function(item) { return typeof item === 'string'; })) {
+              params = { fields: params };
+            } else {
+              reject(new Error('E_INVALID_ARGUMENT_TRANSPORT: fields array must contain only strings'));
+              return;
+            }
+          } else {
+            var obj = {};
+            for (var j = 0; j < fields.length && j < params.length; j++) obj[fields[j]] = params[j];
+            params = obj;
+          }
         } else if (typeof params === 'string' || typeof params === 'number') {
           var named = {}; named[fields[0]] = params; params = named;
         }

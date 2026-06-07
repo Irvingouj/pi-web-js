@@ -1,6 +1,22 @@
 use crate::types::CellError;
 use rquickjs::{Ctx, Value};
 
+/// True when user cell code declares top-level `let`/`const` bindings.
+pub(crate) fn cell_needs_isolation_wrap(code: &str) -> bool {
+    code.lines().any(|line| {
+        let trimmed = line.trim_start();
+        trimmed.starts_with("let ")
+            || trimmed.starts_with("const ")
+            || trimmed.starts_with("let\t")
+            || trimmed.starts_with("const\t")
+    })
+}
+
+/// Wrap user cell code so top-level `let`/`const` can be re-run without global redeclaration errors.
+pub(crate) fn wrap_user_cell_code(code: &str) -> String {
+    format!("(async function __webJsCell() {{\n{}\n}})()", code)
+}
+
 /// Extract a line number from an error message or stack trace.
 /// Handles "at line N", "line N", and "filename:line:col" patterns.
 pub(crate) fn extract_line_number(msg: &str) -> Option<u32> {
@@ -51,16 +67,14 @@ pub(crate) fn extract_line_number(msg: &str) -> Option<u32> {
 }
 
 /// Clean up error messages to be more user-friendly.
+/// Never rewrites real QuickJS error names into generic placeholders —
+/// that destroys the original message that QuickJS already provided.
 pub(crate) fn clean_error_message(msg: &str) -> String {
     let trimmed = msg.trim();
-    // If the message is just an error name with no details, add a hint
-    if trimmed == "SyntaxError"
-        || trimmed == "ReferenceError"
-        || trimmed == "TypeError"
-        || trimmed == "RangeError"
-    {
-        format!("{}: <no details available>", trimmed)
-    } else if trimmed == "TypeError: )"
+    // Only rewrite clearly corrupted / artifact messages, never real error names.
+    // These artifacts appear when QuickJS async resume corrupts the exception object
+    // (e.g., null/undefined property access or internal state loss during async resume).
+    if trimmed == "TypeError: )"
         || trimmed == "TypeError: <no message>"
         || trimmed.ends_with(": )")
     {
@@ -269,9 +283,23 @@ pub(crate) fn exception_to_string<'js>(value: &Value<'js>) -> String {
             out
         }
         (Some(n), None) => {
-            // Try toString() as a last resort before falling back to bare name
+            // Try toString() first, then String(error), then stack line, then bare name
             if let Ok(to_string) = obj.get::<_, rquickjs::Function>("toString") {
                 if let Ok(val) = to_string.call::<_, rquickjs::String>(()) {
+                    if let Ok(s) = val.to_string() {
+                        let s = s.replace('\0', "").trim().to_string();
+                        if !s.is_empty() && s != "[object Object]" && s != n {
+                            return format!("{}{}", prefix, s);
+                        }
+                    }
+                }
+            }
+            // Try String(error) via a helper function to get the default string representation
+            let ctx = value.ctx().clone();
+            if let Ok(stringify_fn) = ctx.eval::<rquickjs::Function, _>(
+                "(function(v) { try { return String(v); } catch(e) { return ''; } })"
+            ) {
+                if let Ok(val) = stringify_fn.call::<_, rquickjs::String>((value.clone(),)) {
                     if let Ok(s) = val.to_string() {
                         let s = s.replace('\0', "").trim().to_string();
                         if !s.is_empty() && s != "[object Object]" && s != n {
@@ -285,7 +313,8 @@ pub(crate) fn exception_to_string<'js>(value: &Value<'js>) -> String {
                     return format!("{}{}: {}", prefix, n, first_line.trim());
                 }
             }
-            format!("{}{}: <no message>", prefix, n)
+            // Preserve the original error name rather than inventing a placeholder
+            format!("{}{}", prefix, n)
         }
         (None, Some(m)) => format!("{}{}", prefix, m),
         (None, None) => format!("{}{}", prefix, format_js_value(value)),

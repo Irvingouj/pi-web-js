@@ -694,6 +694,7 @@ pub fn init_fs_registry() {
     }
 
     if was_frozen {
-        web_js_core::api_docs::freeze_manifest();
+        web_js_core::api_docs::freeze_manifest()
+            .expect("Failed to re-freeze manifest after browser API registration");
     }
 }

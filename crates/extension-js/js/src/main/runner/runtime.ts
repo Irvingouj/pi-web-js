@@ -17,6 +17,8 @@ export {
 export {
 	DEFAULT_MAX_NODES,
 	DEFAULT_TIMEOUT_MS,
+	NAVIGATION_SETTLE_MS,
+	CONTENT_SCRIPT_GRACE_MS,
 	DEFAULT_SCROLL_AMOUNT,
 	DEFAULT_POLL_INTERVAL_MS,
 } from "./lib/constants.js";
@@ -34,7 +36,7 @@ export { asRecord, extractTabId, normalizeParams, unwrapResult } from "./lib/par
 
 export { executeMainThreadCommand } from "./command.js";
 export { handleFetch } from "./fetch.js";
-export { executeInTab, preflightScriptableTab, waitForTabLoad } from "./tab/execute.js";
+export { executeInTab, pingTabContentScript, preflightScriptableTab, waitForTabLoad } from "./tab/execute.js";
 export { sendMessageToTab } from "./tab/messaging.js";
 export { getElementByRefId, extractRefId } from "./sidepanel/dom.js";
 export {

@@ -15,11 +15,10 @@ import {
 	asRecord,
 	extractTabId,
 	unwrapResult,
-	sendMessageToTab,
-	getActiveTabId,
 	resolveActiveTabId,
 	executeInTab,
 	waitForTabLoad,
+	pingTabContentScript,
 	handleFetch,
 	handleHostCallAction,
 	registerChromePassthrough,
@@ -31,6 +30,7 @@ import {
 	buildSnapshotInTab,
 	throwIfAborted,
 	DEFAULT_TIMEOUT_MS,
+	CONTENT_SCRIPT_GRACE_MS,
 	DEFAULT_MAX_NODES,
 	DEFAULT_SCROLL_AMOUNT,
 	DEFAULT_POLL_INTERVAL_MS,
@@ -48,6 +48,7 @@ registerContentScriptJsCall({
 	paramTypes: [],
 	returnDoc: "URL string",
 	errorCode: "E_NO_TAB",
+	example: "page.url()",
 });
 
 registerContentScriptJsCall({
@@ -60,6 +61,7 @@ registerContentScriptJsCall({
 	paramTypes: [],
 	returnDoc: "Title string",
 	errorCode: "E_NO_TAB",
+	example: "page.title()",
 });
 
 registerJsCall({
@@ -76,22 +78,99 @@ registerJsCall({
 		if (activeTab === null) {
 			throw makeError("No active tab", "E_NO_TAB");
 		}
-		const result = await dispatchTool("chrome_tabs_update", [
-			activeTab,
-			{ url: params.url },
-		]);
-		return unwrapResult(result);
+		if (!params.url.startsWith("http:") && !params.url.startsWith("https:")) {
+			throw makeError(
+				`Navigation blocked: URL scheme not supported (${params.url})`,
+				"E_NAVIGATION",
+				"navigation",
+			);
+		}
+		const preNavResult = await dispatchTool("chrome_tabs_get", [activeTab]);
+		const preNavigationUrl =
+			preNavResult.ok && preNavResult.value
+				? (preNavResult.value as { url?: string }).url
+				: undefined;
+		const chromeApi = window.chrome;
+		let navSawLoading = false;
+		const navListener = (
+			tabId: number,
+			changeInfo: { status?: string },
+		) => {
+			if (tabId !== activeTab) return;
+			if (changeInfo.status === "loading") {
+				navSawLoading = true;
+			}
+		};
+		const timeoutMs = Number(params.timeout) || DEFAULT_TIMEOUT_MS;
+		chromeApi?.tabs?.onUpdated?.addListener(navListener);
+		try {
+			const updateResult = await dispatchTool("chrome_tabs_update", [
+				activeTab,
+				{ url: params.url },
+			]);
+			if (!updateResult.ok) {
+				return unwrapResult(updateResult);
+			}
+			const loadResult = await waitForTabLoad(activeTab, timeoutMs, {
+				preNavigationUrl,
+				getNavSawLoading: () => navSawLoading,
+			});
+			if (!loadResult.ok) {
+				return unwrapResult(loadResult);
+			}
+		} finally {
+			chromeApi?.tabs?.onUpdated?.removeListener(navListener);
+		}
+		const tabCheck = await dispatchTool("chrome_tabs_get", [activeTab]);
+		if (tabCheck.ok && tabCheck.value) {
+			const tab = tabCheck.value as { url?: string; status?: string };
+			const currentUrl = tab.url ?? "";
+			if (
+				currentUrl &&
+				!currentUrl.startsWith("http:") &&
+				!currentUrl.startsWith("https:")
+			) {
+				throw makeError(
+					`Navigation blocked: cannot script ${currentUrl}`,
+					"E_NAVIGATION",
+					"navigation",
+				);
+			}
+			if (
+				preNavigationUrl &&
+				tab.status === "complete" &&
+				currentUrl === preNavigationUrl &&
+				currentUrl !== params.url
+			) {
+				throw makeError(
+					`Navigation did not start for ${params.url}`,
+					"E_NAVIGATION",
+					"navigation",
+				);
+			}
+		}
+		const pingResult = await pingTabContentScript(activeTab, timeoutMs);
+		if (!pingResult.ok) {
+			return unwrapResult(pingResult);
+		}
+		await new Promise((resolve) =>
+			setTimeout(resolve, CONTENT_SCRIPT_GRACE_MS),
+		);
+		const freshTab = await dispatchTool("chrome_tabs_get", [activeTab]);
+		return unwrapResult(freshTab);
 	},
 	paramTypes: [
 		{
 			name: "url",
 			type: "string",
 			required: true,
-			description: "URL to navigate to",
+			description: "URL to navigate to (url)",
 		},
 	],
 	returnDoc: "Tab update result",
-	errorCode: "E_NO_TAB",
+	errorCode: "E_NAVIGATION",
+	errorCategory: "navigation",
+	example: "page.goto(\"https://example.com\")",
 });
 
 registerContentScriptJsCall({
@@ -104,6 +183,7 @@ registerContentScriptJsCall({
 	paramTypes: [],
 	returnDoc: "Navigation result",
 	errorCode: "E_NO_TAB",
+	example: "page.back()",
 });
 
 registerJsCall({
@@ -129,6 +209,7 @@ registerJsCall({
 	paramTypes: [],
 	returnDoc: "true",
 	errorCode: "E_NO_TAB",
+	example: "page.forward()",
 });
 
 registerJsCall({
@@ -151,6 +232,7 @@ registerJsCall({
 	paramTypes: [],
 	returnDoc: "null",
 	errorCode: "E_NO_TAB",
+	example: "page.reload()",
 });
 
 registerJsCall({
@@ -173,11 +255,12 @@ registerJsCall({
 			name: "duration",
 			type: "number",
 			required: false,
-			description: "Duration to wait in milliseconds",
+			description: "Duration to wait in milliseconds (literal)",
 		},
 	],
 	returnDoc: "true",
 	errorCode: "E_UNKNOWN",
+	example: "page.wait(1000)",
 });
 
 registerContentScriptJsCall({
@@ -187,23 +270,23 @@ registerContentScriptJsCall({
 	description: "Click an element in the active tab",
 	params: schemas.PageClickParamsSchema,
 	returns: z.null(),
-	fields: ["refId"],
 	paramTypes: [
 		{
 			name: "refId",
 			type: "string",
 			required: false,
-			description: "Element reference ID",
+			description: "Element reference ID (refId)",
 		},
 		{
 			name: "label",
 			type: "string",
 			required: false,
-			description: "Element label to click",
+			description: "Element label to click (label)",
 		},
 	],
 	returnDoc: "Click result",
 	errorCode: "E_MISSING_PARAM",
+	example: "page.click({ refId: \"e2\" })",
 });
 
 registerContentScriptJsCall({
@@ -213,29 +296,29 @@ registerContentScriptJsCall({
 	description: "Fill an element in the active tab",
 	params: schemas.PageFillParamsSchema,
 	returns: z.null(),
-	fields: ["refId", "value"],
 	paramTypes: [
 		{
 			name: "refId",
 			type: "string",
 			required: false,
-			description: "Element reference ID",
+			description: "Element reference ID (refId)",
 		},
 		{
 			name: "value",
 			type: "string",
 			required: false,
-			description: "Value to fill",
+			description: "Value to fill (literal)",
 		},
 		{
 			name: "label",
 			type: "string",
 			required: false,
-			description: "Element label",
+			description: "Element label (label)",
 		},
 	],
 	returnDoc: "Fill result",
 	errorCode: "E_MISSING_PARAM",
+	example: "page.fill({ refId: \"e2\", value: \"hello\" })",
 });
 
 registerContentScriptJsCall({
@@ -250,23 +333,24 @@ registerContentScriptJsCall({
 			name: "refId",
 			type: "string",
 			required: false,
-			description: "Element reference ID",
+			description: "Element reference ID (refId)",
 		},
 		{
 			name: "text",
 			type: "string",
 			required: false,
-			description: "Text to type",
+			description: "Text to type (literal)",
 		},
 		{
 			name: "label",
 			type: "string",
 			required: false,
-			description: "Element label",
+			description: "Element label (label)",
 		},
 	],
 	returnDoc: "Type result",
 	errorCode: "E_MISSING_PARAM",
+	example: "page.type({ refId: \"e2\", text: \"hello\" })",
 });
 
 registerContentScriptJsCall({
@@ -281,23 +365,24 @@ registerContentScriptJsCall({
 			name: "refId",
 			type: "string",
 			required: false,
-			description: "Element reference ID",
+			description: "Element reference ID (refId)",
 		},
 		{
 			name: "text",
 			type: "string",
 			required: false,
-			description: "Text to append",
+			description: "Text to append (literal)",
 		},
 		{
 			name: "label",
 			type: "string",
 			required: false,
-			description: "Element label",
+			description: "Element label (label)",
 		},
 	],
 	returnDoc: "Append result",
 	errorCode: "E_MISSING_PARAM",
+	example: "page.append({ refId: \"e2\", text: \" world\" })",
 });
 
 registerContentScriptJsCall({
@@ -313,11 +398,12 @@ registerContentScriptJsCall({
 			name: "key",
 			type: "string",
 			required: true,
-			description: "Key to press",
+			description: "Key to press (literal)",
 		},
 	],
 	returnDoc: "Press result",
 	errorCode: "E_NO_TAB",
+	example: "page.press(\"Enter\")",
 });
 
 registerContentScriptJsCall({
@@ -331,18 +417,25 @@ registerContentScriptJsCall({
 		{
 			name: "refId",
 			type: "string",
-			required: true,
-			description: "Element reference ID",
+			required: false,
+			description: "Element reference ID (refId)",
+		},
+		{
+			name: "label",
+			type: "string",
+			required: false,
+			description: "Element label (label)",
 		},
 		{
 			name: "value",
 			type: "string",
 			required: false,
-			description: "Option value to select",
+			description: "Option value to select (literal)",
 		},
 	],
 	returnDoc: "Select result",
 	errorCode: "E_MISSING_PARAM",
+	example: "page.select({ refId: \"e2\", value: \"option1\" })",
 });
 
 registerContentScriptJsCall({
@@ -356,18 +449,25 @@ registerContentScriptJsCall({
 		{
 			name: "refId",
 			type: "string",
-			required: true,
-			description: "Element reference ID",
+			required: false,
+			description: "Element reference ID (refId)",
+		},
+		{
+			name: "label",
+			type: "string",
+			required: false,
+			description: "Element label (label)",
 		},
 		{
 			name: "checked",
 			type: "boolean",
 			required: false,
-			description: "Whether to check or uncheck",
+			description: "Whether to check or uncheck (literal)",
 		},
 	],
 	returnDoc: "Check result",
 	errorCode: "E_MISSING_PARAM",
+	example: "page.check({ refId: \"e2\", checked: true })",
 });
 
 registerContentScriptJsCall({
@@ -381,12 +481,19 @@ registerContentScriptJsCall({
 		{
 			name: "refId",
 			type: "string",
-			required: true,
-			description: "Element reference ID",
+			required: false,
+			description: "Element reference ID (refId)",
+		},
+		{
+			name: "label",
+			type: "string",
+			required: false,
+			description: "Element label (label)",
 		},
 	],
 	returnDoc: "Hover result",
 	errorCode: "E_MISSING_PARAM",
+	example: "page.hover({ refId: \"e2\" })",
 });
 
 registerContentScriptJsCall({
@@ -399,6 +506,7 @@ registerContentScriptJsCall({
 	paramTypes: [],
 	returnDoc: "Unhover result",
 	errorCode: "E_NO_TAB",
+	example: "page.unhover()",
 });
 
 registerContentScriptJsCall({
@@ -414,17 +522,18 @@ registerContentScriptJsCall({
 			name: "direction",
 			type: "string",
 			required: false,
-			description: "Scroll direction (up or down)",
+			description: "Scroll direction (up or down) (literal)",
 		},
 		{
 			name: "amount",
 			type: "number",
 			required: false,
-			description: "Scroll amount in pixels",
+			description: "Scroll amount in pixels (literal)",
 		},
 	],
 	returnDoc: "Scroll result",
 	errorCode: "E_NO_TAB",
+	example: "page.scroll(\"down\", 500)",
 });
 
 registerContentScriptJsCall({
@@ -439,11 +548,18 @@ registerContentScriptJsCall({
 			name: "refId",
 			type: "string",
 			required: false,
-			description: "Element reference ID to scroll to",
+			description: "Element reference ID to scroll to (refId)",
+		},
+		{
+			name: "label",
+			type: "string",
+			required: false,
+			description: "Element label to scroll to (label)",
 		},
 	],
 	returnDoc: "Scroll to result",
 	errorCode: "E_MISSING_PARAM",
+	example: "page.scroll_to({ refId: \"e2\" })",
 });
 
 registerContentScriptJsCall({
@@ -457,19 +573,26 @@ registerContentScriptJsCall({
 		{
 			name: "refId",
 			type: "string",
-			required: true,
-			description: "Element reference ID",
+			required: false,
+			description: "Element reference ID (refId)",
+		},
+		{
+			name: "label",
+			type: "string",
+			required: false,
+			description: "Element label (label)",
 		},
 	],
 	returnDoc: "Double-click result",
 	errorCode: "E_MISSING_PARAM",
+	example: "page.dblclick({ refId: \"e2\" })",
 });
 
 registerJsCall({
 	action: "page_find",
 	namespace: "page",
 	name: "find",
-	description: "Find elements in the active tab",
+	description: "Find elements in the active tab using a CSS selector",
 	params: schemas.PageFindParamsSchema,
 	returns: z.array(
 		z.object({
@@ -478,6 +601,8 @@ registerJsCall({
 			text: z.string(),
 		}),
 	),
+	aliases: [{ namespace: "page", name: "query" }],
+	fields: ["selector"],
 	owner: "main-thread",
 	handler: async (params, _ctx) => {
 		const activeTab = await resolveActiveTabId();
@@ -504,11 +629,12 @@ registerJsCall({
 			name: "selector",
 			type: "string",
 			required: true,
-			description: "CSS selector to find elements",
+			description: "CSS selector to find elements (selector)",
 		},
 	],
 	returnDoc: "Array of elements",
 	errorCode: "E_NO_TAB",
+	example: "page.find(\"h1\")",
 });
 
 registerJsCall({
@@ -518,7 +644,7 @@ registerJsCall({
 	description: "Wait for a selector in the active tab",
 	params: schemas.PageWaitForParamsSchema,
 	returns: z.boolean(),
-	fields: ["refId", "timeout"],
+	fields: ["selector", "timeout"],
 	owner: "main-thread",
 	handler: async (params, _ctx) => {
 		const activeTab = await resolveActiveTabId();
@@ -554,18 +680,19 @@ registerJsCall({
 			name: "selector",
 			type: "string",
 			required: true,
-			description: "CSS selector to wait for",
+			description: "CSS selector to wait for (selector)",
 		},
 		{
 			name: "timeout",
 			type: "number",
 			required: false,
-			description: "Timeout in milliseconds",
+			description: "Timeout in milliseconds (literal)",
 		},
 	],
 	returnDoc: "true",
 	errorCode: "E_TIMEOUT",
 	errorCategory: "timeout",
+	example: "page.wait_for(\"#submit\", 5000)",
 });
 
 registerJsCall({
@@ -575,6 +702,7 @@ registerJsCall({
 	description: "Extract data from the active tab",
 	params: schemas.PageExtractParamsSchema,
 	returns: z.record(z.unknown()),
+	fields: ["fields"],
 	owner: "main-thread",
 	handler: async (params, _ctx) => {
 		const activeTab = await resolveActiveTabId();
@@ -623,11 +751,12 @@ registerJsCall({
 			type: "array",
 			required: true,
 			description:
-				"Array of fields to extract (title, url, headings, links, text)",
+				"Array of fields to extract (title, url, headings, links, text) (literal)",
 		},
 	],
 	returnDoc: "Extracted data",
 	errorCode: "E_NO_TAB",
+	example: "page.extract([\"title\", \"url\"])",
 });
 
 registerJsCall({
@@ -650,11 +779,102 @@ registerJsCall({
 			name: "tabId",
 			type: "number",
 			required: false,
-			description: "Tab ID to close",
+			description: "Tab ID to close (literal)",
 		},
 	],
 	returnDoc: "null",
 	errorCode: "E_MISSING_PARAM",
+	example: "page.close(123)",
+});
+
+registerJsCall({
+	action: "page_tabs",
+	namespace: "page",
+	name: "tabs",
+	description: "Query tabs",
+	params: schemas.TabQueryParamsSchema,
+	returns: schemas.ChromeTabArraySchema,
+	owner: "main-thread",
+	handler: async (params, _ctx) => {
+		return unwrapResult(await dispatchTool("chrome_tabs_query", [params]));
+	},
+	paramTypes: [
+		{
+			name: "params",
+			type: "object",
+			required: false,
+			description: "Tab query filter (e.g. { active: true, currentWindow: true }) (literal)",
+		},
+	],
+	returnDoc: "Tab array",
+	errorCode: "ECHROME",
+	errorCategory: "extension",
+	example: "page.tabs({ active: true })",
+});
+
+registerJsCall({
+	action: "page_switch",
+	namespace: "page",
+	name: "switch",
+	description: "Switch to a tab",
+	params: schemas.TabActivateParamsSchema,
+	returns: schemas.ChromeTabSchema,
+	owner: "main-thread",
+	handler: async (params, _ctx) => {
+		const tabId =
+			typeof params === "number"
+				? params
+				: extractTabId(params);
+		if (tabId === null) {
+			throw makeError("page_switch requires a tabId", "E_MISSING_PARAM");
+		}
+		return unwrapResult(
+			await dispatchTool("chrome_tabs_update", [tabId, { active: true }]),
+		);
+	},
+	paramTypes: [
+		{
+			name: "tabId",
+			type: "number",
+			required: true,
+			description: "Tab ID to activate (can also be passed as a plain number or as { tabId: number }) (literal)",
+		},
+	],
+	returnDoc: "Updated tab",
+	errorCode: "E_MISSING_PARAM",
+	example: "page.switch(123)",
+});
+
+registerJsCall({
+	action: "page_new_tab",
+	namespace: "page",
+	name: "new_tab",
+	description: "Open a new tab",
+	params: schemas.TabCreateParamsSchema,
+	returns: schemas.ChromeTabSchema,
+	fields: ["url"],
+	owner: "main-thread",
+	handler: async (params, _ctx) => {
+		return unwrapResult(await dispatchTool("chrome_tabs_create", [params]));
+	},
+	paramTypes: [
+		{
+			name: "url",
+			type: "string",
+			required: false,
+			description: "URL to open in new tab (url)",
+		},
+		{
+			name: "active",
+			type: "boolean",
+			required: false,
+			description: "Whether to focus the new tab (literal)",
+		},
+	],
+	returnDoc: "Created tab",
+	errorCode: "ECHROME",
+	errorCategory: "extension",
+	example: "page.new_tab(\"https://example.com\")",
 });
 
 registerJsCall({
@@ -675,6 +895,7 @@ registerJsCall({
 	paramTypes: [],
 	returnDoc: "Tab query result",
 	errorCode: "E_NO_TAB",
+	example: "page.active_tab()",
 });
 
 registerJsCall({
@@ -717,15 +938,16 @@ registerJsCall({
 			name: "url",
 			type: "string",
 			required: false,
-			description: "URL to fetch",
+			description: "URL to fetch (url)",
 		},
 		{
 			name: "options",
 			type: "object",
 			required: false,
-			description: "Fetch options",
+			description: "Fetch options (literal)",
 		},
 	],
-	returnDoc: "Response object",
+	returnDoc: "DTO with `{ body, headers, ok, status }` — not a native Response object",
 	errorCode: "E_NO_TAB",
+	example: "page.fetch(\"https://api.example.com/data\")",
 });

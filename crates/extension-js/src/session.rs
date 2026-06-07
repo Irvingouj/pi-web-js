@@ -57,11 +57,11 @@ impl ExtensionSession {
     pub fn inject_registry_bindings(&mut self) {
         let js_code = web_js_core::api_docs::generate_js_bindings_code();
         if !js_code.is_empty() {
-            let _ = self.base.inner.run_cell(&js_code, "");
+            let _ = self.base.inner.run_cell_unwrapped(&js_code, "");
         }
         let sync_js_code = web_js_core::api_docs::generate_js_sync_bindings_code();
         if !sync_js_code.is_empty() {
-            let _ = self.base.inner.run_cell(&sync_js_code, "");
+            let _ = self.base.inner.run_cell_unwrapped(&sync_js_code, "");
         }
     }
 
@@ -78,6 +78,13 @@ impl ExtensionSession {
     /// Inspect all global variables in the current JS state.
     pub fn inspect_globals(&mut self) -> WasmGlobalsSnapshot {
         self.base.inspect_globals()
+    }
+
+    /// Generate API documentation for every registered public API.
+    #[wasm_bindgen(js_name = apiDocs)]
+    pub fn api_docs(&self, format: String) -> Result<String, JsValue> {
+        web_js_core::api_docs::generate(&format)
+            .map_err(|e| JsValue::from_str(&e))
     }
 
     /// Clean up the session and release resources.
@@ -275,6 +282,8 @@ mod tests {
             tool_source: web_js_core::api_docs::ToolSource::Extension,
             fields: None,
             aliases: vec![],
+            permission: None,
+            example: None,
         };
         let _ = web_js_core::api_docs::register_manifest_entry(entry);
         // Register a handler so the binding is generated
@@ -308,6 +317,8 @@ mod tests {
             tool_source: web_js_core::api_docs::ToolSource::Extension,
             fields: None,
             aliases: vec![],
+            permission: None,
+            example: None,
         };
         let _ = web_js_core::api_docs::register_manifest_entry(entry2);
         // Register a handler so the binding is generated
@@ -446,6 +457,8 @@ mod tests {
             tool_source: web_js_core::api_docs::ToolSource::Extension,
             fields: None,
             aliases: vec![],
+            permission: None,
+            example: None,
         });
 
         // Test 1: fs_exists routes to handler_registry and succeeds
@@ -526,6 +539,8 @@ mod tests {
             tool_source: web_js_core::api_docs::ToolSource::Extension,
             fields: None,
             aliases: vec![],
+            permission: None,
+            example: None,
         });
 
         let entries = web_js_core::api_docs::list_manifest_entries();
@@ -594,9 +609,11 @@ mod tests {
                 local_name: None,
                 transport: web_js_core::api_docs::ToolTransport::Async,
                 tool_source: web_js_core::api_docs::ToolSource::Extension,
-                fields: None,
-                aliases: vec![],
-            });
+            fields: None,
+            aliases: vec![],
+            permission: None,
+            example: None,
+        });
         }
 
         // Verify each action is in the manifest
@@ -773,6 +790,8 @@ mod tests {
                 name: "fetch".into(),
                 fields: Some(vec!["url".into()]),
             }],
+            permission: None,
+            example: None,
         };
         let _ = web_js_core::api_docs::register_manifest_entry(entry);
         let _ = web_js_core::api_docs::register_handler(
@@ -827,6 +846,8 @@ mod tests {
             tool_source: web_js_core::api_docs::ToolSource::Extension,
             fields: Some(vec!["key".into()]),
             aliases: vec![],
+            permission: None,
+            example: None,
         };
         let _ = web_js_core::api_docs::register_manifest_entry(entry);
         let _ = web_js_core::api_docs::register_handler(
@@ -870,8 +891,10 @@ mod tests {
         );
 
         // Simulate the JS side freezing the manifest after init
-        web_js_core::api_docs::freeze_manifest();
-        assert!(web_js_core::api_docs::is_manifest_frozen(), "Manifest should be frozen before reset");
+        assert!(
+            web_js_core::api_docs::freeze_manifest().is_ok(),
+            "freeze_manifest should succeed after init (sync APIs are not orphans)"
+        );
 
         // Reset the session
         session.reset();

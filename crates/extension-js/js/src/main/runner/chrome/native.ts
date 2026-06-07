@@ -2,7 +2,11 @@ import { makeError } from "../lib/types.js";
 
 export type NativeArgs = readonly unknown[];
 
-/** Chrome parity aliases that forward opaque argument arrays to chrome_* targets. */
+/**
+ * Chrome parity aliases that forward opaque argument arrays to chrome_* targets.
+ * Ergonomic reshaping for web.* sugar (string URL, notification wrapper objects)
+ * lives in aliases.ts normalizeAliasArgs — not in parity transport.
+ */
 const NATIVE_PARITY_ALIASES = new Set([
 	"bookmarks_search",
 	"bookmarks_create",
@@ -68,12 +72,13 @@ export function resolveChromeMethod(
 	methodName: string,
 ): (...args: unknown[]) => unknown {
 	let api: unknown = chromeRoot;
-	for (const part of apiPath) {
+	for (let i = 0; i < apiPath.length; i++) {
+		const part = apiPath[i];
 		api = (api as Record<string, unknown>)[part];
 		if (api == null) {
 			throw makeError(
-				`Chrome API path not found: ${apiPath.join(".")}`,
-				"E_EXTENSION",
+				`Chrome API not available: chrome.${apiPath.slice(0, i + 1).join(".")}`,
+				"E_UNAVAILABLE",
 				"extension",
 			);
 		}

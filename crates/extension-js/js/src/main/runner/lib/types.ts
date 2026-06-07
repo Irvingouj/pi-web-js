@@ -47,7 +47,8 @@ export type TabMessage =
 	| { action: "scroll"; params: { direction: string; amount: number } }
 	| { action: "scrollTo"; params: { x: number; y: number; refId?: string } }
 	| { action: "dblclick"; params: { refId: string } }
-	| { action: "back"; params: Record<string, never> };
+	| { action: "back"; params: Record<string, never> }
+	| { action: "ping"; params?: Record<string, never> };
 
 type CodedError = Error & { code: string; category?: string };
 

@@ -35,8 +35,41 @@ import {
 	DEFAULT_SCROLL_AMOUNT,
 	DEFAULT_POLL_INTERVAL_MS,
 } from "../runtime.js";
+import {
+	checkPermission,
+	permissionFromChromeAction,
+} from "./chrome/capability.js";
 
 // ─── Alias actions ───────────────────────────────────────────────
+
+function normalizeAliasArgs(action: string, args: readonly unknown[]): unknown[] {
+	if (args.length === 1 && typeof args[0] === "string") {
+		switch (action) {
+			case "history_delete":
+				return [{ url: args[0] }];
+			case "bookmarks_search":
+				return [{ query: args[0] }];
+			case "bookmarks_delete":
+			case "notifications_clear":
+				return [args[0]];
+			default:
+				break;
+		}
+	}
+	if (
+		action === "notifications_create" &&
+		args.length === 1 &&
+		args[0] !== null &&
+		typeof args[0] === "object" &&
+		!Array.isArray(args[0])
+	) {
+		const obj = args[0] as Record<string, unknown>;
+		if ("options" in obj) {
+			return [obj.id ?? "", obj.options];
+		}
+	}
+	return [...args];
+}
 
 function registerAlias(
 	action: string,
@@ -44,11 +77,13 @@ function registerAlias(
 	description: string,
 	returnsSchema: z.ZodSchema<unknown>,
 	paramTypes: ToolDocParam[] = [],
+	example?: string,
 ): void {
 	const parts = action.split("_");
 	const name = parts[parts.length - 1];
 	const category = parts.length > 1 ? parts[0] : "";
 	const namespace = category ? `web.${category}` : "web";
+	const manifestPermission = permissionFromChromeAction(target);
 	registerJsCall({
 		action,
 		namespace,
@@ -57,9 +92,14 @@ function registerAlias(
 		params: z.unknown(),
 		returns: returnsSchema,
 		owner: "main-thread",
+		permission: manifestPermission ?? undefined,
 		handler: async (params, _ctx) => {
 			const log = logger.child("alias");
-			const args = requireArgumentArray(params, action);
+			checkPermission(action, manifestPermission);
+			const args = normalizeAliasArgs(
+				action,
+				requireArgumentArray(params, action),
+			);
 			log.debug("alias_dispatch", { action, target, argCount: args.length });
 			return unwrapResult(await dispatchTool(target, args));
 		},
@@ -67,6 +107,7 @@ function registerAlias(
 		returnDoc: "Alias result",
 		errorCode: "ECHROME",
 		errorCategory: "extension",
+		example,
 	});
 }
 
@@ -76,14 +117,15 @@ registerAlias(
 	"Get a cookie",
 	schemas.ChromeCookieSchema,
 	[
-		{ name: "url", type: "string", required: false, description: "Cookie URL" },
+		{ name: "url", type: "string", required: false, description: "Cookie URL (url)" },
 		{
 			name: "name",
 			type: "string",
 			required: false,
-			description: "Cookie name",
+			description: "Cookie name (literal)",
 		},
 	],
+	"web.cookies.get({ url: \"https://example.com\", name: \"session\" })",
 );
 registerAlias(
 	"cookies_set",
@@ -91,20 +133,21 @@ registerAlias(
 	"Set a cookie",
 	schemas.ChromeCookieSchema,
 	[
-		{ name: "url", type: "string", required: false, description: "Cookie URL" },
+		{ name: "url", type: "string", required: false, description: "Cookie URL (url)" },
 		{
 			name: "name",
 			type: "string",
 			required: false,
-			description: "Cookie name",
+			description: "Cookie name (literal)",
 		},
 		{
 			name: "value",
 			type: "string",
 			required: false,
-			description: "Cookie value",
+			description: "Cookie value (literal)",
 		},
 	],
+	"web.cookies.set({ url: \"https://example.com\", name: \"session\", value: \"abc\" })",
 );
 registerAlias(
 	"cookies_delete",
@@ -112,21 +155,23 @@ registerAlias(
 	"Remove a cookie",
 	z.record(z.unknown()),
 	[
-		{ name: "url", type: "string", required: false, description: "Cookie URL" },
+		{ name: "url", type: "string", required: false, description: "Cookie URL (url)" },
 		{
 			name: "name",
 			type: "string",
 			required: false,
-			description: "Cookie name",
+			description: "Cookie name (literal)",
 		},
 	],
+	"web.cookies.delete({ url: \"https://example.com\", name: \"session\" })",
 );
 registerAlias(
 	"cookies_list",
 	"chrome_cookies_getAll",
 	"Get all cookies",
 	schemas.ChromeCookieArraySchema,
-	[{ name: "url", type: "string", required: false, description: "Cookie URL" }],
+	[{ name: "url", type: "string", required: false, description: "Cookie URL (url)" }],
+	"web.cookies.list({ url: \"https://example.com\" })",
 );
 registerAlias(
 	"history_search",
@@ -138,15 +183,16 @@ registerAlias(
 			name: "text",
 			type: "string",
 			required: false,
-			description: "Search text",
+			description: "Search text (literal)",
 		},
 		{
 			name: "maxResults",
 			type: "number",
 			required: false,
-			description: "Maximum results",
+			description: "Maximum results (literal)",
 		},
 	],
+	"web.history.search({ text: \"example\", maxResults: 10 })",
 );
 registerAlias(
 	"history_delete",
@@ -158,9 +204,10 @@ registerAlias(
 			name: "url",
 			type: "string",
 			required: false,
-			description: "URL to delete from history",
+			description: "URL to delete from history (url)",
 		},
 	],
+	"web.history.delete(\"https://example.com\")",
 );
 registerAlias(
 	"bookmarks_search",
@@ -172,9 +219,10 @@ registerAlias(
 			name: "query",
 			type: "string",
 			required: false,
-			description: "Search query",
+			description: "Search query (literal)",
 		},
 	],
+	"web.bookmarks.search(\"example\")",
 );
 registerAlias(
 	"bookmarks_create",
@@ -186,21 +234,22 @@ registerAlias(
 			name: "parentId",
 			type: "string",
 			required: false,
-			description: "Parent folder ID",
+			description: "Parent folder ID (literal)",
 		},
 		{
 			name: "title",
 			type: "string",
 			required: false,
-			description: "Bookmark title",
+			description: "Bookmark title (literal)",
 		},
 		{
 			name: "url",
 			type: "string",
 			required: false,
-			description: "Bookmark URL",
+			description: "Bookmark URL (url)",
 		},
 	],
+	"web.bookmarks.create({ title: \"Example\", url: \"https://example.com\" })",
 );
 registerAlias(
 	"bookmarks_delete",
@@ -212,9 +261,10 @@ registerAlias(
 			name: "id",
 			type: "string",
 			required: false,
-			description: "Bookmark ID to remove",
+			description: "Bookmark ID to remove (literal)",
 		},
 	],
+	"web.bookmarks.delete(\"bookmarkId\")",
 );
 registerAlias(
 	"notifications_create",
@@ -226,15 +276,16 @@ registerAlias(
 			name: "id",
 			type: "string",
 			required: false,
-			description: "Notification ID",
+			description: "Notification ID (literal)",
 		},
 		{
 			name: "options",
 			type: "object",
 			required: false,
-			description: "Notification options",
+			description: "Notification options (literal)",
 		},
 	],
+	"web.notifications.create({ id: \"test\", options: { type: \"basic\", title: \"Hello\", message: \"World\" } })",
 );
 registerAlias(
 	"notifications_clear",
@@ -246,7 +297,8 @@ registerAlias(
 			name: "id",
 			type: "string",
 			required: false,
-			description: "Notification ID to clear",
+			description: "Notification ID to clear (literal)",
 		},
 	],
+	"web.notifications.clear(\"test\")",
 );

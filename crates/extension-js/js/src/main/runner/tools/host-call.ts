@@ -57,16 +57,18 @@ registerJsCall({
 			name: "action",
 			type: "string",
 			required: true,
-			description: "Host action name",
+			description: "Host action name (literal)",
 		},
 		{
 			name: "params",
 			type: "object",
 			required: false,
-			description: "Parameters for the host action",
+			description: "Parameters for the host action (literal)",
 		},
 	],
 	returnDoc: "Handler result",
 	errorCode: "ENOHANDLER",
 	errorCategory: "host",
+
+	example: "host.call([\"title\", \"url\"])",
 });

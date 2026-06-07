@@ -81,6 +81,18 @@ fn is_selector(s: &str) -> bool {
 /// Resolve a ref_id or CSS selector to an actual ref_id.
 /// If `selector` is explicitly provided, use it. Otherwise, if `ref_id` looks like
 /// a CSS selector, treat it as one and resolve it via page.find.
+fn optional_str<'a>(value: &'a Option<String>) -> &'a str {
+    value.as_deref().unwrap_or("")
+}
+
+fn resolved_label(ref_id: &str, label: &Option<String>) -> String {
+    label
+        .as_ref()
+        .filter(|l| !l.is_empty())
+        .cloned()
+        .unwrap_or_else(|| ref_id.to_string())
+}
+
 async fn resolve_ref_id_or_selector(
     _document: &web_sys::Document,
     ref_id: &str,
@@ -834,15 +846,11 @@ pub async fn execute_page_click(params: PageClickParams) -> WasmAsyncResponse {
             }
         }
     };
-    let ref_id = match resolve_ref_id_or_selector(&document, &params.ref_id, &params.selector).await {
+    let ref_id = match resolve_ref_id_or_selector(&document, optional_str(&params.ref_id), &params.selector).await {
         Ok(rid) => rid,
         Err(resp) => return resp,
     };
-    let label = if params.label.is_empty() && !ref_id.is_empty() {
-        ref_id.clone()
-    } else {
-        params.label.clone()
-    };
+    let label = resolved_label(&ref_id, &params.label);
     let element = match document.query_selector(&format!("[data-ref-id='{}']", ref_id)) {
         Ok(el) => el,
         Err(e) => {
@@ -904,15 +912,11 @@ pub async fn execute_page_fill(params: PageFillParams) -> WasmAsyncResponse {
             }
         }
     };
-    let ref_id = match resolve_ref_id_or_selector(&document, &params.ref_id, &params.selector).await {
+    let ref_id = match resolve_ref_id_or_selector(&document, optional_str(&params.ref_id), &params.selector).await {
         Ok(rid) => rid,
         Err(resp) => return resp,
     };
-    let label = if params.label.is_empty() && !ref_id.is_empty() {
-        ref_id.clone()
-    } else {
-        params.label.clone()
-    };
+    let label = resolved_label(&ref_id, &params.label);
     let element = match document.query_selector(&format!("[data-ref-id='{}']", ref_id)) {
         Ok(el) => el,
         Err(e) => {
@@ -986,15 +990,11 @@ pub async fn execute_page_append(params: PageAppendParams) -> WasmAsyncResponse 
             }
         }
     };
-    let ref_id = match resolve_ref_id_or_selector(&document, &params.ref_id, &params.selector).await {
+    let ref_id = match resolve_ref_id_or_selector(&document, optional_str(&params.ref_id), &params.selector).await {
         Ok(rid) => rid,
         Err(resp) => return resp,
     };
-    let label = if params.label.is_empty() && !ref_id.is_empty() {
-        ref_id.clone()
-    } else {
-        params.label.clone()
-    };
+    let label = resolved_label(&ref_id, &params.label);
     let element = match document.query_selector(&format!("[data-ref-id='{}']", ref_id)) {
         Ok(el) => el,
         Err(e) => {
@@ -1069,7 +1069,7 @@ pub async fn execute_page_hover(params: PageHoverParams) -> WasmAsyncResponse {
             }
         }
     };
-    let ref_id = match resolve_ref_id_or_selector(&document, &params.ref_id, &params.selector).await {
+    let ref_id = match resolve_ref_id_or_selector(&document, optional_str(&params.ref_id), &params.selector).await {
         Ok(rid) => rid,
         Err(resp) => return resp,
     };
@@ -1183,6 +1183,25 @@ pub async fn execute_page_scroll(params: PageScrollParams) -> WasmAsyncResponse 
 }
 
 pub async fn execute_page_scroll_to(params: PageScrollToParams) -> WasmAsyncResponse {
+    if params.x.is_some() || params.y.is_some() {
+        if let Some(window) = web_sys::window() {
+            window.scroll_to_with_x_and_y(params.x.unwrap_or(0.0), params.y.unwrap_or(0.0));
+            return WasmAsyncResponse {
+                ok: true,
+                value: Some(serde_json::Value::Bool(true)),
+                error: None,
+            };
+        }
+        return WasmAsyncResponse {
+            ok: false,
+            value: None,
+            error: Some(WasmAsyncError {
+                message: "No window available".into(),
+                code: "E_AGENT".into(),
+            }),
+        };
+    }
+
     let document = match web_sys::window().and_then(|w| w.document()) {
         Some(d) => d,
         None => {
@@ -1196,10 +1215,11 @@ pub async fn execute_page_scroll_to(params: PageScrollToParams) -> WasmAsyncResp
             }
         }
     };
-    let ref_id = match resolve_ref_id_or_selector(&document, &params.ref_id, &params.selector).await {
+    let ref_id = match resolve_ref_id_or_selector(&document, optional_str(&params.ref_id), &params.selector).await {
         Ok(rid) => rid,
         Err(resp) => return resp,
     };
+    let label = resolved_label(&ref_id, &params.label);
     let element = match document.query_selector(&format!("[data-ref-id='{}']", ref_id)) {
         Ok(el) => el,
         Err(e) => {
@@ -1213,6 +1233,7 @@ pub async fn execute_page_scroll_to(params: PageScrollToParams) -> WasmAsyncResp
             }
         }
     };
+    let element = element.or_else(|| find_element_by_label(&document, &label));
     let element = match element {
         Some(el) => el,
         None => {
@@ -1248,7 +1269,7 @@ pub async fn execute_page_dblclick(params: PageDblClickParams) -> WasmAsyncRespo
             }
         }
     };
-    let ref_id = match resolve_ref_id_or_selector(&document, &params.ref_id, &params.selector).await {
+    let ref_id = match resolve_ref_id_or_selector(&document, optional_str(&params.ref_id), &params.selector).await {
         Ok(rid) => rid,
         Err(resp) => return resp,
     };
@@ -1316,7 +1337,7 @@ pub async fn execute_page_type(params: PageTypeParams) -> WasmAsyncResponse {
             }
         }
     };
-    let ref_id = match resolve_ref_id_or_selector(&document, &params.ref_id, &params.selector).await {
+    let ref_id = match resolve_ref_id_or_selector(&document, optional_str(&params.ref_id), &params.selector).await {
         Ok(rid) => rid,
         Err(resp) => return resp,
     };
@@ -1420,7 +1441,7 @@ pub async fn execute_page_select(params: PageSelectParams) -> WasmAsyncResponse 
             }
         }
     };
-    let ref_id = match resolve_ref_id_or_selector(&document, &params.ref_id, &params.selector).await {
+    let ref_id = match resolve_ref_id_or_selector(&document, optional_str(&params.ref_id), &params.selector).await {
         Ok(rid) => rid,
         Err(resp) => return resp,
     };
@@ -1483,7 +1504,7 @@ pub async fn execute_page_check(params: PageCheckParams) -> WasmAsyncResponse {
             }
         }
     };
-    let ref_id = match resolve_ref_id_or_selector(&document, &params.ref_id, &params.selector).await {
+    let ref_id = match resolve_ref_id_or_selector(&document, optional_str(&params.ref_id), &params.selector).await {
         Ok(rid) => rid,
         Err(resp) => return resp,
     };

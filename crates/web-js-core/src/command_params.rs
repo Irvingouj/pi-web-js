@@ -79,9 +79,9 @@ pub struct SleepParams {
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 pub struct PageClickParams {
     #[serde(rename = "refId", default)]
-    pub ref_id: String,
+    pub ref_id: Option<String>,
     #[serde(default)]
-    pub label: String,
+    pub label: Option<String>,
     #[serde(default)]
     pub selector: Option<String>,
 }
@@ -89,9 +89,9 @@ pub struct PageClickParams {
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 pub struct PageDblClickParams {
     #[serde(rename = "refId", default)]
-    pub ref_id: String,
+    pub ref_id: Option<String>,
     #[serde(default)]
-    pub label: String,
+    pub label: Option<String>,
     #[serde(default)]
     pub selector: Option<String>,
 }
@@ -99,9 +99,9 @@ pub struct PageDblClickParams {
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 pub struct PageFillParams {
     #[serde(rename = "refId", default)]
-    pub ref_id: String,
+    pub ref_id: Option<String>,
     #[serde(default)]
-    pub label: String,
+    pub label: Option<String>,
     pub value: String,
     #[serde(default)]
     pub selector: Option<String>,
@@ -110,9 +110,9 @@ pub struct PageFillParams {
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 pub struct PageTypeParams {
     #[serde(rename = "refId", default)]
-    pub ref_id: String,
+    pub ref_id: Option<String>,
     #[serde(default)]
-    pub label: String,
+    pub label: Option<String>,
     pub text: String,
     #[serde(default)]
     pub selector: Option<String>,
@@ -126,7 +126,9 @@ pub struct PagePressParams {
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 pub struct PageSelectParams {
     #[serde(rename = "refId", default)]
-    pub ref_id: String,
+    pub ref_id: Option<String>,
+    #[serde(default)]
+    pub label: Option<String>,
     pub value: String,
     #[serde(default)]
     pub selector: Option<String>,
@@ -135,7 +137,9 @@ pub struct PageSelectParams {
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 pub struct PageCheckParams {
     #[serde(rename = "refId", default)]
-    pub ref_id: String,
+    pub ref_id: Option<String>,
+    #[serde(default)]
+    pub label: Option<String>,
     #[serde(default = "default_true")]
     pub checked: bool,
     #[serde(default)]
@@ -145,7 +149,9 @@ pub struct PageCheckParams {
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 pub struct PageHoverParams {
     #[serde(rename = "refId", default)]
-    pub ref_id: String,
+    pub ref_id: Option<String>,
+    #[serde(default)]
+    pub label: Option<String>,
     #[serde(default)]
     pub selector: Option<String>,
 }
@@ -161,7 +167,13 @@ pub struct PageScrollParams {
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 pub struct PageScrollToParams {
     #[serde(rename = "refId", default)]
-    pub ref_id: String,
+    pub ref_id: Option<String>,
+    #[serde(default)]
+    pub label: Option<String>,
+    #[serde(default)]
+    pub x: Option<f64>,
+    #[serde(default)]
+    pub y: Option<f64>,
     #[serde(default)]
     pub selector: Option<String>,
 }
@@ -191,9 +203,9 @@ pub struct PageExtractParams {
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 pub struct PageAppendParams {
     #[serde(rename = "refId", default)]
-    pub ref_id: String,
+    pub ref_id: Option<String>,
     #[serde(default)]
-    pub label: String,
+    pub label: Option<String>,
     pub text: String,
     #[serde(default)]
     pub selector: Option<String>,
@@ -311,11 +323,13 @@ pub struct TabScrollToParams {
     #[serde(rename = "tabId")]
     pub tab_id: u64,
     #[serde(default)]
-    pub x: f64,
+    pub x: Option<f64>,
     #[serde(default)]
-    pub y: f64,
-    #[serde(rename = "refId")]
+    pub y: Option<f64>,
+    #[serde(rename = "refId", default)]
     pub ref_id: Option<String>,
+    #[serde(default)]
+    pub label: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -516,7 +530,7 @@ mod tests {
     #[test]
     fn test_extension_async_command_params_typed() {
         let content = fs::read_to_string(
-            concat!(env!("CARGO_MANIFEST_DIR"), "/../../crates/extension-js/js/generated.ts")
+            concat!(env!("CARGO_MANIFEST_DIR"), "/../../crates/extension-js/js/src/shared/generated.ts")
         ).expect("extension generated.ts should exist");
         assert!(
             content.contains("params: CommandParams"),
@@ -527,7 +541,7 @@ mod tests {
     #[test]
     fn test_extension_run_result_commands_typed() {
         let content = fs::read_to_string(
-            concat!(env!("CARGO_MANIFEST_DIR"), "/../../crates/extension-js/js/generated.ts")
+            concat!(env!("CARGO_MANIFEST_DIR"), "/../../crates/extension-js/js/src/shared/generated.ts")
         ).expect("extension generated.ts should exist");
         assert!(
             content.contains("commands: CommandParams[]"),
@@ -538,7 +552,7 @@ mod tests {
     #[test]
     fn test_extension_generated_ts_has_command_params_union() {
         let content = fs::read_to_string(
-            concat!(env!("CARGO_MANIFEST_DIR"), "/../../crates/extension-js/js/generated.ts")
+            concat!(env!("CARGO_MANIFEST_DIR"), "/../../crates/extension-js/js/src/shared/generated.ts")
         ).expect("extension generated.ts should exist");
         assert!(
             content.contains("export type CommandParams ="),

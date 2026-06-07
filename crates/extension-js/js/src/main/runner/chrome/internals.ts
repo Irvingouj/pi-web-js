@@ -14,6 +14,10 @@ import {
 	requireArgumentArray,
 	resolveChromeMethod,
 } from "./native.js";
+import {
+	checkPermission,
+	manifestPermissionForApiPath,
+} from "../tools/chrome/capability.js";
 
 export {
 	invokeNative,
@@ -31,7 +35,7 @@ export function normalizeChromeError(err: unknown): { ok: false; error: AsyncErr
 			ok: false,
 			error: {
 				message: msg,
-				code: "E_PERMISSION_DENIED",
+				code: "E_PERMISSION",
 				category: "permission",
 			},
 		};
@@ -85,10 +89,12 @@ export function registerChromePassthrough(
 	errorCode: string,
 	errorCategory: string | undefined,
 	paramTypes: ToolDocParam[] = [],
+	example?: string,
 ): void {
 	const name = chromeMethodName(action);
 	const namespace =
 		apiPath.length > 0 ? `chrome.${apiPath.join(".")}` : _namespace;
+	const manifestPermission = manifestPermissionForApiPath(apiPath);
 	registerJsCall({
 		action,
 		namespace,
@@ -97,6 +103,7 @@ export function registerChromePassthrough(
 		params: z.unknown(),
 		returns: returnsSchema,
 		owner: "main-thread",
+		permission: manifestPermission ?? undefined,
 		handler: async (params: unknown, _ctx: CallContext) => {
 			const log = logger.child("chrome");
 			const chrome = window.chrome;
@@ -107,6 +114,7 @@ export function registerChromePassthrough(
 					"permission",
 				);
 			}
+			checkPermission(action, manifestPermission);
 			const args = normalizeParityArgs(
 				action,
 				requireArgumentArray(params, action),
@@ -144,6 +152,7 @@ export function registerChromePassthrough(
 		returnDoc: "Chrome API result",
 		errorCode,
 		errorCategory,
+		example,
 	});
 }
 

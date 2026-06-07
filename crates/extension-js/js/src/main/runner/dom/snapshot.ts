@@ -173,7 +173,7 @@ export function buildSnapshotInTab(maxNodesArg: unknown) {
 		if (style.display === "none" || style.visibility === "hidden") return false;
 		return true;
 	}
-	type DomNode = { refId: number; role: string; tag: string; name?: string };
+	type DomNode = { refId: string; role: string; tag: string; name?: string };
 	const nodes: DomNode[] = [];
 	const lines: string[] = [];
 	let nextRefId = 1;
@@ -190,8 +190,9 @@ export function buildSnapshotInTab(maxNodesArg: unknown) {
 		const included = shouldInclude(el);
 		let currentDepth = depth;
 		if (included) {
-			const refId = nextRefId++;
-			el.setAttribute("data-ref-id", String(refId));
+			// Opaque element reference ID. Format 'e{N}' aligns with dom-semantic-tree and schema regex ^e\d+$.
+			const refId = "e" + nextRefId++;
+			el.setAttribute("data-ref-id", refId);
 			const role = getAccessibleRole(el);
 			const name = getAccessibleName(el);
 			const node: DomNode = { refId, role, tag };
@@ -200,7 +201,7 @@ export function buildSnapshotInTab(maxNodesArg: unknown) {
 			const indent = "  ".repeat(depth);
 			const parts: string[] = [`${indent}- ${role}`];
 			if (name) parts.push(`"${name.replace(/"/g, '\\"')}"`);
-			parts.push(`[ref=${refId}]`);
+			parts.push(`[${refId}]`);
 			lines.push(parts.join(" "));
 			currentDepth = depth + 1;
 		}
