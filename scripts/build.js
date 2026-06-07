@@ -95,33 +95,6 @@ async function buildTarget(target) {
     run(`node ${bundleScript} ${target.outDir} ${target.cratePrefix}`, rootDir);
   }
 
-  // Generate API docs by loading the self-contained WASM module in Node.js
-  const jsFile = target.name === "web-js"
-    ? "web_js.js"
-    : target.name === "extension-js"
-      ? "extension_js.js"
-      : null;
-  if (jsFile) {
-    const jsPath = path.join(outDir, jsFile);
-    if (fs.existsSync(jsPath)) {
-      try {
-        const wasmModule = await import(jsPath);
-        if (typeof wasmModule.generateApiDocs === "function") {
-          const md = wasmModule.generateApiDocs("markdown");
-          const json = wasmModule.generateApiDocs("json");
-          const jsDir = path.resolve(target.outDir, "../js");
-          if (fs.existsSync(jsDir)) {
-            fs.writeFileSync(path.join(jsDir, "API.md"), md);
-            fs.writeFileSync(path.join(jsDir, "api.json"), json);
-            console.log(`  API.md + api.json generated`);
-          }
-        }
-      } catch (e) {
-        console.warn(`  Doc generation skipped: ${e.message}`);
-      }
-    }
-  }
-
   console.log(`✅ ${target.name} built`);
 }
 

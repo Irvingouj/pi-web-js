@@ -81,6 +81,7 @@ registerJsCall({
 	description: "Get the active tab in the current window",
 	params: z.object({}),
 	returns: schemas.ChromeTabSchema,
+	aliases: [{ namespace: "tab", name: "current" }],
 	owner: "main-thread",
 	handler: async (_params, _ctx) => {
 		const tabId = await resolveActiveTabId();
@@ -106,6 +107,7 @@ registerJsCall({
 	params: schemas.ChromeTabsGetParamsSchema,
 	returns: schemas.ChromeTabSchema,
 	fields: ["tabId"],
+	aliases: [{ namespace: "tab", name: "get", fields: ["tabId"] }],
 	owner: "main-thread",
 	handler: async (params, _ctx) => {
 		const tabId = extractTabId(asRecord(params));
@@ -131,6 +133,7 @@ registerJsCall({
 	description: "Find tabs matching a query",
 	params: schemas.TabQueryParamsSchema,
 	returns: schemas.ChromeTabArraySchema,
+	aliases: [{ namespace: "tab", name: "find" }],
 	owner: "main-thread",
 	handler: async (params, _ctx) => {
 		return unwrapResult(await dispatchTool("chrome_tabs_query", [params]));
@@ -155,6 +158,7 @@ registerJsCall({
 	description: "List all tabs",
 	params: z.object({}),
 	returns: schemas.ChromeTabArraySchema,
+	aliases: [{ namespace: "tab", name: "list" }],
 	owner: "main-thread",
 	handler: async (_params, _ctx) => {
 		return unwrapResult(await dispatchTool("chrome_tabs_query", [{}]));
@@ -172,6 +176,7 @@ registerJsCall({
 	description: "Create a tab",
 	params: schemas.TabCreateParamsSchema,
 	returns: schemas.ChromeTabSchema,
+	aliases: [{ namespace: "tab", name: "create" }],
 	owner: "main-thread",
 	handler: async (params, _ctx) => {
 		return unwrapResult(await dispatchTool("chrome_tabs_create", [params]));

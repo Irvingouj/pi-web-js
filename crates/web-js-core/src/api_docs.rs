@@ -50,6 +50,8 @@ pub struct JsApiDoc {
     /// Field names for positional arg normalization in makeAsync.
     /// e.g. `["duration"]` for `web.sleep(1000)` → `{duration: 1000}`
     pub fields: Option<Vec<String>>,
+    /// Alternate public names that route to the same action.
+    pub aliases: Vec<ApiAlias>,
 }
 
 impl Serialize for JsApiDoc {
@@ -57,7 +59,7 @@ impl Serialize for JsApiDoc {
     where
         S: serde::Serializer,
     {
-        let mut state = serializer.serialize_struct("JsApiDoc", 11)?;
+        let mut state = serializer.serialize_struct("JsApiDoc", 13)?;
         state.serialize_field("namespace", &self.namespace)?;
         state.serialize_field("name", &self.name)?;
         state.serialize_field("action", &self.action)?;
@@ -75,6 +77,7 @@ impl Serialize for JsApiDoc {
         state.serialize_field("transport", &self.transport)?;
         state.serialize_field("tool_source", &self.tool_source)?;
         state.serialize_field("fields", &self.fields)?;
+        state.serialize_field("aliases", &self.aliases)?;
         state.end()
     }
 }
@@ -150,7 +153,7 @@ impl From<JsApiDoc> for ApiManifestEntry {
             transport: doc.transport,
             tool_source: doc.tool_source,
             fields: doc.fields,
-            aliases: vec![],
+            aliases: doc.aliases,
         }
     }
 }
@@ -169,6 +172,7 @@ impl From<ApiManifestEntry> for JsApiDoc {
             transport: entry.transport,
             tool_source: entry.tool_source,
             fields: entry.fields,
+            aliases: entry.aliases,
         }
     }
 }
@@ -795,17 +799,33 @@ pub fn generate_markdown() -> String {
                 "**Returns** `{}`: {}\n\n",
                 api.returns.js_type, api.returns.description
             ));
+            if !api.aliases.is_empty() {
+                md.push_str("**Aliases**\n\n");
+                for alias in &api.aliases {
+                    let alias_name = format!("{}.{}", alias.namespace, alias.name);
+                    md.push_str(&format!("- `{}`", alias_name));
+                    if let Some(fields) = &alias.fields {
+                        if !fields.is_empty() {
+                            md.push_str(&format!(" (fields: {:?})", fields));
+                        }
+                    }
+                    md.push('\n');
+                }
+                md.push('\n');
+            }
         }
     }
 
     md
 }
 
+/// Serialize the live in-memory registry. Only callable from a running session (`runtime.apiDocs`).
 pub fn generate(format: &str) -> Result<String, String> {
+    let format = format.trim();
     match format {
-        "json" => generate_json(),
+        "" | "json" => generate_json(),
         "markdown" | "md" => Ok(generate_markdown()),
-        _ => Ok(generate_markdown()),
+        other => Err(format!("Unsupported API docs format: {other}")),
     }
 }
 
@@ -1046,6 +1066,7 @@ mod tests {
             transport: ToolTransport::Async,
             tool_source: ToolSource::RustCore,
             fields: None,
+            aliases: vec![],
         });
 
         let json = generate_json().unwrap();
@@ -1075,6 +1096,7 @@ mod tests {
             transport: ToolTransport::Sync,
             tool_source: ToolSource::JsPrelude,
             fields: None,
+            aliases: vec![],
         };
 
         register(doc.clone());
@@ -1108,6 +1130,7 @@ mod tests {
             transport: ToolTransport::Async,
             tool_source: ToolSource::RustCore,
             fields: None,
+            aliases: vec![],
         });
 
         let md = generate_markdown();
@@ -1139,6 +1162,7 @@ mod tests {
             transport: ToolTransport::Sync,
             tool_source: ToolSource::Extension,
             fields: None,
+            aliases: vec![],
         });
 
         let json = generate("json").unwrap();
@@ -1146,6 +1170,14 @@ mod tests {
         assert!(json.contains("fs_read"));
         assert!(json.contains("Extension"));
         assert!(json.contains("extension"));
+    }
+
+    #[test]
+    fn test_generate_rejects_unknown_format() {
+        clear_docs();
+        let err = generate("jsonn").unwrap_err();
+        assert!(err.contains("Unsupported API docs format"));
+        clear_docs();
     }
 
     #[test]
@@ -1167,6 +1199,7 @@ mod tests {
             transport: ToolTransport::Sync,
             tool_source: ToolSource::JsPrelude,
             fields: None,
+            aliases: vec![],
         });
 
         let md = generate("markdown").unwrap();
@@ -1198,6 +1231,7 @@ mod tests {
             transport: ToolTransport::Async,
             tool_source: ToolSource::RustCore,
             fields: None,
+            aliases: vec![],
         });
         // Register a handler so the binding is generated
         let _ = register_handler("fetch", ApiHandler::Rust(std::rc::Rc::new(|_cmd| {
@@ -1220,6 +1254,7 @@ mod tests {
             transport: ToolTransport::Async,
             tool_source: ToolSource::Extension,
             fields: None,
+            aliases: vec![],
         });
         // Register a handler so the binding is generated
         let _ = register_handler("chrome_tabs_query", ApiHandler::Rust(std::rc::Rc::new(|_cmd| {
@@ -1242,6 +1277,7 @@ mod tests {
             transport: ToolTransport::Sync,
             tool_source: ToolSource::JsPrelude,
             fields: None,
+            aliases: vec![],
         });
 
         let js = generate_js_bindings_code();
@@ -1295,6 +1331,7 @@ mod tests {
             transport: ToolTransport::Sync,
             tool_source: ToolSource::JsPrelude,
             fields: None,
+            aliases: vec![],
         });
 
         let js = generate_js_bindings_code();
@@ -1324,6 +1361,7 @@ mod tests {
             transport: ToolTransport::Async,
             tool_source: ToolSource::RustCore,
             fields: None,
+            aliases: vec![],
         });
         // Register a handler so the binding is generated
         let _ = register_handler(r#"test_"quote""#, ApiHandler::Rust(std::rc::Rc::new(|_cmd| {
@@ -1359,6 +1397,7 @@ mod tests {
             transport: ToolTransport::Async,
             tool_source: ToolSource::RustCore,
             fields: Some(vec!["duration".into()]),
+            aliases: vec![],
         });
         // Register a handler so the binding is generated
         let _ = register_handler("sleep", ApiHandler::Rust(std::rc::Rc::new(|_cmd| {
@@ -1394,6 +1433,7 @@ mod tests {
             transport: ToolTransport::Async,
             tool_source: ToolSource::Extension,
             fields: None,
+            aliases: vec![],
         });
         // Register a handler so the binding is generated
         let _ = register_handler("chrome_sessions_getRecentlyClosed", ApiHandler::Rust(std::rc::Rc::new(|_cmd| {
@@ -1416,6 +1456,7 @@ mod tests {
             transport: ToolTransport::Async,
             tool_source: ToolSource::Extension,
             fields: None,
+            aliases: vec![],
         });
         // Register a handler so the binding is generated
         let _ = register_handler("chrome_windows_getCurrent", ApiHandler::Rust(std::rc::Rc::new(|_cmd| {

@@ -226,6 +226,35 @@ pub(crate) fn register_web_module<'js>(
 
     crate::web_api_sync! {
         ctx: ctx,
+        action: "runtime_api_docs",
+        namespace: "runtime",
+        name: "apiDocs",
+        doc: "Returns API documentation for every registered public API.",
+        params: [
+            format: "string", "optional", "Output format: json (default) or markdown",
+        ],
+        returns: "object|string" => "Parsed API catalog for json, or markdown string",
+        handler: move |ctx: Ctx<'js>, args: Rest<Value<'js>>| -> rquickjs::Result<Value<'js>> {
+            let format = args
+                .0.first()
+                .and_then(|v| v.as_string())
+                .and_then(|s| s.to_string().ok())
+                .unwrap_or_else(|| "json".to_string());
+            let output = crate::api_docs::generate(format.trim()).map_err(|e| {
+                rquickjs::Error::new_from_js_message("runtime", "apiDocs", e)
+            })?;
+            if format.trim().is_empty() || format.trim() == "json" {
+                return ctx.json_parse(output).map_err(|e| {
+                    rquickjs::Error::new_from_js_message("json", "Value", e.to_string())
+                });
+            }
+            Ok(rquickjs::String::from_str(ctx, output.as_str())?.into_value())
+        },
+        local_name: "__webJsRuntimeApiDocs",
+    };
+
+    crate::web_api_sync! {
+        ctx: ctx,
         action: "runtime_loadLibrary",
         namespace: "runtime",
         name: "loadLibrary",

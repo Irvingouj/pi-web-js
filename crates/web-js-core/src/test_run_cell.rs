@@ -774,6 +774,7 @@ mod tests {
             transport: ToolTransport::Async,
             tool_source: ToolSource::Extension,
             fields: None,
+            aliases: vec![],
         });
         let _ = register_handler(
             "chrome_cookies_get",

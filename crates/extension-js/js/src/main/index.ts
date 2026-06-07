@@ -1,6 +1,5 @@
 // Public extension-js main-thread API.
 
-export { generateApiDocs } from "../../pkg/extension_js.js";
 export type { LogLevel } from "../shared/logger.js";
 export { setLogLevel } from "../shared/logger.js";
 export type {

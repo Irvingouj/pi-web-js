@@ -184,10 +184,6 @@ export class ExtensionSession {
 	stopWith(): void {}
 }
 
-export function generateApiDocs(_format: string): string {
-	return "mock docs";
-}
-
 export function setLogLevel(_level: number): void {
 	// mock
 }

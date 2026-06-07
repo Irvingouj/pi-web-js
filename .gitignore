@@ -25,13 +25,8 @@ crates/web-js/js/web_js.js
 crates/web-js/js/web_js_bg.wasm
 crates/web-js/js/web_js.d.ts
 crates/web-js/js/web_js_bg.wasm.d.ts
-crates/web-js/js/api.json
-crates/web-js/js/API.md
-
 crates/extension-js/js/extension_js.js
 crates/extension-js/js/extension_js.d.ts
-crates/extension-js/js/api.json
-crates/extension-js/js/API.md
 crates/extension-js/js/pkg/
 
 crates/dom-semantic-tree/js/dom_semantic_tree.js

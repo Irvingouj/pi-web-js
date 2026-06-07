@@ -380,6 +380,7 @@ macro_rules! web_api_sync {
                 transport: $crate::api_docs::ToolTransport::Sync,
                 tool_source: $crate::api_docs::ToolSource::RustCore,
                 fields: None,
+                aliases: vec![],
             });
 
             // Register rquickjs callback with local_name

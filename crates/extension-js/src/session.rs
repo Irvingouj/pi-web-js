@@ -712,6 +712,149 @@ mod tests {
     }
 
     #[test]
+    fn test_generate_docs_json_includes_rust_fs_apis() {
+        web_js_core::handler_registry::clear_handlers();
+        web_js_core::api_docs::clear_manifest_entries();
+
+        let _session = ExtensionSession::new();
+
+        let json = web_js_core::api_docs::generate("json").expect("json docs");
+        assert!(json.contains("\"public_name\": \"fs.exists\""));
+        assert!(json.contains("\"action\": \"fs_exists\""));
+        assert!(json.contains("\"tool_source\": \"RustCore\""));
+
+        web_js_core::handler_registry::clear_handlers();
+        web_js_core::api_docs::clear_manifest_entries();
+    }
+
+    #[test]
+    fn test_generate_docs_markdown_groups_by_namespace() {
+        web_js_core::handler_registry::clear_handlers();
+        web_js_core::api_docs::clear_manifest_entries();
+
+        let _session = ExtensionSession::new();
+
+        let markdown = web_js_core::api_docs::generate("markdown")
+            .expect("markdown docs");
+        assert!(markdown.contains("## `fs` module"));
+        assert!(markdown.contains("fs.exists"));
+        assert!(markdown.contains("_(action: `fs_exists`)_"));
+        assert!(markdown.contains("**Parameters**"));
+        assert!(markdown.contains("**Returns**"));
+
+        web_js_core::handler_registry::clear_handlers();
+        web_js_core::api_docs::clear_manifest_entries();
+    }
+
+    #[test]
+    fn test_generate_docs_includes_aliases() {
+        web_js_core::handler_registry::clear_handlers();
+        web_js_core::api_docs::clear_manifest_entries();
+
+        let _session = ExtensionSession::new();
+
+        let entry = web_js_core::api_docs::ApiManifestEntry {
+            namespace: "web".into(),
+            name: "fetch".into(),
+            action: Some("fetch".into()),
+            description: "Fetch a URL.".into(),
+            params: vec![],
+            returns: web_js_core::api_docs::ReturnDoc {
+                js_type: "object".into(),
+                description: "Response.".into(),
+            },
+            public_name: "web.fetch".into(),
+            local_name: None,
+            transport: web_js_core::api_docs::ToolTransport::Async,
+            tool_source: web_js_core::api_docs::ToolSource::Extension,
+            fields: Some(vec!["url".into()]),
+            aliases: vec![web_js_core::api_docs::ApiAlias {
+                namespace: "network".into(),
+                name: "fetch".into(),
+                fields: Some(vec!["url".into()]),
+            }],
+        };
+        let _ = web_js_core::api_docs::register_manifest_entry(entry);
+        let _ = web_js_core::api_docs::register_handler(
+            "fetch",
+            web_js_core::api_docs::ApiHandler::Rust(std::rc::Rc::new(|_cmd| {
+                Box::pin(async move {
+                    Ok(web_js_core::AsyncResponse {
+                        ok: true,
+                        value: None,
+                        error: None,
+                    })
+                })
+                    as std::pin::Pin<
+                        Box<dyn std::future::Future<Output = Result<web_js_core::AsyncResponse, String>>>,
+                    >
+            })),
+        );
+
+        let json = web_js_core::api_docs::generate("json").expect("json docs");
+        assert!(json.contains("\"namespace\": \"network\""));
+        assert!(json.contains("\"name\": \"fetch\""));
+
+        web_js_core::handler_registry::clear_handlers();
+        web_js_core::api_docs::clear_manifest_entries();
+    }
+
+    #[test]
+    fn test_generate_docs_includes_registered_extension_manifest_entry() {
+        web_js_core::handler_registry::clear_handlers();
+        web_js_core::api_docs::clear_manifest_entries();
+
+        let _session = ExtensionSession::new();
+
+        let entry = web_js_core::api_docs::ApiManifestEntry {
+            namespace: "contract".into(),
+            name: "docs_export".into(),
+            action: Some("contract_docs_export".into()),
+            description: "Contract docs export test.".into(),
+            params: vec![web_js_core::api_docs::ParamDoc {
+                name: "key".into(),
+                js_type: "string".into(),
+                required: true,
+                description: "Lookup key.".into(),
+            }],
+            returns: web_js_core::api_docs::ReturnDoc {
+                js_type: "string".into(),
+                description: "Lookup result.".into(),
+            },
+            public_name: "contract.docs_export".into(),
+            local_name: None,
+            transport: web_js_core::api_docs::ToolTransport::Async,
+            tool_source: web_js_core::api_docs::ToolSource::Extension,
+            fields: Some(vec!["key".into()]),
+            aliases: vec![],
+        };
+        let _ = web_js_core::api_docs::register_manifest_entry(entry);
+        let _ = web_js_core::api_docs::register_handler(
+            "contract_docs_export",
+            web_js_core::api_docs::ApiHandler::Rust(std::rc::Rc::new(|_cmd| {
+                Box::pin(async move {
+                    Ok(web_js_core::AsyncResponse {
+                        ok: true,
+                        value: Some(serde_json::json!("ok")),
+                        error: None,
+                    })
+                })
+                    as std::pin::Pin<
+                        Box<dyn std::future::Future<Output = Result<web_js_core::AsyncResponse, String>>>,
+                    >
+            })),
+        );
+
+        let json = web_js_core::api_docs::generate("json").expect("json docs");
+        assert!(json.contains("\"public_name\": \"contract.docs_export\""));
+        assert!(json.contains("\"description\": \"Contract docs export test.\""));
+        assert!(json.contains("\"tool_source\": \"Extension\""));
+
+        web_js_core::handler_registry::clear_handlers();
+        web_js_core::api_docs::clear_manifest_entries();
+    }
+
+    #[test]
     fn test_reset_reinjects_bindings() {
         web_js_core::handler_registry::clear_handlers();
         web_js_core::api_docs::clear_manifest_entries();

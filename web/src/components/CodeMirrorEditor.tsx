@@ -202,6 +202,7 @@ const notebookGlobals = [
 	"page.close",
 	"page.activeTab",
 	"runtime.inspect",
+	"runtime.apiDocs",
 	"runtime.fetch",
 	"tab.query",
 	"tab.open",

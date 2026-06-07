@@ -100,9 +100,3 @@ pub fn freeze_manifest() {
     web_js_core::api_docs::freeze_manifest();
 }
 
-#[wasm_bindgen(js_name = generateApiDocs)]
-pub fn generate_api_docs(format: String) -> Result<String, JsValue> {
-    let _session = ExtensionSession::new();
-    web_js_core::api_docs::generate(&format)
-        .map_err(|e| JsValue::from_str(&e))
-}

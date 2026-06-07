@@ -454,6 +454,36 @@ describe("ExtensionSession fs namespace e2e", () => {
 		);
 	});
 
+	it("init posts manifest entries with documentation metadata", async () => {
+		await initSession();
+
+		const initMsg = postMessages.find(
+			(m): m is { type: string; manifest?: unknown[] } =>
+				typeof m === "object" &&
+				m !== null &&
+				(m as { type?: string }).type === "init" &&
+				Array.isArray((m as { manifest?: unknown[] }).manifest),
+		);
+		expect(initMsg?.manifest?.length).toBeGreaterThanOrEqual(130);
+
+		for (const entry of initMsg?.manifest ?? []) {
+			expect(entry).toMatchObject({
+				action: expect.any(String),
+				namespace: expect.any(String),
+				name: expect.any(String),
+				publicName: expect.any(String),
+				description: expect.any(String),
+				errorCode: expect.any(String),
+				owner: expect.any(String),
+				paramsDoc: expect.any(Array),
+				returnsDoc: {
+					type: expect.any(String),
+					description: expect.any(String),
+				},
+			});
+		}
+	});
+
 	it("routes a main-thread sidepanel handler through dispatchTool", async () => {
 		globalThis.chrome = {
 			runtime: { id: "extension-test" },
