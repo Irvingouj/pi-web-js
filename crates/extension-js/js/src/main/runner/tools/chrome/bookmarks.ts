@@ -11,7 +11,9 @@ registerChromePassthrough(
 	["bookmarks"],
 	schemas.ChromeBookmarkArraySchema,
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.bookmarks.search({ query: \"example\" })"
 );
 registerChromePassthrough(
 	"chrome_bookmarks_create",
@@ -20,7 +22,9 @@ registerChromePassthrough(
 	["bookmarks"],
 	z.record(z.unknown()),
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.bookmarks.create({ title: \"Example\", url: \"https://example.com\" })"
 );
 registerChromePassthrough(
 	"chrome_bookmarks_remove",
@@ -35,9 +39,11 @@ registerChromePassthrough(
 			name: "id",
 			type: "string",
 			required: false,
-			description: "Bookmark ID to remove",
+			description: "Bookmark ID to remove (literal)",
 		},
 	]
+,
+	"chrome.bookmarks.remove(\"bookmarkId\")"
 );
 registerChromePassthrough(
 	"chrome_bookmarks_get",
@@ -46,7 +52,9 @@ registerChromePassthrough(
 	["bookmarks"],
 	schemas.ChromeBookmarkArraySchema,
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.bookmarks.get(\"bookmarkId\")"
 );
 registerChromePassthrough(
 	"chrome_bookmarks_getChildren",
@@ -55,7 +63,9 @@ registerChromePassthrough(
 	["bookmarks"],
 	schemas.ChromeBookmarkArraySchema,
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.bookmarks.getChildren(\"folderId\")"
 );
 registerChromePassthrough(
 	"chrome_bookmarks_getTree",
@@ -64,7 +74,9 @@ registerChromePassthrough(
 	["bookmarks"],
 	schemas.ChromeBookmarkArraySchema,
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.bookmarks.getTree()"
 );
 registerChromePassthrough(
 	"chrome_bookmarks_move",
@@ -73,7 +85,9 @@ registerChromePassthrough(
 	["bookmarks"],
 	z.record(z.unknown()),
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.bookmarks.move(\"bookmarkId\", { parentId: \"newFolderId\" })"
 );
 registerChromePassthrough(
 	"chrome_bookmarks_removeTree",
@@ -82,7 +96,9 @@ registerChromePassthrough(
 	["bookmarks"],
 	zChromeVoid,
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.bookmarks.removeTree(\"folderId\")"
 );
 registerChromePassthrough(
 	"chrome_bookmarks_update",
@@ -91,5 +107,7 @@ registerChromePassthrough(
 	["bookmarks"],
 	z.record(z.unknown()),
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.bookmarks.update(\"bookmarkId\", { title: \"New Title\" })"
 );

@@ -1,4 +1,4 @@
 /// <reference types="chrome" />
-import { regChrome } from "./register-helpers.js";
+import { regChrome, zChromeAny } from "./register-helpers.js";
 
-regChrome("chrome_idle_queryState", ["idle"], "Query idle state");
+regChrome("chrome_idle_queryState", ["idle"], "Query idle state", zChromeAny, "chrome.idle.queryState(60)");

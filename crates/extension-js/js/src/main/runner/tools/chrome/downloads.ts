@@ -11,7 +11,9 @@ registerChromePassthrough(
 	["downloads"],
 	schemas.ChromeDownloadIdSchema,
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.downloads.download({ url: \"https://example.com/file.zip\" })"
 );
 registerChromePassthrough(
 	"chrome_downloads_search",
@@ -20,7 +22,9 @@ registerChromePassthrough(
 	["downloads"],
 	schemas.ChromeDownloadArraySchema,
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.downloads.search({})"
 );
 registerChromePassthrough(
 	"chrome_downloads_erase",
@@ -29,7 +33,9 @@ registerChromePassthrough(
 	["downloads"],
 	schemas.ChromeDownloadArraySchema,
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.downloads.erase({ ids: [1] })"
 );
 registerChromePassthrough(
 	"chrome_downloads_pause",
@@ -38,7 +44,9 @@ registerChromePassthrough(
 	["downloads"],
 	zChromeVoid,
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.downloads.pause(1)"
 );
 registerChromePassthrough(
 	"chrome_downloads_resume",
@@ -47,7 +55,9 @@ registerChromePassthrough(
 	["downloads"],
 	zChromeVoid,
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.downloads.resume(1)"
 );
 registerChromePassthrough(
 	"chrome_downloads_cancel",
@@ -56,7 +66,9 @@ registerChromePassthrough(
 	["downloads"],
 	zChromeVoid,
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.downloads.cancel(1)"
 );
 registerChromePassthrough(
 	"chrome_downloads_open",
@@ -65,7 +77,9 @@ registerChromePassthrough(
 	["downloads"],
 	zChromeVoid,
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.downloads.open(1)"
 );
 registerChromePassthrough(
 	"chrome_downloads_show",
@@ -74,7 +88,9 @@ registerChromePassthrough(
 	["downloads"],
 	zChromeVoid,
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.downloads.show(1)"
 );
 registerChromePassthrough(
 	"chrome_downloads_removeFile",
@@ -83,5 +99,7 @@ registerChromePassthrough(
 	["downloads"],
 	zChromeVoid,
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.downloads.removeFile(1)"
 );

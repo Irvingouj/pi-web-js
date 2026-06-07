@@ -10,7 +10,9 @@ registerChromePassthrough(
 	["tabGroups"],
 	schemas.ChromeTabGroupArraySchema,
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.tabGroups.query({})"
 );
 registerChromePassthrough(
 	"chrome_tabGroups_get",
@@ -19,7 +21,9 @@ registerChromePassthrough(
 	["tabGroups"],
 	schemas.ChromeTabGroupSchema,
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.tabGroups.get(1)"
 );
 registerChromePassthrough(
 	"chrome_tabGroups_update",
@@ -28,7 +32,9 @@ registerChromePassthrough(
 	["tabGroups"],
 	schemas.ChromeTabGroupSchema,
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.tabGroups.update(1, { title: \"Work\" })"
 );
 registerChromePassthrough(
 	"chrome_tabGroups_move",
@@ -37,5 +43,7 @@ registerChromePassthrough(
 	["tabGroups"],
 	schemas.ChromeTabGroupSchema,
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.tabGroups.move(1, { index: 0 })"
 );

@@ -10,7 +10,9 @@ registerChromePassthrough(
 	["sessions"],
 	schemas.ChromeSessionArraySchema,
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.sessions.getRecentlyClosed()"
 );
 registerChromePassthrough(
 	"chrome_sessions_restore",
@@ -25,9 +27,10 @@ registerChromePassthrough(
 			name: "sessionId",
 			type: "string",
 			required: false,
-			description: "Session ID",
+			description: "Session ID (literal)",
 		},
-	]
+	],
+	"chrome.sessions.restore(\"sessionId\")"
 );
 registerChromePassthrough(
 	"chrome_sessions_getDevices",
@@ -36,5 +39,7 @@ registerChromePassthrough(
 	["sessions"],
 	schemas.ChromeDeviceArraySchema,
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.sessions.getDevices()"
 );

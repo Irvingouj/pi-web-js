@@ -11,7 +11,9 @@ registerChromePassthrough(
 	["sidePanel"],
 	zChromeVoid,
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.sidePanel.setOptions({ path: \"sidepanel.html\" })"
 );
 registerChromePassthrough(
 	"chrome_sidePanel_setPanelBehavior",
@@ -20,5 +22,7 @@ registerChromePassthrough(
 	["sidePanel"],
 	zChromeVoid,
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })"
 );

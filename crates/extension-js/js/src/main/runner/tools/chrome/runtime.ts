@@ -10,7 +10,9 @@ registerChromePassthrough(
 	["runtime"],
 	z.unknown(),
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.runtime.sendMessage({ greeting: \"hello\" })"
 );
 registerChromePassthrough(
 	"chrome_runtime_connect",
@@ -19,7 +21,9 @@ registerChromePassthrough(
 	["runtime"],
 	z.record(z.unknown()),
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.runtime.connect({ name: \"myPort\" })"
 );
 registerChromePassthrough(
 	"chrome_runtime_getURL",
@@ -28,7 +32,9 @@ registerChromePassthrough(
 	["runtime"],
 	z.string(),
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.runtime.getURL(\"page.html\")"
 );
 registerChromePassthrough(
 	"chrome_runtime_getManifest",
@@ -37,5 +43,7 @@ registerChromePassthrough(
 	["runtime"],
 	z.record(z.unknown()),
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.runtime.getManifest()"
 );

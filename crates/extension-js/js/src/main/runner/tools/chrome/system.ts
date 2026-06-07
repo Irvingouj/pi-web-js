@@ -12,6 +12,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
+	"chrome.system.cpu.getInfo()"
 );
 registerChromePassthrough(
 	"chrome_system_memory_getInfo",
@@ -22,6 +23,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
+	"chrome.system.memory.getInfo()"
 );
 registerChromePassthrough(
 	"chrome_system_storage_getInfo",
@@ -32,4 +34,5 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
+	"chrome.system.storage.getInfo()"
 );

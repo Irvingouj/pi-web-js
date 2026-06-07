@@ -11,7 +11,9 @@ registerChromePassthrough(
 	["history"],
 	schemas.ChromeHistoryArraySchema,
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.history.search({ text: \"example\" })"
 );
 registerChromePassthrough(
 	"chrome_history_deleteUrl",
@@ -26,9 +28,10 @@ registerChromePassthrough(
 			name: "url",
 			type: "string",
 			required: false,
-			description: "URL to delete from history",
+			description: "URL to delete from history (url)",
 		},
-	]
+	],
+	"chrome.history.deleteUrl({ url: \"https://example.com\" })"
 );
 registerChromePassthrough(
 	"chrome_history_addUrl",
@@ -37,7 +40,9 @@ registerChromePassthrough(
 	["history"],
 	zChromeVoid,
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.history.addUrl({ url: \"https://example.com\" })"
 );
 registerChromePassthrough(
 	"chrome_history_deleteAll",
@@ -46,7 +51,9 @@ registerChromePassthrough(
 	["history"],
 	zChromeVoid,
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.history.deleteAll()"
 );
 registerChromePassthrough(
 	"chrome_history_deleteRange",
@@ -55,7 +62,9 @@ registerChromePassthrough(
 	["history"],
 	zChromeVoid,
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.history.deleteRange({ startTime: 0, endTime: Date.now() })"
 );
 registerChromePassthrough(
 	"chrome_history_getVisits",
@@ -64,5 +73,7 @@ registerChromePassthrough(
 	["history"],
 	schemas.ChromeHistoryArraySchema,
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.history.getVisits({ url: \"https://example.com\" })"
 );

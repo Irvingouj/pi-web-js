@@ -16,15 +16,17 @@ registerChromePassthrough(
 			name: "id",
 			type: "string",
 			required: false,
-			description: "Notification ID",
+			description: "Notification ID (literal)",
 		},
 		{
 			name: "options",
 			type: "object",
 			required: false,
-			description: "Notification options",
+			description: "Notification options (literal)",
 		},
 	]
+,
+	"chrome.notifications.create(\"notificationId\", { type: \"basic\", title: \"Hello\", message: \"World\" })"
 );
 registerChromePassthrough(
 	"chrome_notifications_clear",
@@ -39,9 +41,11 @@ registerChromePassthrough(
 			name: "id",
 			type: "string",
 			required: false,
-			description: "Notification ID to clear",
+			description: "Notification ID to clear (literal)",
 		},
 	]
+,
+	"chrome.notifications.clear(\"notificationId\")"
 );
 registerChromePassthrough(
 	"chrome_notifications_getAll",
@@ -50,7 +54,9 @@ registerChromePassthrough(
 	["notifications"],
 	z.record(z.unknown()),
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.notifications.getAll()"
 );
 registerChromePassthrough(
 	"chrome_notifications_update",
@@ -59,5 +65,7 @@ registerChromePassthrough(
 	["notifications"],
 	z.boolean(),
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.notifications.update(\"notificationId\", { title: \"Updated\" })"
 );

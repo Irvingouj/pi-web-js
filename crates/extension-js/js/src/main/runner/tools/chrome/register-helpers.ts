@@ -14,6 +14,7 @@ export function regChrome(
 	apiPath: string[],
 	description: string,
 	returnsSchema: z.ZodSchema<unknown> = zChromeAny,
+	example?: string,
 ): void {
 	registerChromePassthrough(
 		action,
@@ -23,5 +24,7 @@ export function regChrome(
 		returnsSchema,
 		"ECHROME",
 		"extension",
+		[],
+		example,
 	);
 }

@@ -10,7 +10,9 @@ registerChromePassthrough(
 	["scripting"],
 	schemas.ChromeScriptResultSchema,
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.scripting.executeScript({ target: { tabId: 1 }, func: () => document.title })"
 );
 registerChromePassthrough(
 	"chrome_scripting_insertCSS",
@@ -19,7 +21,9 @@ registerChromePassthrough(
 	["scripting"],
 	zChromeAny,
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.scripting.insertCSS({ target: { tabId: 1 }, css: \"body { color: red; }\" })"
 );
 registerChromePassthrough(
 	"chrome_scripting_removeCSS",
@@ -28,5 +32,7 @@ registerChromePassthrough(
 	["scripting"],
 	zChromeAny,
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.scripting.removeCSS({ target: { tabId: 1 }, css: \"body { color: red; }\" })"
 );

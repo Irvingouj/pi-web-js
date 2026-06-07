@@ -11,7 +11,9 @@ registerChromePassthrough(
 	["contextMenus"],
 	schemas.ChromeMenuItemIdSchema,
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.contextMenus.create({ id: \"menuItemId\", title: \"My Menu\", contexts: [\"page\"] })"
 );
 registerChromePassthrough(
 	"chrome_contextMenus_remove",
@@ -26,9 +28,10 @@ registerChromePassthrough(
 			name: "menuItemId",
 			type: "string",
 			required: false,
-			description: "Menu item ID to remove",
+			description: "Menu item ID to remove (literal)",
 		},
-	]
+	],
+	"chrome.contextMenus.remove(\"menuItemId\")"
 );
 registerChromePassthrough(
 	"chrome_contextMenus_removeAll",
@@ -37,7 +40,9 @@ registerChromePassthrough(
 	["contextMenus"],
 	zChromeVoid,
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.contextMenus.removeAll()"
 );
 registerChromePassthrough(
 	"chrome_contextMenus_update",
@@ -46,5 +51,7 @@ registerChromePassthrough(
 	["contextMenus"],
 	zChromeVoid,
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.contextMenus.update(\"menuItemId\", { title: \"Updated\" })"
 );

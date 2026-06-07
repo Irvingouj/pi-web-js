@@ -17,9 +17,10 @@ registerChromePassthrough(
 			name: "populate",
 			type: "boolean",
 			required: false,
-			description: "Whether to populate tab info",
+			description: "Whether to populate tab info (literal)",
 		},
 	],
+	"chrome.windows.getCurrent({ populate: true })"
 );
 
 registerChromePassthrough(
@@ -29,7 +30,9 @@ registerChromePassthrough(
 	["windows"],
 	schemas.ChromeWindowArraySchema,
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.windows.getAll({ populate: false })"
 );
 registerChromePassthrough(
 	"chrome_windows_create",
@@ -38,7 +41,9 @@ registerChromePassthrough(
 	["windows"],
 	schemas.ChromeWindowSchema,
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.windows.create({ url: \"https://example.com\" })"
 );
 registerChromePassthrough(
 	"chrome_windows_update",
@@ -47,7 +52,9 @@ registerChromePassthrough(
 	["windows"],
 	schemas.ChromeWindowSchema,
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.windows.update(1, { focused: true })"
 );
 registerChromePassthrough(
 	"chrome_windows_remove",
@@ -64,5 +71,6 @@ registerChromePassthrough(
 			required: false,
 			description: "Window ID to remove",
 		},
-	]
+	],
+	"chrome.windows.remove(1)"
 );

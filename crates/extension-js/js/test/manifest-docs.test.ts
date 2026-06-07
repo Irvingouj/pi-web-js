@@ -1,13 +1,19 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 // Load the full runner tool registrations.
 import "../src/main/runner/index.js";
 import { manifestEntryToWasm } from "../src/shared/registry/manifest.js";
 import {
+	clearRegistry,
+	freezeJsRegistry,
 	getSerializableJsManifest,
 	listTools,
+	registerContentScriptJsCall,
+	registerJsCall,
+	removeToolForTest,
 } from "../src/shared/tool-registry.js";
 
 const KNOWN_OWNERS = new Set([
@@ -40,6 +46,8 @@ describe("manifest documentation export", () => {
 			expect(Array.isArray(entry.paramsDoc)).toBe(true);
 			expect(entry.returnsDoc.type.length).toBeGreaterThan(0);
 			expect(entry.returnsDoc.description.length).toBeGreaterThan(0);
+			expect(entry.example).toBeDefined();
+			expect(entry.example.length).toBeGreaterThan(0);
 
 			for (const param of entry.paramsDoc) {
 				expect(param.name.length).toBeGreaterThan(0);
@@ -106,6 +114,8 @@ describe("manifest documentation export", () => {
 			},
 			errorCode: sample.errorCode,
 			errorCategory: sample.errorCategory ?? null,
+			permission: sample.permission ?? null,
+			example: sample.example ?? null,
 		});
 	});
 
@@ -129,16 +139,166 @@ describe("manifest documentation export", () => {
 		const manifest = getSerializableJsManifest();
 		const pageGoto = manifest.find((entry) => entry.action === "page_goto");
 		const pageClick = manifest.find((entry) => entry.action === "page_click");
+		const pageFind = manifest.find((entry) => entry.action === "page_find");
 		const chromeTabsQuery = manifest.find(
 			(entry) => entry.action === "chrome_tabs_query",
 		);
 
 		expect(pageGoto?.owner).toBe("main-thread");
 		expect(pageGoto?.fields).toEqual(["url"]);
+		expect(pageGoto?.example).toBe('page.goto("https://example.com")');
 		expect(pageClick?.owner).toBe("content-script");
+		expect(pageClick?.paramsDoc[0]?.description).toContain("(refId)");
+		expect(pageFind?.description).toContain("CSS selector");
+		expect(pageFind?.fields).toEqual(["selector"]);
 		expect(chromeTabsQuery?.fields).toBeNull();
 
 		const tabCreate = manifest.find((entry) => entry.action === "tab_create");
-		expect(tabCreate?.aliases).toEqual([{ namespace: "tab", name: "create", fields: null }]);
+		expect(tabCreate?.fields).toEqual(["url"]);
+		expect(tabCreate?.aliases).toEqual([
+			{ namespace: "tab", name: "create", fields: ["url"] },
+		]);
+		const pageNewTab = manifest.find((entry) => entry.action === "page_new_tab");
+		expect(pageNewTab?.fields).toEqual(["url"]);
+
+		expect(pageFind?.aliases?.some((a) => a.namespace === "page" && a.name === "query")).toBe(true);
+	});
+
+	it("registers page tab aliases", () => {
+		const manifest = getSerializableJsManifest();
+		expect(manifest.some((e) => e.action === "page_tabs")).toBe(true);
+		expect(manifest.some((e) => e.action === "page_switch")).toBe(true);
+		expect(manifest.some((e) => e.action === "page_new_tab")).toBe(true);
+	});
+
+	it("manifest examples avoid known-invalid chrome call patterns", () => {
+		const manifest = getSerializableJsManifest();
+		const denylist = [
+			/chrome\.getInfo\(/,
+			/chrome\.search\(/,
+			/^chrome\.query\(/,
+			/^chrome\.create\(/,
+			/^chrome\.get\(/,
+			/^chrome\.set\(/,
+			/^chrome\.remove\(/,
+			/^chrome\.update\(/,
+			/^chrome\.clear\(/,
+		];
+		for (const entry of manifest) {
+			if (!entry.example) continue;
+			for (const pattern of denylist) {
+				expect(entry.example).not.toMatch(pattern);
+			}
+			if (entry.example.startsWith("chrome.")) {
+				const prefix = entry.publicName.replace(/\.[^.]+$/, "");
+				expect(entry.example.startsWith(prefix)).toBe(true);
+			}
+		}
+		const cpuInfo = manifest.find(
+			(entry) => entry.action === "chrome_system_cpu_getInfo",
+		);
+		const memoryInfo = manifest.find(
+			(entry) => entry.action === "chrome_system_memory_getInfo",
+		);
+		const storageInfo = manifest.find(
+			(entry) => entry.action === "chrome_system_storage_getInfo",
+		);
+		expect(cpuInfo?.example).toBe("chrome.system.cpu.getInfo()");
+		expect(memoryInfo?.example).toBe("chrome.system.memory.getInfo()");
+		expect(storageInfo?.example).toBe("chrome.system.storage.getInfo()");
+		const bookmarksSearch = manifest.find(
+			(entry) => entry.action === "chrome_bookmarks_search",
+		);
+		expect(bookmarksSearch?.example).toContain("chrome.bookmarks.search");
+	});
+
+	it("includes permission field for permission-gated APIs", () => {
+		const manifest = getSerializableJsManifest();
+		const chromeNotificationsCreate = manifest.find(
+			(entry) => entry.action === "chrome_notifications_create",
+		);
+		const chromeCookiesGet = manifest.find(
+			(entry) => entry.action === "chrome_cookies_get",
+		);
+		expect(chromeNotificationsCreate?.permission).toBe("notifications");
+		expect(chromeCookiesGet?.permission).toBe("cookies");
+
+		const wasmNotifications = manifestEntryToWasm(chromeNotificationsCreate!);
+		const wasmCookies = manifestEntryToWasm(chromeCookiesGet!);
+		expect(wasmNotifications.permission).toBe("notifications");
+		expect(wasmCookies.permission).toBe("cookies");
+
+		const chromeRuntimeGetUrl = manifest.find(
+			(entry) => entry.action === "chrome_runtime_getURL",
+		);
+		const chromeActionSetBadge = manifest.find(
+			(entry) => entry.action === "chrome_action_setBadgeText",
+		);
+		expect(chromeRuntimeGetUrl?.permission).toBeUndefined();
+		expect(chromeActionSetBadge?.permission).toBeUndefined();
+	});
+});
+
+describe("manifest integrity", () => {
+	it("freezeJsRegistry passes when every manifest entry has a handler", () => {
+		// The full runner registration already loaded; freeze should succeed.
+		expect(() => freezeJsRegistry()).not.toThrow();
+	});
+
+	it("freezeJsRegistry throws when a content-script entry lacks a handler manifest entry", () => {
+		clearRegistry();
+		registerContentScriptJsCall({
+			action: "phantom_content_action",
+			namespace: "test",
+			name: "phantom",
+			description: "Phantom content-script action",
+			params: z.object({}),
+			returns: z.null(),
+			paramTypes: [],
+			returnDoc: "null",
+			errorCode: "ETEST",
+		});
+		expect(() => freezeJsRegistry()).toThrow("phantom_content_action");
+	});
+
+	it("freezeJsRegistry passes when a main-thread entry has a tool handler", () => {
+		clearRegistry();
+		registerJsCall({
+			action: "phantom_main_action",
+			namespace: "test",
+			name: "phantom",
+			description: "Phantom main-thread action",
+			params: z.object({}),
+			returns: z.null(),
+			owner: "main-thread",
+			handler: async () => null,
+			paramTypes: [],
+			returnDoc: "null",
+			errorCode: "ETEST",
+		});
+		expect(() => freezeJsRegistry()).not.toThrow();
+		const manifest = getSerializableJsManifest();
+		const mainThreadEntry = manifest.find((e) => e.action === "phantom_main_action");
+		expect(mainThreadEntry?.owner).toBe("main-thread");
+	});
+
+	it("freezeJsRegistry throws when a main-thread entry lacks a tool handler", () => {
+		clearRegistry();
+		registerJsCall({
+			action: "orphan_main_action",
+			namespace: "test",
+			name: "orphan",
+			description: "Orphan main-thread action",
+			params: z.object({}),
+			returns: z.null(),
+			owner: "main-thread",
+			handler: async () => null,
+			paramTypes: [],
+			returnDoc: "null",
+			errorCode: "ETEST",
+		});
+		// Simulate a phantom API by removing the tool handler while keeping the JS registry entry.
+		expect(removeToolForTest("orphan_main_action")).toBe(true);
+		expect(() => freezeJsRegistry()).toThrow("orphan_main_action");
 	});
 });

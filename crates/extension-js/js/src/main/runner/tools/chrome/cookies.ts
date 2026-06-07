@@ -10,7 +10,9 @@ registerChromePassthrough(
 	["cookies"],
 	schemas.ChromeCookieSchema,
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.cookies.get({ url: \"https://example.com\", name: \"session\" })"
 );
 registerChromePassthrough(
 	"chrome_cookies_set",
@@ -19,7 +21,9 @@ registerChromePassthrough(
 	["cookies"],
 	schemas.ChromeCookieSchema,
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.cookies.set({ url: \"https://example.com\", name: \"session\", value: \"abc\" })"
 );
 registerChromePassthrough(
 	"chrome_cookies_remove",
@@ -28,7 +32,9 @@ registerChromePassthrough(
 	["cookies"],
 	z.record(z.unknown()),
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.cookies.remove({ url: \"https://example.com\", name: \"session\" })"
 );
 registerChromePassthrough(
 	"chrome_cookies_getAll",
@@ -37,5 +43,7 @@ registerChromePassthrough(
 	["cookies"],
 	schemas.ChromeCookieArraySchema,
 	"ECHROME",
-	"extension"
+	"extension",
+	[],
+	"chrome.cookies.getAll({ url: \"https://example.com\" })"
 );
