@@ -2,12 +2,17 @@ import { logger } from "./logger.js";
 import {
 	asRecord,
 	findElementByLabel,
+	findSemanticCandidates,
 	getElementByRefId,
 	getNumberParam,
 	getStringParam,
 	throwElementNotFound,
 } from "./dom-utils.js";
 import { inlineSnapshot } from "./snapshot.js";
+import {
+	assertFillEffect,
+	makeActionResult,
+} from "./action-result.js";
 
 export const DEFAULT_FETCH_TIMEOUT_MS = 30_000;
 
@@ -28,7 +33,7 @@ export const handlers: Record<string, Handler> = {
 			throwElementNotFound(refId, label, true);
 		}
 		(el as HTMLElement).click();
-		return null;
+		return makeActionResult("click", el);
 	},
 
 	fill: (params) => {
@@ -46,7 +51,9 @@ export const handlers: Record<string, Handler> = {
 			el.value = value;
 			const ev = new InputEvent("input", { bubbles: true });
 			el.dispatchEvent(ev);
-			return null;
+			const resolvedRefId = refId || el.getAttribute("data-ref-id") || "";
+			assertFillEffect("fill", el, resolvedRefId, value);
+			return makeActionResult("fill", el, { value: el.value });
 		}
 		throw new Error("Element is not an input");
 	},
@@ -66,7 +73,9 @@ export const handlers: Record<string, Handler> = {
 			el.value = text;
 			const ev = new InputEvent("input", { bubbles: true });
 			el.dispatchEvent(ev);
-			return null;
+			const resolvedRefId = refId || el.getAttribute("data-ref-id") || "";
+			assertFillEffect("type", el, resolvedRefId, text);
+			return makeActionResult("type", el, { text: el.value });
 		}
 		throw new Error("Element is not an input");
 	},
@@ -86,7 +95,7 @@ export const handlers: Record<string, Handler> = {
 			el.value += text;
 			const ev = new InputEvent("input", { bubbles: true });
 			el.dispatchEvent(ev);
-			return null;
+			return makeActionResult("append", el, { text: el.value });
 		}
 		throw new Error("Element is not an input");
 	},
@@ -97,7 +106,7 @@ export const handlers: Record<string, Handler> = {
 		document.dispatchEvent(evDown);
 		const evUp = new KeyboardEvent("keyup", { key, bubbles: true });
 		document.dispatchEvent(evUp);
-		return null;
+		return makeActionResult("press", null, { key });
 	},
 
 	select: (params) => {
@@ -109,11 +118,12 @@ export const handlers: Record<string, Handler> = {
 			el = findElementByLabel(label);
 		}
 		if (!el) {
-			throwElementNotFound(refId, label);
+			throwElementNotFound(refId, label, true);
 		}
 		if (el instanceof HTMLSelectElement) {
 			el.value = value;
-			return null;
+			el.dispatchEvent(new Event("change", { bubbles: true }));
+			return makeActionResult("select", el, { value: el.value });
 		}
 		throw new Error("Element is not a select");
 	},
@@ -130,13 +140,17 @@ export const handlers: Record<string, Handler> = {
 			el = findElementByLabel(label);
 		}
 		if (!el) {
-			throwElementNotFound(refId, label);
+			throwElementNotFound(refId, label, true);
 		}
-		if (el instanceof HTMLInputElement && el.type === "checkbox") {
+		if (
+			el instanceof HTMLInputElement &&
+			(el.type === "checkbox" || el.type === "radio")
+		) {
 			el.checked = checked;
-			return null;
+			el.dispatchEvent(new Event("change", { bubbles: true }));
+			return makeActionResult("check", el, { checked: el.checked });
 		}
-		throw new Error("Element is not a checkbox");
+		throw new Error("Element is not a checkbox or radio");
 	},
 
 	hover: (params) => {
@@ -147,17 +161,17 @@ export const handlers: Record<string, Handler> = {
 			el = findElementByLabel(label);
 		}
 		if (!el) {
-			throwElementNotFound(refId, label);
+			throwElementNotFound(refId, label, true);
 		}
 		const ev = new MouseEvent("mouseenter", { bubbles: true });
 		el.dispatchEvent(ev);
-		return null;
+		return makeActionResult("hover", el);
 	},
 
 	unhover: () => {
 		const ev = new MouseEvent("mouseleave", { bubbles: true });
 		document.body.dispatchEvent(ev);
-		return null;
+		return makeActionResult("unhover", null);
 	},
 
 	scroll: (params) => {
@@ -168,7 +182,7 @@ export const handlers: Record<string, Handler> = {
 			top: direction === "down" ? amount : -amount,
 			behavior: "smooth",
 		});
-		return true;
+		return makeActionResult("scroll", null, { direction, amount });
 	},
 
 	dblclick: (params) => {
@@ -179,21 +193,21 @@ export const handlers: Record<string, Handler> = {
 			el = findElementByLabel(label);
 		}
 		if (!el) {
-			throwElementNotFound(refId, label);
+			throwElementNotFound(refId, label, true);
 		}
 		const ev = new MouseEvent("dblclick", { bubbles: true });
 		el.dispatchEvent(ev);
-		return null;
+		return makeActionResult("dblclick", el);
 	},
 
 	forward: () => {
 		window.history.forward();
-		return true;
+		return makeActionResult("forward", null);
 	},
 
 	reload: () => {
 		window.location.reload();
-		return true;
+		return makeActionResult("reload", null);
 	},
 
 	scroll_to: (params) => {
@@ -208,12 +222,12 @@ export const handlers: Record<string, Handler> = {
 			}
 			if (el) {
 				el.scrollIntoView({ behavior: "smooth" });
-				return true;
+				return makeActionResult("scroll_to", el);
 			}
-			throwElementNotFound(refId, label);
+			throwElementNotFound(refId, label, true);
 		}
 		window.scrollTo({ top: y, left: x, behavior: "smooth" });
-		return true;
+		return makeActionResult("scroll_to", null, { amount: y });
 	},
 
 	evaluate: (params) => {
@@ -227,12 +241,8 @@ export const handlers: Record<string, Handler> = {
 
 	back: () => {
 		window.history.back();
-		return true;
+		return makeActionResult("back", null);
 	},
-
-	url: () => window.location.href,
-
-	title: () => document.title,
 
 	ping: () => {
 		return { ok: true };

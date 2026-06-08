@@ -20,6 +20,27 @@ pub enum WasmCellStatus {
 pub struct WasmAsyncError {
     pub message: String,
     pub code: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hint: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recovery: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub details: Option<serde_json::Value>,
+}
+
+impl WasmAsyncError {
+    pub fn new(message: impl Into<String>, code: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+            code: code.into(),
+            category: None,
+            hint: None,
+            recovery: None,
+            details: None,
+        }
+    }
 }
 
 /// Response passed to `resume_cell` to resolve an async yield.

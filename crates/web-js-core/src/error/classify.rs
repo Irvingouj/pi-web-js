@@ -79,9 +79,18 @@ pub(crate) fn cell_error_from_js_exception(exc: JsException) -> CellError {
             line,
         }
     } else {
+        let message = if exc.action.is_some()
+            || exc.code.is_some()
+            || exc.hint.is_some()
+            || exc.recovery.as_ref().is_some_and(|r| !r.is_empty())
+        {
+            format_js_exception(&exc)
+        } else {
+            exc.message.clone()
+        };
         CellError::Runtime {
             name: exc.name,
-            message: exc.message,
+            message,
             line,
             action: exc.action,
             code: exc.code,
@@ -121,6 +130,8 @@ pub(crate) fn cell_error_from_text(msg: &str) -> CellError {
         line: extract_line_number(msg),
         action: None,
         code: None,
+        hint: None,
+        recovery: None,
     })
 }
 

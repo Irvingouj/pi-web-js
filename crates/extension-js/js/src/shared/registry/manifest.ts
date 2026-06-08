@@ -11,6 +11,9 @@ export type AsyncError = {
 	message: string;
 	code: string;
 	category?: string;
+	hint?: string;
+	recovery?: string[];
+	details?: Record<string, unknown>;
 };
 
 export type AsyncResponse<T = unknown> =

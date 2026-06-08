@@ -9,3 +9,5 @@ export const INJECTION_DELAY_MS = 300;
 export const NAVIGATION_SETTLE_MS = 100;
 /** Grace period after content-script ping before returning from page.goto. */
 export const CONTENT_SCRIPT_GRACE_MS = 500;
+/** Fast fail-fast ping before content-script mutations (health, relay). */
+export const CS_FAST_PING_MS = 500;

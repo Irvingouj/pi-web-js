@@ -50,15 +50,40 @@ export type TabMessage =
 	| { action: "back"; params: Record<string, never> }
 	| { action: "ping"; params?: Record<string, never> };
 
-type CodedError = Error & { code: string; category?: string };
+type CodedError = Error & {
+	code: string;
+	category?: string;
+	hint?: string;
+	recovery?: string[];
+	details?: Record<string, unknown>;
+};
 
 export function makeError(
 	message: string,
 	code: string,
 	category?: string,
+	extra?: Pick<CodedError, "hint" | "recovery" | "details">,
 ): CodedError {
 	const err = new Error(message) as CodedError;
 	err.code = code;
 	if (category) err.category = category;
+	if (extra?.hint) err.hint = extra.hint;
+	if (extra?.recovery) err.recovery = extra.recovery;
+	if (extra?.details) err.details = extra.details;
 	return err;
+}
+
+export function throwAgentError(error: {
+	message: string;
+	code: string;
+	category?: string;
+	hint?: string;
+	recovery?: string[];
+	details?: Record<string, unknown>;
+}): never {
+	throw makeError(error.message, error.code, error.category, {
+		hint: error.hint,
+		recovery: error.recovery,
+		details: error.details,
+	});
 }

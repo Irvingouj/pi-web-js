@@ -14,7 +14,6 @@ import {
 	asRecord,
 	extractTabId,
 	unwrapResult,
-	sendMessageToTab,
 	getActiveTabId,
 	resolveActiveTabId,
 	executeInTab,
@@ -51,7 +50,7 @@ const sidepanelHandlers = new Map<
 				el = findElementByLabel(label);
 			}
 			if (!el) {
-				throwElementNotFound(refId, label, false, "ENOTFOUND");
+				throwElementNotFound(refId, label, false);
 			}
 			(el as HTMLElement).click();
 			return null;
@@ -66,7 +65,7 @@ const sidepanelHandlers = new Map<
 				el = findElementByLabel(label);
 			}
 			if (!el) {
-				throwElementNotFound(refId, label, false, "ENOTFOUND");
+				throwElementNotFound(refId, label, false);
 			}
 			const ev = new MouseEvent("dblclick", { bubbles: true });
 			el.dispatchEvent(ev);
@@ -82,7 +81,7 @@ const sidepanelHandlers = new Map<
 				el = findElementByLabel(label);
 			}
 			if (!el) {
-				throwElementNotFound(refId, label, false, "ENOTFOUND");
+				throwElementNotFound(refId, label, false);
 			}
 			const value = obj.value ?? "";
 			if ("value" in el) (el as HTMLInputElement).value = String(value);
@@ -98,7 +97,7 @@ const sidepanelHandlers = new Map<
 				el = findElementByLabel(label);
 			}
 			if (!el) {
-				throwElementNotFound(refId, label, false, "ENOTFOUND");
+				throwElementNotFound(refId, label, false);
 			}
 			const text = obj.text ?? "";
 			if ("value" in el) {
@@ -118,7 +117,7 @@ const sidepanelHandlers = new Map<
 				el = findElementByLabel(label);
 			}
 			if (!el) {
-				throwElementNotFound(refId, label, false, "ENOTFOUND");
+				throwElementNotFound(refId, label, false);
 			}
 			const text = obj.text ?? "";
 			if ("value" in el) {
@@ -157,7 +156,7 @@ const sidepanelHandlers = new Map<
 				el = findElementByLabel(label);
 			}
 			if (!el) {
-				throwElementNotFound(refId, label, false, "ENOTFOUND");
+				throwElementNotFound(refId, label, false);
 			}
 			const value = obj.value ?? "";
 			if ("value" in el) {
@@ -177,7 +176,7 @@ const sidepanelHandlers = new Map<
 				el = findElementByLabel(label);
 			}
 			if (!el) {
-				throwElementNotFound(refId, label, false, "ENOTFOUND");
+				throwElementNotFound(refId, label, false);
 			}
 			const checked = typeof obj.checked === "boolean" ? obj.checked : true;
 			if ("checked" in el) {
@@ -197,7 +196,7 @@ const sidepanelHandlers = new Map<
 				el = findElementByLabel(label);
 			}
 			if (!el) {
-				throwElementNotFound(refId, label, false, "ENOTFOUND");
+				throwElementNotFound(refId, label, false);
 			}
 			const ev = new MouseEvent("mouseenter", { bubbles: true });
 			el.dispatchEvent(ev);
@@ -236,7 +235,7 @@ const sidepanelHandlers = new Map<
 				el = findElementByLabel(label);
 			}
 			if (!el) {
-				throwElementNotFound(refId, label, false, "ENOTFOUND");
+				throwElementNotFound(refId, label, false);
 			}
 			el.scrollIntoView({ behavior: "smooth", block: "center" });
 			return null;

@@ -590,11 +590,44 @@ export const DomSnapshotValueSchema = z.object({
 	text: z.string(),
 });
 
+export const PageActionResultSchema = z.object({
+	ok: z.literal(true),
+	action: z.string(),
+	refId: z.string().optional(),
+	value: z.string().optional(),
+	checked: z.boolean().optional(),
+	disabled: z.boolean().optional(),
+	readOnly: z.boolean().optional(),
+	text: z.string().optional(),
+	key: z.string().optional(),
+	direction: z.string().optional(),
+	amount: z.number().optional(),
+});
+
+export type PageActionResult = z.infer<typeof PageActionResultSchema>;
+
+export const PageHealthParamsSchema = z.object({});
+
+export const PageHealthResultSchema = z.object({
+	tabId: z.number(),
+	url: z.string(),
+	title: z.string(),
+	contentScript: z.enum(["connected", "missing"]),
+	scripting: z.enum(["ok", "blocked"]),
+	mutationsReady: z.boolean(),
+	hint: z.string().optional(),
+	recovery: z.array(z.string()).optional(),
+});
+
 export const SnapshotNodeSchema = z.object({
 	refId: refIdString(),
 	role: z.string(),
 	tag: z.string(),
 	name: z.string().optional(),
+	value: z.string().optional(),
+	checked: z.boolean().optional(),
+	disabled: z.boolean().optional(),
+	readOnly: z.boolean().optional(),
 });
 
 export const SnapshotResultSchema = z.object({

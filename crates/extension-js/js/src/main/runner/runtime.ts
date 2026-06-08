@@ -19,12 +19,13 @@ export {
 	DEFAULT_TIMEOUT_MS,
 	NAVIGATION_SETTLE_MS,
 	CONTENT_SCRIPT_GRACE_MS,
+	CS_FAST_PING_MS,
 	DEFAULT_SCROLL_AMOUNT,
 	DEFAULT_POLL_INTERVAL_MS,
 } from "./lib/constants.js";
 
 export type { DomFormatParams, DomSnapshotParams, FetchParams } from "./lib/types.js";
-export { makeError } from "./lib/types.js";
+export { makeError, throwAgentError } from "./lib/types.js";
 
 export {
 	registerHostHandler,
@@ -36,8 +37,7 @@ export { asRecord, extractTabId, normalizeParams, unwrapResult } from "./lib/par
 
 export { executeMainThreadCommand } from "./command.js";
 export { handleFetch } from "./fetch.js";
-export { executeInTab, pingTabContentScript, preflightScriptableTab, waitForTabLoad } from "./tab/execute.js";
-export { sendMessageToTab } from "./tab/messaging.js";
+export { executeInTab, executeSnapshotInTab, pingTabContentScript, preflightScriptableTab, waitForTabLoad } from "./tab/execute.js";
 export { getElementByRefId, extractRefId } from "./sidepanel/dom.js";
 export {
 	ensureDomSnapshot,

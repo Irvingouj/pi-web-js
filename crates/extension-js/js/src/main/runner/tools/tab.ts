@@ -15,9 +15,9 @@ import {
 	asRecord,
 	extractTabId,
 	unwrapResult,
-	sendMessageToTab,
 	getActiveTabId,
 	resolveActiveTabId,
+	executeSnapshotInTab,
 	executeInTab,
 	preflightScriptableTab,
 	waitForTabLoad,
@@ -29,7 +29,6 @@ import {
 	handleDomSnapshot,
 	handleDomFormat,
 	ensureDomSnapshot,
-	buildSnapshotInTab,
 	throwIfAborted,
 	DEFAULT_TIMEOUT_MS,
 	DEFAULT_MAX_NODES,
@@ -57,7 +56,7 @@ async function runTabSnapshot(
 			blocked.error.category,
 		);
 	}
-	const result = await executeInTab(tabId, buildSnapshotInTab, [maxNodes]);
+	const result = await executeSnapshotInTab(tabId, maxNodes);
 	if (!result.ok) {
 		throw makeError(
 			`${actionLabel} failed for tab ${tabId}: ${result.error.message}`,
@@ -335,7 +334,7 @@ registerContentScriptJsCall({
 	name: "click",
 	description: "Click in a tab",
 	params: schemas.TabClickParamsSchema,
-	returns: z.null(),
+	returns: schemas.PageActionResultSchema,
 	paramTypes: [
 		{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
 		{
@@ -362,7 +361,7 @@ registerContentScriptJsCall({
 	name: "fill",
 	description: "Fill in a tab",
 	params: schemas.TabFillParamsSchema,
-	returns: z.null(),
+	returns: schemas.PageActionResultSchema,
 	paramTypes: [
 		{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
 		{
@@ -395,7 +394,7 @@ registerContentScriptJsCall({
 	name: "scroll_to",
 	description: "Scroll to position in a tab",
 	params: schemas.TabScrollToParamsSchema,
-	returns: z.boolean(),
+	returns: schemas.PageActionResultSchema,
 	paramTypes: [
 		{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
 		{ name: "x", type: "number", required: false, description: "X coordinate (literal)" },
@@ -424,7 +423,7 @@ registerContentScriptJsCall({
 	name: "type",
 	description: "Type in a tab",
 	params: schemas.TabTypeParamsSchema,
-	returns: z.null(),
+	returns: schemas.PageActionResultSchema,
 	paramTypes: [
 		{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
 		{
@@ -457,7 +456,7 @@ registerContentScriptJsCall({
 	name: "press",
 	description: "Press a key in a tab",
 	params: schemas.TabPressParamsSchema,
-	returns: z.null(),
+	returns: schemas.PageActionResultSchema,
 	paramTypes: [
 		{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
 		{
@@ -478,7 +477,7 @@ registerContentScriptJsCall({
 	name: "select",
 	description: "Select an option in a tab",
 	params: schemas.TabSelectParamsSchema,
-	returns: z.null(),
+	returns: schemas.PageActionResultSchema,
 	paramTypes: [
 		{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
 		{
@@ -511,7 +510,7 @@ registerContentScriptJsCall({
 	name: "check",
 	description: "Check/uncheck in a tab",
 	params: schemas.TabCheckParamsSchema,
-	returns: z.null(),
+	returns: schemas.PageActionResultSchema,
 	paramTypes: [
 		{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
 		{
@@ -544,7 +543,7 @@ registerContentScriptJsCall({
 	name: "hover",
 	description: "Hover in a tab",
 	params: schemas.TabHoverParamsSchema,
-	returns: z.null(),
+	returns: schemas.PageActionResultSchema,
 	paramTypes: [
 		{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
 		{
@@ -571,7 +570,7 @@ registerContentScriptJsCall({
 	name: "unhover",
 	description: "Unhover in a tab",
 	params: schemas.TabUnhoverParamsSchema,
-	returns: z.null(),
+	returns: schemas.PageActionResultSchema,
 	paramTypes: [
 		{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
 	],
@@ -586,7 +585,7 @@ registerContentScriptJsCall({
 	name: "scroll",
 	description: "Scroll in a tab",
 	params: schemas.TabScrollParamsSchema,
-	returns: z.boolean(),
+	returns: schemas.PageActionResultSchema,
 	paramTypes: [
 		{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
 		{
@@ -613,7 +612,7 @@ registerContentScriptJsCall({
 	name: "dblclick",
 	description: "Double-click in a tab",
 	params: schemas.TabDblClickParamsSchema,
-	returns: z.null(),
+	returns: schemas.PageActionResultSchema,
 	paramTypes: [
 		{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
 		{
@@ -692,7 +691,7 @@ registerContentScriptJsCall({
 	name: "back",
 	description: "Go back in a tab",
 	params: schemas.TabBackParamsSchema,
-	returns: z.boolean(),
+	returns: schemas.PageActionResultSchema,
 	paramTypes: [
 		{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
 	],

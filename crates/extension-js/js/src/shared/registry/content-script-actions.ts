@@ -3,8 +3,6 @@
  * Chrome/scripting wrappers and executeInTab-only APIs stay on main-thread.
  */
 export const CONTENT_SCRIPT_ACTIONS = new Set<string>([
-	"page_url",
-	"page_title",
 	"page_click",
 	"page_fill",
 	"page_type",

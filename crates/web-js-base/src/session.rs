@@ -144,10 +144,7 @@ where
                 let err_json = serde_json::to_string(&WasmAsyncResponse {
                     ok: false,
                     value: None,
-                    error: Some(WasmAsyncError {
-                        message: "Runner aborted".into(),
-                        code: "E_ABORTED".into(),
-                    }),
+                    error: Some(WasmAsyncError::new("Runner aborted", "E_ABORTED")),
                 })
                 .unwrap_or_default();
                 for cmd in &batch {
@@ -189,10 +186,7 @@ where
                     let err_json = serde_json::to_string(&WasmAsyncResponse {
                         ok: false,
                         value: None,
-                        error: Some(WasmAsyncError {
-                            message: "Runner aborted".into(),
-                            code: "E_ABORTED".into(),
-                        }),
+                        error: Some(WasmAsyncError::new("Runner aborted", "E_ABORTED")),
                     })
                     .unwrap_or_default();
                     result = base.resume_cell(call_id, &err_json);

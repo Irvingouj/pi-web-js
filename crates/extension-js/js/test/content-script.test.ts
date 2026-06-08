@@ -2,7 +2,16 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { inlineSnapshot } from "../src/content-script/snapshot.js";
-import { getElementByRefId } from "../src/content-script/dom-utils.js";
+import {
+	getElementByRefId,
+	throwElementNotFound,
+} from "../src/content-script/dom-utils.js";
+import {
+	dispatchContentScriptCall,
+	registerContentScriptSpec,
+} from "../src/content-script/registry.js";
+import { buildContentScriptSpecs } from "../src/content-script/schemas.js";
+import { handlers } from "../src/content-script/handlers.js";
 
 const mockAddListener = vi.fn();
 
@@ -200,6 +209,16 @@ describe("snapshot refId contract", () => {
 		expect(result.text).not.toContain("[ref=");
 	});
 
+	it("inlineSnapshot includes input value on form controls", () => {
+		const input = document.createElement("input");
+		input.type = "text";
+		input.value = "typed";
+		document.body.appendChild(input);
+
+		const result = inlineSnapshot(500);
+		expect(result.nodes.find((n) => n.tag === "input")?.value).toBe("typed");
+	});
+
 	it("snapshot → extract refId → click round-trip works", () => {
 		const btn = document.createElement("button");
 		btn.textContent = "Click me";
@@ -217,5 +236,123 @@ describe("snapshot refId contract", () => {
 		expect(el).toBe(btn);
 		(el as HTMLElement).click();
 		expect(clicked).toBe(true);
+	});
+});
+
+describe("stale refId errors", () => {
+	beforeEach(() => {
+		document.body.innerHTML = "";
+		for (const spec of buildContentScriptSpecs()) {
+			registerContentScriptSpec(spec);
+		}
+	});
+
+	it("throws E_STALE with recovery when refId is missing after DOM replace", async () => {
+		const input = document.createElement("input");
+		input.type = "text";
+		document.body.appendChild(input);
+		inlineSnapshot(500);
+		const staleRefId = input.getAttribute("data-ref-id")!;
+		input.remove();
+
+		const result = await dispatchContentScriptCall(
+			"page_fill",
+			"fill",
+			handlers.fill,
+			{ refId: staleRefId, value: "x" },
+		);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_STALE");
+			expect(result.error.recovery?.[0]).toContain("snapshot_data");
+			expect(result.error.details?.staleRefId).toBe(staleRefId);
+		}
+	});
+
+	it("throwElementNotFound uses E_STALE for refId misses", () => {
+		expect(() => throwElementNotFound("e99", undefined)).toThrow(/e99/);
+		try {
+			throwElementNotFound("e99", undefined);
+		} catch (err) {
+			expect((err as Error & { code?: string }).code).toBe("E_STALE");
+		}
+	});
+
+	it("throwElementNotFound uses E_NOT_FOUND for label misses", () => {
+		try {
+			throwElementNotFound(undefined, "Missing label");
+		} catch (err) {
+			expect((err as Error & { code?: string }).code).toBe("E_NOT_FOUND");
+			expect((err as Error).message).toContain('label "Missing label"');
+		}
+	});
+
+	it("fill returns E_NOT_INTERACTABLE when value assignment has no effect", async () => {
+		const input = document.createElement("input");
+		input.setAttribute("data-ref-id", "e7");
+		Object.defineProperty(input, "value", {
+			get: () => "locked",
+			set: () => {},
+			configurable: true,
+		});
+		document.body.appendChild(input);
+
+		const result = await dispatchContentScriptCall(
+			"page_fill",
+			"fill",
+			handlers.fill,
+			{ refId: "e7", value: "new" },
+		);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_NOT_INTERACTABLE");
+			expect(result.error.message).toContain("fill on e7");
+		}
+		document.body.removeChild(input);
+	});
+
+	it("select dispatches change event", async () => {
+		const select = document.createElement("select");
+		select.setAttribute("data-ref-id", "e8");
+		const opt = document.createElement("option");
+		opt.value = "b";
+		select.appendChild(opt);
+		document.body.appendChild(select);
+		let changed = false;
+		select.addEventListener("change", () => {
+			changed = true;
+		});
+
+		const result = await dispatchContentScriptCall(
+			"page_select",
+			"select",
+			handlers.select,
+			{ refId: "e8", value: "b" },
+		);
+		expect(result.ok).toBe(true);
+		expect(changed).toBe(true);
+		document.body.removeChild(select);
+	});
+
+	it("check supports radio buttons and dispatches change", async () => {
+		const radio = document.createElement("input");
+		radio.type = "radio";
+		radio.setAttribute("data-ref-id", "e9");
+		document.body.appendChild(radio);
+		let changed = false;
+		radio.addEventListener("change", () => {
+			changed = true;
+		});
+
+		const result = await dispatchContentScriptCall(
+			"page_check",
+			"check",
+			handlers.check,
+			{ refId: "e9", checked: true },
+		);
+		expect(result.ok).toBe(true);
+		expect((radio as HTMLInputElement).checked).toBe(true);
+		expect(changed).toBe(true);
+		document.body.removeChild(radio);
 	});
 });

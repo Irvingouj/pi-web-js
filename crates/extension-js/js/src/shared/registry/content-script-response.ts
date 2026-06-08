@@ -28,10 +28,21 @@ export function parseAsyncError(
 			typeof obj.code === "string" && obj.code ? obj.code : fallback.code;
 		const category =
 			typeof obj.category === "string" ? obj.category : fallback.category;
+		const hint = typeof obj.hint === "string" ? obj.hint : fallback.hint;
+		const recovery = Array.isArray(obj.recovery)
+			? (obj.recovery as string[])
+			: fallback.recovery;
+		const details =
+			typeof obj.details === "object" && obj.details !== null
+				? (obj.details as Record<string, unknown>)
+				: fallback.details;
 		return {
 			message,
 			code,
 			...(category ? { category } : {}),
+			...(hint ? { hint } : {}),
+			...(recovery?.length ? { recovery } : {}),
+			...(details ? { details } : {}),
 		};
 	}
 	return { ...fallback };

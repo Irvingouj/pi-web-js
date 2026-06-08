@@ -12,6 +12,7 @@ import {
 import type { DomFormatParams, DomSnapshotParams, FetchParams } from "../runtime.js";
 import {
 	makeError,
+	throwAgentError,
 	asRecord,
 	extractTabId,
 	unwrapResult,
@@ -19,6 +20,7 @@ import {
 	executeInTab,
 	waitForTabLoad,
 	pingTabContentScript,
+	preflightScriptableTab,
 	handleFetch,
 	handleHostCallAction,
 	registerChromePassthrough,
@@ -27,37 +29,62 @@ import {
 	handleDomSnapshot,
 	handleDomFormat,
 	ensureDomSnapshot,
-	buildSnapshotInTab,
 	throwIfAborted,
 	DEFAULT_TIMEOUT_MS,
 	CONTENT_SCRIPT_GRACE_MS,
+	CS_FAST_PING_MS,
 	DEFAULT_MAX_NODES,
 	DEFAULT_SCROLL_AMOUNT,
 	DEFAULT_POLL_INTERVAL_MS,
 } from "../runtime.js";
+import { noTabError, contentScriptMissingError } from "../../../shared/registry/normalize-agent-error.js";
+
+async function requireActiveTab(action: string): Promise<number> {
+	const tabId = await resolveActiveTabId();
+	if (tabId === null) {
+		throwAgentError(noTabError(action));
+	}
+	return tabId;
+}
 
 // ─── Page actions ────────────────────────────────────────────────
 
-registerContentScriptJsCall({
+registerJsCall({
 	action: "page_url",
 	namespace: "page",
 	name: "url",
 	description: "Get the URL of the active tab",
 	params: schemas.PageUrlParamsSchema,
 	returns: z.string(),
+	owner: "main-thread",
+	handler: async (_params, _ctx) => {
+		const activeTab = await requireActiveTab("page.url()");
+		const tab = unwrapResult(
+			await dispatchTool("chrome_tabs_get", [activeTab]),
+		) as { url?: string };
+		return tab.url ?? "";
+	},
 	paramTypes: [],
 	returnDoc: "URL string",
 	errorCode: "E_NO_TAB",
 	example: "page.url()",
 });
 
-registerContentScriptJsCall({
+registerJsCall({
 	action: "page_title",
 	namespace: "page",
 	name: "title",
 	description: "Get the title of the active tab",
 	params: schemas.PageTitleParamsSchema,
 	returns: z.string(),
+	owner: "main-thread",
+	handler: async (_params, _ctx) => {
+		const activeTab = await requireActiveTab("page.title()");
+		const tab = unwrapResult(
+			await dispatchTool("chrome_tabs_get", [activeTab]),
+		) as { title?: string };
+		return tab.title ?? "";
+	},
 	paramTypes: [],
 	returnDoc: "Title string",
 	errorCode: "E_NO_TAB",
@@ -74,10 +101,7 @@ registerJsCall({
 	fields: ["url"],
 	owner: "main-thread",
 	handler: async (params, _ctx) => {
-		const activeTab = await resolveActiveTabId();
-		if (activeTab === null) {
-			throw makeError("No active tab", "E_NO_TAB");
-		}
+		const activeTab = await requireActiveTab("page.goto()");
 		if (!params.url.startsWith("http:") && !params.url.startsWith("https:")) {
 			throw makeError(
 				`Navigation blocked: URL scheme not supported (${params.url})`,
@@ -179,11 +203,62 @@ registerContentScriptJsCall({
 	name: "back",
 	description: "Go back in the active tab",
 	params: schemas.PageBackParamsSchema,
-	returns: z.boolean(),
+	returns: schemas.PageActionResultSchema,
 	paramTypes: [],
 	returnDoc: "Navigation result",
 	errorCode: "E_NO_TAB",
 	example: "page.back()",
+});
+
+registerJsCall({
+	action: "page_health",
+	namespace: "page",
+	name: "health",
+	description: "Report tab readiness for mutations vs read-only snapshot APIs",
+	params: schemas.PageHealthParamsSchema,
+	returns: schemas.PageHealthResultSchema,
+	owner: "main-thread",
+	handler: async (_params, _ctx) => {
+		const tabId = await requireActiveTab("page.health()");
+		const tab = unwrapResult(
+			await dispatchTool("chrome_tabs_get", [tabId]),
+		) as { url?: string; title?: string };
+		const url = tab.url ?? "";
+		const title = tab.title ?? "";
+		const scriptingPreflight = await preflightScriptableTab(tabId);
+		const scripting =
+			scriptingPreflight && !scriptingPreflight.ok ? "blocked" : "ok";
+		const pingResult = await pingTabContentScript(tabId, CS_FAST_PING_MS);
+		const contentScript = pingResult.ok ? "connected" : "missing";
+		const mutationsReady =
+			scripting === "ok" && contentScript === "connected";
+		const health: z.infer<typeof schemas.PageHealthResultSchema> = {
+			tabId,
+			url,
+			title,
+			contentScript,
+			scripting,
+			mutationsReady,
+		};
+		if (!mutationsReady) {
+			if (scripting === "blocked") {
+				health.hint =
+					"This tab URL cannot be scripted. Only http(s) pages support mutations.";
+				health.recovery = [
+					"Navigate to an http(s) URL with await page.goto(url)",
+				];
+			} else {
+				const guidance = contentScriptMissingError(tabId, url);
+				health.hint = guidance.hint;
+				health.recovery = guidance.recovery;
+			}
+		}
+		return health;
+	},
+	paramTypes: [],
+	returnDoc: "Tab health with contentScript and mutationsReady flags",
+	errorCode: "E_NO_TAB",
+	example: "page.health()",
 });
 
 registerJsCall({
@@ -195,9 +270,10 @@ registerJsCall({
 	returns: z.boolean(),
 	owner: "main-thread",
 	handler: async (_params, _ctx) => {
-		const activeTab = await resolveActiveTabId();
-		if (activeTab === null) {
-			throw makeError("No active tab", "E_NO_TAB");
+		const activeTab = await requireActiveTab("page.forward()");
+		const preflight = await preflightScriptableTab(activeTab);
+		if (preflight) {
+			return unwrapResult(preflight);
 		}
 		return unwrapResult(
 			await executeInTab(activeTab, () => {
@@ -221,10 +297,7 @@ registerJsCall({
 	returns: z.null(),
 	owner: "main-thread",
 	handler: async (_params, _ctx) => {
-		const activeTab = await resolveActiveTabId();
-		if (activeTab === null) {
-			throw makeError("No active tab", "E_NO_TAB");
-		}
+		const activeTab = await requireActiveTab("page.reload()");
 		return unwrapResult(
 			await dispatchTool("chrome_tabs_reload", [activeTab]),
 		);
@@ -269,7 +342,7 @@ registerContentScriptJsCall({
 	name: "click",
 	description: "Click an element in the active tab",
 	params: schemas.PageClickParamsSchema,
-	returns: z.null(),
+	returns: schemas.PageActionResultSchema,
 	paramTypes: [
 		{
 			name: "refId",
@@ -295,7 +368,7 @@ registerContentScriptJsCall({
 	name: "fill",
 	description: "Fill an element in the active tab",
 	params: schemas.PageFillParamsSchema,
-	returns: z.null(),
+	returns: schemas.PageActionResultSchema,
 	paramTypes: [
 		{
 			name: "refId",
@@ -327,7 +400,7 @@ registerContentScriptJsCall({
 	name: "type",
 	description: "Type into an element in the active tab",
 	params: schemas.PageTypeParamsSchema,
-	returns: z.null(),
+	returns: schemas.PageActionResultSchema,
 	paramTypes: [
 		{
 			name: "refId",
@@ -359,7 +432,7 @@ registerContentScriptJsCall({
 	name: "append",
 	description: "Append text to an element in the active tab",
 	params: schemas.PageAppendParamsSchema,
-	returns: z.null(),
+	returns: schemas.PageActionResultSchema,
 	paramTypes: [
 		{
 			name: "refId",
@@ -391,7 +464,7 @@ registerContentScriptJsCall({
 	name: "press",
 	description: "Press a key in the active tab",
 	params: schemas.PagePressParamsSchema,
-	returns: z.null(),
+	returns: schemas.PageActionResultSchema,
 	fields: ["key"],
 	paramTypes: [
 		{
@@ -412,7 +485,7 @@ registerContentScriptJsCall({
 	name: "select",
 	description: "Select an option in the active tab",
 	params: schemas.PageSelectParamsSchema,
-	returns: z.null(),
+	returns: schemas.PageActionResultSchema,
 	paramTypes: [
 		{
 			name: "refId",
@@ -444,7 +517,7 @@ registerContentScriptJsCall({
 	name: "check",
 	description: "Check/uncheck an element in the active tab",
 	params: schemas.PageCheckParamsSchema,
-	returns: z.null(),
+	returns: schemas.PageActionResultSchema,
 	paramTypes: [
 		{
 			name: "refId",
@@ -476,7 +549,7 @@ registerContentScriptJsCall({
 	name: "hover",
 	description: "Hover over an element in the active tab",
 	params: schemas.PageHoverParamsSchema,
-	returns: z.null(),
+	returns: schemas.PageActionResultSchema,
 	paramTypes: [
 		{
 			name: "refId",
@@ -502,7 +575,7 @@ registerContentScriptJsCall({
 	name: "unhover",
 	description: "Unhover in the active tab",
 	params: schemas.PageUnhoverParamsSchema,
-	returns: z.null(),
+	returns: schemas.PageActionResultSchema,
 	paramTypes: [],
 	returnDoc: "Unhover result",
 	errorCode: "E_NO_TAB",
@@ -515,7 +588,7 @@ registerContentScriptJsCall({
 	name: "scroll",
 	description: "Scroll the active tab",
 	params: schemas.PageScrollParamsSchema,
-	returns: z.boolean(),
+	returns: schemas.PageActionResultSchema,
 	fields: ["direction", "amount"],
 	paramTypes: [
 		{
@@ -542,7 +615,7 @@ registerContentScriptJsCall({
 	name: "scroll_to",
 	description: "Scroll to an element in the active tab",
 	params: schemas.PageScrollToParamsSchema,
-	returns: z.boolean(),
+	returns: schemas.PageActionResultSchema,
 	paramTypes: [
 		{
 			name: "refId",
@@ -568,7 +641,7 @@ registerContentScriptJsCall({
 	name: "dblclick",
 	description: "Double-click an element in the active tab",
 	params: schemas.PageDblClickParamsSchema,
-	returns: z.null(),
+	returns: schemas.PageActionResultSchema,
 	paramTypes: [
 		{
 			name: "refId",
@@ -605,10 +678,7 @@ registerJsCall({
 	fields: ["selector"],
 	owner: "main-thread",
 	handler: async (params, _ctx) => {
-		const activeTab = await resolveActiveTabId();
-		if (activeTab === null) {
-			throw makeError("No active tab", "E_NO_TAB");
-		}
+		const activeTab = await requireActiveTab("page.find()");
 		return unwrapResult(
 			await executeInTab(
 				activeTab,
@@ -647,10 +717,7 @@ registerJsCall({
 	fields: ["selector", "timeout"],
 	owner: "main-thread",
 	handler: async (params, _ctx) => {
-		const activeTab = await resolveActiveTabId();
-		if (activeTab === null) {
-			throw makeError("No active tab", "E_NO_TAB");
-		}
+		const activeTab = await requireActiveTab("page.wait_for()");
 		const start = Date.now();
 		const timeoutMs = Number(params.timeout) || DEFAULT_TIMEOUT_MS;
 		while (true) {
@@ -705,10 +772,7 @@ registerJsCall({
 	fields: ["fields"],
 	owner: "main-thread",
 	handler: async (params, _ctx) => {
-		const activeTab = await resolveActiveTabId();
-		if (activeTab === null) {
-			throw makeError("No active tab", "E_NO_TAB");
-		}
+		const activeTab = await requireActiveTab("page.extract()");
 		return unwrapResult(
 			await executeInTab(
 				activeTab,
@@ -883,17 +947,17 @@ registerJsCall({
 	name: "active_tab",
 	description: "Get the active tab",
 	params: schemas.PageActiveTabParamsSchema,
-	returns: schemas.ChromeTabArraySchema,
+	returns: schemas.ChromeTabSchema,
 	owner: "main-thread",
 	handler: async (_params, _ctx) => {
-		return unwrapResult(
-			await dispatchTool("chrome_tabs_query", [
-				{ active: true, currentWindow: true },
-			]),
-		);
+		const tabId = await requireActiveTab("page.active_tab()");
+		const tab = unwrapResult(
+			await dispatchTool("chrome_tabs_get", [tabId]),
+		) as Record<string, unknown>;
+		return { ...tab, tabId: tab.id ?? tabId };
 	},
 	paramTypes: [],
-	returnDoc: "Tab query result",
+	returnDoc: "Active tab object with tabId",
 	errorCode: "E_NO_TAB",
 	example: "page.active_tab()",
 });
@@ -908,10 +972,7 @@ registerJsCall({
 	fields: ["url", "options"],
 	owner: "main-thread",
 	handler: async (params, _ctx) => {
-		const activeTab = await resolveActiveTabId();
-		if (activeTab === null) {
-			throw makeError("No active tab", "E_NO_TAB");
-		}
+		const activeTab = await requireActiveTab("page.fetch()");
 		const obj = asRecord(params);
 		const url = obj.url ?? "";
 		const options = obj.options ?? {};

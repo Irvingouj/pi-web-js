@@ -22,12 +22,26 @@ fn format_named_error(name: Option<&str>, message: &str, line: Option<u32>) -> S
 
 /// Format parsed exception fields as `Name: message` for logs and classification.
 pub(crate) fn format_js_exception(exc: &JsException) -> String {
-    if exc.action.is_some() || exc.code.is_some() {
+    let mut out = if exc.action.is_some() || exc.code.is_some() {
         let action = exc.action.as_deref().unwrap_or("unknown");
         let code = exc.code.as_deref().unwrap_or("E_UNKNOWN");
-        return format!("[{}] ({}): {}", action, code, exc.message);
+        format!("[{}] ({}): {}", action, code, exc.message)
+    } else {
+        format_name_message(exc.name.as_deref(), &exc.message)
+    };
+    if let Some(hint) = &exc.hint {
+        out.push_str("\n\nHint: ");
+        out.push_str(hint);
     }
-    format_name_message(exc.name.as_deref(), &exc.message)
+    if let Some(steps) = &exc.recovery {
+        if !steps.is_empty() {
+            out.push_str("\n\nRecovery:");
+            for (idx, step) in steps.iter().enumerate() {
+                out.push_str(&format!("\n  {}. {}", idx + 1, step));
+            }
+        }
+    }
+    out
 }
 
 /// User-facing error text for Rust `Display` and tests. The notebook UI mirrors this in `formatCellError`.
@@ -76,7 +90,29 @@ impl fmt::Display for CellError {
 #[cfg(test)]
 mod tests {
     use super::format_cell_error_text;
+    use super::format_js_exception;
+    use crate::error::js_exception::JsException;
     use crate::types::CellError;
+
+    #[test]
+    fn format_js_exception_includes_hint_and_recovery() {
+        let exc = JsException {
+            name: Some("Error".into()),
+            message: "Content script is not connected".into(),
+            line: None,
+            action: Some("page_fill".into()),
+            code: Some("E_CONTENT_SCRIPT".into()),
+            hint: Some("snapshot works; fill does not".into()),
+            recovery: Some(vec![
+                "await page.goto(url)".into(),
+                "refresh the tab".into(),
+            ]),
+        };
+        let text = format_js_exception(&exc);
+        assert!(text.contains("Hint: snapshot works"));
+        assert!(text.contains("Recovery:"));
+        assert!(text.contains("1. await page.goto(url)"));
+    }
 
     #[test]
     fn format_compile_error() {

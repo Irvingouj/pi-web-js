@@ -19,6 +19,24 @@ interface PostMessage {
 	action?: string;
 }
 
+const MOCK_PAGE_CLICK_RESULT = { ok: true, action: "click", refId: "e1" };
+
+function mockContentScriptSendMessage(
+	response:
+		| { ok: true; value: unknown }
+		| { ok: false; error: unknown } = {
+		ok: true,
+		value: MOCK_PAGE_CLICK_RESULT,
+	},
+) {
+	return vi.fn(async (_tabId: number, msg: Record<string, unknown>) => {
+		if (msg.action === "ping") {
+			return { ok: true };
+		}
+		return response;
+	});
+}
+
 declare global {
 	var chrome: {
 		runtime: { id: string };
@@ -379,16 +397,14 @@ describe("ExtensionSession fs namespace e2e", () => {
 		globalThis.chrome = {
 			runtime: { id: "extension-test" },
 			tabs: {
-				sendMessage: vi.fn(() =>
-					Promise.resolve({
-						ok: false,
-						error: {
-							message: "Invalid parameters for page_click: missing refId",
-							code: "E_INVALID_PARAMS",
-							category: "validation",
-						},
-					}),
-				),
+				sendMessage: mockContentScriptSendMessage({
+					ok: false,
+					error: {
+						message: "Invalid parameters for page_click: missing refId",
+						code: "E_INVALID_PARAMS",
+						category: "validation",
+					},
+				}),
 				onActivated: { addListener: vi.fn(), removeListener: vi.fn() },
 				onUpdated: { addListener: vi.fn(), removeListener: vi.fn() },
 				query: vi.fn(() => Promise.resolve([{ id: 1 }])),
@@ -424,12 +440,10 @@ describe("ExtensionSession fs namespace e2e", () => {
 		globalThis.chrome = {
 			runtime: { id: "extension-test" },
 			tabs: {
-				sendMessage: vi.fn(() =>
-					Promise.resolve({
-						ok: false,
-						error: "Unknown content script action: foo",
-					}),
-				),
+				sendMessage: mockContentScriptSendMessage({
+					ok: false,
+					error: "Unknown content script action: foo",
+				}),
 				onActivated: { addListener: vi.fn(), removeListener: vi.fn() },
 				onUpdated: { addListener: vi.fn(), removeListener: vi.fn() },
 				query: vi.fn(() => Promise.resolve([{ id: 1 }])),
@@ -463,7 +477,7 @@ describe("ExtensionSession fs namespace e2e", () => {
 		globalThis.chrome = {
 			runtime: { id: "extension-test" },
 			tabs: {
-				sendMessage: vi.fn(() => Promise.resolve({ ok: true, value: null })),
+				sendMessage: mockContentScriptSendMessage(),
 				onActivated: { addListener: vi.fn(), removeListener: vi.fn() },
 				onUpdated: { addListener: vi.fn(), removeListener: vi.fn() },
 				query: vi.fn(() => Promise.resolve([{ id: 1 }])),
@@ -492,7 +506,7 @@ describe("ExtensionSession fs namespace e2e", () => {
 		globalThis.chrome = {
 			runtime: { id: "extension-test" },
 			tabs: {
-				sendMessage: vi.fn(() => Promise.resolve({ ok: true, value: null })),
+				sendMessage: mockContentScriptSendMessage(),
 				onActivated: { addListener: vi.fn(), removeListener: vi.fn() },
 				onUpdated: { addListener: vi.fn(), removeListener: vi.fn() },
 				query: vi.fn(() => Promise.resolve([{ id: 1 }])),
@@ -520,12 +534,20 @@ describe("ExtensionSession fs namespace e2e", () => {
 		expect(relayResult).toMatchObject({
 			type: "asyncRelayResult",
 			id: "relay-1",
-			result: { ok: true, value: null },
+			result: { ok: true, value: MOCK_PAGE_CLICK_RESULT },
 		});
 	});
 
 	it("routes page_fill to cached activeTabId when side panel tab steals focus", async () => {
-		const sendMessage = vi.fn(() => Promise.resolve({ ok: true, value: null }));
+		const sendMessage = mockContentScriptSendMessage({
+			ok: true,
+			value: {
+				ok: true,
+				action: "fill",
+				refId: "e1",
+				value: "hello",
+			},
+		});
 		globalThis.chrome = {
 			runtime: { id: "extension-test" },
 			tabs: {
@@ -561,7 +583,12 @@ describe("ExtensionSession fs namespace e2e", () => {
 		globalThis.chrome = {
 			runtime: { id: "extension-test" },
 			tabs: {
-				sendMessage: vi.fn(() => new Promise(() => {})),
+				sendMessage: vi.fn(async (_tabId: number, msg: Record<string, unknown>) => {
+					if (msg.action === "ping") {
+						return { ok: true };
+					}
+					return new Promise(() => {});
+				}),
 				onActivated: { addListener: vi.fn(), removeListener: vi.fn() },
 				onUpdated: { addListener: vi.fn(), removeListener: vi.fn() },
 				query: vi.fn(() => Promise.resolve([{ id: 1 }])),

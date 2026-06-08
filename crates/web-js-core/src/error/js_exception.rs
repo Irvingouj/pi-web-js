@@ -9,6 +9,8 @@ pub(crate) struct JsException {
     pub line: Option<u32>,
     pub action: Option<String>,
     pub code: Option<String>,
+    pub hint: Option<String>,
+    pub recovery: Option<Vec<String>>,
 }
 
 /// Extract a line number from an error message or stack trace.
@@ -141,6 +143,8 @@ pub(crate) fn parse_js_exception<'js>(value: &Value<'js>) -> JsException {
             line: extract_line_number(&text),
             action: None,
             code: None,
+            hint: None,
+            recovery: None,
         };
     };
 
@@ -149,6 +153,31 @@ pub(crate) fn parse_js_exception<'js>(value: &Value<'js>) -> JsException {
     let stack = read_js_string_field(obj, "stack");
     let action = read_js_string_field(obj, "action");
     let code = read_js_string_field(obj, "code");
+    let hint = read_js_string_field(obj, "hint");
+    let recovery = obj
+        .get::<_, rquickjs::Value>("recovery")
+        .ok()
+        .and_then(|val| {
+            if let Some(arr) = val.as_array() {
+                let mut items = Vec::new();
+                for i in 0..arr.len() {
+                    if let Ok(item) = arr.get::<rquickjs::String>(i) {
+                        if let Ok(s) = item.to_string() {
+                            if !s.is_empty() {
+                                items.push(s);
+                            }
+                        }
+                    }
+                }
+                if items.is_empty() {
+                    None
+                } else {
+                    Some(items)
+                }
+            } else {
+                None
+            }
+        });
 
     if is_artifact_message(&message) {
         message = resolve_message_fallback(value, obj, &name, &stack);
@@ -181,5 +210,7 @@ pub(crate) fn parse_js_exception<'js>(value: &Value<'js>) -> JsException {
         line,
         action,
         code,
+        hint,
+        recovery,
     }
 }

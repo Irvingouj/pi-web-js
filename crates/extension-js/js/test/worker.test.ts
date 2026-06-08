@@ -122,8 +122,9 @@ describe("extensionDispatch", () => {
 		const message = sentMessages[0] as { id: string; owner: string; tabPolicy: string };
 		expect(message.owner).toBe("content-script");
 		expect(message.tabPolicy).toBe("active");
-		resolveAsyncRelayResult(message.id, { ok: true, value: null });
-		await expect(promise).resolves.toEqual({ ok: true, value: null });
+		const pageClickResult = { ok: true, action: "click", refId: "e1" };
+		resolveAsyncRelayResult(message.id, { ok: true, value: pageClickResult });
+		await expect(promise).resolves.toEqual({ ok: true, value: pageClickResult });
 	});
 });
 

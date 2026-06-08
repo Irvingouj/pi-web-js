@@ -14,26 +14,25 @@ import {
 	asRecord,
 	extractTabId,
 	unwrapResult,
-	sendMessageToTab,
 	getActiveTabId,
 	resolveActiveTabId,
-	executeInTab,
+	executeSnapshotInTab,
 	waitForTabLoad,
-	handleFetch,
-	handleHostCallAction,
-	registerChromePassthrough,
-	getElementByRefId,
-	extractRefId,
-	handleDomSnapshot,
-	handleDomFormat,
-	ensureDomSnapshot,
-	buildSnapshotInTab,
-	throwIfAborted,
 	DEFAULT_TIMEOUT_MS,
 	DEFAULT_MAX_NODES,
 	DEFAULT_SCROLL_AMOUNT,
 	DEFAULT_POLL_INTERVAL_MS,
 } from "../runtime.js";
+import { noTabError } from "../../../shared/registry/normalize-agent-error.js";
+import { throwAgentError } from "../lib/types.js";
+
+async function requireActiveTab(action: string): Promise<number> {
+	const tabId = await resolveActiveTabId();
+	if (tabId === null) {
+		throwAgentError(noTabError(action));
+	}
+	return tabId;
+}
 
 // ─── Page snapshot ───────────────────────────────────────────────
 
@@ -46,17 +45,12 @@ registerJsCall({
 	returns: z.string(),
 	owner: "main-thread",
 	handler: async (params, _ctx) => {
-		const activeTab = await resolveActiveTabId();
-		if (activeTab === null) {
-			throw makeError("No active tab", "E_NO_TAB");
-		}
+		const activeTab = await requireActiveTab("page.snapshot()");
 		const obj = asRecord(params);
 		const opts = asRecord(obj.options ?? obj);
 		const maxNodes =
 			typeof opts.max_nodes === "number" ? opts.max_nodes : DEFAULT_MAX_NODES;
-		const result = await executeInTab(activeTab, buildSnapshotInTab, [
-			maxNodes,
-		]);
+		const result = await executeSnapshotInTab(activeTab, maxNodes);
 		if (!result.ok) {
 			throw makeError(
 				result.error.message,
@@ -99,17 +93,12 @@ registerJsCall({
 	returns: z.string(),
 	owner: "main-thread",
 	handler: async (params, _ctx) => {
-		const activeTab = await resolveActiveTabId();
-		if (activeTab === null) {
-			throw makeError("No active tab", "E_NO_TAB");
-		}
+		const activeTab = await requireActiveTab("page.snapshot()");
 		const obj = asRecord(params);
 		const opts = asRecord(obj.options ?? obj);
 		const maxNodes =
 			typeof opts.max_nodes === "number" ? opts.max_nodes : DEFAULT_MAX_NODES;
-		const result = await executeInTab(activeTab, buildSnapshotInTab, [
-			maxNodes,
-		]);
+		const result = await executeSnapshotInTab(activeTab, maxNodes);
 		if (!result.ok) {
 			throw makeError(
 				result.error.message,
@@ -152,17 +141,12 @@ registerJsCall({
 	returns: schemas.SnapshotResultSchema,
 	owner: "main-thread",
 	handler: async (params, _ctx) => {
-		const activeTab = await resolveActiveTabId();
-		if (activeTab === null) {
-			throw makeError("No active tab", "E_NO_TAB");
-		}
+		const activeTab = await requireActiveTab("page.snapshot()");
 		const obj = asRecord(params);
 		const opts = asRecord(obj.options ?? obj);
 		const maxNodes =
 			typeof opts.max_nodes === "number" ? opts.max_nodes : DEFAULT_MAX_NODES;
-		const result = await executeInTab(activeTab, buildSnapshotInTab, [
-			maxNodes,
-		]);
+		const result = await executeSnapshotInTab(activeTab, maxNodes);
 		if (!result.ok) {
 			throw makeError(
 				result.error.message,

@@ -4,6 +4,8 @@ import { logger } from "../../../shared/logger.js";
 import { throwIfAborted } from "../../../shared/tool-registry.js";
 import { getActiveTabId } from "../../tab-context.js";
 import { normalizeChromeError } from "../chrome/internals.js";
+import { contentScriptMissingError } from "../../../shared/registry/normalize-agent-error.js";
+import { collectInlineSnapshot } from "../../../shared/collect-inline-snapshot.js";
 import {
 	DEFAULT_POLL_INTERVAL_MS,
 	INJECTION_DELAY_MS,
@@ -137,6 +139,25 @@ export async function executeInTab(
 	}
 }
 
+/** Run shared inline snapshot logic in a tab MAIN world (DRY vs content-script path). */
+export async function executeSnapshotInTab(
+	tabId: number | null,
+	maxNodes: number,
+): Promise<AsyncResponse> {
+	return executeInTab(
+		tabId,
+		(maxNodesArg: unknown, fnSource: unknown) => {
+			const run = (0, eval)(`(${String(fnSource)})`) as (
+				maxNodes: number,
+			) => unknown;
+			const maxNodesNum =
+				typeof maxNodesArg === "number" ? maxNodesArg : Number(maxNodesArg) || 500;
+			return run(maxNodesNum);
+		},
+		[maxNodes, collectInlineSnapshot.toString()],
+	);
+}
+
 export async function pingTabContentScript(
 	tabId: number,
 	timeoutMs: number = 3_000,
@@ -197,13 +218,16 @@ export async function pingTabContentScript(
 		lastRaceMsg.includes("Could not establish connection") ||
 		lastRaceMsg.includes("Receiving end does not exist")
 	) {
+		let url = "";
+		try {
+			const tab = await chrome.tabs.get(tabId);
+			url = tab.url ?? "";
+		} catch {
+			// ignore
+		}
 		return {
 			ok: false,
-			error: {
-				message: `content script not available on this URL`,
-				code: "E_CONTENT_SCRIPT",
-				category: "content-script",
-			},
+			error: contentScriptMissingError(tabId, url),
 		};
 	}
 	return {

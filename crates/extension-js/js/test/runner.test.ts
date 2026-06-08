@@ -826,13 +826,13 @@ describe("sidepanel", () => {
 		expect(elapsed).toBeGreaterThanOrEqual(40);
 	});
 
-	it("sidepanel_click throws ENOTFOUND when target element missing", async () => {
+	it("sidepanel_click throws E_STALE when target element missing", async () => {
 		const result = await dispatchTool("sidepanel_click", {
 			refId: "e999",
 		});
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
-			expect(result.error.code).toBe("ENOTFOUND");
+			expect(result.error.code).toBe("E_STALE");
 		}
 	});
 
@@ -1224,10 +1224,138 @@ describe("page actions", () => {
 		}
 	});
 
-	it("page_url is registered for content-script execution in the manifest", () => {
+	it("page_url is registered for main-thread execution in the manifest", () => {
 		const manifest = getSerializableJsManifest();
 		const entry = manifest.find((e) => e.action === "page_url");
-		expect(entry?.owner).toBe("content-script");
+		expect(entry?.owner).toBe("main-thread");
+	});
+
+	it("page.health reports mutationsReady false when content script is missing", async () => {
+		mockChrome.tabs.get.mockResolvedValue({
+			id: 1,
+			url: "https://www.google.com/",
+			title: "Google",
+		});
+		mockChrome.tabs.sendMessage.mockRejectedValue(
+			new Error("Receiving end does not exist."),
+		);
+
+		const result = await executeMainThreadCommand({
+			action: "page_health",
+			params: {},
+			call_id: 1,
+		});
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			const health = result.value as {
+				mutationsReady: boolean;
+				contentScript: string;
+				hint?: string;
+				recovery?: string[];
+			};
+			expect(health.mutationsReady).toBe(false);
+			expect(health.contentScript).toBe("missing");
+			expect(health.hint).toContain("page.snapshot()");
+			expect(health.recovery?.[0]).toContain("page.goto");
+		}
+	});
+
+	it("page.health reports mutationsReady true when content script is connected", async () => {
+		mockChrome.tabs.get.mockResolvedValue({
+			id: 1,
+			url: "https://www.google.com/",
+			title: "Google",
+		});
+		mockChrome.tabs.sendMessage.mockImplementation(
+			async (_tabId: number, msg: { action?: string }) => {
+				if (msg.action === "ping") {
+					return { ok: true };
+				}
+				return {};
+			},
+		);
+
+		const result = await executeMainThreadCommand({
+			action: "page_health",
+			params: {},
+			call_id: 1,
+		});
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			const health = result.value as {
+				mutationsReady: boolean;
+				contentScript: string;
+				scripting: string;
+				hint?: string;
+				recovery?: string[];
+			};
+			expect(health.mutationsReady).toBe(true);
+			expect(health.contentScript).toBe("connected");
+			expect(health.scripting).toBe("ok");
+			expect(health.tabId).toBe(1);
+			expect(health.url).toBe("https://www.google.com/");
+			expect(health.title).toBe("Google");
+			expect(health.hint).toBeUndefined();
+			expect(health.recovery).toBeUndefined();
+		}
+	});
+
+	it("page.health reports scripting-blocked hint for non-http tabs", async () => {
+		mockChrome.tabs.get.mockResolvedValue({
+			id: 1,
+			url: "chrome://settings/",
+			title: "Settings",
+		});
+		mockChrome.tabs.sendMessage.mockImplementation(
+			async (_tabId: number, msg: { action?: string }) => {
+				if (msg.action === "ping") {
+					return { ok: true };
+				}
+				return {};
+			},
+		);
+
+		const result = await executeMainThreadCommand({
+			action: "page_health",
+			params: {},
+			call_id: 1,
+		});
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			const health = result.value as {
+				mutationsReady: boolean;
+				scripting: string;
+				contentScript: string;
+				hint?: string;
+				recovery?: string[];
+			};
+			expect(health.mutationsReady).toBe(false);
+			expect(health.scripting).toBe("blocked");
+			expect(health.contentScript).toBe("connected");
+			expect(health.hint).toContain("http(s)");
+			expect(health.recovery?.[0]).toContain("page.goto");
+			expect(health.hint).not.toContain("MV3 does not retro-inject");
+		}
+	});
+
+	it("page.active_tab returns a single tab object with tabId", async () => {
+		mockChrome.tabs.get.mockResolvedValue({
+			id: 42,
+			url: "https://example.com/",
+			title: "Example",
+		});
+		const result = await executeMainThreadCommand({
+			action: "page_active_tab",
+			params: {},
+			call_id: 1,
+		});
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(Array.isArray(result.value)).toBe(false);
+			expect((result.value as { tabId: number }).tabId).toBe(42);
+			expect((result.value as { url: string }).url).toBe("https://example.com/");
+			expect((result.value as { title: string }).title).toBe("Example");
+		}
 	});
 
 	it("page_find accepts positional selector string", async () => {
@@ -1527,6 +1655,25 @@ describe("page actions", () => {
 		expect(result.ok).toBe(true);
 		expect(mockChrome.tabs.sendMessage).toHaveBeenCalledTimes(2);
 	});
+
+	it("pingTabContentScript returns E_CONTENT_SCRIPT with hint and recovery when CS missing", async () => {
+		mockChrome.tabs.sendMessage.mockRejectedValue(
+			new Error("Receiving end does not exist."),
+		);
+		mockChrome.tabs.get.mockResolvedValue({
+			id: 1,
+			url: "https://www.google.com/",
+		});
+
+		const result = await pingTabContentScript(1, 50);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_CONTENT_SCRIPT");
+			expect(result.error.hint).toContain("page.snapshot()");
+			expect(result.error.recovery?.[0]).toContain("page.goto");
+			expect(result.error.message).not.toContain("Receiving end does not exist");
+		}
+	});
 });
 
 // ─── 12. Tab action tests ────────────────────────────────────────
@@ -1772,6 +1919,9 @@ describe("WU-5: unambiguous element action arguments", () => {
 			{ refId: "e2" },
 		);
 		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.value).toMatchObject({ ok: true, action: "click", refId: "e2" });
+		}
 		document.body.removeChild(btn);
 	});
 
@@ -2104,6 +2254,7 @@ describe("WU-5: unambiguous element action arguments", () => {
 		);
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
+			expect(result.error.code).toBe("E_NOT_FOUND");
 			expect(result.error.message).toContain('by label "Nonexistent"');
 		}
 	});
@@ -2130,6 +2281,7 @@ describe("WU-5: unambiguous element action arguments", () => {
 		);
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
+			expect(result.error.code).toBe("E_NOT_FOUND");
 			expect(result.error.message).toContain('by label "Nonexistent"');
 		}
 	});
@@ -2233,6 +2385,17 @@ describe("sleep", () => {
 describe("snapshot refId contract", () => {
 	beforeEach(() => {
 		document.body.innerHTML = "";
+	});
+
+	it("buildSnapshotInTab includes input value on form controls", () => {
+		const input = document.createElement("input");
+		input.type = "text";
+		input.value = "preset";
+		document.body.appendChild(input);
+
+		const result = buildSnapshotInTab(500);
+		const inputNode = result.nodes.find((n) => n.tag === "input");
+		expect(inputNode?.value).toBe("preset");
 	});
 
 	it("buildSnapshotInTab emits string refIds in e{N} format", () => {

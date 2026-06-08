@@ -59,6 +59,14 @@ describe("Browsergent parity: snapshot_data contract", () => {
 			{ refId: node!.refId, value: "hello" },
 		);
 		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.value).toMatchObject({
+				ok: true,
+				action: "fill",
+				refId: node!.refId,
+				value: "hello",
+			});
+		}
 		expect((input as HTMLInputElement).value).toBe("hello");
 	});
 });

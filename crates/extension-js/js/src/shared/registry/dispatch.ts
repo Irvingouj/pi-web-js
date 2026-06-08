@@ -1,5 +1,6 @@
 import type { z } from "zod";
 import { coerceWasmParams, type AsyncResponse } from "./manifest.js";
+import { normalizeAgentError } from "./normalize-agent-error.js";
 
 function inferReceivedType(params: unknown): string {
 	if (params === null) return "null";
@@ -185,27 +186,16 @@ export async function dispatchValidated<P, R>(
 		}
 		return { ok: true, value: returnResult.data };
 	} catch (err: unknown) {
-		const message = err instanceof Error ? err.message : String(err);
-		const code =
-			typeof err === "object" &&
-			err !== null &&
-			"code" in err &&
-			typeof err.code === "string"
-				? err.code
-				: "E_HANDLER";
-		const category =
-			typeof err === "object" &&
-			err !== null &&
-			"category" in err &&
-			typeof err.category === "string"
-				? err.category
-				: undefined;
+		const normalized = normalizeAgentError(err);
+		const usedHandlerFallback =
+			normalized.code === "E_EXTENSION" &&
+			(typeof err !== "object" || err === null || !("code" in err));
 		return {
 			ok: false,
 			error: {
-				message: `${action}: ${message}`,
-				code,
-				category,
+				...normalized,
+				code: usedHandlerFallback ? "E_HANDLER" : normalized.code,
+				message: `${action}: ${normalized.message}`,
 			},
 		};
 	}

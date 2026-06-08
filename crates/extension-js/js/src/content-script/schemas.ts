@@ -3,50 +3,44 @@ import * as schemas from "../shared/schemas.js";
 import { CONTENT_SCRIPT_ACTIONS } from "../shared/registry/content-script-actions.js";
 import type { ContentScriptHandlerSpec } from "./registry.js";
 
-const returns = {
-	string: z.string(),
-	null: z.null(),
-	boolean: z.boolean(),
-} as const;
+const actionResult = schemas.PageActionResultSchema;
 
 /** Params/returns schemas aligned with runner.ts registerJsCall definitions. */
 const ACTION_SCHEMAS: Record<
 	string,
 	{ params: z.ZodSchema<unknown>; returns: z.ZodSchema<unknown> }
 > = {
-	page_url: { params: schemas.PageUrlParamsSchema, returns: returns.string },
-	page_title: { params: schemas.PageTitleParamsSchema, returns: returns.string },
-	page_click: { params: schemas.PageClickParamsSchema, returns: returns.null },
-	page_fill: { params: schemas.PageFillParamsSchema, returns: returns.null },
-	page_type: { params: schemas.PageTypeParamsSchema, returns: returns.null },
-	page_append: { params: schemas.PageAppendParamsSchema, returns: returns.null },
-	page_press: { params: schemas.PagePressParamsSchema, returns: returns.null },
-	page_select: { params: schemas.PageSelectParamsSchema, returns: returns.null },
-	page_check: { params: schemas.PageCheckParamsSchema, returns: returns.null },
-	page_hover: { params: schemas.PageHoverParamsSchema, returns: returns.null },
-	page_unhover: { params: schemas.PageUnhoverParamsSchema, returns: returns.null },
-	page_scroll: { params: schemas.PageScrollParamsSchema, returns: returns.boolean },
+	page_click: { params: schemas.PageClickParamsSchema, returns: actionResult },
+	page_fill: { params: schemas.PageFillParamsSchema, returns: actionResult },
+	page_type: { params: schemas.PageTypeParamsSchema, returns: actionResult },
+	page_append: { params: schemas.PageAppendParamsSchema, returns: actionResult },
+	page_press: { params: schemas.PagePressParamsSchema, returns: actionResult },
+	page_select: { params: schemas.PageSelectParamsSchema, returns: actionResult },
+	page_check: { params: schemas.PageCheckParamsSchema, returns: actionResult },
+	page_hover: { params: schemas.PageHoverParamsSchema, returns: actionResult },
+	page_unhover: { params: schemas.PageUnhoverParamsSchema, returns: actionResult },
+	page_scroll: { params: schemas.PageScrollParamsSchema, returns: actionResult },
 	page_scroll_to: {
 		params: schemas.PageScrollToParamsSchema,
-		returns: returns.boolean,
+		returns: actionResult,
 	},
-	page_dblclick: { params: schemas.PageDblClickParamsSchema, returns: returns.null },
-	page_back: { params: schemas.PageBackParamsSchema, returns: returns.boolean },
-	tab_click: { params: schemas.TabClickParamsSchema, returns: returns.null },
-	tab_fill: { params: schemas.TabFillParamsSchema, returns: returns.null },
-	tab_type: { params: schemas.TabTypeParamsSchema, returns: returns.null },
-	tab_press: { params: schemas.TabPressParamsSchema, returns: returns.null },
-	tab_select: { params: schemas.TabSelectParamsSchema, returns: returns.null },
-	tab_check: { params: schemas.TabCheckParamsSchema, returns: returns.null },
-	tab_hover: { params: schemas.TabHoverParamsSchema, returns: returns.null },
-	tab_unhover: { params: schemas.TabUnhoverParamsSchema, returns: returns.null },
-	tab_scroll: { params: schemas.TabScrollParamsSchema, returns: returns.boolean },
+	page_dblclick: { params: schemas.PageDblClickParamsSchema, returns: actionResult },
+	page_back: { params: schemas.PageBackParamsSchema, returns: actionResult },
+	tab_click: { params: schemas.TabClickParamsSchema, returns: actionResult },
+	tab_fill: { params: schemas.TabFillParamsSchema, returns: actionResult },
+	tab_type: { params: schemas.TabTypeParamsSchema, returns: actionResult },
+	tab_press: { params: schemas.TabPressParamsSchema, returns: actionResult },
+	tab_select: { params: schemas.TabSelectParamsSchema, returns: actionResult },
+	tab_check: { params: schemas.TabCheckParamsSchema, returns: actionResult },
+	tab_hover: { params: schemas.TabHoverParamsSchema, returns: actionResult },
+	tab_unhover: { params: schemas.TabUnhoverParamsSchema, returns: actionResult },
+	tab_scroll: { params: schemas.TabScrollParamsSchema, returns: actionResult },
 	tab_scroll_to: {
 		params: schemas.TabScrollToParamsSchema,
-		returns: returns.boolean,
+		returns: actionResult,
 	},
-	tab_dblclick: { params: schemas.TabDblClickParamsSchema, returns: returns.null },
-	tab_back: { params: schemas.TabBackParamsSchema, returns: returns.boolean },
+	tab_dblclick: { params: schemas.TabDblClickParamsSchema, returns: actionResult },
+	tab_back: { params: schemas.TabBackParamsSchema, returns: actionResult },
 };
 
 /** Direct handler-key messages (non-registryCall) kept for compatibility. */

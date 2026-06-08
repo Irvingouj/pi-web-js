@@ -304,7 +304,7 @@ export async function dispatchTool(
 				error: {
 					...result.error,
 					code: tool.errorCode,
-					category: result.error.category ?? tool.errorCategory,
+					category: tool.errorCategory ?? result.error.category,
 				},
 			};
 		}

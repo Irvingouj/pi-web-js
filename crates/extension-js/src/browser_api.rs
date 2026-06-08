@@ -4,10 +4,7 @@ use web_js_core::types::{AsyncError, AsyncResponse};
 // ─── fs.* helpers ───────────────────────────────────────────────
 
 fn fs_err_to_async(err: web_fs::FsError) -> AsyncError {
-    AsyncError {
-        message: err.wire_message(),
-        code: err.wire_code().into(),
-    }
+    AsyncError::new(err.wire_message(), err.wire_code())
 }
 
 pub async fn execute_fs_exists(params: FsPathParams) -> AsyncResponse {
@@ -30,10 +27,10 @@ pub async fn execute_fs_stat(params: FsPathParams) -> AsyncResponse {
             Err(e) => AsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(AsyncError {
-                    message: format!("Failed to serialize metadata: {}", e),
-                    code: "E_IO".into(),
-                }),
+                error: Some(AsyncError::new(
+                    format!("Failed to serialize metadata: {}", e),
+                    "E_IO",
+                )),
             },
         },
         Err(e) => AsyncResponse {
@@ -55,10 +52,10 @@ pub async fn execute_fs_list(params: FsPathParams) -> AsyncResponse {
             Err(e) => AsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(AsyncError {
-                    message: format!("Failed to serialize entries: {}", e),
-                    code: "E_IO".into(),
-                }),
+                error: Some(AsyncError::new(
+                    format!("Failed to serialize entries: {}", e),
+                    "E_IO",
+                )),
             },
         },
         Err(e) => AsyncResponse {
@@ -200,10 +197,10 @@ pub async fn execute_fs_write(params: FsWriteParams) -> AsyncResponse {
             return AsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(AsyncError {
-                    message: "Invalid base64 data".into(),
-                    code: "E_INVALID_ENCODING".into(),
-                }),
+                error: Some(AsyncError::new(
+                    "Invalid base64 data",
+                    "E_INVALID_ENCODING",
+                )),
             };
         }
     };
@@ -258,10 +255,10 @@ pub async fn execute_fs_append(params: FsWriteParams) -> AsyncResponse {
             return AsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(AsyncError {
-                    message: "Invalid base64 data".into(),
-                    code: "E_INVALID_ENCODING".into(),
-                }),
+                error: Some(AsyncError::new(
+                    "Invalid base64 data",
+                    "E_INVALID_ENCODING",
+                )),
             };
         }
     };
@@ -316,10 +313,10 @@ pub async fn execute_fs_update(params: FsUpdateParams) -> AsyncResponse {
             return AsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(AsyncError {
-                    message: "Invalid base64 data".into(),
-                    code: "E_INVALID_ENCODING".into(),
-                }),
+                error: Some(AsyncError::new(
+                    "Invalid base64 data",
+                    "E_INVALID_ENCODING",
+                )),
             };
         }
     };

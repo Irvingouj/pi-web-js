@@ -18,7 +18,10 @@ import {
   executeMainThreadCommand,
   isValidMainThreadAction,
   setRunnerAbortController,
+  pingTabContentScript,
 } from "../runner/runtime.js";
+import { normalizeAgentError } from "../../shared/registry/normalize-agent-error.js";
+import { CS_FAST_PING_MS } from "../runner/lib/constants.js";
 import { unwrapContentScriptMessage } from "../../shared/registry/content-script-response.js";
 import {
   initTabContext,
@@ -380,6 +383,19 @@ export class ExtensionSession {
     };
     signal?.addEventListener("abort", onAbort, { once: true });
 
+    let tabUrl = "";
+    try {
+      const tab = await chromeApi.tabs.get(tabId);
+      tabUrl = tab.url ?? "";
+    } catch {
+      // ignore
+    }
+
+    const pingResult = await pingTabContentScript(tabId, CS_FAST_PING_MS);
+    if (!pingResult.ok) {
+      return pingResult;
+    }
+
     try {
       const result = await chromeApi.tabs.sendMessage(tabId, {
         type: "registryCall",
@@ -403,10 +419,9 @@ export class ExtensionSession {
           error: { message: "Relay aborted", code: "E_ABORT" },
         };
       }
-      const message = err instanceof Error ? err.message : String(err);
       return {
         ok: false,
-        error: { message, code: "E_CONTENT_SCRIPT", category: "resource" },
+        error: normalizeAgentError(err, { tabId, url: tabUrl, action: cmd.action }),
       };
     } finally {
       signal?.removeEventListener("abort", onAbort);

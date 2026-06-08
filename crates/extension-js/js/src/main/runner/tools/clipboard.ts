@@ -14,7 +14,6 @@ import {
 	asRecord,
 	extractTabId,
 	unwrapResult,
-	sendMessageToTab,
 	getActiveTabId,
 	resolveActiveTabId,
 	executeInTab,

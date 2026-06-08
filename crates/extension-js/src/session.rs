@@ -118,10 +118,7 @@ impl ExtensionSession {
                     cmd.run_id = Some(run_id_for_cmd);
                     match ExtensionSession::handle_command(&cmd).await {
                         Ok(r) => Ok(r),
-                        Err(e) => Err(WasmAsyncError {
-                            message: e,
-                            code: "E_DISPATCH_ERROR".into(),
-                        }),
+                        Err(e) => Err(WasmAsyncError::new(e, "E_DISPATCH_ERROR")),
                     }
                 }
             },
@@ -154,6 +151,10 @@ impl ExtensionSession {
                     error: resp.error.map(|e| WasmAsyncError {
                         message: e.message,
                         code: e.code,
+                        category: e.category,
+                        hint: e.hint,
+                        recovery: e.recovery,
+                        details: e.details,
                     }),
                 };
                 tracing::trace!(call_id = cmd.call_id, action = %cmd.action, ok = wasm_resp.ok, "handle_command_exit");

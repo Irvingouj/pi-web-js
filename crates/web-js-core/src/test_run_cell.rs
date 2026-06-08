@@ -106,6 +106,10 @@ mod tests {
             error: Some(crate::types::AsyncError {
                 message: "Cannot execute script in tab 1".into(),
                 code: "E_SCRIPTING".into(),
+                category: None,
+                hint: None,
+                recovery: None,
+                details: None,
             }),
         };
         let json = serde_json::to_string(&response).unwrap();
@@ -138,6 +142,48 @@ mod tests {
             }
             other => panic!("expected runtime error, got {other:?}"),
         }
+    }
+
+    /// Async reject preserves hint/recovery in the formatted message.
+    #[test]
+    fn test_resume_async_reject_includes_hint_and_recovery() {
+        let mut session = JsSession::new();
+
+        let setup = session.run_cell_unwrapped(
+            r#"
+            function myAsync() {
+                return new Promise((resolve, reject) => {
+                    __webJsTriggerAsync("page_fill", {refId: "e1", value: "x"}, resolve, reject);
+                });
+            }
+        "#,
+            "",
+        );
+        assert!(setup.error.is_none());
+
+        let result = session.run_cell("await myAsync()", "");
+        let call_id = result.pending_commands[0].call_id;
+
+        let response = crate::types::AsyncResponse {
+            ok: false,
+            value: None,
+            error: Some(crate::types::AsyncError {
+                message: "Content script is not connected on tab 1.".into(),
+                code: "E_CONTENT_SCRIPT".into(),
+                category: Some("content-script".into()),
+                hint: Some("Use page.snapshot() first.".into()),
+                recovery: Some(vec!["await page.goto(url)".into()]),
+                details: Some(serde_json::json!({"tabId": 1})),
+            }),
+        };
+        let json = serde_json::to_string(&response).unwrap();
+        let resumed = session.resume_cell(call_id, &json);
+        assert!(resumed.error.is_some());
+        let err = resumed.error.unwrap();
+        let display = crate::format_cell_error_text(&err);
+        assert!(display.contains("Hint: Use page.snapshot() first."), "{display}");
+        assert!(display.contains("Recovery:"), "{display}");
+        assert!(display.contains("page.goto"), "{display}");
     }
 
     /// Promise.all with 2 async calls produces 2 pending commands.
@@ -404,6 +450,10 @@ mod tests {
             error: Some(crate::types::AsyncError {
                 message: "boom".into(),
                 code: "E_TEST".into(),
+                category: None,
+                hint: None,
+                recovery: None,
+                details: None,
             }),
         };
         let _r1 = session.resume_cell(id1, &serde_json::to_string(&resp1).unwrap());
@@ -487,6 +537,10 @@ mod tests {
             error: Some(crate::types::AsyncError {
                 message: "Action '__proto__' is not allowed".into(),
                 code: "E_BLOCKED_ACTION".into(),
+                category: None,
+                hint: None,
+                recovery: None,
+                details: None,
             }),
         };
         let resumed = session.resume_cell(call_id, &serde_json::to_string(&response).unwrap());
@@ -531,6 +585,10 @@ mod tests {
             error: Some(crate::types::AsyncError {
                 message: "Unknown action: nonexistent_api".into(),
                 code: "E_UNKNOWN_ACTION".into(),
+                category: None,
+                hint: None,
+                recovery: None,
+                details: None,
             }),
         };
         let resumed = session.resume_cell(call_id, &serde_json::to_string(&response).unwrap());
@@ -907,6 +965,10 @@ console.log(result)"#;
             error: Some(crate::types::AsyncError {
                 message: "quoted \" newline\n slash \\ separator \u{2028}".to_string(),
                 code: "E_TEST".to_string(),
+                category: None,
+                hint: None,
+                recovery: None,
+                details: None,
             }),
         };
         let resumed = session.resume_cell(
