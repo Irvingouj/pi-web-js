@@ -1,0 +1,9 @@
+import * as fs from "node:fs";
+import * as path from "node:path";
+
+const realWasmPath = path.resolve(__dirname, "../pkg/extension_js.js");
+const symlinkPath = path.resolve(__dirname, "_real_wasm.js");
+
+if (fs.existsSync(realWasmPath) && !fs.existsSync(symlinkPath)) {
+	fs.symlinkSync(path.relative(__dirname, realWasmPath), symlinkPath);
+}

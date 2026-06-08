@@ -85,6 +85,10 @@ macro_rules! web_api {
                 aliases: vec![],
                 permission: None,
                 example: None,
+                prerequisites: None,
+                notes: None,
+                tags: None,
+                related_apis: None,
             };
             $crate::api_docs::register_executable_entry(
                 __entry,
@@ -150,6 +154,10 @@ macro_rules! web_api {
                 aliases: vec![],
                 permission: None,
                 example: None,
+                prerequisites: None,
+                notes: None,
+                tags: None,
+                related_apis: None,
             };
             $crate::api_docs::register_executable_entry(
                 __entry,
@@ -221,6 +229,10 @@ macro_rules! web_api {
                 ],
                 permission: None,
                 example: None,
+                prerequisites: None,
+                notes: None,
+                tags: None,
+                related_apis: None,
             };
             $crate::api_docs::register_executable_entry(
                 __entry,
@@ -295,6 +307,10 @@ macro_rules! web_api {
                 ],
                 permission: None,
                 example: None,
+                prerequisites: None,
+                notes: None,
+                tags: None,
+                related_apis: None,
             };
             $crate::api_docs::register_executable_entry(
                 __entry,
@@ -395,6 +411,10 @@ macro_rules! web_api_sync {
                 aliases: vec![],
                 permission: None,
                 example: None,
+                prerequisites: None,
+                notes: None,
+                tags: None,
+                related_apis: None,
             });
 
             // Register rquickjs callback with local_name

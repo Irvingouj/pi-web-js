@@ -58,6 +58,14 @@ pub struct JsApiDoc {
     pub permission: Option<String>,
     /// Runnable example string for this API.
     pub example: Option<String>,
+    /// Prerequisites for using this API.
+    pub prerequisites: Option<Vec<String>>,
+    /// Additional notes about this API.
+    pub notes: Option<Vec<String>>,
+    /// Tags for categorizing this API.
+    pub tags: Option<Vec<String>>,
+    /// Related APIs.
+    pub related_apis: Option<Vec<String>>,
 }
 
 impl Serialize for JsApiDoc {
@@ -65,7 +73,8 @@ impl Serialize for JsApiDoc {
     where
         S: serde::Serializer,
     {
-        let mut state = serializer.serialize_struct("JsApiDoc", 15)?;
+        // Keep in sync with serialize_field calls below (currently 19).
+        let mut state = serializer.serialize_struct("JsApiDoc", 19)?;
         state.serialize_field("namespace", &self.namespace)?;
         state.serialize_field("name", &self.name)?;
         state.serialize_field("action", &self.action)?;
@@ -86,6 +95,10 @@ impl Serialize for JsApiDoc {
         state.serialize_field("aliases", &self.aliases)?;
         state.serialize_field("permission", &self.permission)?;
         state.serialize_field("example", &self.example)?;
+        state.serialize_field("prerequisites", &self.prerequisites)?;
+        state.serialize_field("notes", &self.notes)?;
+        state.serialize_field("tags", &self.tags)?;
+        state.serialize_field("related_apis", &self.related_apis)?;
         state.end()
     }
 }
@@ -147,6 +160,10 @@ pub struct ApiManifestEntry {
     pub aliases: Vec<ApiAlias>,
     pub permission: Option<String>,
     pub example: Option<String>,
+    pub prerequisites: Option<Vec<String>>,
+    pub notes: Option<Vec<String>>,
+    pub tags: Option<Vec<String>>,
+    pub related_apis: Option<Vec<String>>,
 }
 
 impl From<JsApiDoc> for ApiManifestEntry {
@@ -166,6 +183,10 @@ impl From<JsApiDoc> for ApiManifestEntry {
             aliases: doc.aliases,
             permission: doc.permission,
             example: doc.example,
+            prerequisites: doc.prerequisites,
+            notes: doc.notes,
+            tags: doc.tags,
+            related_apis: doc.related_apis,
         }
     }
 }
@@ -187,6 +208,10 @@ impl From<ApiManifestEntry> for JsApiDoc {
             aliases: entry.aliases,
             permission: entry.permission,
             example: entry.example,
+            prerequisites: entry.prerequisites,
+            notes: entry.notes,
+            tags: entry.tags,
+            related_apis: entry.related_apis,
         }
     }
 }
@@ -238,6 +263,14 @@ pub struct JsManifestEntry {
     pub error_category: Option<String>,
     pub permission: Option<String>,
     pub example: Option<String>,
+    #[serde(default)]
+    pub prerequisites: Option<Vec<String>>,
+    #[serde(default)]
+    pub notes: Option<Vec<String>>,
+    #[serde(default)]
+    pub tags: Option<Vec<String>>,
+    #[serde(default)]
+    pub related_apis: Option<Vec<String>>,
 }
 
 impl From<JsApiAlias> for ApiAlias {
@@ -288,6 +321,10 @@ impl TryFrom<JsManifestEntry> for ApiManifestEntry {
             aliases: entry.aliases.into_iter().map(Into::into).collect(),
             permission: entry.permission,
             example: entry.example,
+            prerequisites: entry.prerequisites,
+            notes: entry.notes,
+            tags: entry.tags,
+            related_apis: entry.related_apis,
         })
     }
 }
@@ -904,6 +941,30 @@ pub fn generate_markdown() -> String {
             if let Some(permission) = &api.permission {
                 md.push_str(&format!("**Permission required:** `{}`\n\n", permission));
             }
+            if let Some(prereqs) = &api.prerequisites {
+                md.push_str("**Prerequisites**\n\n");
+                for p in prereqs {
+                    md.push_str(&format!("- {}\n", p));
+                }
+                md.push('\n');
+            }
+            if let Some(notes) = &api.notes {
+                md.push_str("**Notes**\n\n");
+                for n in notes {
+                    md.push_str(&format!("- {}\n", n));
+                }
+                md.push('\n');
+            }
+            if let Some(tags) = &api.tags {
+                md.push_str(&format!("**Tags:** `{}`\n\n", tags.join("`, `")));
+            }
+            if let Some(related) = &api.related_apis {
+                md.push_str("**Related APIs**\n\n");
+                for r in related {
+                    md.push_str(&format!("- `{}`\n", r));
+                }
+                md.push('\n');
+            }
             if !api.aliases.is_empty() {
                 md.push_str("**Aliases**\n\n");
                 for alias in &api.aliases {
@@ -1166,6 +1227,10 @@ mod tests {
             aliases: vec![],
             permission: None,
             example: None,
+            prerequisites: None,
+            notes: None,
+            tags: None,
+            related_apis: None,
         });
 
         let json = generate_json().unwrap();
@@ -1174,6 +1239,22 @@ mod tests {
         assert!(json.contains("RustCore"));
         assert!(json.contains("Async"));
         assert!(json.contains("rust_core"));
+    }
+
+    #[test]
+    fn test_js_manifest_entry_backward_compatibility() {
+        // Old manifests without the new agent metadata fields should still deserialize.
+        let json = r#"{"action":"test","namespace":"test","name":"foo","publicName":"test.foo","description":"Test","fields":null,"aliases":[],"paramsDoc":[],"returnsDoc":{"type":"null","description":"None"},"errorCode":"E_TEST"}"#;
+        let entry: JsManifestEntry = serde_json::from_str(json).unwrap();
+        assert_eq!(entry.action, "test");
+        assert_eq!(entry.namespace, "test");
+        assert_eq!(entry.name, "foo");
+        assert_eq!(entry.public_name, "test.foo");
+        assert_eq!(entry.description, "Test");
+        assert!(entry.prerequisites.is_none());
+        assert!(entry.notes.is_none());
+        assert!(entry.tags.is_none());
+        assert!(entry.related_apis.is_none());
     }
 
     #[test]
@@ -1198,6 +1279,10 @@ mod tests {
             aliases: vec![],
             permission: None,
             example: None,
+            prerequisites: None,
+            notes: None,
+            tags: None,
+            related_apis: None,
         };
 
         register(doc.clone());
@@ -1234,6 +1319,10 @@ mod tests {
             aliases: vec![],
             permission: None,
             example: None,
+            prerequisites: None,
+            notes: None,
+            tags: None,
+            related_apis: None,
         });
 
         let md = generate_markdown();
@@ -1273,6 +1362,10 @@ mod tests {
             aliases: vec![],
             permission: None,
             example: Some("browser.navigate(\"https://example.com\")".into()),
+            prerequisites: None,
+            notes: None,
+            tags: None,
+            related_apis: None,
         });
 
         let md = generate_markdown();
@@ -1303,12 +1396,59 @@ mod tests {
             aliases: vec![],
             permission: Some("notifications".into()),
             example: None,
+            prerequisites: None,
+            notes: None,
+            tags: None,
+            related_apis: None,
         });
 
         let md = generate_markdown();
         assert!(md.contains("## `chrome.notifications` module"));
         assert!(md.contains("chrome.notifications.create"));
         assert!(md.contains("**Permission required:** `notifications`"));
+    }
+
+    #[test]
+    fn test_generate_markdown_includes_agent_metadata() {
+        clear_docs();
+
+        register(JsApiDoc {
+            namespace: "agent".into(),
+            name: "plan".into(),
+            action: Some("agent_plan".into()),
+            description: "Create an execution plan.".into(),
+            params: vec![],
+            returns: ReturnDoc {
+                js_type: "object".into(),
+                description: "Plan object.".into(),
+            },
+            public_name: "agent.plan".into(),
+            local_name: None,
+            transport: ToolTransport::Async,
+            tool_source: ToolSource::RustCore,
+            fields: None,
+            aliases: vec![],
+            permission: None,
+            example: None,
+            prerequisites: Some(vec!["User must be authenticated".into(), "Active session required".into()]),
+            notes: Some(vec!["This API is idempotent".into(), "Results are cached for 5 minutes".into()]),
+            tags: Some(vec!["planning".into(), "agent".into(), "core".into()]),
+            related_apis: Some(vec!["agent.execute".into(), "agent.review".into()]),
+        });
+
+        let md = generate_markdown();
+        assert!(md.contains("## `agent` module"));
+        assert!(md.contains("agent.plan"));
+        assert!(md.contains("**Prerequisites**"));
+        assert!(md.contains("- User must be authenticated"));
+        assert!(md.contains("- Active session required"));
+        assert!(md.contains("**Notes**"));
+        assert!(md.contains("- This API is idempotent"));
+        assert!(md.contains("- Results are cached for 5 minutes"));
+        assert!(md.contains("**Tags:** `planning`, `agent`, `core`"));
+        assert!(md.contains("**Related APIs**"));
+        assert!(md.contains("- `agent.execute`"));
+        assert!(md.contains("- `agent.review`"));
     }
 
     #[test]
@@ -1333,6 +1473,10 @@ mod tests {
             aliases: vec![],
             permission: None,
             example: None,
+            prerequisites: None,
+            notes: None,
+            tags: None,
+            related_apis: None,
         });
 
         let json = generate("json").unwrap();
@@ -1372,6 +1516,10 @@ mod tests {
             aliases: vec![],
             permission: None,
             example: None,
+            prerequisites: None,
+            notes: None,
+            tags: None,
+            related_apis: None,
         });
 
         let md = generate("markdown").unwrap();
@@ -1406,6 +1554,10 @@ mod tests {
             aliases: vec![],
             permission: None,
             example: None,
+            prerequisites: None,
+            notes: None,
+            tags: None,
+            related_apis: None,
         });
         // Register a handler so the binding is generated
         let _ = register_handler(
@@ -1439,6 +1591,10 @@ mod tests {
             aliases: vec![],
             permission: None,
             example: None,
+            prerequisites: None,
+            notes: None,
+            tags: None,
+            related_apis: None,
         });
         // Register a handler so the binding is generated
         let _ = register_handler(
@@ -1472,6 +1628,10 @@ mod tests {
             aliases: vec![],
             permission: None,
             example: None,
+            prerequisites: None,
+            notes: None,
+            tags: None,
+            related_apis: None,
         });
 
         let js = generate_js_bindings_code();
@@ -1528,6 +1688,10 @@ mod tests {
             aliases: vec![],
             permission: None,
             example: None,
+            prerequisites: None,
+            notes: None,
+            tags: None,
+            related_apis: None,
         });
 
         let js = generate_js_bindings_code();
@@ -1560,6 +1724,10 @@ mod tests {
             aliases: vec![],
             permission: None,
             example: None,
+            prerequisites: None,
+            notes: None,
+            tags: None,
+            related_apis: None,
         });
         // Register a handler so the binding is generated
         let _ = register_handler(
@@ -1606,6 +1774,10 @@ mod tests {
             aliases: vec![],
             permission: None,
             example: None,
+            prerequisites: None,
+            notes: None,
+            tags: None,
+            related_apis: None,
         });
         // Register a handler so the binding is generated
         let _ = register_handler(
@@ -1652,6 +1824,10 @@ mod tests {
             aliases: vec![],
             permission: None,
             example: None,
+            prerequisites: None,
+            notes: None,
+            tags: None,
+            related_apis: None,
         });
         // Register a handler so the binding is generated
         let _ = register_handler(
@@ -1685,6 +1861,10 @@ mod tests {
             aliases: vec![],
             permission: None,
             example: None,
+            prerequisites: None,
+            notes: None,
+            tags: None,
+            related_apis: None,
         });
         // Register a handler so the binding is generated
         let _ = register_handler(
@@ -1737,6 +1917,10 @@ mod tests {
             aliases: vec![],
             permission: None,
             example: None,
+            prerequisites: None,
+            notes: None,
+            tags: None,
+            related_apis: None,
         };
 
         assert!(register_manifest_entry(entry).is_ok());
@@ -1767,6 +1951,10 @@ mod tests {
             aliases: vec![],
             permission: None,
             example: None,
+            prerequisites: None,
+            notes: None,
+            tags: None,
+            related_apis: None,
         };
 
         let entry2 = ApiManifestEntry {
@@ -1787,6 +1975,10 @@ mod tests {
             aliases: vec![],
             permission: None,
             example: None,
+            prerequisites: None,
+            notes: None,
+            tags: None,
+            related_apis: None,
         };
 
         assert!(register_manifest_entry(entry1).is_ok());
@@ -1819,6 +2011,10 @@ mod tests {
             aliases: vec![],
             permission: None,
             example: None,
+            prerequisites: None,
+            notes: None,
+            tags: None,
+            related_apis: None,
         };
 
         let entry2 = ApiManifestEntry {
@@ -1839,6 +2035,10 @@ mod tests {
             aliases: vec![],
             permission: None,
             example: None,
+            prerequisites: None,
+            notes: None,
+            tags: None,
+            related_apis: None,
         };
 
         assert!(register_manifest_entry(entry1).is_ok());
@@ -1872,6 +2072,10 @@ mod tests {
             aliases: vec![],
             permission: None,
             example: None,
+            prerequisites: None,
+            notes: None,
+            tags: None,
+            related_apis: None,
         };
 
         let second = ApiManifestEntry {
@@ -1896,6 +2100,10 @@ mod tests {
             }],
             permission: None,
             example: None,
+            prerequisites: None,
+            notes: None,
+            tags: None,
+            related_apis: None,
         };
 
         assert!(register_executable_entry(
@@ -1968,6 +2176,10 @@ mod tests {
             ],
             permission: None,
             example: None,
+            prerequisites: None,
+            notes: None,
+            tags: None,
+            related_apis: None,
         };
 
         let result = register_executable_entry(
@@ -2019,6 +2231,10 @@ mod tests {
             }],
             permission: None,
             example: None,
+            prerequisites: None,
+            notes: None,
+            tags: None,
+            related_apis: None,
         };
 
         let result = register_executable_entry(
@@ -2066,6 +2282,10 @@ mod tests {
             aliases: vec![],
             permission: None,
             example: None,
+            prerequisites: None,
+            notes: None,
+            tags: None,
+            related_apis: None,
         };
 
         let duplicate_alias_entry = ApiManifestEntry {
@@ -2097,6 +2317,10 @@ mod tests {
             ],
             permission: None,
             example: None,
+            prerequisites: None,
+            notes: None,
+            tags: None,
+            related_apis: None,
         };
 
         let handler = ApiHandler::Rust(std::rc::Rc::new(|_cmd| {
@@ -2149,6 +2373,10 @@ mod tests {
             aliases: vec![],
             permission: None,
             example: None,
+            prerequisites: None,
+            notes: None,
+            tags: None,
+            related_apis: None,
         };
 
         // Register both manifest and handler atomically so freeze validation passes.
@@ -2197,6 +2425,10 @@ mod tests {
             aliases: vec![],
             permission: None,
             example: None,
+            prerequisites: None,
+            notes: None,
+            tags: None,
+            related_apis: None,
         };
 
         // Register manifest entry WITHOUT handler to create an orphan
@@ -2243,6 +2475,10 @@ mod tests {
             }],
             permission: None,
             example: None,
+            prerequisites: None,
+            notes: None,
+            tags: None,
+            related_apis: None,
         };
 
         let _ = register_manifest_entry(entry);
@@ -2287,6 +2523,10 @@ mod tests {
             aliases: vec![],
             permission: None,
             example: None,
+            prerequisites: None,
+            notes: None,
+            tags: None,
+            related_apis: None,
         };
 
         let _ = register_manifest_entry(entry);

@@ -1,40 +1,24 @@
 /// <reference types="chrome" />
 import { z } from "zod";
-import { logger } from "../../../shared/logger.js";
 import * as schemas from "../../../shared/schemas.js";
 import {
 	dispatchTool,
 	registerJsCall,
-	registerContentScriptJsCall,
 	type CallContext,
-	type ToolDocParam,
 } from "../../../shared/tool-registry.js";
-import type { DomFormatParams, DomSnapshotParams, FetchParams } from "../runtime.js";
+import { CONTENT_SCRIPT_TOOL_SPECS } from "../../../shared/registry/content-script-tools.js";
+import { defineContentScriptTool } from "../../../shared/registry/define-content-script-tool.js";
 import {
 	makeError,
 	asRecord,
 	extractTabId,
 	unwrapResult,
-	sendMessageToTab,
-	getActiveTabId,
 	resolveActiveTabId,
 	executeInTab,
 	preflightScriptableTab,
 	waitForTabLoad,
-	handleFetch,
-	handleHostCallAction,
-	registerChromePassthrough,
-	getElementByRefId,
-	extractRefId,
-	handleDomSnapshot,
-	handleDomFormat,
-	ensureDomSnapshot,
 	buildSnapshotInTab,
-	throwIfAborted,
-	DEFAULT_TIMEOUT_MS,
 	DEFAULT_MAX_NODES,
-	DEFAULT_SCROLL_AMOUNT,
-	DEFAULT_POLL_INTERVAL_MS,
 } from "../runtime.js";
 
 async function runTabSnapshot(
@@ -75,6 +59,10 @@ async function runTabSnapshot(
 }
 
 // ─── Tab actions ─────────────────────────────────────────────────
+
+for (const spec of CONTENT_SCRIPT_TOOL_SPECS.filter((s) => s.namespace === "web.tab")) {
+	defineContentScriptTool(spec);
+}
 
 registerJsCall({
 	action: "tab_query",
@@ -329,310 +317,6 @@ registerJsCall({
 	example: "web.tab.execute_script({ tabId: 123, script: \"document.title\" })",
 });
 
-registerContentScriptJsCall({
-	action: "tab_click",
-	namespace: "web.tab",
-	name: "click",
-	description: "Click in a tab",
-	params: schemas.TabClickParamsSchema,
-	returns: z.null(),
-	paramTypes: [
-		{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
-		{
-			name: "refId",
-			type: "string",
-			required: false,
-			description: "Element reference ID (refId)",
-		},
-		{
-			name: "label",
-			type: "string",
-			required: false,
-			description: "Element label (label)",
-		},
-	],
-	returnDoc: "Click result",
-	errorCode: "E_NO_TAB",
-	example: "web.tab.click({ tabId: 123, refId: \"e2\" })",
-});
-
-registerContentScriptJsCall({
-	action: "tab_fill",
-	namespace: "web.tab",
-	name: "fill",
-	description: "Fill in a tab",
-	params: schemas.TabFillParamsSchema,
-	returns: z.null(),
-	paramTypes: [
-		{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
-		{
-			name: "refId",
-			type: "string",
-			required: false,
-			description: "Element reference ID (refId)",
-		},
-		{
-			name: "value",
-			type: "string",
-			required: false,
-			description: "Value to fill (literal)",
-		},
-		{
-			name: "label",
-			type: "string",
-			required: false,
-			description: "Element label (label)",
-		},
-	],
-	returnDoc: "Fill result",
-	errorCode: "E_NO_TAB",
-	example: "web.tab.fill({ tabId: 123, refId: \"e2\", value: \"hello\" })",
-});
-
-registerContentScriptJsCall({
-	action: "tab_scroll_to",
-	namespace: "web.tab",
-	name: "scroll_to",
-	description: "Scroll to position in a tab",
-	params: schemas.TabScrollToParamsSchema,
-	returns: z.boolean(),
-	paramTypes: [
-		{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
-		{ name: "x", type: "number", required: false, description: "X coordinate (literal)" },
-		{ name: "y", type: "number", required: false, description: "Y coordinate (literal)" },
-		{
-			name: "refId",
-			type: "string",
-			required: false,
-			description: "Element reference ID (refId)",
-		},
-		{
-			name: "label",
-			type: "string",
-			required: false,
-			description: "Element label (label)",
-		},
-	],
-	returnDoc: "Scroll to result",
-	errorCode: "E_NO_TAB",
-	example: "web.tab.scroll_to({ tabId: 123, refId: \"e2\" })",
-});
-
-registerContentScriptJsCall({
-	action: "tab_type",
-	namespace: "web.tab",
-	name: "type",
-	description: "Type in a tab",
-	params: schemas.TabTypeParamsSchema,
-	returns: z.null(),
-	paramTypes: [
-		{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
-		{
-			name: "refId",
-			type: "string",
-			required: false,
-			description: "Element reference ID (refId)",
-		},
-		{
-			name: "text",
-			type: "string",
-			required: false,
-			description: "Text to type (literal)",
-		},
-		{
-			name: "label",
-			type: "string",
-			required: false,
-			description: "Element label (label)",
-		},
-	],
-	returnDoc: "Type result",
-	errorCode: "E_NO_TAB",
-	example: "web.tab.type({ tabId: 123, refId: \"e2\", text: \"hello\" })",
-});
-
-registerContentScriptJsCall({
-	action: "tab_press",
-	namespace: "web.tab",
-	name: "press",
-	description: "Press a key in a tab",
-	params: schemas.TabPressParamsSchema,
-	returns: z.null(),
-	paramTypes: [
-		{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
-		{
-			name: "key",
-			type: "string",
-			required: false,
-			description: "Key to press (literal)",
-		},
-	],
-	returnDoc: "Press result",
-	errorCode: "E_NO_TAB",
-	example: "web.tab.press({ tabId: 123, key: \"Enter\" })",
-});
-
-registerContentScriptJsCall({
-	action: "tab_select",
-	namespace: "web.tab",
-	name: "select",
-	description: "Select an option in a tab",
-	params: schemas.TabSelectParamsSchema,
-	returns: z.null(),
-	paramTypes: [
-		{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
-		{
-			name: "refId",
-			type: "string",
-			required: false,
-			description: "Element reference ID (refId)",
-		},
-		{
-			name: "label",
-			type: "string",
-			required: false,
-			description: "Element label (label)",
-		},
-		{
-			name: "value",
-			type: "string",
-			required: false,
-			description: "Option value to select (literal)",
-		},
-	],
-	returnDoc: "Select result",
-	errorCode: "E_NO_TAB",
-	example: "web.tab.select({ tabId: 123, refId: \"e2\", value: \"option1\" })",
-});
-
-registerContentScriptJsCall({
-	action: "tab_check",
-	namespace: "web.tab",
-	name: "check",
-	description: "Check/uncheck in a tab",
-	params: schemas.TabCheckParamsSchema,
-	returns: z.null(),
-	paramTypes: [
-		{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
-		{
-			name: "refId",
-			type: "string",
-			required: false,
-			description: "Element reference ID (refId)",
-		},
-		{
-			name: "label",
-			type: "string",
-			required: false,
-			description: "Element label (label)",
-		},
-		{
-			name: "checked",
-			type: "boolean",
-			required: false,
-			description: "Whether to check or uncheck (literal)",
-		},
-	],
-	returnDoc: "Check result",
-	errorCode: "E_NO_TAB",
-	example: "web.tab.check({ tabId: 123, refId: \"e2\", checked: true })",
-});
-
-registerContentScriptJsCall({
-	action: "tab_hover",
-	namespace: "web.tab",
-	name: "hover",
-	description: "Hover in a tab",
-	params: schemas.TabHoverParamsSchema,
-	returns: z.null(),
-	paramTypes: [
-		{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
-		{
-			name: "refId",
-			type: "string",
-			required: false,
-			description: "Element reference ID (refId)",
-		},
-		{
-			name: "label",
-			type: "string",
-			required: false,
-			description: "Element label (label)",
-		},
-	],
-	returnDoc: "Hover result",
-	errorCode: "E_NO_TAB",
-	example: "web.tab.hover({ tabId: 123, refId: \"e2\" })",
-});
-
-registerContentScriptJsCall({
-	action: "tab_unhover",
-	namespace: "web.tab",
-	name: "unhover",
-	description: "Unhover in a tab",
-	params: schemas.TabUnhoverParamsSchema,
-	returns: z.null(),
-	paramTypes: [
-		{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
-	],
-	returnDoc: "Unhover result",
-	errorCode: "E_NO_TAB",
-	example: "web.tab.unhover({ tabId: 123 })",
-});
-
-registerContentScriptJsCall({
-	action: "tab_scroll",
-	namespace: "web.tab",
-	name: "scroll",
-	description: "Scroll in a tab",
-	params: schemas.TabScrollParamsSchema,
-	returns: z.boolean(),
-	paramTypes: [
-		{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
-		{
-			name: "direction",
-			type: "string",
-			required: false,
-			description: "Scroll direction (up or down) (literal)",
-		},
-		{
-			name: "amount",
-			type: "number",
-			required: false,
-			description: "Scroll amount in pixels (literal)",
-		},
-	],
-	returnDoc: "Scroll result",
-	errorCode: "E_NO_TAB",
-	example: "web.tab.scroll({ tabId: 123, direction: \"down\", amount: 500 })",
-});
-
-registerContentScriptJsCall({
-	action: "tab_dblclick",
-	namespace: "web.tab",
-	name: "dblclick",
-	description: "Double-click in a tab",
-	params: schemas.TabDblClickParamsSchema,
-	returns: z.null(),
-	paramTypes: [
-		{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
-		{
-			name: "refId",
-			type: "string",
-			required: false,
-			description: "Element reference ID (refId)",
-		},
-		{
-			name: "label",
-			type: "string",
-			required: false,
-			description: "Element label (label)",
-		},
-	],
-	returnDoc: "Double-click result",
-	errorCode: "E_NO_TAB",
-	example: "web.tab.dblclick({ tabId: 123, refId: \"e2\" })",
-});
 
 registerJsCall({
 	action: "tab_evaluate",
@@ -686,20 +370,6 @@ registerJsCall({
 	example: "web.tab.evaluate({ tabId: 123, script: \"document.title\" })",
 });
 
-registerContentScriptJsCall({
-	action: "tab_back",
-	namespace: "web.tab",
-	name: "back",
-	description: "Go back in a tab",
-	params: schemas.TabBackParamsSchema,
-	returns: z.boolean(),
-	paramTypes: [
-		{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
-	],
-	returnDoc: "Back result",
-	errorCode: "E_NO_TAB",
-	example: "web.tab.back({ tabId: 123 })",
-});
 
 registerJsCall({
 	action: "tab_wait_for_load",

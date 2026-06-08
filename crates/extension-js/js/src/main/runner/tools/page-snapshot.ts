@@ -88,6 +88,11 @@ registerJsCall({
 	errorCode: "E_SNAPSHOT",
 
 	example: "page.snapshot({ text: \"hello\" })",
+	agentMeta: {
+		notes: ["Uses script injection; does not guarantee mutations work"],
+		tags: ["snapshot", "read"],
+		relatedApis: ["web.tab.snapshot"],
+	},
 });
 
 registerJsCall({
@@ -193,4 +198,9 @@ registerJsCall({
 	errorCode: "E_SNAPSHOT",
 
 	example: "page.snapshot_data({ value: \"hello\" })",
+	agentMeta: {
+		notes: ["Uses script injection; does not guarantee mutations work"],
+		tags: ["snapshot", "read"],
+		relatedApis: ["web.tab.snapshot_data"],
+	},
 });

@@ -2,7 +2,11 @@ import { z } from "zod";
 import { logger } from "./logger.js";
 import { dispatchValidated } from "./registry/dispatch.js";
 import { getRoute, inferOwner } from "./registry/routes.js";
-import { isContentScriptAction } from "./registry/content-script-actions.js";
+import { clearContentScriptActions, isContentScriptAction } from "./registry/content-script-actions.js";
+import {
+	zodToParamDocs,
+	zodToReturnType,
+} from "./registry/zod-to-docs.js";
 import {
 	type AsyncError,
 	type AsyncResponse,
@@ -56,29 +60,6 @@ export function throwIfAborted(): void {
 	if (signal?.aborted) {
 		throw new Error("Runner aborted: ExtensionSession stopped");
 	}
-}
-
-// ─── Helper: extract a readable type name from a Zod schema ─────
-
-function zodTypeName(schema: z.ZodSchema<unknown>): string {
-	if (schema instanceof z.ZodString) return "string";
-	if (schema instanceof z.ZodNumber) return "number";
-	if (schema instanceof z.ZodBigInt) return "number";
-	if (schema instanceof z.ZodBoolean) return "boolean";
-	if (schema instanceof z.ZodNull) return "null";
-	if (schema instanceof z.ZodArray) return "array";
-	if (schema instanceof z.ZodObject) return "object";
-	if (schema instanceof z.ZodRecord) return "record";
-	if (schema instanceof z.ZodUnion) return "union";
-	if (schema instanceof z.ZodUnknown) return "unknown";
-	if (schema instanceof z.ZodAny) return "unknown";
-	if (schema instanceof z.ZodOptional) {
-		return zodTypeName(schema.unwrap());
-	}
-	if (schema instanceof z.ZodNullable) {
-		return zodTypeName(schema.unwrap());
-	}
-	return "unknown";
 }
 
 function isCodedError(err: unknown): err is { code?: string; category?: string } {
@@ -160,7 +141,7 @@ export function registerJsCall<P, R>(spec: JsCallSpec<P, R>): void {
 		},
 		paramTypes: spec.paramTypes ?? [],
 		returnType:
-			spec.returnType ?? zodTypeName(spec.returns as z.ZodSchema<unknown>),
+			spec.returnType ?? zodToReturnType(spec.returns as z.ZodSchema<unknown>),
 		returnDoc: spec.returnDoc ?? "Result",
 		errorCode: spec.errorCode,
 		errorCategory: spec.errorCategory,
@@ -184,6 +165,7 @@ export function clearRegistry(): void {
 	toolRegistry.clear();
 	jsRegistry.clear();
 	jsRegistryFrozen = false;
+	clearContentScriptActions();
 }
 
 export function freezeJsRegistry(): void {
@@ -201,7 +183,7 @@ export function freezeJsRegistry(): void {
 		} else if (entry.owner === "content-script") {
 			if (!isContentScriptAction(entry.action)) {
 				orphans.push(
-					`${entry.action} (content-script: missing from CONTENT_SCRIPT_ACTIONS)`,
+					`${entry.action} (content-script: missing from content-script action set)`,
 				);
 			}
 		} else {
@@ -225,6 +207,7 @@ export function clearJsRegistry(): void {
 	jsRegistry.clear();
 	jsRegistryFrozen = false;
 	toolRegistry.clear();
+	clearContentScriptActions();
 }
 
 export function getSerializableJsManifest(): SerializableJsCallManifestEntry[] {
@@ -232,9 +215,12 @@ export function getSerializableJsManifest(): SerializableJsCallManifestEntry[] {
 	for (const [action, spec] of jsRegistry) {
 		if (spec.owner === "rust") continue;
 
-		const paramsDoc = spec.paramTypes ?? [];
+		const paramsDoc =
+			spec.paramTypes && spec.paramTypes.length > 0
+				? spec.paramTypes
+				: zodToParamDocs(spec.params);
 		const returnsDoc = {
-			type: spec.returnType ?? zodTypeName(spec.returns),
+			type: spec.returnType ?? zodToReturnType(spec.returns),
 			description: spec.returnDoc ?? "Result",
 		};
 		entries.push({
@@ -252,12 +238,16 @@ export function getSerializableJsManifest(): SerializableJsCallManifestEntry[] {
 				})) ?? null,
 			owner: spec.owner,
 			paramsDoc,
-		returnsDoc,
-		errorCode: spec.errorCode,
-		errorCategory: spec.errorCategory,
-		permission: spec.permission,
-		example: spec.example,
-	});
+			returnsDoc,
+			errorCode: spec.errorCode,
+			errorCategory: spec.errorCategory,
+			permission: spec.permission,
+			example: spec.example,
+			prerequisites: spec.agentMeta?.prerequisites,
+			notes: spec.agentMeta?.notes,
+			tags: spec.agentMeta?.tags,
+			relatedApis: spec.agentMeta?.relatedApis,
+		});
 	}
 	return entries;
 }

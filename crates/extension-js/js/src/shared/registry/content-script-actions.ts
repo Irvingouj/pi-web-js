@@ -1,39 +1,25 @@
 /**
  * Actions whose handler bodies run in the content script (DOM in the active tab).
  * Chrome/scripting wrappers and executeInTab-only APIs stay on main-thread.
+ * Populated dynamically by defineContentScriptTool registrations.
  */
-export const CONTENT_SCRIPT_ACTIONS = new Set<string>([
-	"page_url",
-	"page_title",
-	"page_click",
-	"page_fill",
-	"page_type",
-	"page_append",
-	"page_press",
-	"page_select",
-	"page_check",
-	"page_hover",
-	"page_unhover",
-	"page_scroll",
-	"page_scroll_to",
-	"page_dblclick",
-	"page_back",
-	"tab_click",
-	"tab_fill",
-	"tab_type",
-	"tab_press",
-	"tab_select",
-	"tab_check",
-	"tab_hover",
-	"tab_unhover",
-	"tab_scroll",
-	"tab_scroll_to",
-	"tab_dblclick",
-	"tab_back",
-]);
+const contentScriptActions = new Set<string>();
+
+export function addContentScriptAction(action: string): void {
+	contentScriptActions.add(action);
+}
 
 export function isContentScriptAction(action: string): boolean {
-	return CONTENT_SCRIPT_ACTIONS.has(action);
+	return contentScriptActions.has(action);
+}
+
+export function getContentScriptActions(): string[] {
+	return Array.from(contentScriptActions);
+}
+
+/** Test-only helper: clear the dynamic content-script action set. */
+export function clearContentScriptActions(): void {
+	contentScriptActions.clear();
 }
 
 /** Map registry action (page_click) to content-script handler key (click). */

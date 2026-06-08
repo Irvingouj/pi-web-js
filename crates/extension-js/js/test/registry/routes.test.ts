@@ -7,10 +7,12 @@ import {
 	populateRoutesFromManifest,
 	routeFromOwner,
 } from "../../src/shared/registry/routes.js";
+import { clearContentScriptActions, addContentScriptAction } from "../../src/shared/registry/content-script-actions.js";
 
 describe("registry routes", () => {
 	beforeEach(() => {
 		clearRoutes();
+		clearContentScriptActions();
 	});
 
 	it("inferTabPolicy requires tabId for tab_* actions", () => {
@@ -19,6 +21,7 @@ describe("registry routes", () => {
 	});
 
 	it("routeFromOwner rewrites main-thread page actions to content-script", () => {
+		addContentScriptAction("page_click");
 		const route = routeFromOwner("page_click", "main-thread");
 		expect(route.endpoint).toBe("content-script");
 		expect(route.tabPolicy).toBe("active");

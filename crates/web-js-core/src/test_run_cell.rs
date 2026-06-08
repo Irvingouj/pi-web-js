@@ -789,6 +789,10 @@ mod tests {
                 aliases: vec![],
                 permission: None,
                 example: None,
+                prerequisites: None,
+                notes: None,
+                tags: None,
+                related_apis: None,
             });
             let action_name = action.to_string();
             let _ = register_handler(
@@ -951,6 +955,10 @@ console.log(result)"#;
             aliases: vec![],
             permission: None,
             example: None,
+            prerequisites: None,
+            notes: None,
+            tags: None,
+            related_apis: None,
         });
         let _ = register_handler(
             "chrome_cookies_get",
@@ -1026,6 +1034,10 @@ console.log(result)"#;
             aliases: vec![],
             permission: None,
             example: None,
+            prerequisites: None,
+            notes: None,
+            tags: None,
+            related_apis: None,
         });
         let _ = register_handler(
             "page_extract",
@@ -1124,6 +1136,10 @@ console.log(result)"#;
             aliases: vec![],
             permission: None,
             example: None,
+            prerequisites: None,
+            notes: None,
+            tags: None,
+            related_apis: None,
         });
         let _ = register_handler(
             "chrome_tabs_create",

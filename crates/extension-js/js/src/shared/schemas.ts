@@ -32,22 +32,22 @@ const bigintLike = () =>
 // ─── Storage schemas ───────────────────────────────────────────
 
 export const StorageGetParamsSchema = z.object({
-	key: z.string(),
+	key: z.string().describe("Storage key to retrieve"),
 });
 
 export const StorageSetParamsSchema = z.object({
-	key: z.string(),
-	value: z.string(),
+	key: z.string().describe("Storage key to set"),
+	value: z.string().describe("Value to store"),
 });
 
 export const StorageDeleteParamsSchema = z.object({
-	key: z.string(),
+	key: z.string().describe("Storage key to delete"),
 });
 
 export const StorageListParamsSchema = z.object({});
 
 const storageSetManyShape = z.object({
-	items: z.record(z.unknown()),
+	items: z.record(z.unknown()).describe("Record of key-value pairs to store"),
 });
 export type StorageSetManyParams = z.infer<typeof storageSetManyShape>;
 export const StorageSetManyParamsSchema = z.preprocess((val) => {
@@ -63,8 +63,8 @@ export const StorageSetManyParamsSchema = z.preprocess((val) => {
 }, storageSetManyShape) as z.ZodType<StorageSetManyParams>;
 
 const storageGetManyShape = z.object({
-	keys: z.array(z.string()),
-	defaults: z.record(z.unknown()).optional(),
+	keys: z.array(z.string()).describe("Array of storage keys to retrieve"),
+	defaults: z.record(z.unknown()).optional().describe("Default values for missing keys"),
 });
 export type StorageGetManyParams = z.infer<typeof storageGetManyShape>;
 export const StorageGetManyParamsSchema = z.preprocess(
@@ -75,7 +75,7 @@ export const StorageGetManyParamsSchema = z.preprocess(
 export const StorageGetAllParamsSchema = z.object({});
 
 const storageDeleteManyShape = z.object({
-	keys: z.array(z.string()),
+	keys: z.array(z.string()).describe("Array of storage keys to delete"),
 });
 export type StorageDeleteManyParams = z.infer<typeof storageDeleteManyShape>;
 export const StorageDeleteManyParamsSchema = z.preprocess(
@@ -96,15 +96,15 @@ export const ClipboardWriteParamsSchema = z.union([
 // ─── Network / Sleep schemas ───────────────────────────────────
 
 export const FetchParamsSchema = z.object({
-	url: z.string(),
-	method: z.string().default("GET"),
-	headers: z.record(z.string()).default({}),
-	body: z.string().nullable().default(null),
-	timeout: bigintLike().default(30000n),
+	url: z.string().describe("URL to fetch"),
+	method: z.string().default("GET").describe("HTTP method (GET, POST, PUT, DELETE, etc.)"),
+	headers: z.record(z.string()).default({}).describe("Request headers as key-value pairs"),
+	body: z.string().nullable().default(null).describe("Request body string"),
+	timeout: bigintLike().default(30000n).describe("Timeout in milliseconds"),
 });
 
 export const SleepParamsSchema = z.object({
-	duration: bigintLike(),
+	duration: bigintLike().describe("Duration to sleep in milliseconds"),
 });
 
 // ─── DOM interaction helpers ─────────────────────────────────────
@@ -160,15 +160,15 @@ const elementTargetParams = (extra?: z.ZodRawShape) =>
 		},
 		z
 			.object({
-				__invalidPositional: z.union([z.string(), z.number()]).optional(),
-				refId: refIdString().optional(),
-				label: z.string().optional(),
+				__invalidPositional: z.union([z.string(), z.number()]).optional().describe("Internal flag for positional argument rejection"),
+				refId: refIdString().optional().describe("Element reference ID (e.g. e2)"),
+				label: z.string().optional().describe("Human-readable element label"),
 				...extra,
 			})
 			.superRefine(requireRefIdOrLabel),
 	);
 
-const tabIdField = { tabId: z.union([z.number(), z.bigint()]).optional() };
+const tabIdField = { tabId: z.union([z.number(), z.bigint()]).optional().describe("Target tab ID") };
 
 const tabElementTargetParams = (extra?: z.ZodRawShape) =>
 	z.preprocess(
@@ -180,10 +180,10 @@ const tabElementTargetParams = (extra?: z.ZodRawShape) =>
 		},
 		z
 			.object({
-				__invalidPositional: z.union([z.string(), z.number()]).optional(),
+				__invalidPositional: z.union([z.string(), z.number()]).optional().describe("Internal flag for positional argument rejection"),
 				...tabIdField,
-				refId: refIdString().optional(),
-				label: z.string().optional(),
+				refId: refIdString().optional().describe("Element reference ID (e.g. e2)"),
+				label: z.string().optional().describe("Human-readable element label"),
 				...extra,
 			})
 			.superRefine(requireRefIdOrLabel),
@@ -195,8 +195,8 @@ export const PageUrlParamsSchema = z.object({});
 export const PageTitleParamsSchema = z.object({});
 
 export const PageGotoParamsSchema = z.object({
-	url: z.string(),
-	timeout: bigintLike().optional(),
+	url: z.string().describe("URL to navigate to"),
+	timeout: bigintLike().optional().describe("Navigation timeout in milliseconds"),
 });
 
 export const PageBackParamsSchema = z.object({});
@@ -204,28 +204,28 @@ export const PageForwardParamsSchema = z.object({});
 export const PageReloadParamsSchema = z.object({});
 
 export const PageWaitParamsSchema = z.object({
-	duration: bigintLike().default(1000n),
+	duration: bigintLike().default(1000n).describe("Duration to wait in milliseconds"),
 });
 
 export const PageClickParamsSchema = elementTargetParams();
-export const PageFillParamsSchema = elementTargetParams({ value: z.string() });
-export const PageTypeParamsSchema = elementTargetParams({ text: z.string() });
-export const PageAppendParamsSchema = elementTargetParams({ text: z.string() });
+export const PageFillParamsSchema = elementTargetParams({ value: z.string().describe("Value to fill into the element") });
+export const PageTypeParamsSchema = elementTargetParams({ text: z.string().describe("Text to type into the element") });
+export const PageAppendParamsSchema = elementTargetParams({ text: z.string().describe("Text to append into the element") });
 
 export const PagePressParamsSchema = z.object({
-	key: z.string(),
+	key: z.string().describe("Key to press (e.g. Enter, Escape, ArrowDown)"),
 });
 
-export const PageSelectParamsSchema = elementTargetParams({ value: z.string() });
+export const PageSelectParamsSchema = elementTargetParams({ value: z.string().describe("Value to select in the dropdown") });
 export const PageCheckParamsSchema = elementTargetParams({
-	checked: z.boolean().optional(),
+	checked: z.boolean().optional().describe("Desired checked state (true to check, false to uncheck)"),
 });
 export const PageHoverParamsSchema = elementTargetParams();
 export const PageUnhoverParamsSchema = z.object({});
 
 export const PageScrollParamsSchema = z.object({
-	direction: z.string().default("down"),
-	amount: z.number().default(300),
+	direction: z.string().default("down").describe("Scroll direction: up, down, left, or right"),
+	amount: z.number().default(300).describe("Pixels to scroll"),
 });
 
 export const PageScrollToParamsSchema = z.preprocess(
@@ -237,27 +237,27 @@ export const PageScrollToParamsSchema = z.preprocess(
 	},
 	z
 		.object({
-			__invalidPositional: z.union([z.string(), z.number()]).optional(),
-			refId: refIdString().optional(),
-			label: z.string().optional(),
-			x: z.number().optional(),
-			y: z.number().optional(),
+			__invalidPositional: z.union([z.string(), z.number()]).optional().describe("Internal flag for positional argument rejection"),
+			refId: refIdString().optional().describe("Element reference ID (e.g. e2)"),
+			label: z.string().optional().describe("Human-readable element label"),
+			x: z.number().optional().describe("X coordinate to scroll to"),
+			y: z.number().optional().describe("Y coordinate to scroll to"),
 		})
 		.superRefine(requireRefIdLabelOrCoordinates),
 );
 export const PageDblClickParamsSchema = elementTargetParams();
 
 export const PageFindParamsSchema = z.object({
-	selector: z.string(),
+	selector: z.string().describe("CSS selector to find elements"),
 });
 
 export const PageWaitForParamsSchema = z.object({
-	selector: z.string(),
-	timeout: bigintLike().default(30000n),
+	selector: z.string().describe("CSS selector to wait for"),
+	timeout: bigintLike().default(30000n).describe("Timeout in milliseconds"),
 });
 
 const pageExtractShape = z.object({
-	fields: z.array(z.string()),
+	fields: z.array(z.string()).describe("Array of field names to extract"),
 });
 export const PageExtractParamsSchema = z.preprocess(
 	(val) => (Array.isArray(val) ? { fields: val } : val),
@@ -277,8 +277,8 @@ export const TabQueryParamsSchema = z.record(z.unknown());
 export const TabCreateParamsSchema = z.preprocess(
 	(val) => (typeof val === "string" ? { url: val } : val),
 	z.object({
-		url: z.string().optional(),
-		active: z.boolean().optional(),
+		url: z.string().optional().describe("URL to open in the new tab"),
+		active: z.boolean().optional().describe("Whether to focus the new tab"),
 	}),
 );
 export const TabActivateParamsSchema = z.union([
@@ -294,7 +294,7 @@ export const TabCloseParamsSchema = z.union([
 export const TabExecuteScriptParamsSchema = z.record(z.unknown());
 
 export const TabClickParamsSchema = tabElementTargetParams();
-export const TabFillParamsSchema = tabElementTargetParams({ value: z.string() });
+export const TabFillParamsSchema = tabElementTargetParams({ value: z.string().describe("Value to fill into the element") });
 export const TabScrollToParamsSchema = z.preprocess(
 	(val) => {
 		if (typeof val === "string" || typeof val === "number") {
@@ -304,23 +304,23 @@ export const TabScrollToParamsSchema = z.preprocess(
 	},
 	z
 		.object({
-			__invalidPositional: z.union([z.string(), z.number()]).optional(),
+			__invalidPositional: z.union([z.string(), z.number()]).optional().describe("Internal flag for positional argument rejection"),
 			...tabIdField,
-			refId: refIdString().optional(),
-			label: z.string().optional(),
-			x: z.number().optional(),
-			y: z.number().optional(),
+			refId: refIdString().optional().describe("Element reference ID (e.g. e2)"),
+			label: z.string().optional().describe("Human-readable element label"),
+			x: z.number().optional().describe("X coordinate to scroll to"),
+			y: z.number().optional().describe("Y coordinate to scroll to"),
 		})
 		.superRefine(requireRefIdLabelOrCoordinates),
 );
-export const TabTypeParamsSchema = tabElementTargetParams({ text: z.string() });
+export const TabTypeParamsSchema = tabElementTargetParams({ text: z.string().describe("Text to type into the element") });
 export const TabPressParamsSchema = z.object({
 	...tabIdField,
-	key: z.string(),
+	key: z.string().describe("Key to press (e.g. Enter, Escape, ArrowDown)"),
 });
-export const TabSelectParamsSchema = tabElementTargetParams({ value: z.string() });
+export const TabSelectParamsSchema = tabElementTargetParams({ value: z.string().describe("Value to select in the dropdown") });
 export const TabCheckParamsSchema = tabElementTargetParams({
-	checked: z.boolean().optional(),
+	checked: z.boolean().optional().describe("Desired checked state (true to check, false to uncheck)"),
 });
 export const TabHoverParamsSchema = tabElementTargetParams();
 export const TabUnhoverParamsSchema = z.object({
@@ -328,8 +328,8 @@ export const TabUnhoverParamsSchema = z.object({
 });
 export const TabScrollParamsSchema = z.object({
 	...tabIdField,
-	direction: z.string().default("down"),
-	amount: z.number().default(300),
+	direction: z.string().default("down").describe("Scroll direction: up, down, left, or right"),
+	amount: z.number().default(300).describe("Pixels to scroll"),
 });
 export const TabDblClickParamsSchema = tabElementTargetParams();
 
@@ -347,60 +347,60 @@ export const TabSnapshotDataParamsSchema = z.record(z.unknown());
 export const SidepanelClickParamsSchema = elementTargetParams();
 export const SidepanelDblClickParamsSchema = elementTargetParams();
 export const SidepanelFillParamsSchema = elementTargetParams({
-	value: z.string().optional(),
+	value: z.string().optional().describe("Value to fill into the element"),
 });
 export const SidepanelTypeParamsSchema = elementTargetParams({
-	text: z.string().optional(),
+	text: z.string().optional().describe("Text to type into the element"),
 });
 export const SidepanelPressParamsSchema = z.object({
-	key: z.string().optional(),
+	key: z.string().optional().describe("Key to press (e.g. Enter, Escape, ArrowDown)"),
 });
 export const SidepanelSelectParamsSchema = elementTargetParams({
-	value: z.string().optional(),
+	value: z.string().optional().describe("Value to select in the dropdown"),
 });
 export const SidepanelCheckParamsSchema = elementTargetParams({
-	checked: z.boolean().optional(),
+	checked: z.boolean().optional().describe("Desired checked state (true to check, false to uncheck)"),
 });
 export const SidepanelHoverParamsSchema = elementTargetParams();
 export const SidepanelUnhoverParamsSchema = z.object({});
 export const SidepanelScrollParamsSchema = z.object({
-	direction: z.string().optional(),
-	amount: z.number().optional(),
+	direction: z.string().optional().describe("Scroll direction: up, down, left, or right"),
+	amount: z.number().optional().describe("Pixels to scroll"),
 });
 export const SidepanelScrollToParamsSchema = elementTargetParams();
 export const SidepanelAppendParamsSchema = elementTargetParams({
-	text: z.string().optional(),
+	text: z.string().optional().describe("Text to append into the element"),
 });
 
 export const SidepanelUrlParamsSchema = z.object({});
 export const SidepanelTitleParamsSchema = z.object({});
 export const SidepanelWaitParamsSchema = z.object({
-	duration: bigintLike().default(1000n),
+	duration: bigintLike().default(1000n).describe("Duration to wait in milliseconds"),
 });
 
 export const SidepanelSnapshotParamsSchema = z.object({
-	interactive_only: z.boolean().default(false),
-	max_nodes: bigintLike().default(500n),
+	interactive_only: z.boolean().default(false).describe("Only include interactive elements"),
+	max_nodes: bigintLike().default(500n).describe("Maximum number of nodes to include in snapshot"),
 });
 export const SidepanelSnapshotTextParamsSchema = z.object({
-	interactive_only: z.boolean().default(false),
-	max_nodes: bigintLike().default(500n),
+	interactive_only: z.boolean().default(false).describe("Only include interactive elements"),
+	max_nodes: bigintLike().default(500n).describe("Maximum number of nodes to include in snapshot"),
 });
 export const SidepanelSnapshotDataParamsSchema = z.object({
-	interactive_only: z.boolean().default(false),
-	max_nodes: bigintLike().default(500n),
+	interactive_only: z.boolean().default(false).describe("Only include interactive elements"),
+	max_nodes: bigintLike().default(500n).describe("Maximum number of nodes to include in snapshot"),
 });
 
 // ─── DOM schemas ───────────────────────────────────────────────
 
 export const DomSnapshotParamsSchema = z.object({
-	interactive_only: z.boolean().default(false),
-	max_nodes: bigintLike().default(500n),
+	interactive_only: z.boolean().default(false).describe("Only include interactive elements"),
+	max_nodes: bigintLike().default(500n).describe("Maximum number of nodes to include in snapshot"),
 });
 
 export const DomFormatParamsSchema = z.object({
-	snapshot: z.unknown(),
-	format: z.string().optional(),
+	snapshot: z.unknown().describe("Raw DOM snapshot data to format"),
+	format: z.string().optional().describe("Output format (e.g. markdown, html)"),
 });
 
 // ─── Page snapshot schemas ─────────────────────────────────────
@@ -412,34 +412,34 @@ export const PageSnapshotDataParamsSchema = z.record(z.unknown());
 // ─── Filesystem schemas ────────────────────────────────────────
 
 export const FsPathParamsSchema = z.object({
-	path: z.string(),
+	path: z.string().describe("File or directory path"),
 });
 
 export const FsCopyParamsSchema = z.object({
-	from: z.string(),
-	to: z.string(),
+	from: z.string().describe("Source path"),
+	to: z.string().describe("Destination path"),
 });
 
 export const FsWriteParamsSchema = z.object({
-	path: z.string(),
-	data: z.string(),
+	path: z.string().describe("File path to write to"),
+	data: z.string().describe("Data to write"),
 });
 
 export const FsReadRangeParamsSchema = z.object({
-	path: z.string(),
-	offset: bigintLike(),
-	len: z.number(),
+	path: z.string().describe("File path to read from"),
+	offset: bigintLike().describe("Byte offset to start reading"),
+	len: z.number().describe("Number of bytes to read"),
 });
 
 export const FsUpdateParamsSchema = z.object({
-	path: z.string(),
-	offset: bigintLike(),
-	data: z.string(),
+	path: z.string().describe("File path to update"),
+	offset: bigintLike().describe("Byte offset to start writing"),
+	data: z.string().describe("Data to write"),
 });
 
 export const FsHashParamsSchema = z.object({
-	path: z.string(),
-	algo: z.string().default("sha256"),
+	path: z.string().describe("File path to hash"),
+	algo: z.string().default("sha256").describe("Hash algorithm (e.g. sha256, md5)"),
 });
 
 // ─── Chrome passthrough schemas ────────────────────────────────
@@ -578,34 +578,54 @@ export const HostCallParamsSchema = z.record(z.unknown());
 
 // ─── Return value schemas ──────────────────────────────────────
 
+// TODO: Remove z.null() arm once content-script handlers (content-script/handlers.ts)
+// return structured PageActionResult objects instead of null. Then delete
+// MutationReturnSchema and use PageActionResultSchema directly in
+// CONTENT_SCRIPT_TOOL_SPECS.
+export const PageActionResultSchema = z.object({
+	ok: z.literal(true).describe("Whether the action succeeded"),
+	action: z.string().describe("Action identifier (e.g. 'page_fill')"),
+	refId: refIdString().optional().describe("Element reference ID that was acted upon (e.g. e2)"),
+	tag: z.string().optional().describe("HTML tag name of the element"),
+	role: z.string().optional().describe("ARIA role of the element"),
+	value: z.string().optional().describe("Final value of the element after the action"),
+	checked: z.boolean().optional().describe("Checked state after the action"),
+	key: z.string().optional().describe("Key that was pressed (for press actions)"),
+});
+
+export const MutationReturnSchema = z.union([
+	PageActionResultSchema,
+	z.null(),
+]);
+
 export const FetchValueSchema = z.object({
-	status: z.number(),
-	ok: z.boolean(),
-	headers: z.record(z.string()),
-	body: z.string(),
+	status: z.number().describe("HTTP response status code"),
+	ok: z.boolean().describe("Whether the response status is 2xx"),
+	headers: z.record(z.string()).describe("Response headers as key-value pairs"),
+	body: z.string().describe("Response body as string"),
 });
 
 export const DomSnapshotValueSchema = z.object({
-	data: z.unknown(),
-	text: z.string(),
+	data: z.unknown().describe("Structured snapshot data"),
+	text: z.string().describe("Plain text representation of the snapshot"),
 });
 
 export const SnapshotNodeSchema = z.object({
-	refId: refIdString(),
-	role: z.string(),
-	tag: z.string(),
-	name: z.string().optional(),
+	refId: refIdString().describe("Element reference ID (e.g. e2)"),
+	role: z.string().describe("ARIA role of the element"),
+	tag: z.string().describe("HTML tag name"),
+	name: z.string().optional().describe("Accessible name of the element"),
 });
 
 export const SnapshotResultSchema = z.object({
-	text: z.string(),
-	nodes: z.array(SnapshotNodeSchema),
-	url: z.string(),
-	title: z.string(),
+	text: z.string().describe("Plain text representation of the page"),
+	nodes: z.array(SnapshotNodeSchema).describe("Array of interactive nodes"),
+	url: z.string().describe("Current page URL"),
+	title: z.string().describe("Current page title"),
 	viewport: z.object({
-		width: z.number(),
-		height: z.number(),
-	}),
+		width: z.number().describe("Viewport width in pixels"),
+		height: z.number().describe("Viewport height in pixels"),
+	}).describe("Viewport dimensions"),
 });
 
 export const ChromeTabSchema = z.record(z.unknown());

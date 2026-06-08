@@ -8,6 +8,7 @@ const wasmMock = path.resolve(__dirname, "./__mocks__/extension_js.ts");
 export default defineConfig({
 	test: {
 		environment: "jsdom",
+		setupFiles: ["./test/setup-symlink.ts"],
 	},
 	plugins: [
 		{
