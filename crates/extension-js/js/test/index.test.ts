@@ -524,6 +524,39 @@ describe("ExtensionSession fs namespace e2e", () => {
 		});
 	});
 
+	it("routes page_fill to cached activeTabId when side panel tab steals focus", async () => {
+		const sendMessage = vi.fn(() => Promise.resolve({ ok: true, value: null }));
+		globalThis.chrome = {
+			runtime: { id: "extension-test" },
+			tabs: {
+				sendMessage,
+				onActivated: { addListener: vi.fn(), removeListener: vi.fn() },
+				onUpdated: { addListener: vi.fn(), removeListener: vi.fn() },
+				query: vi.fn(() => Promise.resolve([{ id: 1 }])),
+			},
+			scripting: { executeScript: vi.fn() },
+		};
+		const [, , worker] = await initSession();
+		setActiveTabId(1);
+		setActiveTabId(99);
+		await new Promise((resolve) => setTimeout(resolve, 0));
+
+		sendWorkerAsyncRelay(worker, "relay-fill", "page_fill", "content-script", {
+			params: { refId: "e1", value: "hello" },
+		});
+		await new Promise((resolve) => setTimeout(resolve, 0));
+
+		expect(sendMessage).toHaveBeenCalledWith(
+			99,
+			expect.objectContaining({
+				type: "registryCall",
+				action: "page_fill",
+			}),
+		);
+		expect(sendMessage).not.toHaveBeenCalledWith(99, expect.objectContaining({ action: "page_click" }));
+		expect(sendMessage).not.toHaveBeenCalledWith(1, expect.anything());
+	});
+
 	it("posts registryCallCancel when worker relay is cancelled", async () => {
 		globalThis.chrome = {
 			runtime: { id: "extension-test" },

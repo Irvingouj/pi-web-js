@@ -9,7 +9,7 @@
   "scripts": {
     "pretest": "cd ../../.. && node scripts/build.js extension",
     "test": "vitest run",
-    "build": "npx tsc --noEmit && npx vite build && npx vite build --config vite.content-script.config.ts"
+    "build": "npx tsc --noEmit && npx vite build && npx vite build --config vite.worker.config.ts && npx vite build --config vite.content-script.config.ts"
   },
   "dependencies": {
     "zod": "^3.23.8",

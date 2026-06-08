@@ -1,11 +1,16 @@
 import { defineConfig } from "vite";
 import dts from "vite-plugin-dts";
 import path from "path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const wasmPath = path.resolve(__dirname, "pkg/extension_js.js");
 
 const externalize = (id: string) =>
 	id === "zod" ||
 	id === "@pi-oxide/dom-semantic-tree" ||
-	id.endsWith("pkg/extension_js.js");
+	id.endsWith("pkg/extension_js.js") ||
+	id.endsWith("extension_js.js");
 
 export default defineConfig({
 	base: "./",
@@ -36,13 +41,21 @@ export default defineConfig({
 			},
 		},
 	},
+	resolve: {
+		alias: {
+			"./extension_js.js": wasmPath,
+		},
+	},
 	plugins: [
 		{
 			name: "external-extension-js",
 			enforce: "pre",
 			resolveId(id) {
-				if (id.endsWith("pkg/extension_js.js")) {
-					return { id, external: true };
+				if (
+					id.endsWith("pkg/extension_js.js") ||
+					id === "./extension_js.js"
+				) {
+					return { id: "./extension_js.js", external: true };
 				}
 			},
 		},

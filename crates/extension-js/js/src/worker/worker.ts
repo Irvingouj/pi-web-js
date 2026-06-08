@@ -5,7 +5,7 @@ import init, {
   ExtensionSession,
   registerJsCallBatch as register_js_call_batch,
   setLogLevel as setWasmLogLevel,
-} from "../../pkg/extension_js.js";
+} from "./extension_js.js";
 import type { FsAction, FsActionMap } from "../shared/fs-types.js";
 import type { LogLevel } from "../shared/logger.js";
 import { logger, registerWasmSetLogLevel, setLogLevel, numericToLogLevel } from "../shared/logger.js";
@@ -541,7 +541,7 @@ async function initWasm(
 	}
 
 	// Freeze the Rust registry before injecting bindings
-	const { freezeManifest } = await import("../../pkg/extension_js.js");
+	const { freezeManifest } = await import("./extension_js.js");
 	try {
 		freezeManifest();
 	} catch (err: unknown) {

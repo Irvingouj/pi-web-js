@@ -14,7 +14,7 @@ export default defineConfig({
 			name: "wasm-mock-alias",
 			enforce: "pre",
 			resolveId(id) {
-				if (id.endsWith("pkg/extension_js.js")) {
+				if (id.endsWith("pkg/extension_js.js") || id === "./extension_js.js") {
 					return wasmMock;
 				}
 			},
