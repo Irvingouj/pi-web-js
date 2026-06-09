@@ -1,6 +1,6 @@
 /**
  * Actions whose handler bodies run in the content script (DOM in the active tab).
- * Chrome/scripting wrappers and executeInTab-only APIs stay on main-thread.
+ * Chrome passthrough APIs (e.g. chrome.scripting.*) stay on main-thread.
  * Populated dynamically by defineContentScriptTool registrations.
  */
 const contentScriptActions = new Set<string>();

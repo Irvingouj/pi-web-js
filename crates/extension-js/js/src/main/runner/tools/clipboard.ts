@@ -16,7 +16,6 @@ import {
 	unwrapResult,
 	getActiveTabId,
 	resolveActiveTabId,
-	executeInTab,
 	waitForTabLoad,
 	handleFetch,
 	handleHostCallAction,

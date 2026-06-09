@@ -37,7 +37,7 @@ export { asRecord, extractTabId, normalizeParams, unwrapResult } from "./lib/par
 
 export { executeMainThreadCommand } from "./command.js";
 export { handleFetch } from "./fetch.js";
-export { executeInTab, executeSnapshotInTab, pingTabContentScript, preflightScriptableTab, waitForTabLoad } from "./tab/execute.js";
+export { pingTabContentScript, preflightDomTab, waitForTabLoad } from "./tab/execute.js";
 export { getElementByRefId, extractRefId } from "./sidepanel/dom.js";
 export {
 	ensureDomSnapshot,

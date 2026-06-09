@@ -68,7 +68,10 @@ fn should_implicit_return(line: &str) -> bool {
     if STMT_PREFIXES.iter().any(|prefix| line.starts_with(prefix)) {
         return false;
     }
-    if line.ends_with('{') || line == "}" || line.ends_with("};") {
+    if line.starts_with('}') || line.ends_with('{') || line == "}" || line.ends_with("};") {
+        return false;
+    }
+    if line.starts_with("print(") || line.starts_with("console.log(") {
         return false;
     }
     true
@@ -84,7 +87,8 @@ mod tests {
         let wrapped = wrap_user_cell_code(code);
         assert!(wrapped.contains("async function __webJsCell"));
         assert!(wrapped.contains("await page.goto"));
-        assert!(wrapped.contains("return console.log(result)"));
+        assert!(wrapped.contains("console.log(result)"));
+        assert!(!wrapped.contains("return console.log(result)"));
     }
 
     #[test]
@@ -93,7 +97,8 @@ mod tests {
         let wrapped = wrap_user_cell_code(code);
         assert!(wrapped.starts_with("(async function __webJsCell()"));
         assert!(wrapped.ends_with("})()"));
-        assert!(wrapped.contains("return print(\"done\")"));
+        assert!(wrapped.contains("print(\"done\")"));
+        assert!(!wrapped.contains("return print(\"done\")"));
     }
 
     #[test]
@@ -112,5 +117,13 @@ mod tests {
     fn wraps_sync_cells_too() {
         let code = "print(1 + 1);";
         assert!(wrap_user_cell_code(code).contains("print(1 + 1);"));
+    }
+
+    #[test]
+    fn multiline_print_closing_line_is_not_implicit_return() {
+        let code = "print(JSON.stringify({\n  ok: true,\n}));";
+        let wrapped = wrap_user_cell_code(code);
+        assert!(!wrapped.contains("return }));"));
+        assert!(wrapped.contains("}));"));
     }
 }

@@ -18,25 +18,12 @@ import {
 	extractTabId,
 	unwrapResult,
 	resolveActiveTabId,
-	executeInTab,
 	waitForTabLoad,
 	pingTabContentScript,
-	preflightScriptableTab,
-	handleFetch,
-	handleHostCallAction,
-	registerChromePassthrough,
-	getElementByRefId,
-	extractRefId,
-	handleDomSnapshot,
-	handleDomFormat,
-	ensureDomSnapshot,
-	throwIfAborted,
-	DEFAULT_TIMEOUT_MS,
+	preflightDomTab,
 	CONTENT_SCRIPT_GRACE_MS,
 	CS_FAST_PING_MS,
-	DEFAULT_MAX_NODES,
-	DEFAULT_SCROLL_AMOUNT,
-	DEFAULT_POLL_INTERVAL_MS,
+	DEFAULT_TIMEOUT_MS,
 } from "../runtime.js";
 import { noTabError, contentScriptMissingError } from "../../../shared/registry/normalize-agent-error.js";
 
@@ -219,25 +206,25 @@ registerJsCall({
 		) as { url?: string; title?: string };
 		const url = tab.url ?? "";
 		const title = tab.title ?? "";
-		const scriptingPreflight = await preflightScriptableTab(tabId);
-		const scripting =
-			scriptingPreflight && !scriptingPreflight.ok ? "blocked" : "ok";
+		const urlPreflight = await preflightDomTab(tabId);
+		const domApis =
+			urlPreflight && !urlPreflight.ok ? "blocked" : "ok";
 		const pingResult = await pingTabContentScript(tabId, CS_FAST_PING_MS);
 		const contentScript = pingResult.ok ? "connected" : "missing";
 		const mutationsReady =
-			scripting === "ok" && contentScript === "connected";
+			domApis === "ok" && contentScript === "connected";
 		const health: z.infer<typeof schemas.PageHealthResultSchema> = {
 			tabId,
 			url,
 			title,
 			contentScript,
-			scripting,
+			domApis,
 			mutationsReady,
 		};
 		if (!mutationsReady) {
-			if (scripting === "blocked") {
+			if (domApis === "blocked") {
 				health.hint =
-					"This tab URL cannot be scripted. Only http(s) pages support mutations.";
+					"This tab URL does not support DOM APIs. Only http(s) pages support page.* and web.tab.* DOM operations.";
 				health.recovery = [
 					"Navigate to an http(s) URL with await page.goto(url)",
 				];
@@ -250,36 +237,9 @@ registerJsCall({
 		return health;
 	},
 	paramTypes: [],
-	returnDoc: "Tab health with contentScript and mutationsReady flags",
+	returnDoc: "Tab health: contentScript connection and http(s) domApis readiness",
 	errorCode: "E_NO_TAB",
 	example: "page.health()",
-});
-
-registerJsCall({
-	action: "page_forward",
-	namespace: "page",
-	name: "forward",
-	description: "Go forward in the active tab",
-	params: schemas.PageForwardParamsSchema,
-	returns: z.boolean(),
-	owner: "main-thread",
-	handler: async (_params, _ctx) => {
-		const activeTab = await requireActiveTab("page.forward()");
-		const preflight = await preflightScriptableTab(activeTab);
-		if (preflight) {
-			return unwrapResult(preflight);
-		}
-		return unwrapResult(
-			await executeInTab(activeTab, () => {
-				window.history.forward();
-				return true;
-			}, []),
-		);
-	},
-	paramTypes: [],
-	returnDoc: "true",
-	errorCode: "E_NO_TAB",
-	example: "page.forward()",
 });
 
 registerJsCall({
@@ -341,174 +301,6 @@ registerJsCall({
 
 
 
-
-registerJsCall({
-	action: "page_find",
-	namespace: "page",
-	name: "find",
-	description: "Find elements in the active tab using a CSS selector",
-	params: schemas.PageFindParamsSchema,
-	returns: z.array(
-		z.object({
-			tag: z.string(),
-			refId: z.string().nullable(),
-			text: z.string(),
-		}),
-	),
-	aliases: [{ namespace: "page", name: "query" }],
-	fields: ["selector"],
-	owner: "main-thread",
-	handler: async (params, _ctx) => {
-		const activeTab = await requireActiveTab("page.find()");
-		return unwrapResult(
-			await executeInTab(
-				activeTab,
-				(sel: unknown) => {
-					const elements = Array.from(document.querySelectorAll(String(sel)));
-					return elements.map((el) => ({
-						tag: el.tagName,
-						refId: el.getAttribute("data-ref-id"),
-						text: el.textContent?.slice(0, 100) || "",
-					}));
-				},
-				[params.selector],
-			),
-		);
-	},
-	paramTypes: [
-		{
-			name: "selector",
-			type: "string",
-			required: true,
-			description: "CSS selector to find elements (selector)",
-		},
-	],
-	returnDoc: "Array of elements",
-	errorCode: "E_NO_TAB",
-	example: "page.find(\"h1\")",
-});
-
-registerJsCall({
-	action: "page_wait_for",
-	namespace: "page",
-	name: "wait_for",
-	description: "Wait for a selector in the active tab",
-	params: schemas.PageWaitForParamsSchema,
-	returns: z.boolean(),
-	fields: ["selector", "timeout"],
-	owner: "main-thread",
-	handler: async (params, _ctx) => {
-		const activeTab = await requireActiveTab("page.wait_for()");
-		const start = Date.now();
-		const timeoutMs = Number(params.timeout) || DEFAULT_TIMEOUT_MS;
-		while (true) {
-			throwIfAborted();
-			const result = await executeInTab(
-				activeTab,
-				(sel: unknown) => !!document.querySelector(String(sel)),
-				[params.selector],
-			);
-			if (result.ok && result.value === true) {
-				return true;
-			}
-			if (Date.now() - start >= timeoutMs) {
-				const err = new Error(
-					`Timeout waiting for selector: ${params.selector}`,
-				);
-
-				throw err;
-			}
-			await new Promise((resolve) =>
-				setTimeout(resolve, DEFAULT_POLL_INTERVAL_MS),
-			);
-		}
-	},
-	paramTypes: [
-		{
-			name: "selector",
-			type: "string",
-			required: true,
-			description: "CSS selector to wait for (selector)",
-		},
-		{
-			name: "timeout",
-			type: "number",
-			required: false,
-			description: "Timeout in milliseconds (literal)",
-		},
-	],
-	returnDoc: "true",
-	errorCode: "E_TIMEOUT",
-	errorCategory: "timeout",
-	example: "page.wait_for(\"#submit\", 5000)",
-});
-
-registerJsCall({
-	action: "page_extract",
-	namespace: "page",
-	name: "extract",
-	description: "Extract data from the active tab",
-	params: schemas.PageExtractParamsSchema,
-	returns: z.object({
-		title: z.string().optional(),
-		url: z.string().optional(),
-		headings: z.array(z.object({ tag: z.string(), text: z.string() })).optional(),
-		links: z.array(z.object({ href: z.string().nullable(), text: z.string() })).optional(),
-		text: z.string().optional(),
-	}).passthrough(),
-	fields: ["fields"],
-	owner: "main-thread",
-	handler: async (params, _ctx) => {
-		const activeTab = await requireActiveTab("page.extract()");
-		return unwrapResult(
-			await executeInTab(
-				activeTab,
-				(fieldsArg: unknown) => {
-					const fieldList = Array.isArray(fieldsArg) ? fieldsArg : [];
-					const result: Record<string, unknown> = {};
-					for (const field of fieldList) {
-						if (field === "title") {
-							result.title = document.title;
-						} else if (field === "url") {
-							result.url = window.location.href;
-						} else if (field === "headings") {
-							const headings = Array.from(
-								document.querySelectorAll("h1, h2, h3, h4, h5, h6"),
-							);
-							result.headings = headings.map((el) => ({
-								tag: el.tagName,
-								text: el.textContent?.trim().slice(0, 200) || "",
-							}));
-						} else if (field === "links") {
-							const links = Array.from(document.querySelectorAll("a[href]"));
-							result.links = links.map((el) => ({
-								href: el.getAttribute("href"),
-								text: el.textContent?.trim().slice(0, 100) || "",
-							}));
-						} else if (field === "text") {
-							result.text =
-								document.body?.textContent?.trim().slice(0, 500) || "";
-						}
-					}
-					return result;
-				},
-				[params.fields],
-			),
-		);
-	},
-	paramTypes: [
-		{
-			name: "fields",
-			type: "array",
-			required: true,
-			description:
-				"Array of fields to extract (title, url, headings, links, text) (literal)",
-		},
-	],
-	returnDoc: "Extracted data",
-	errorCode: "E_NO_TAB",
-	example: "page.extract([\"title\", \"url\"])",
-});
 
 registerJsCall({
 	action: "page_close",
@@ -649,53 +441,3 @@ registerJsCall({
 	example: "page.active_tab()",
 });
 
-registerJsCall({
-	action: "page_fetch",
-	namespace: "page",
-	name: "fetch",
-	description: "Fetch in the active tab",
-	params: z.record(z.unknown()),
-	returns: schemas.FetchValueSchema,
-	fields: ["url", "options"],
-	owner: "main-thread",
-	handler: async (params, _ctx) => {
-		const activeTab = await requireActiveTab("page.fetch()");
-		const obj = asRecord(params);
-		const url = obj.url ?? "";
-		const options = obj.options ?? {};
-		return unwrapResult(
-			await executeInTab(
-				activeTab,
-				(u: unknown, opts: unknown) => {
-					return fetch(String(u), opts as RequestInit).then(async (resp) => {
-						const text = await resp.text();
-						return {
-							status: resp.status,
-							ok: resp.ok,
-							headers: Object.fromEntries(resp.headers.entries()),
-							body: text,
-						};
-					});
-				},
-				[url, options],
-			),
-		);
-	},
-	paramTypes: [
-		{
-			name: "url",
-			type: "string",
-			required: false,
-			description: "URL to fetch (url)",
-		},
-		{
-			name: "options",
-			type: "{ method?: string, headers?: { [key: string]: string }, body?: string }",
-			required: false,
-			description: "Fetch options (literal)",
-		},
-	],
-	returnDoc: "DTO with `{ body, headers, ok, status }` — not a native Response object",
-	errorCode: "E_NO_TAB",
-	example: "page.fetch(\"https://api.example.com/data\")",
-});

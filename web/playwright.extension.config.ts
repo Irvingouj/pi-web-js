@@ -5,6 +5,12 @@ export default defineConfig({
 	testMatch: "**/*.spec.ts",
 	fullyParallel: false,
 	workers: 1,
+	webServer: {
+		command: "node ../scripts/serve-testcases.mjs",
+		url: "http://127.0.0.1:9292/testcases/simple-form-1/",
+		reuseExistingServer: !process.env.CI,
+		timeout: 30_000,
+	},
 	// Extension launch + WASM init + first async cell can exceed 10s.
 	timeout: 60_000,
 	expect: {

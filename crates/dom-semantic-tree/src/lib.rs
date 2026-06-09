@@ -1,6 +1,7 @@
 pub mod collect;
 pub mod format;
 pub mod geometry;
+pub mod markdown_visible;
 pub mod model;
 pub mod name;
 pub mod refs;

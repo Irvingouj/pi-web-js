@@ -54,7 +54,7 @@ export function normalizeAgentError(
 			code: "E_CONTENT_SCRIPT",
 			category: "content-script",
 			hint:
-				"page.snapshot() uses script injection and can succeed even when fill/click cannot. " +
+				"Content script is not connected on this tab. " +
 				"This tab was likely open before the extension loaded (MV3 does not retro-inject).",
 			recovery: [
 				`await page.goto(${JSON.stringify(context?.url ?? "")})`,

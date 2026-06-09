@@ -2,6 +2,9 @@ import { z } from "zod";
 import type { JsCallSpec } from "./manifest.js";
 import * as schemas from "../schemas.js";
 
+const AWAIT_PROMISE_NOTE =
+	"Returns a Promise; await before reading the result. For a cell's last line, use `page.snapshot()` without a leading await so the cell returns the settled value.";
+
 export type ContentScriptToolSpec<P = unknown, R = unknown> = Omit<
 	JsCallSpec<P, R>,
 	"owner" | "handler"
@@ -11,7 +14,7 @@ export type ContentScriptToolSpec<P = unknown, R = unknown> = Omit<
 
 /** Static build-time list of content-script tool specs.
  *  Both main-thread and content-script IIFE bundles import this at build time.
- *  Populated in wu-7/wu-8 when page.ts and tab.ts are migrated.
+ *  Single source of truth for content-script registry tools (page + web.tab).
  *
  *  TODO: Mutation returnDoc strings are hand-written pseudo-type-signatures.
  *  When PageActionResultSchema changes, update all mutation returnDoc strings
@@ -57,6 +60,7 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		agentMeta: {
 			prerequisites: ["Ensure the target tab is active and the content script is ready before mutating"],
 			notes: [
+				AWAIT_PROMISE_NOTE,
 				"Same content-script path as web.tab.*",
 				"Always operates on the active tab; use web.tab.* if you need to target a specific tabId",
 			],
@@ -98,6 +102,7 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		agentMeta: {
 			prerequisites: ["Ensure the target tab is active and the content script is ready before mutating"],
 			notes: [
+				AWAIT_PROMISE_NOTE,
 				"Same content-script path as web.tab.*",
 				"Always operates on the active tab; use web.tab.* if you need to target a specific tabId",
 			],
@@ -139,6 +144,7 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		agentMeta: {
 			prerequisites: ["Ensure the target tab is active and the content script is ready before mutating"],
 			notes: [
+				AWAIT_PROMISE_NOTE,
 				"Same content-script path as web.tab.*",
 				"Always operates on the active tab; use web.tab.* if you need to target a specific tabId",
 			],
@@ -817,5 +823,350 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		errorCode: "E_NO_TAB",
 		example: 'web.tab.back({ tabId: 123 })',
 		handlerKey: "back",
+	},
+	{
+		action: "page_forward",
+		namespace: "page",
+		name: "forward",
+		description: "Go forward in the active tab",
+		params: schemas.PageForwardParamsSchema,
+		returns: schemas.PageActionResultSchema,
+		paramTypes: [],
+		returnDoc: "Navigation result",
+		errorCode: "E_NO_TAB",
+		example: "page.forward()",
+		handlerKey: "forward",
+	},
+	{
+		action: "page_snapshot",
+		namespace: "page",
+		name: "snapshot",
+		description: "Capture full DOM snapshot",
+		params: schemas.PageSnapshotParamsSchema,
+		returns: z.string(),
+		paramTypes: [
+			{
+				name: "max_nodes",
+				type: "number",
+				required: false,
+				description: "Maximum nodes to include (literal)",
+			},
+			{
+				name: "options",
+				type: "{ max_nodes?: number }",
+				required: false,
+				description: "Snapshot options (literal)",
+			},
+		],
+		returnDoc: "Snapshot text",
+		errorCode: "E_SNAPSHOT",
+		example: "page.snapshot()",
+		agentMeta: {
+			notes: [
+				AWAIT_PROMISE_NOTE,
+				"Content-script path; same refIds as mutations",
+			],
+			tags: ["snapshot", "read"],
+			relatedApis: ["page.snapshot_data", "web.tab.snapshot"],
+		},
+		handlerKey: "snapshot_text",
+	},
+	{
+		action: "page_snapshot_text",
+		namespace: "page",
+		name: "snapshot_text",
+		description: "Capture DOM snapshot and return text representation",
+		params: schemas.PageSnapshotTextParamsSchema,
+		returns: z.string(),
+		paramTypes: [
+			{
+				name: "max_nodes",
+				type: "number",
+				required: false,
+				description: "Maximum nodes to include (literal)",
+			},
+		],
+		returnDoc: "Snapshot text",
+		errorCode: "E_SNAPSHOT",
+		example: "page.snapshot_text()",
+		handlerKey: "snapshot_text",
+	},
+	{
+		action: "page_snapshot_data",
+		namespace: "page",
+		name: "snapshot_data",
+		description: "Get page snapshot data",
+		params: schemas.PageSnapshotDataParamsSchema,
+		returns: schemas.SnapshotResultSchema,
+		paramTypes: [
+			{
+				name: "max_nodes",
+				type: "number",
+				required: false,
+				description: "Maximum nodes to include (literal)",
+			},
+		],
+		returnDoc: "{ text, nodes, url, title, viewport }",
+		errorCode: "E_SNAPSHOT",
+		example: "page.snapshot_data()",
+		agentMeta: {
+			notes: [
+				AWAIT_PROMISE_NOTE,
+				"Content-script path; nodes include refId for targeting",
+				"After mutations, call snapshot_data() again to verify state",
+			],
+			tags: ["snapshot", "read"],
+			relatedApis: ["page.click", "web.tab.snapshot_data"],
+		},
+		handlerKey: "snapshot",
+	},
+	{
+		action: "page_find",
+		namespace: "page",
+		name: "find",
+		description: "Find elements in the active tab using a CSS selector",
+		params: schemas.PageFindParamsSchema,
+		returns: z.array(
+			z.object({
+				tag: z.string(),
+				refId: z.string().nullable(),
+				text: z.string(),
+			}),
+		),
+		aliases: [{ namespace: "page", name: "query" }],
+		fields: ["selector"],
+		paramTypes: [
+			{
+				name: "selector",
+				type: "string",
+				required: true,
+				description: "CSS selector to find elements (selector)",
+			},
+		],
+		returnDoc: "Array of elements",
+		errorCode: "E_NO_TAB",
+		example: 'page.find("h1")',
+		agentMeta: {
+			tags: ["read"],
+		},
+		handlerKey: "find",
+	},
+	{
+		action: "page_wait_for",
+		namespace: "page",
+		name: "wait_for",
+		description: "Wait for a selector in the active tab",
+		params: schemas.PageWaitForParamsSchema,
+		returns: z.boolean(),
+		fields: ["selector", "timeout"],
+		paramTypes: [
+			{
+				name: "selector",
+				type: "string",
+				required: true,
+				description: "CSS selector to wait for (selector)",
+			},
+			{
+				name: "timeout",
+				type: "number",
+				required: false,
+				description: "Timeout in milliseconds (literal)",
+			},
+		],
+		returnDoc: "true",
+		errorCode: "E_TIMEOUT",
+		errorCategory: "timeout",
+		example: 'page.wait_for("#submit", 5000)',
+		agentMeta: {
+			notes: [AWAIT_PROMISE_NOTE],
+			tags: ["read"],
+		},
+		handlerKey: "wait_for",
+	},
+	{
+		action: "page_extract",
+		namespace: "page",
+		name: "extract",
+		description: "Extract data from the active tab",
+		params: schemas.PageExtractParamsSchema,
+		returns: z
+			.object({
+				title: z.string().optional(),
+				url: z.string().optional(),
+				headings: z
+					.array(z.object({ tag: z.string(), text: z.string() }))
+					.optional(),
+				links: z
+					.array(
+						z.object({ href: z.string().nullable(), text: z.string() }),
+					)
+					.optional(),
+				text: z.string().optional(),
+			})
+			.passthrough(),
+		fields: ["fields"],
+		paramTypes: [
+			{
+				name: "fields",
+				type: "array",
+				required: true,
+				description:
+					"Array of fields to extract (title, url, headings, links, text)",
+			},
+		],
+		returnDoc: "Extracted data",
+		errorCode: "E_NO_TAB",
+		example: 'page.extract(["title", "url"])',
+		agentMeta: {
+			notes: [AWAIT_PROMISE_NOTE],
+			tags: ["read"],
+		},
+		handlerKey: "extract",
+	},
+	{
+		action: "page_fetch",
+		namespace: "page",
+		name: "fetch",
+		description: "Fetch in the active tab",
+		params: z.record(z.unknown()),
+		returns: schemas.FetchValueSchema,
+		fields: ["url", "options"],
+		paramTypes: [
+			{
+				name: "url",
+				type: "string",
+				required: false,
+				description: "URL to fetch (url)",
+			},
+			{
+				name: "options",
+				type: "{ method?: string, headers?: object, body?: string }",
+				required: false,
+				description: "Fetch options (literal)",
+			},
+		],
+		returnDoc: "DTO with `{ body, headers, ok, status }`",
+		errorCode: "E_NO_TAB",
+		example: 'page.fetch({ url: "https://api.example.com/data" })',
+		agentMeta: {
+			notes: [AWAIT_PROMISE_NOTE],
+			tags: ["read"],
+		},
+		handlerKey: "fetch",
+	},
+	{
+		action: "tab_forward",
+		namespace: "web.tab",
+		name: "forward",
+		description: "Go forward in a tab",
+		params: schemas.TabForwardParamsSchema,
+		returns: schemas.PageActionResultSchema,
+		paramTypes: [
+			{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
+		],
+		returnDoc: "Forward result",
+		errorCode: "E_NO_TAB",
+		example: 'web.tab.forward({ tabId: 123 })',
+		handlerKey: "forward",
+	},
+	{
+		action: "tab_snapshot",
+		namespace: "web.tab",
+		name: "snapshot",
+		description: "Get tab snapshot",
+		params: schemas.TabSnapshotParamsSchema,
+		returns: z.string(),
+		fields: ["tabId"],
+		paramTypes: [
+			{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
+			{
+				name: "max_nodes",
+				type: "number",
+				required: false,
+				description: "Maximum nodes to include (literal)",
+			},
+		],
+		returnDoc: "Snapshot text",
+		errorCode: "E_SNAPSHOT",
+		example: "web.tab.snapshot({ tabId: 123 })",
+		handlerKey: "snapshot_text",
+	},
+	{
+		action: "tab_snapshot_text",
+		namespace: "web.tab",
+		name: "snapshot_text",
+		description: "Get tab snapshot text",
+		params: schemas.TabSnapshotTextParamsSchema,
+		returns: z.string(),
+		fields: ["tabId"],
+		paramTypes: [
+			{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
+		],
+		returnDoc: "Snapshot text",
+		errorCode: "E_SNAPSHOT",
+		example: "web.tab.snapshot_text({ tabId: 123 })",
+		handlerKey: "snapshot_text",
+	},
+	{
+		action: "tab_snapshot_data",
+		namespace: "web.tab",
+		name: "snapshot_data",
+		description: "Get tab snapshot data",
+		params: schemas.TabSnapshotDataParamsSchema,
+		returns: schemas.SnapshotResultSchema,
+		fields: ["tabId"],
+		paramTypes: [
+			{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
+		],
+		returnDoc: "Snapshot data",
+		errorCode: "E_SNAPSHOT",
+		example: "web.tab.snapshot_data({ tabId: 123 })",
+		handlerKey: "snapshot",
+	},
+	{
+		action: "tab_fetch",
+		namespace: "web.tab",
+		name: "fetch",
+		description: "Fetch in a tab",
+		params: schemas.TabFetchParamsSchema,
+		returns: schemas.FetchValueSchema,
+		fields: ["tabId", "url", "options"],
+		paramTypes: [
+			{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
+			{ name: "url", type: "string", required: false, description: "URL to fetch" },
+		],
+		returnDoc: "Fetch result DTO",
+		errorCode: "E_NO_TAB",
+		example: 'web.tab.fetch({ tabId: 123, url: "https://api.example.com/data" })',
+		handlerKey: "fetch",
+	},
+	{
+		action: "tab_evaluate",
+		namespace: "web.tab",
+		name: "evaluate",
+		description: "Evaluate script in a tab (content-script context)",
+		params: schemas.TabEvaluateParamsSchema,
+		returns: schemas.TabEvaluateResultSchema,
+		fields: ["tabId", "script"],
+		paramTypes: [
+			{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
+			{
+				name: "script",
+				type: "string",
+				required: false,
+				description: "Script to evaluate (literal)",
+			},
+		],
+		returnDoc: "Evaluation result",
+		errorCode: "E_NO_TAB",
+		example: 'web.tab.evaluate({ tabId: 123, script: "document.title" })',
+		agentMeta: {
+			notes: [
+				"Runs in content-script isolated world, not MAIN-world injection",
+				"For MAIN-world access use chrome.scripting.executeScript from a cell",
+			],
+			tags: ["read"],
+		},
+		handlerKey: "evaluate",
 	},
 ] as const;

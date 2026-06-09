@@ -29,3 +29,15 @@ for (const asset of assets) {
   fs.copyFileSync(src, dest);
   console.log(`Copied ${src.replace(rootDir + "/", "")} → public/${asset.name}`);
 }
+
+// Sidepanel worker imports ./extension_js.js from src/worker/ at Vite bundle time.
+const extensionPkgDir = path.join(rootDir, "crates/extension-js/js/pkg");
+const extensionWasmJs = path.join(extensionPkgDir, "extension_js.js");
+const workerWasmJs = path.join(
+  rootDir,
+  "crates/extension-js/js/src/worker/extension_js.js",
+);
+if (fs.existsSync(extensionWasmJs)) {
+  fs.copyFileSync(extensionWasmJs, workerWasmJs);
+  console.log("Copied crates/extension-js/js/pkg/extension_js.js → src/worker/");
+}

@@ -2,7 +2,7 @@
 import { registerContentScriptSpecs } from "./registry.js";
 import {
 	buildContentScriptSpecs,
-	buildLegacyContentScriptSpecs,
+	buildInfraContentScriptSpecs,
 } from "./schemas.js";
 import { initContentScriptLogger } from "./logger.js";
 import { installMessageListener } from "./message-router.js";
@@ -24,7 +24,7 @@ window.__jsNotebookContentScriptInjected = true;
 
 registerContentScriptSpecs([
 	...buildContentScriptSpecs(),
-	...buildLegacyContentScriptSpecs(),
+	...buildInfraContentScriptSpecs(),
 ]);
 
 installMessageListener();

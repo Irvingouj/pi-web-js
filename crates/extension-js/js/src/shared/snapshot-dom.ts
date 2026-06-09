@@ -3,6 +3,42 @@
 export const INTERACTIVE_SELECTOR =
 	'input, textarea, select, button, a, [role="button"], [role="link"]';
 
+const EXCLUDED_TAGS = new Set([
+	"script",
+	"style",
+	"noscript",
+	"template",
+]);
+
+const MARKDOWN_TEXT_TAGS = new Set([
+	"p",
+	"span",
+	"label",
+	"footer",
+	"header",
+	"blockquote",
+	"pre",
+	"code",
+	"figcaption",
+	"td",
+	"th",
+	"li",
+	"em",
+	"strong",
+	"small",
+	"cite",
+	"q",
+	"mark",
+	"time",
+	"abbr",
+	"dfn",
+	"kbd",
+	"samp",
+	"var",
+	"sub",
+	"sup",
+]);
+
 export function readFormFields(el: Element): {
 	value?: string;
 	checked?: boolean;
@@ -98,6 +134,58 @@ export function getAccessibleRole(el: Element): string {
 	return "generic";
 }
 
+export function hasDirectTextContent(el: Element): boolean {
+	for (const child of el.childNodes) {
+		if (child.nodeType === Node.TEXT_NODE) {
+			const text = child.textContent?.trim();
+			if (text) return true;
+		}
+	}
+	return false;
+}
+
+export function getOwnVisibleText(el: Element, maxLen = 60): string {
+	const parts: string[] = [];
+	for (const child of el.childNodes) {
+		if (child.nodeType === Node.TEXT_NODE) {
+			const text = child.textContent?.trim();
+			if (text) parts.push(text);
+		}
+	}
+	return parts.join(" ").slice(0, maxLen);
+}
+
+function isHiddenElement(el: Element): boolean {
+	if ((el as HTMLElement).hidden) return true;
+	if (el.getAttribute("aria-hidden") === "true") return true;
+	if ((el as HTMLElement).inert) return true;
+	const style = window.getComputedStyle(el);
+	return style.display === "none" || style.visibility === "hidden";
+}
+
+/** Include if the element would remain visible in a Markdown rendering. */
+export function isMarkdownVisible(el: Element): boolean {
+	const tag = el.tagName.toLowerCase();
+	if (EXCLUDED_TAGS.has(tag)) return false;
+	if (isHiddenElement(el)) return false;
+
+	const role = getAccessibleRole(el);
+	if (role === "presentation" || role === "none") return false;
+	if (role !== "generic") return true;
+
+	const ariaLive = el.getAttribute("aria-live");
+	if (ariaLive && ariaLive !== "off") return true;
+	const explicitRole = el.getAttribute("role");
+	if (explicitRole === "status" || explicitRole === "alert") return true;
+
+	const text = el.textContent?.trim() || "";
+	if (!text) return false;
+	if (MARKDOWN_TEXT_TAGS.has(tag)) return true;
+	if (hasDirectTextContent(el)) return true;
+
+	return false;
+}
+
 export function getAccessibleName(el: Element): string {
 	const ariaLabel = el.getAttribute("aria-label");
 	if (ariaLabel) return ariaLabel;
@@ -130,15 +218,17 @@ export function getAccessibleName(el: Element): string {
 		const text = el.textContent?.trim().slice(0, 60) || "";
 		return text;
 	}
+	if (role === "generic" && isMarkdownVisible(el)) {
+		const own = getOwnVisibleText(el);
+		if (own) return own;
+		const tag = el.tagName.toLowerCase();
+		if (MARKDOWN_TEXT_TAGS.has(tag) || el.childElementCount === 0) {
+			return el.textContent?.trim().slice(0, 60) || "";
+		}
+	}
 	return "";
 }
 
 export function shouldInclude(el: Element): boolean {
-	const role = getAccessibleRole(el);
-	if (role === "generic") return false;
-	if (role === "presentation" || role === "none") return false;
-	if ((el as HTMLElement).hidden) return false;
-	const style = window.getComputedStyle(el);
-	if (style.display === "none" || style.visibility === "hidden") return false;
-	return true;
+	return isMarkdownVisible(el);
 }

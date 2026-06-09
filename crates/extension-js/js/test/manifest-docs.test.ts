@@ -282,14 +282,20 @@ describe("manifest documentation export", () => {
 	it("seeds agentMeta on page.* snapshot APIs", () => {
 		const manifest = getSerializableJsManifest();
 		const pageSnapshot = manifest.find((e) => e.action === "page_snapshot");
-		expect(pageSnapshot?.notes).toContain("Uses script injection; does not guarantee mutations work");
+		expect(pageSnapshot?.notes?.join(" ")).toMatch(/content-script/i);
 		expect(pageSnapshot?.tags).toEqual(["snapshot", "read"]);
-		expect(pageSnapshot?.relatedApis).toEqual(["web.tab.snapshot"]);
+		expect(pageSnapshot?.relatedApis).toEqual([
+			"page.snapshot_data",
+			"web.tab.snapshot",
+		]);
 
 		const pageSnapshotData = manifest.find((e) => e.action === "page_snapshot_data");
-		expect(pageSnapshotData?.notes).toContain("Uses script injection; does not guarantee mutations work");
+		expect(pageSnapshotData?.notes?.join(" ")).toMatch(/content-script/i);
 		expect(pageSnapshotData?.tags).toEqual(["snapshot", "read"]);
-		expect(pageSnapshotData?.relatedApis).toEqual(["web.tab.snapshot_data"]);
+		expect(pageSnapshotData?.relatedApis).toEqual([
+			"page.click",
+			"web.tab.snapshot_data",
+		]);
 	});
 
 	it("seeds agentMeta on web.tab.* mutation APIs", () => {

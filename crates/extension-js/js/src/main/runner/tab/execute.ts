@@ -2,14 +2,11 @@
 import type { AsyncResponse } from "../../../shared/tool-registry.js";
 import { logger } from "../../../shared/logger.js";
 import { throwIfAborted } from "../../../shared/tool-registry.js";
-import { getActiveTabId } from "../../tab-context.js";
 import { normalizeChromeError } from "../chrome/internals.js";
 import { contentScriptMissingError } from "../../../shared/registry/normalize-agent-error.js";
-import { collectInlineSnapshot } from "../../../shared/collect-inline-snapshot.js";
+import { unwrapContentScriptMessage } from "../../../shared/registry/content-script-response.js";
 import {
 	DEFAULT_POLL_INTERVAL_MS,
-	INJECTION_DELAY_MS,
-	RETRY_DELAY_MS,
 } from "../lib/constants.js";
 
 function sleep(ms: number): Promise<void> {
@@ -18,8 +15,8 @@ function sleep(ms: number): Promise<void> {
 
 // ─── Tab script execution ──────────────────────────────────────
 
-/** Fail fast with a readable message when a tab URL cannot be scripted/snapshotted. */
-export async function preflightScriptableTab(
+/** Fail fast when a tab URL cannot host content-script DOM APIs (non-http(s)). */
+export async function preflightDomTab(
 	tabId: number,
 ): Promise<AsyncResponse | null> {
 	throwIfAborted();
@@ -34,7 +31,7 @@ export async function preflightScriptableTab(
 			return {
 				ok: false,
 				error: {
-					message: `Cannot snapshot ${label}. Snapshots require an http(s) page tab — use tabs.find(t => t.url?.startsWith("http")) instead of tabs[0].`,
+					message: `Cannot use DOM APIs on ${label}. page.* and web.tab.* DOM operations require an http(s) page tab — use tabs.find(t => t.url?.startsWith("http")) instead of tabs[0].`,
 					code: "E_PERMISSION",
 					category: "permission",
 				},
@@ -44,118 +41,6 @@ export async function preflightScriptableTab(
 	} catch (err: unknown) {
 		return normalizeChromeError(err);
 	}
-}
-
-export async function executeInTab(
-	tabId: number | null,
-	func: (...args: unknown[]) => unknown,
-	args: unknown[],
-): Promise<AsyncResponse> {
-	throwIfAborted();
-	const log = logger.child("runner");
-	log.debug("executeInTab_start", {
-		tabId,
-		scriptType: func.name || "anonymous",
-	});
-	const chrome = window.chrome;
-	if (!chrome?.runtime?.id) {
-		log.debug("executeInTab_result", {
-			tabId,
-			result: "error",
-			reason: "no_extension",
-		});
-		return {
-			ok: false,
-			error: {
-				message: "Not in extension context",
-				code: "E_NO_EXTENSION",
-				category: "permission",
-			},
-		};
-	}
-	const targetTab = typeof tabId === "number" ? tabId : getActiveTabId();
-	if (targetTab === null) {
-		log.debug("executeInTab_result", {
-			tabId,
-			result: "error",
-			reason: "no_tab",
-		});
-		return {
-			ok: false,
-			error: {
-				message: "No active tab available",
-				code: "E_NO_TAB",
-				category: "resource",
-			},
-		};
-	}
-	try {
-		const results = await chrome.scripting.executeScript({
-			target: { tabId: targetTab },
-			func,
-			args,
-			world: "MAIN",
-		});
-		if (chrome.runtime.lastError) {
-			const message =
-				chrome.runtime.lastError.message || "Chrome scripting failed";
-			log.error("executeInTab_lastError", {
-				tabId: targetTab,
-				error: message,
-			});
-			return {
-				ok: false,
-				error: {
-					message: `Cannot execute script in tab ${targetTab}: ${message}`,
-					code: "E_SCRIPTING",
-					category: "extension",
-				},
-			};
-		}
-		if (!results?.[0]) {
-			log.debug("executeInTab_result", {
-				tabId: targetTab,
-				result: "error",
-				reason: "no_result",
-			});
-			return {
-				ok: false,
-				error: {
-					message: `No result from script execution in tab ${targetTab}`,
-					code: "E_SCRIPTING",
-					category: "extension",
-				},
-			};
-		}
-		log.debug("executeInTab_result", { tabId: targetTab, result: "ok" });
-		return { ok: true, value: results[0].result };
-	} catch (err: unknown) {
-		log.debug("executeInTab_result", {
-			tabId: targetTab,
-			result: "error",
-			error: err instanceof Error ? err.message : String(err),
-		});
-		return normalizeChromeError(err);
-	}
-}
-
-/** Run shared inline snapshot logic in a tab MAIN world (DRY vs content-script path). */
-export async function executeSnapshotInTab(
-	tabId: number | null,
-	maxNodes: number,
-): Promise<AsyncResponse> {
-	return executeInTab(
-		tabId,
-		(maxNodesArg: unknown, fnSource: unknown) => {
-			const run = (0, eval)(`(${String(fnSource)})`) as (
-				maxNodes: number,
-			) => unknown;
-			const maxNodesNum =
-				typeof maxNodesArg === "number" ? maxNodesArg : Number(maxNodesArg) || 500;
-			return run(maxNodesNum);
-		},
-		[maxNodes, collectInlineSnapshot.toString()],
-	);
 }
 
 export async function pingTabContentScript(
@@ -192,6 +77,11 @@ export async function pingTabContentScript(
 					),
 				),
 			]);
+			const parsed = unwrapContentScriptMessage(result);
+			if (!parsed.ok) {
+				log.debug("pingTabContentScript_rejected", { tabId, error: parsed.error });
+				return parsed;
+			}
 			log.debug("pingTabContentScript_success", { tabId, result });
 			return { ok: true, value: { ok: true } };
 		} catch (err: unknown) {

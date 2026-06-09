@@ -39,6 +39,12 @@
 - Chrome invocation goes through `invokeNative(method, args)` only — the bridge must not reshape arguments
 - Project-owned APIs (`page.*`, `tab.*`, `dom.*`) keep their existing normalization
 
+### Content-Script Channel (first-party DOM APIs)
+- All first-party `page.*` / `web.tab.*` DOM read/write APIs MUST use the content-script registry channel (`registryCall` → `handlers.*`)
+- First-party APIs MUST NOT call `chrome.scripting.executeScript` internally
+- `chrome.scripting.executeScript` is only for explicit user/agent code in QuickJS cells (opt-in MAIN-world scripting)
+- There is no `web.tab.execute_script` — use `chrome.scripting.executeScript` from a cell when MAIN-world access is required
+
 ### When Fixing Bugs
 1. Check if bug reproduces in extension context
 2. Fix extension-js runner (`crates/extension-js/js/src/main/runner/` — `runtime.ts` + `tools/`)

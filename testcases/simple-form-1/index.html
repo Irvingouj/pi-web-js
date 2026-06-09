@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Simple Form 1</title>
+</head>
+<body>
+  <h1>Simple Form 1</h1>
+  <form id="form" onsubmit="return false">
+    <label for="name">Name</label>
+    <input id="name" name="name" type="text" placeholder="Your name" />
+    <button type="button" id="submit">Submit</button>
+  </form>
+  <p id="status" aria-live="polite">idle</p>
+  <script>
+    document.getElementById("submit").addEventListener("click", function () {
+      var value = document.getElementById("name").value;
+      document.getElementById("status").textContent = value ? "filled:" + value : "empty";
+    });
+  </script>
+</body>
+</html>

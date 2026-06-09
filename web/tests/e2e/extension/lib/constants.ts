@@ -18,6 +18,10 @@ export const EXTENSION_MANIFEST_PATH = path.resolve(
 
 export const FIXTURE_ORIGIN = "https://extension-js.test";
 export const FIXTURE_URL = `${FIXTURE_ORIGIN}/fixture`;
+
+export const TESTCASE_SERVER_PORT = Number(process.env.TESTCASE_SERVER_PORT ?? "9292");
+export const TESTCASE_SERVER_HOST = process.env.TESTCASE_SERVER_HOST ?? "127.0.0.1";
+export const SIMPLE_FORM_1_URL = `http://${TESTCASE_SERVER_HOST}:${TESTCASE_SERVER_PORT}/testcases/simple-form-1/`;
 export const RESULT_PREFIX = "__EXTENSION_CONTRACT_RESULT__";
 
 export const EXT_CONTRACT_APIS = process.env.EXT_CONTRACT_APIS === "1";

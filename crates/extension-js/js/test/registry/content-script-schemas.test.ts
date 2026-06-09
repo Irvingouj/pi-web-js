@@ -5,7 +5,7 @@ import { CONTENT_SCRIPT_TOOL_SPECS } from "../../src/shared/registry/content-scr
 import { handlers } from "../../src/content-script/handlers.js";
 import {
 	buildContentScriptSpecs,
-	buildLegacyContentScriptSpecs,
+	buildInfraContentScriptSpecs,
 } from "../../src/content-script/schemas.js";
 
 describe("buildContentScriptSpecs", () => {
@@ -33,9 +33,9 @@ describe("buildContentScriptSpecs", () => {
 	});
 });
 
-describe("buildLegacyContentScriptSpecs", () => {
-	it("defines legacy direct-action schemas", () => {
-		const specs = buildLegacyContentScriptSpecs();
+describe("buildInfraContentScriptSpecs", () => {
+	it("defines infra-only direct-action schemas", () => {
+		const specs = buildInfraContentScriptSpecs();
 		expect(specs.length).toBeGreaterThan(0);
 		for (const spec of specs) {
 			expect(spec.registryAction).toBeTruthy();

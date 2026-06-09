@@ -1616,4 +1616,12 @@ console.log(result)"#;
             result.error
         );
     }
+
+    #[test]
+    fn test_print_pending_promise_is_not_empty_object() {
+        let mut session = JsSession::new();
+        let result = session.run_cell("print(new Promise(() => {}))", "");
+        assert!(result.error.is_none(), "{:?}", result.error);
+        assert_eq!(result.stdout, vec!["[Promise pending]"]);
+    }
 }

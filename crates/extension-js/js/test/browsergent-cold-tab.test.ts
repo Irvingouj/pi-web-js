@@ -197,7 +197,7 @@ describe("browsergent cold tab acceptance", () => {
 		} as MessageEvent);
 	}
 
-	it("pre-opened tab: snapshot ok, fill fails with E_CONTENT_SCRIPT, then fill succeeds after CS connects", async () => {
+	it("pre-opened tab: snapshot and fill fail without CS, then succeed after CS connects", async () => {
 		let csConnected = false;
 		let snapshotInputValue: string | undefined;
 		const sendMessage = vi.fn(async (_tabId: number, msg: Record<string, unknown>) => {
@@ -206,6 +206,34 @@ describe("browsergent cold tab acceptance", () => {
 					throw new Error("Receiving end does not exist.");
 				}
 				return { ok: true };
+			}
+			if (
+				msg.type === "registryCall" &&
+				msg.action === "page_snapshot_data"
+			) {
+				if (!csConnected) {
+					throw new Error("Receiving end does not exist.");
+				}
+				const fillValue = snapshotInputValue;
+				const node: Record<string, unknown> = {
+					refId: "e6",
+					role: "textbox",
+					tag: "input",
+					name: "Search",
+				};
+				if (fillValue !== undefined) {
+					node.value = fillValue;
+				}
+				return {
+					ok: true,
+					value: {
+						text: "URL: https://www.google.com/\nTitle: Google\n\n- textbox [e6]",
+						nodes: [node],
+						url: GOOGLE_URL,
+						title: "Google",
+						viewport: { width: 800, height: 600 },
+					},
+				};
 			}
 			if (msg.type === "registryCall" && msg.action === "page_fill") {
 				return {
@@ -229,12 +257,22 @@ describe("browsergent cold tab acceptance", () => {
 		);
 		await initCapabilities();
 
-		const snapResult = await executeMainThreadCommand({
-			action: "page_snapshot_data",
-			params: {},
-			call_id: 1,
+		const worker = await initSession();
+		await new Promise((resolve) => setTimeout(resolve, 0));
+
+		relayAsync(worker, "cold-snap", "page_snapshot_data", {});
+		await new Promise((resolve) => setTimeout(resolve, 700));
+		const coldSnap = postMessages.find(
+			(m): m is PostMessage =>
+				typeof m === "object" &&
+				m !== null &&
+				(m as PostMessage).type === "asyncRelayResult" &&
+				(m as PostMessage).id === "cold-snap",
+		);
+		expect(coldSnap?.result).toMatchObject({
+			ok: false,
+			error: expect.objectContaining({ code: "E_CONTENT_SCRIPT" }),
 		});
-		expect(snapResult.ok).toBe(true);
 
 		const urlResult = await executeMainThreadCommand({
 			action: "page_url",
@@ -256,9 +294,6 @@ describe("browsergent cold tab acceptance", () => {
 			expect(titleResult.value).toBe("Google");
 		}
 
-		const worker = await initSession();
-		await new Promise((resolve) => setTimeout(resolve, 0));
-
 		relayAsync(worker, "cold-fill", "page_fill", {
 			refId: "e6",
 			value: "test search",
@@ -276,7 +311,7 @@ describe("browsergent cold tab acceptance", () => {
 			ok: false,
 			error: expect.objectContaining({
 				code: "E_CONTENT_SCRIPT",
-				hint: expect.stringContaining("page.snapshot()"),
+				hint: expect.stringContaining("Content script is not connected"),
 				recovery: expect.arrayContaining([
 					expect.stringContaining("page.goto"),
 				]),
@@ -310,17 +345,20 @@ describe("browsergent cold tab acceptance", () => {
 		});
 
 		snapshotInputValue = "test search";
-		const snapAfterFill = await executeMainThreadCommand({
-			action: "page_snapshot_data",
-			params: {},
-			call_id: 4,
-		});
-		expect(snapAfterFill.ok).toBe(true);
-		if (snapAfterFill.ok && snapAfterFill.value && typeof snapAfterFill.value === "object") {
-			const nodes = (snapAfterFill.value as { nodes?: Array<{ value?: string }> }).nodes;
-			const inputNode = nodes?.find((n) => n.value === "test search");
-			expect(inputNode?.value).toBe("test search");
-		}
+		relayAsync(worker, "warm-snap", "page_snapshot_data", {});
+		await new Promise((resolve) => setTimeout(resolve, 700));
+		const snapAfterFill = postMessages.find(
+			(m): m is PostMessage =>
+				typeof m === "object" &&
+				m !== null &&
+				(m as PostMessage).type === "asyncRelayResult" &&
+				(m as PostMessage).id === "warm-snap",
+		);
+		expect(snapAfterFill?.result).toMatchObject({ ok: true });
+		const snapValue = (snapAfterFill?.result as { value?: { nodes?: Array<{ value?: string }> } })
+			?.value;
+		const inputNode = snapValue?.nodes?.find((n) => n.value === "test search");
+		expect(inputNode?.value).toBe("test search");
 
 		document.body.innerHTML = "";
 		const input = document.createElement("input");
@@ -339,8 +377,8 @@ describe("browsergent cold tab acceptance", () => {
 		}
 		expect((input as HTMLInputElement).value).toBe("test search");
 		const data = inlineSnapshot(500);
-		const inputNode = data.nodes.find((n) => n.tag === "input");
-		expect(inputNode?.value).toBe("test search");
+		const inputNodeAfterFill = data.nodes.find((n) => n.tag === "input");
+		expect(inputNodeAfterFill?.value).toBe("test search");
 	});
 
 	it("page.goto(currentUrl) reconnects content script so fill succeeds", async () => {

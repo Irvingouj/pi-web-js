@@ -6,6 +6,7 @@ use crate::name::{compute_name, NameContext};
 use crate::refs::RefAllocator;
 use crate::role::{infer_role, is_interactive_role};
 use crate::state::{extract_states, StateInput};
+use crate::markdown_visible::is_markdown_visible_element;
 use crate::visibility::{is_display_none, is_visibility_hidden, is_zero_size};
 
 use crate::geometry::dom_rect_to_rect;
@@ -417,9 +418,12 @@ fn traverse(
 
     let value = select_value.or(input_value);
 
-    // Skip empty generic containers
-    let is_empty_generic =
-        role == "generic" && name.is_none() && value.is_none() && element.children().length() == 0;
+    // Skip empty generic containers unless they carry markdown-visible text
+    let is_empty_generic = role == "generic"
+        && name.is_none()
+        && value.is_none()
+        && element.children().length() == 0
+        && !is_markdown_visible_element(element, &role);
     if is_empty_generic {
         return;
     }

@@ -1,326 +1,271 @@
-# extension-js — Known Problems & Agent-Oriented Error Guidance
+# extension-js: Required Product Behavior
 
-**Status:** Living document — **P0–P2 fixes landed in [PR #2](https://github.com/Irvingouj/pi-web-js/pull/2)** (`merge/fix-doc-into-main`)
-**Source:** Browsergent developer capability-check session (`browsergent-conversation-1780882773592.json`, extension-js `^0.4.1`)  
-**Audience:** extension-js maintainers; consumers wiring agent prompts
+**Status:** Unresolved product requirements
+**Owner:** extension-js
+**Priority:** Blocking for browser agents
+**Evidence:** Browsergent capability sessions using extension-js `^0.4.1` and `^0.5.0`
 
----
+## Objective
 
-## Why this file exists
+Fix extension-js so an agent can reliably observe a page, identify a specific element or media object, act on it, fetch its data, save it, and verify the result without guessing undocumented behavior.
 
-Modern agents *can* recover from failures — but only when errors say **what failed**, **why**, and **what to try next**.
+The agent must not need application-specific DOM execution, raw Chrome APIs, repeated signature experiments, or speculative recovery loops to complete ordinary browser tasks.
 
-Raw Chrome strings like `Could not establish connection. Receiving end does not exist.` force the model to guess. In the Browsergent session the agent burned ~15 `run_js` steps probing `typeof page`, switching between `page.*` and `web.tab.*`, and eventually `page.goto` to a different site before mutations worked. A single explicit error would have short-circuited that loop.
+This document specifies required behavior only. Implementation choices belong to the extension-js agent.
 
-**Principle:** Every user-visible failure should be agent-actionable:
+## P0: Complete Element Observation
 
-1. **Machine code** — stable `E_*` for branching (`E_CONTENT_SCRIPT`, `E_STALE`, …)
-2. **Human message** — one sentence, no jargon without explanation
-3. **Hint** — what still works vs what does not (e.g. “snapshot works; fill does not”)
-4. **Recovery** — 1–3 concrete next steps the agent can put in the next `run_js` cell
+An agent querying page elements must receive enough structured information to understand and use the results.
 
-Agents are smart enough to follow good guidance. They are not psychic about Chrome extension injection semantics.
+For every element returned by `page.find()` or the equivalent structured observation API, provide:
 
----
+- A usable `refId` when the element can be targeted.
+- Element tag and semantic role.
+- Accessible name, visible text, and relevant form state.
+- Relevant DOM attributes, including `src`, `href`, `alt`, `title`, `value`, `checked`, `disabled`, and `readOnly` when applicable.
+- Absolute URLs for URL-bearing attributes, or an unambiguous documented representation.
+- Enough relationship or context information to associate nested media with its containing article, post, link, or other parent object.
 
-## Proposed error shape (target)
+Returning objects such as `{ tag: "IMG", refId: null, text: "" }` is not sufficient.
 
-Today errors are mostly `{ code, message, category? }`. We should standardize:
+CSS queries for links and images must not report matching elements while omitting the requested element's `href` or `src`.
 
-```typescript
-type AgentError = {
-  code: string;           // E_CONTENT_SCRIPT
-  message: string;        // short summary
-  category?: string;      // content-script | permission | navigation | ...
-  hint?: string;          // why this happened / what is misleading
-  recovery?: string[];    // ordered steps for the agent
-  details?: Record<string, unknown>; // tabId, refId, url, candidates, ...
-};
-```
+## P0: Reliable Snapshots on Real Applications
 
-Surface `hint` + `recovery` in:
+`page.snapshot()`, `page.snapshot_text()`, and `page.snapshot_data()` must work reliably on large, dynamic applications such as X.
 
-- WASM / worker tool results (`_is_error` JSON)
-- `console.log` / thrown runtime messages agents read in `run_js` output
-- `get_doc` notes for APIs with non-obvious prerequisites
+Required behavior:
 
----
+- A snapshot must not fail merely because the page is large or changes while being observed.
+- `max_nodes` must actually bound the work and allow a smaller snapshot to succeed.
+- Snapshot failures must identify the concrete cause.
+- A structured observation fallback must remain available if one snapshot representation cannot be produced.
+- Recovery guidance must never direct the agent back to an API that cannot succeed under the current condition.
+- Snapshot nodes must contain the state needed to verify prior mutations.
 
-## Problem 1 — Cold tab: read works, write fails (P0)
+Repeated `E_SNAPSHOT: Failed to get page snapshot` at 500, 200, 100, and 50 nodes is unacceptable.
 
-### What happened
+## P0: Stable Element Targeting
 
-On an **already-open** Google tab (extension loaded after the tab was opened):
+Elements discovered through supported observation APIs must be actionable through supported mutation APIs.
 
-| API | Result |
-|-----|--------|
-| `page.snapshot()` / `page.snapshot_data()` | ✅ |
-| `page.extract()` | ✅ |
-| `web.tab.snapshot(tabId)` | ✅ |
-| `page.url()` / `page.title()` | ✅ (main-thread via `chrome.tabs.get`) |
-| `page.fill` / `page.click` / `web.tab.fill` / `web.tab.click` | ❌ same |
+Required behavior:
 
-After `page.goto("https://example.com")`, `page.url`, `fill`, `click`, `scroll` all worked.
+- Visible interactive elements must receive usable references.
+- Label targeting must use the same semantic information exposed during observation.
+- When targeting fails, the error must distinguish stale reference, no matching label, non-interactable element, and unsupported target.
+- Failure details must include useful candidates or enough context to select a valid target.
+- Dynamic page changes must produce an explicit stale-reference result, not a generic not-found result.
+- `page.*` and `web.tab.*` must behave consistently for equivalent targeting operations.
 
-### Root cause
+An agent must not be able to find a post or media container but then be unable to click it because all returned references are null.
 
-Two execution paths:
+## P0: Binary-Safe Fetching and File Saving
 
-- **Read path** — `chrome.scripting.executeScript` in MAIN world (`buildSnapshotInTab`, extract, …). Does **not** require manifest content script.
-- **Write path** — `chrome.tabs.sendMessage` → `content-script.js`. Requires content script injected and listening.
+extension-js must provide a documented, end-to-end path for downloading and saving binary resources such as images, PDFs, audio, and archives.
 
-`pingTabContentScript` runs after `page.goto`, not before arbitrary mutations on stale tabs.
+Required behavior:
 
-### Why agents get confused
+- Fetching binary content must preserve every byte.
+- The response must clearly identify whether its body is text, bytes, or base64.
+- Binary data returned by fetch must be directly accepted by a documented filesystem write operation, or convertible using documented runtime facilities.
+- Content type, status, final URL, and byte length must be available.
+- A saved file must be verifiable through filesystem metadata and read/hash operations.
+- The flow must work for cross-origin media URLs accessible from the active page.
+- Unsupported binary operations must fail before data corruption occurs and explain the limitation precisely.
 
-Snapshot success implies “I can control this page.” Mutations then fail with an opaque Chrome message. The agent assumes API misuse, stale refs, or wrong namespace — not missing injection.
+Returning JPEG bytes through `response.text()` as corrupted replacement characters is unacceptable.
 
-### What extension-js should do
+## P0: Filesystem Calls Must Match Their Documentation
 
-1. **Ping preflight before every content-script mutation** (fill, click, …). Implemented inline in `ExtensionSession.executeContentScriptCommand` via `pingTabContentScript`; retry on transient errors; structured fail with hint/recovery.
-2. **Recovery without a dedicated wake API:** agents use `await page.goto(currentUrl)` or ask the user to **refresh** the target tab, then retry mutations.
+Every documented filesystem signature must work exactly as documented.
 
-### Target error (example)
+Required behavior:
 
-```text
-[E_CONTENT_SCRIPT] Content script is not connected on tab 941354017 (https://www.google.com/...).
+- `fs.write`, `fs.writeBase64`, and aliases must accept their documented parameter shapes.
+- Parameters must arrive at the filesystem dispatcher unchanged and non-null.
+- Invalid data must produce a precise validation error naming the field and expected representation.
+- Successful writes must return explicit confirmation containing the destination and written byte count.
+- Relative-path behavior and the filesystem root must be documented.
+- Equivalent camelCase and snake_case aliases, if both are exposed, must have equivalent semantics.
 
-Hint: page.snapshot() uses script injection and can succeed even when fill/click cannot.
-      This tab was likely open before the extension loaded (MV3 does not retro-inject).
+A documented call such as `fs.writeBase64({ path, data })` must not reach the dispatcher as null.
 
-Recovery:
-  1. await page.goto("<current url>")  // re-navigation injects content script
-  2. Or ask the user to refresh the target tab, then retry fill/click
-```
+## P0: Cold-Tab Read and Write Consistency
 
----
+On a normal HTTP(S) tab that was open before extension-js loaded, the API must clearly and consistently represent what is ready.
 
-## Problem 2 — `page.url()` / `page.title()` use content script unnecessarily (P0)
+Required behavior:
 
-### What happened
+- Read success must not misleadingly imply mutation readiness.
+- Mutation attempts must either become ready automatically or fail with a specific readiness error.
+- The error must explain why reads can work while writes cannot.
+- Recovery must be concrete and known to work.
+- `page.health()` or equivalent capability state must accurately report observation and mutation readiness before the agent acts.
+- `page.url()` and `page.title()` must work whenever active-tab metadata is available.
 
-`web.tab.current()` returned url/title via `chrome.tabs.get`. `page.url()` / `page.title()` failed with Receiving end does not exist on the same tab.
+Raw Chrome connection errors must never reach the agent.
 
-### Root cause
+## P1: Explicit Success Results
 
-`page_url` / `page_title` are registered as content-script actions. They only need tab metadata.
+All state-changing operations must return explicit, typed confirmation rather than `null` or ambiguous values.
 
-### What extension-js should do
+The result must identify:
 
-Implement `page.url` / `page.title` on the **main thread** via `chrome.tabs.get(activeTabId)` (same as tab metadata elsewhere).
+- The operation performed.
+- The target used.
+- The relevant resulting state.
+- Whether extension-js observed the intended effect.
 
-### Target error (if tab missing)
+A successful dispatch that produced no page effect must not be reported as successful task completion.
 
-```text
-[E_NO_TAB] No active tab resolved for page.url().
+## P1: Actionable Errors
 
-Recovery:
-  1. const t = await web.tab.current(); console.log(t.tabId, t.url)
-  2. Ensure the user is focused on a normal http(s) page tab, not chrome:// or the side panel
-```
+Every failure exposed to agent code must contain:
 
----
+- A stable machine-readable code.
+- A specific human-readable message.
+- The failed API and operation.
+- Useful structured details such as URL, tab ID, selector, label, reference, status, or candidate targets.
+- A short explanation when the behavior is non-obvious.
+- Recovery steps that are valid for the actual failure.
 
-## Problem 3 — Raw Chrome errors bubble to agents (P0)
+Generic `TypeError`, `ReferenceError`, `E_UNKNOWN`, `E_EXTENSION`, and `Failed to get page snapshot` messages without the original message, location, and cause are unacceptable.
 
-### What happened
+Runtime errors must preserve:
 
-Agents saw verbatim: `Could not establish connection. Receiving end does not exist.`
+- Error name.
+- Error message.
+- Failing line or expression when available.
+- Stack or equivalent source location when available.
 
-`pingTabContentScript` maps this to `content script not available on this URL` — better, but still no recovery steps. `executeContentScriptCommand` forwards the raw message with `E_CONTENT_SCRIPT`.
+## P1: Runtime Capability Clarity
 
-### What extension-js should do
+The JavaScript runtime must expose a coherent, documented set of language and binary primitives.
 
-Centralize mapping in one module (`normalizeAgentError`). Never pass Chrome connection errors through unchanged.
+Required behavior:
 
-| Chrome substring | Code | Recovery template |
-|------------------|------|-------------------|
-| Receiving end does not exist | `E_CONTENT_SCRIPT` | goto current URL / refresh tab |
-| Timeout waiting for content-script ping | `E_CONTENT_SCRIPT` | goto current URL / refresh tab |
-| Element not found by refId | `E_STALE` or `E_NOT_FOUND` | re-snapshot; list candidates |
-| Permission / denied | `E_PERMISSION` | name manifest permission; optional request path |
+- Documentation must state whether standard APIs such as `Uint8Array`, `ArrayBuffer`, `TextEncoder`, `TextDecoder`, `atob`, and `btoa` are available.
+- APIs shown in examples must exist in the runtime.
+- Missing runtime capabilities must produce named errors rather than bare `ReferenceError` output.
+- Ordinary binary workflows must not depend on guessing which JavaScript globals survived sandboxing.
 
----
+## P1: Accurate Generated Documentation
 
-## Problem 4 — Mutations return `null` (P1)
+`get_doc` is the runtime contract for agents and must be trustworthy.
 
-### What happened
+Required behavior:
 
-`page.fill`, `page.click`, `page.press` returned `null` on success. Agent report: *“success only confirmed by later snapshot/navigation.”*
+- Every parameter must have its real type, required status, accepted shapes, and defaults.
+- Every return value must have its real structure and field types.
+- Examples must use a valid signature and be executable in the documented runtime.
+- Documentation must identify whether an API returns text or binary data.
+- Documentation must identify prerequisites, permissions, context restrictions, and side effects.
+- Aliases must be documented consistently.
+- `page.*` versus `web.tab.*` ownership and behavior must be unambiguous.
+- Recovery examples must not recommend APIs known to share the same failing dependency.
 
-### What extension-js should do
+Parameters and return values described as `undefined` are unacceptable when concrete schemas exist.
 
-Return a small confirmation object:
+## P1: API Signature Consistency
 
-```typescript
-{ ok: true, action: "fill", refId: "e6", value: "test" }
-```
+Supported calling conventions must be consistent and deterministic.
 
-Document in `get_doc` that `null` historically meant success — migrate to explicit `ok`.
+Required behavior:
 
-### Target error on silent DOM no-op (SPA)
+- Object and positional forms must not be accepted inconsistently across closely related APIs.
+- If only one form is supported, documentation and validation must require it consistently.
+- Invalid calls must explain the accepted form.
+- Equivalent `page.*` and `web.tab.*` operations must use predictable parameter naming and return shapes.
+- Active-tab APIs must use a consistent tab identity shape.
 
-```text
-[E_NOT_INTERACTABLE] fill on e17 (input combobox) returned no effect.
+The agent must not need to probe multiple argument permutations to discover the actual signature.
 
-Hint: Some sites ignore programmatic value assignment; value may not appear in snapshot_data.
+## P1: Dynamic-Page Continuity
 
-Recovery:
-  1. await page.click({ refId: "e17" }) then await page.type({ refId: "e17", text: "..." })
-  2. Or await page.press("Enter") after fill
-  3. Re-snapshot and confirm URL or node state changed
-```
+extension-js must make it possible to preserve the identity of objects on feeds and other virtualized applications.
 
----
+Required behavior:
 
-## Problem 5 — `snapshot_data` omits form state (P1)
+- Structured results must expose stable URLs or identifiers when the page provides them.
+- Media must be associable with the post or article that contains it.
+- After scrolling or rerendering, the agent must be able to determine whether it is still acting on the same object.
+- Stale ephemeral references must be clearly distinguished from stable page-provided identifiers.
 
-### What happened
+## P2: Trace and Lifecycle Correctness
 
-After `page.fill({ refId: "e17", value: "test search" })`, `snapshot_data` still showed no `value` on the node. Capability-check step 4 (“read back via snapshot_data”) cannot pass.
+Every execution must reach a final state.
 
-### Root cause
+Required behavior:
 
-`buildSnapshotInTab` emits `{ refId, role, tag, name? }` only — no `value`, `checked`, or `disabled`.
+- A completed, failed, stopped, or timed-out cell must not remain marked `running`.
+- Tool events must have deterministic chronological ordering.
+- Errors and completion states must retain the call ID needed to correlate them.
+- Timeouts and cancellation must produce explicit final results.
 
-### What extension-js should do
+## Required Acceptance Scenarios
 
-For `input`, `textarea`, `select`: include `value`, `checked` where readable from DOM.
+The extension-js agent must add automated extension-context tests proving all scenarios below.
 
-### Target doc note (`get_doc` for `page.snapshot_data`)
+### 1. Dynamic Feed Observation
 
-```text
-Returns nodes[].refId, role, tag, name, value (inputs), checked (checkbox/radio).
-After fill, call snapshot_data() again on the same tab to verify value changed.
-```
+On a realistic dynamic feed fixture:
 
----
+1. Find at least ten article elements.
+2. Identify images belonging to each article.
+3. Read each image's absolute source URL and alternative text.
+4. Read each article's stable permalink.
+5. Associate every returned image with the correct article.
+6. Target a selected article or image using a supported reference.
 
-## Problem 6 — Misleading “works” signal from snapshot-only probes (P1)
+### 2. X-Sized Snapshot
 
-### What happened
-
-Agent logged `page.snapshot works, length: 8543` on Google while all mutations were broken — then reported “Works” for APIs that had failed on the starting page.
-
-### What extension-js should do
-
-Optional snapshot metadata:
-
-```typescript
-{ nodes, url, title, contentScriptReady: boolean }
-```
-
-Or a lightweight `page.health()`:
-
-```typescript
-{ contentScript: "connected" | "missing", scripting: "ok", tabId, url }
-```
-
-### Target `page.health()` output when disconnected
-
-```text
-contentScript: "missing"
-hint: "snapshot/extract use script injection; fill/click require content script"
-recovery: ["page.goto(url)", "refresh target tab"]
-```
-
----
-
-## Problem 7 — `page.*` vs `web.tab.*` duplication (P2)
-
-### What happened
-
-Agent pivoted to `web.tab.current()` + `web.tab.snapshot(tabId)` after `page.url` failed — still could not fill. Two namespaces look like alternatives; they share the same content-script dependency for mutations.
-
-### What extension-js should do
-
-- **Document:** `page.*` = active tab shorthand; `web.tab.*` = explicit `tabId` / multi-tab.
-- **Do not** imply `web.tab` bypasses content script for fill/click.
-- Align `page.active_tab()` return shape with `web.tab.current()` (object vs array).
-
-### Target error when mixing APIs
-
-```text
-[E_API_MISMATCH] web.tab.fill succeeded at API level but content script was not connected.
-
-Hint: web.tab.fill and page.fill use the same content-script path.
-
-Recovery: fix content script first (see E_CONTENT_SCRIPT recovery), then retry.
-```
-
----
-
-## Problem 8 — Stale refIds after DOM change (P2)
-
-### What happened
-
-`page.type({ refId: "e17" })` → `Element not found by refId "e17". Candidates: none` after DuckDuckGo UI re-render (combobox became `e5`).
-
-### What extension-js should do
-
-- Keep throwing on stale refs (correct).
-- Enrich error: `previousRef`, `suggestedAction: "snapshot_data again"`, `similarNodes` if any.
-
-### Target error
-
-```text
-[E_STALE] Element not found by refId "e17".
-
-Hint: RefIds are invalidated when the DOM is replaced (navigation, SPA rerender, autocomplete).
-
-Recovery:
-  1. const d = await page.snapshot_data(); find combobox/input in d.nodes
-  2. Use a fresh refId from that snapshot only
-  3. Do not reuse refIds from before press/click/navigation
-```
-
----
-
-## Problem 9 — `get_doc` types are unhelpful (P2)
-
-### What happened
-
-`get_doc` listed every parameter as `` `undefined` `` and returns as `` `undefined` ``. Agents cannot learn argument shapes from docs alone.
-
-### What extension-js should do
-
-Wire real Zod/param types into generated docs (name, type, required, example).
-
----
-
-## Priority backlog
-
-| Priority | Item | Primary fix |
-|----------|------|-------------|
-| P0 | Cold-tab read/write split | ping preflight before CS mutations + agent errors with hint/recovery |
-| P0 | `page.url` / `page.title` on main thread | `chrome.tabs.get` |
-| P0 | Normalize all Chrome errors | `normalizeAgentError` + never raw Receiving end |
-| P1 | Mutation return values | `{ ok, refId, … }` not `null` |
-| P1 | `snapshot_data` form fields | `value`, `checked`, `disabled` |
-| P1 | `page.health()` or snapshot flag | `contentScriptReady` |
-| P2 | API docs clarity | `page` vs `web.tab`, `active_tab` shape |
-| P2 | Stale ref errors | `E_STALE` + recovery text |
-| P2 | `get_doc` accuracy | Real types, permissions, prerequisites |
-
----
-
-## Out of scope (host / Browsergent)
-
-These showed up in the same session but belong in the consumer, not extension-js core:
-
-- Side panel stealing active tab focus → `resolveActiveTabId` should prefer `lastFocusedWindow: true` (host tab context).
-- Agent prompts that over-trust “Works” without correlating trace failures.
-- UI surfacing `hint` / `recovery` in the side panel trace (extension-js should still *emit* them).
-
----
-
-## Acceptance test (suggested)
-
-Reproduce the Browsergent capability-check on a **pre-opened** Google tab without refresh:
+On a large, mutating DOM fixture:
 
 1. `page.snapshot()` succeeds.
-2. `page.fill()` returns `E_CONTENT_SCRIPT` with hint + recovery (not raw Chrome text).
-3. After `page.goto(currentUrl)` or **refreshing the tab**, fill succeeds and returns `{ ok: true, … }`.
-4. `snapshot_data` after fill includes `value` on the target input.
+2. `page.snapshot_data({ max_nodes: 50 })` succeeds and returns no more than the documented bound.
+3. Increasing the bound returns additional useful nodes.
+4. A concurrent rerender does not produce an unexplained generic failure.
 
-Until this passes, agents will keep rediscovering the same failure mode expensively.
+### 3. Download and Save an Image
+
+From a page containing a cross-origin JPEG:
+
+1. Discover the image URL through a supported observation API.
+2. Fetch the image without byte corruption.
+3. Save it through the documented filesystem API.
+4. Confirm the file exists.
+5. Confirm its size matches the fetched byte length.
+6. Confirm its hash matches the original bytes.
+7. Return explicit success results at every step.
+
+### 4. Cold Existing Tab
+
+On an HTTP(S) tab opened before the extension loads:
+
+1. Observation capability is reported accurately.
+2. Mutation capability is reported accurately.
+3. A mutation either succeeds or returns a specific readiness error with working recovery.
+4. No raw Chrome connection string is exposed.
+5. After recovery, fill and click succeed with explicit confirmation.
+
+### 5. Stale Dynamic Reference
+
+1. Capture a reference to an interactive element.
+2. Replace that element through a rerender.
+3. Attempt to use the old reference.
+4. Receive a specific stale-reference error with useful details.
+5. Refresh observation and successfully target the replacement.
+
+### 6. Documentation Contract
+
+For every public `page`, `web.tab`, and `fs` API used above:
+
+1. Generate documentation.
+2. Execute the documented example unchanged.
+3. Validate its parameters and result against the documented schema.
+4. Confirm no parameter or return type is incorrectly reported as `undefined`.
+
+## Completion Standard
+
+This work is complete only when the automated extension-context tests pass in a fresh build and a browser agent can complete the image-download scenario without undocumented APIs, signature guessing, raw DOM execution, corrupted data, or speculative retries.

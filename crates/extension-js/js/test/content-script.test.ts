@@ -83,7 +83,7 @@ describe("content-script onMessage handler", () => {
 		);
 		expect(sendResponse).toHaveBeenCalledWith({
 			ok: false,
-			error: "Unknown content script action: unknown_action_xyz",
+			error: "Use registryCall for content-script actions",
 		});
 	});
 
@@ -147,25 +147,116 @@ describe("content-script onMessage handler", () => {
 		expect(sendResponse).toHaveBeenCalledWith({ ok: true });
 	});
 
-	it("routes async handlers and calls sendResponse when the promise resolves", async () => {
+	it("rejects bare DOM actions without registryCall", async () => {
 		const sendResponse = vi.fn();
 		const listener = mockAddListener.mock.calls[0][0];
-		const returnValue = listener(
-			{ action: "snapshot", params: {} },
+		listener(
+			{ action: "click", params: { refId: "e1" } },
 			{ id: globalThis.chrome.runtime.id },
 			sendResponse,
 		);
-		// Async handlers must return true to keep the message channel open
-		expect(returnValue).toBe(true);
-		// sendResponse should not be called synchronously
-		expect(sendResponse).not.toHaveBeenCalled();
-		// Wait for the async snapshot to complete
+		expect(sendResponse).toHaveBeenCalledWith({
+			ok: false,
+			error: "Use registryCall for content-script actions",
+		});
+	});
+
+	it("registryCall page_snapshot resolves snapshot_text handler (string)", async () => {
+		document.body.innerHTML = "<button>Go</button>";
+		const sendResponse = vi.fn();
+		const listener = mockAddListener.mock.calls[0][0];
+		listener(
+			{
+				type: "registryCall",
+				action: "page_snapshot",
+				params: {},
+				id: "snap-text-1",
+			},
+			{ id: globalThis.chrome.runtime.id },
+			sendResponse,
+		);
 		await new Promise((resolve) => setTimeout(resolve, 10));
-		expect(sendResponse).toHaveBeenCalledOnce();
-		const response = sendResponse.mock.calls[0][0] as { ok: boolean; value: { nodes: unknown[] } };
+		const response = sendResponse.mock.calls[0][0] as {
+			ok: boolean;
+			value: string;
+		};
+		expect(response.ok).toBe(true);
+		expect(typeof response.value).toBe("string");
+		expect(response.value).toContain("[e1]");
+	});
+
+	it("registryCall page_snapshot_data resolves snapshot handler (object)", async () => {
+		document.body.innerHTML = "<button>Go</button>";
+		const sendResponse = vi.fn();
+		const listener = mockAddListener.mock.calls[0][0];
+		listener(
+			{
+				type: "registryCall",
+				action: "page_snapshot_data",
+				params: {},
+				id: "snap-data-1",
+			},
+			{ id: globalThis.chrome.runtime.id },
+			sendResponse,
+		);
+		await new Promise((resolve) => setTimeout(resolve, 10));
+		const response = sendResponse.mock.calls[0][0] as {
+			ok: boolean;
+			value: { text: string; nodes: unknown[] };
+		};
 		expect(response.ok).toBe(true);
 		expect(response.value.nodes).toBeDefined();
 		expect(Array.isArray(response.value.nodes)).toBe(true);
+		expect(response.value.text).toContain("[e1]");
+	});
+
+	it("registryCall tab_snapshot resolves snapshot_text handler (string)", async () => {
+		document.body.innerHTML = "<button>Tab</button>";
+		const sendResponse = vi.fn();
+		const listener = mockAddListener.mock.calls[0][0];
+		listener(
+			{
+				type: "registryCall",
+				action: "tab_snapshot",
+				params: { tabId: 1 },
+				id: "tab-snap-text-1",
+			},
+			{ id: globalThis.chrome.runtime.id },
+			sendResponse,
+		);
+		await new Promise((resolve) => setTimeout(resolve, 10));
+		const response = sendResponse.mock.calls[0][0] as {
+			ok: boolean;
+			value: string;
+		};
+		expect(response.ok).toBe(true);
+		expect(typeof response.value).toBe("string");
+		expect(response.value).toContain("[e1]");
+	});
+
+	it("registryCall tab_snapshot_data resolves snapshot handler (object)", async () => {
+		document.body.innerHTML = "<button>Tab</button>";
+		const sendResponse = vi.fn();
+		const listener = mockAddListener.mock.calls[0][0];
+		listener(
+			{
+				type: "registryCall",
+				action: "tab_snapshot_data",
+				params: { tabId: 1 },
+				id: "tab-snap-data-1",
+			},
+			{ id: globalThis.chrome.runtime.id },
+			sendResponse,
+		);
+		await new Promise((resolve) => setTimeout(resolve, 10));
+		const response = sendResponse.mock.calls[0][0] as {
+			ok: boolean;
+			value: { text: string; nodes: unknown[] };
+		};
+		expect(response.ok).toBe(true);
+		expect(response.value.nodes).toBeDefined();
+		expect(Array.isArray(response.value.nodes)).toBe(true);
+		expect(response.value.text).toContain("[e1]");
 	});
 });
 
@@ -207,6 +298,19 @@ describe("snapshot refId contract", () => {
 		const result = inlineSnapshot(500);
 		expect(result.text).toContain("[e1]");
 		expect(result.text).not.toContain("[ref=");
+	});
+
+	it("inlineSnapshot includes status feedback in generic p elements", () => {
+		const status = document.createElement("p");
+		status.id = "status";
+		status.textContent = "filled:Alice";
+		document.body.appendChild(status);
+
+		const result = inlineSnapshot(500);
+		expect(result.text).toContain("filled:Alice");
+		expect(result.nodes.some((n) => n.tag === "p" && n.name === "filled:Alice")).toBe(
+			true,
+		);
 	});
 
 	it("inlineSnapshot includes input value on form controls", () => {
@@ -287,6 +391,45 @@ describe("stale refId errors", () => {
 		}
 	});
 
+	it.each([
+		["down", { top: 300, left: 0 }],
+		["up", { top: -300, left: 0 }],
+		["right", { top: 0, left: 300 }],
+		["left", { top: 0, left: -300 }],
+	])("scroll %s calls scrollBy with correct offsets", (direction, expected) => {
+		const scrollBy = vi.spyOn(window, "scrollBy").mockImplementation(() => {});
+		handlers.scroll({ direction, amount: 300 });
+		expect(scrollBy).toHaveBeenCalledWith({
+			...expected,
+			behavior: "smooth",
+		});
+		scrollBy.mockRestore();
+	});
+
+	it("append returns E_NOT_INTERACTABLE when value assignment has no effect", async () => {
+		const input = document.createElement("input");
+		input.setAttribute("data-ref-id", "e9");
+		Object.defineProperty(input, "value", {
+			get: () => "locked",
+			set: () => {},
+			configurable: true,
+		});
+		document.body.appendChild(input);
+
+		const result = await dispatchContentScriptCall(
+			"page_append",
+			"append",
+			handlers.append,
+			{ refId: "e9", text: "more" },
+		);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_NOT_INTERACTABLE");
+			expect(result.error.message).toContain("append on e9");
+		}
+		document.body.removeChild(input);
+	});
+
 	it("fill returns E_NOT_INTERACTABLE when value assignment has no effect", async () => {
 		const input = document.createElement("input");
 		input.setAttribute("data-ref-id", "e7");
@@ -332,6 +475,51 @@ describe("stale refId errors", () => {
 		expect(result.ok).toBe(true);
 		expect(changed).toBe(true);
 		document.body.removeChild(select);
+	});
+
+	it("find returns matching elements", async () => {
+		document.body.innerHTML = "<h1>Title</h1>";
+		const result = await dispatchContentScriptCall(
+			"page_find",
+			"find",
+			handlers.find,
+			{ selector: "h1" },
+		);
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.value).toEqual([
+				{ tag: "H1", refId: null, text: "Title" },
+			]);
+		}
+	});
+
+	it("extract returns requested fields", async () => {
+		document.title = "Page";
+		const result = await dispatchContentScriptCall(
+			"page_extract",
+			"extract",
+			handlers.extract,
+			{ fields: ["title"] },
+		);
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.value).toEqual({ title: "Page" });
+		}
+	});
+
+	it("snapshot_text returns text only", async () => {
+		document.body.innerHTML = "<button>Go</button>";
+		const result = await dispatchContentScriptCall(
+			"page_snapshot_text",
+			"snapshot_text",
+			handlers.snapshot_text,
+			{ max_nodes: 50 },
+		);
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(typeof result.value).toBe("string");
+			expect(result.value).toContain("Go");
+		}
 	});
 
 	it("check supports radio buttons and dispatches change", async () => {

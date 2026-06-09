@@ -631,9 +631,12 @@ describe("WU-9: actionable validation errors", () => {
 	});
 
 	it("nested path errors show actual path instead of empty string", async () => {
-		const result = await dispatchTool("page_extract", {
-			fields: [123],
-		});
+		const result = await dispatchContentScriptCall(
+			"page_extract",
+			"extract",
+			handlers.extract,
+			{ fields: [123] },
+		);
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.message).toContain("Invalid parameters for page_extract");
@@ -1271,7 +1274,7 @@ describe("page actions", () => {
 			};
 			expect(health.mutationsReady).toBe(false);
 			expect(health.contentScript).toBe("missing");
-			expect(health.hint).toContain("page.snapshot()");
+			expect(health.hint).toContain("Content script is not connected");
 			expect(health.recovery?.[0]).toContain("page.goto");
 		}
 	});
@@ -1301,13 +1304,13 @@ describe("page actions", () => {
 			const health = result.value as {
 				mutationsReady: boolean;
 				contentScript: string;
-				scripting: string;
+				domApis: string;
 				hint?: string;
 				recovery?: string[];
 			};
 			expect(health.mutationsReady).toBe(true);
 			expect(health.contentScript).toBe("connected");
-			expect(health.scripting).toBe("ok");
+			expect(health.domApis).toBe("ok");
 			expect(health.tabId).toBe(1);
 			expect(health.url).toBe("https://www.google.com/");
 			expect(health.title).toBe("Google");
@@ -1316,7 +1319,7 @@ describe("page actions", () => {
 		}
 	});
 
-	it("page.health reports scripting-blocked hint for non-http tabs", async () => {
+	it("page.health reports domApis-blocked hint for non-http tabs", async () => {
 		mockChrome.tabs.get.mockResolvedValue({
 			id: 1,
 			url: "chrome://settings/",
@@ -1340,13 +1343,13 @@ describe("page actions", () => {
 		if (result.ok) {
 			const health = result.value as {
 				mutationsReady: boolean;
-				scripting: string;
+				domApis: string;
 				contentScript: string;
 				hint?: string;
 				recovery?: string[];
 			};
 			expect(health.mutationsReady).toBe(false);
-			expect(health.scripting).toBe("blocked");
+			expect(health.domApis).toBe("blocked");
 			expect(health.contentScript).toBe("connected");
 			expect(health.hint).toContain("http(s)");
 			expect(health.recovery?.[0]).toContain("page.goto");
@@ -1375,24 +1378,29 @@ describe("page actions", () => {
 	});
 
 	it("page_find accepts positional selector string", async () => {
-		mockChrome.scripting.executeScript.mockResolvedValue([
-			{ result: [{ tag: "H1", refId: null, text: "Hi" }] },
-		]);
-		const result = await executeMainThreadCommand({
-			action: "page_find",
-			params: "h1",
-			call_id: 1,
-		});
+		document.body.innerHTML = "<h1>Hi</h1>";
+		const result = await dispatchContentScriptCall(
+			"page_find",
+			"find",
+			handlers.find,
+			{ selector: "h1" },
+		);
 		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.value).toEqual([
+				{ tag: "H1", refId: null, text: "Hi" },
+			]);
+		}
 	});
 
 	it("page_wait_for accepts positional selector and timeout", async () => {
-		mockChrome.scripting.executeScript.mockResolvedValue([{ result: true }]);
-		const result = await executeMainThreadCommand({
-			action: "page_wait_for",
-			params: ["#submit", 50n],
-			call_id: 1,
-		});
+		document.body.innerHTML = '<div id="submit"></div>';
+		const result = await dispatchContentScriptCall(
+			"page_wait_for",
+			"wait_for",
+			handlers.wait_for,
+			{ selector: "#submit", timeout: 50 },
+		);
 		expect(result.ok).toBe(true);
 	});
 
@@ -1406,14 +1414,17 @@ describe("page actions", () => {
 	});
 
 	it("page_extract accepts positional fields array", async () => {
-		mockChrome.scripting.executeScript.mockResolvedValue([
-			{ result: { title: "Fixture", url: "https://example.com" } },
-		]);
-		const result = await executeMainThreadCommand({
-			action: "page_extract",
-			params: ["title", "url"],
-			call_id: 1,
+		document.title = "Fixture";
+		Object.defineProperty(window, "location", {
+			value: { href: "https://example.com" },
+			writable: true,
 		});
+		const result = await dispatchContentScriptCall(
+			"page_extract",
+			"extract",
+			handlers.extract,
+			{ fields: ["title", "url"] },
+		);
 		expect(result.ok).toBe(true);
 		if (result.ok) {
 			expect(result.value).toEqual({
@@ -1424,16 +1435,17 @@ describe("page actions", () => {
 	});
 
 	it("page_wait_for timeout returns E_TIMEOUT with category timeout", async () => {
-		// Mock executeInTab by making scripting always return false for selector check
-		mockChrome.scripting.executeScript.mockResolvedValue([{ result: false }]);
-		const result = await dispatchTool("page_wait_for", {
-			selector: "#never-exists",
-			timeout: 100n,
-		});
+		const result = await dispatchContentScriptCall(
+			"page_wait_for",
+			"wait_for",
+			handlers.wait_for,
+			{ selector: "#never-exists", timeout: 100 },
+		);
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.code).toBe("E_TIMEOUT");
 			expect(result.error.category).toBe("timeout");
+			expect(result.error.message).toContain("Timeout waiting for selector");
 		}
 	});
 
@@ -1685,7 +1697,7 @@ describe("page actions", () => {
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.code).toBe("E_CONTENT_SCRIPT");
-			expect(result.error.hint).toContain("page.snapshot()");
+			expect(result.error.hint).toContain("Content script is not connected");
 			expect(result.error.recovery?.[0]).toContain("page.goto");
 			expect(result.error.message).not.toContain("Receiving end does not exist");
 		}
@@ -1706,7 +1718,7 @@ describe("page actions", () => {
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.code).toBe("E_CONTENT_SCRIPT");
-			expect(result.error.hint).toContain("page.snapshot()");
+			expect(result.error.hint).toContain("Content script is not connected");
 			expect(result.error.recovery?.length).toBeGreaterThan(0);
 		}
 	});
@@ -2055,10 +2067,14 @@ describe("WU-5: unambiguous element action arguments", () => {
 		});
 	});
 
-	it("page_dblclick resolves element by refId", async () => {
+	it("page_dblclick resolves element by refId and dispatches dblclick event", async () => {
 		const btn = document.createElement("button");
 		btn.setAttribute("data-ref-id", "e8");
 		document.body.appendChild(btn);
+		let dblClicked = false;
+		btn.addEventListener("dblclick", () => {
+			dblClicked = true;
+		});
 		const result = await dispatchContentScriptCall(
 			"page_dblclick",
 			"dblclick",
@@ -2066,6 +2082,7 @@ describe("WU-5: unambiguous element action arguments", () => {
 			{ refId: "e8" },
 		);
 		expect(result.ok).toBe(true);
+		expect(dblClicked).toBe(true);
 		document.body.removeChild(btn);
 	});
 
@@ -2612,10 +2629,12 @@ describe("registry contract with runner tools", () => {
 	});
 
 	it("test_page_fetch_exists: page_fetch is registered", () => {
-		const tool = getTool("page_fetch");
-		expect(tool).toBeDefined();
-		expect(tool?.namespace).toBe("page");
-		expect(tool?.action).toBe("page_fetch");
+		const manifest = getSerializableJsManifest();
+		const entry = manifest.find((e) => e.action === "page_fetch");
+		expect(entry).toBeDefined();
+		expect(entry?.namespace).toBe("page");
+		expect(entry?.name).toBe("fetch");
+		expect(entry?.owner).toBe("content-script");
 	});
 
 	it("content-script APIs are exported with content-script owner metadata", () => {

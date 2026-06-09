@@ -1,4 +1,6 @@
+use crate::error::format::exception_to_string;
 use crate::types::CellError;
+use rquickjs::promise::PromiseState as QjsPromiseState;
 use rquickjs::{Ctx, Value};
 
 /// Format a Value for display (used by print/emit).
@@ -22,6 +24,25 @@ pub(crate) fn format_js_value<'js>(value: &Value<'js>) -> String {
             .as_string()
             .and_then(|s| s.to_string().ok())
             .unwrap_or_else(|| "[string]".to_string())
+    } else if value.is_promise() {
+        let ctx = value.ctx().clone();
+        if let Some(promise) = value.as_promise() {
+            match promise.state() {
+                QjsPromiseState::Pending => "[Promise pending]".to_string(),
+                QjsPromiseState::Resolved => match promise.result::<Value>() {
+                    Some(Ok(val)) => format_js_value(&val),
+                    Some(Err(_)) => "[Promise rejected]".to_string(),
+                    None => "[Promise pending]".to_string(),
+                },
+                QjsPromiseState::Rejected => {
+                    let _ = promise.result::<Value>();
+                    let exc = ctx.catch();
+                    format!("[Promise rejected: {}]", exception_to_string(&exc))
+                }
+            }
+        } else {
+            "[Promise pending]".to_string()
+        }
     } else {
         let ctx = value.ctx().clone();
         ctx.json_stringify(value)

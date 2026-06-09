@@ -19,6 +19,7 @@ import {
   isValidMainThreadAction,
   setRunnerAbortController,
   pingTabContentScript,
+  preflightDomTab,
 } from "../runner/runtime.js";
 import { normalizeAgentError } from "../../shared/registry/normalize-agent-error.js";
 import { CS_FAST_PING_MS } from "../runner/lib/constants.js";
@@ -232,7 +233,14 @@ export class ExtensionSession {
         this.executeContextCommand(owner, cmd, tabPolicy, relayId, relayAbort.signal)
           .then((result) => {
             if (relayAbort.signal.aborted) {
-              return;
+              const completed =
+                typeof result === "object" &&
+                result !== null &&
+                "ok" in result &&
+                (result as { ok: boolean }).ok === true;
+              if (!completed) {
+                return;
+              }
             }
             logger.trace("asyncRelayResult", {
               action,
@@ -391,6 +399,11 @@ export class ExtensionSession {
       // ignore
     }
 
+    const urlPreflight = await preflightDomTab(tabId);
+    if (urlPreflight && !urlPreflight.ok) {
+      return urlPreflight;
+    }
+
     const pingResult = await pingTabContentScript(tabId, CS_FAST_PING_MS);
     if (!pingResult.ok) {
       return pingResult;
@@ -405,13 +418,17 @@ export class ExtensionSession {
         callId: cmd.call_id,
         runId: cmd.runId,
       });
+      const parsed = unwrapContentScriptMessage(result);
+      if (cancelled && parsed.ok) {
+        return parsed;
+      }
       if (cancelled) {
         return {
           ok: false,
           error: { message: "Relay aborted", code: "E_ABORT" },
         };
       }
-      return unwrapContentScriptMessage(result);
+      return parsed;
     } catch (err: unknown) {
       if (cancelled || signal?.aborted) {
         return {
@@ -570,6 +587,11 @@ export class ExtensionSession {
     this.abortController = new AbortController();
     setRunnerAbortController(this.abortController);
     this.abortController.abort();
+
+    for (const [, relayAbort] of this.inFlightRelays) {
+      relayAbort.abort();
+    }
+    this.inFlightRelays.clear();
 
     // Tell the worker to abort runs and settle every pending relay before termination.
     if (this.worker) {

@@ -294,11 +294,6 @@ const tabIdScalarOrObject = z.union([
 export const TabActivateParamsSchema = tabIdScalarOrObject;
 export const TabCloseParamsSchema = tabIdScalarOrObject;
 
-export const TabExecuteScriptParamsSchema = z.object({
-	tabId: z.union([z.number(), z.bigint()]).optional().describe("Target tab ID"),
-	script: z.string().optional().describe("Script to execute"),
-}).passthrough();
-
 export const TabClickParamsSchema = tabElementTargetParams();
 export const TabFillParamsSchema = tabElementTargetParams({ value: z.string().describe("Value to fill into the element") });
 export const TabScrollToParamsSchema = z.preprocess(
@@ -346,6 +341,9 @@ export const TabEvaluateParamsSchema = z.object({
 	js: z.string().optional().describe("Alternative JS code"),
 }).passthrough();
 export const TabBackParamsSchema = z.object({
+	tabId: z.union([z.number(), z.bigint()]).optional().describe("Target tab ID"),
+}).passthrough();
+export const TabForwardParamsSchema = z.object({
 	tabId: z.union([z.number(), z.bigint()]).optional().describe("Target tab ID"),
 }).passthrough();
 export const TabWaitForLoadParamsSchema = z.object({
@@ -678,7 +676,7 @@ export const PageHealthResultSchema = z.object({
 	url: z.string(),
 	title: z.string(),
 	contentScript: z.enum(["connected", "missing"]),
-	scripting: z.enum(["ok", "blocked"]),
+	domApis: z.enum(["ok", "blocked"]),
 	mutationsReady: z.boolean(),
 	hint: z.string().optional(),
 	recovery: z.array(z.string()).optional(),

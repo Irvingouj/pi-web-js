@@ -1,7 +1,7 @@
 import type { AsyncError } from "./manifest.js";
 
 const CONTENT_SCRIPT_HINT =
-	"page.snapshot() uses script injection and can succeed even when fill/click cannot. " +
+	"Content script is not connected on this tab. " +
 	"This tab was likely open before the extension loaded (MV3 does not retro-inject).";
 
 function contentScriptRecovery(url: string): string[] {

@@ -19,7 +19,6 @@ import "./tools/clipboard.js";
 import "./tools/network.js";
 import "./tools/page.js";
 import "./tools/sidepanel.js";
-import "./tools/page-snapshot.js";
 import "./tools/dom.js";
 import "./tools/tab.js";
 import "./tools/chrome/index.js";

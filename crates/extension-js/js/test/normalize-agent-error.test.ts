@@ -15,7 +15,7 @@ describe("normalizeAgentError", () => {
 		expect(err.code).toBe("E_CONTENT_SCRIPT");
 		expect(err.category).toBe("content-script");
 		expect(err.message).not.toContain("Receiving end does not exist");
-		expect(err.hint).toContain("page.snapshot()");
+		expect(err.hint).toContain("Content script is not connected");
 		expect(err.recovery?.[0]).toContain("page.goto");
 		expect(err.recovery?.some((s) => s.includes("page.wake"))).toBe(false);
 		expect(err.details?.tabId).toBe(941354017);
@@ -27,7 +27,7 @@ describe("normalizeAgentError", () => {
 		);
 		expect(err.code).toBe("E_CONTENT_SCRIPT");
 		expect(err.details).toBeUndefined();
-		expect(err.hint).toContain("page.snapshot()");
+		expect(err.hint).toContain("Content script is not connected");
 	});
 
 	it("passthrough preserves structured errors with hint", () => {
@@ -40,7 +40,7 @@ describe("normalizeAgentError", () => {
 			{ message: "Content script missing", code: "E_CONTENT_SCRIPT" },
 			{ tabId: 3, url: "https://example.com/" },
 		);
-		expect(err.hint).toContain("page.snapshot()");
+		expect(err.hint).toContain("Content script is not connected");
 		expect(err.details?.tabId).toBe(3);
 	});
 

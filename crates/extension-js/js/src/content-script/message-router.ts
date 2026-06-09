@@ -1,3 +1,4 @@
+import { normalizeAgentError } from "../shared/registry/normalize-agent-error.js";
 import { toHandlerAction } from "../shared/registry/content-script-actions.js";
 import {
 	cancelContentScriptCall,
@@ -22,6 +23,14 @@ function resolveRegistryAction(
 	return registryAction;
 }
 
+function resolveHandlerKey(
+	registryAction: string,
+	fallback: string,
+): string {
+	const spec = getContentScriptSpec(registryAction);
+	return spec?.handlerKey ?? fallback;
+}
+
 function runHandler(
 	registryAction: string,
 	handlerAction: string,
@@ -33,19 +42,26 @@ function runHandler(
 		registryAction,
 		handlerAction,
 	);
-	const handler = handlers[handlerAction as string];
+	const resolvedHandlerKey = resolveHandlerKey(
+		effectiveRegistryAction,
+		handlerAction,
+	);
+	const handler = handlers[resolvedHandlerKey as string];
 	if (!handler) {
-		logger.debug("no_handler", { action: handlerAction, registryAction });
+		logger.debug("no_handler", {
+			action: resolvedHandlerKey,
+			registryAction,
+		});
 		sendResponse({
 			ok: false,
-			error: `Unknown content script action: ${handlerAction}`,
+			error: `Unknown content script action: ${resolvedHandlerKey}`,
 		});
 		return false;
 	}
 
 	const promise = dispatchContentScriptCall(
 		effectiveRegistryAction,
-		handlerAction,
+		resolvedHandlerKey,
 		handler,
 		params,
 		callId,
@@ -54,19 +70,19 @@ function runHandler(
 		.then((result) => {
 			logger.debug("dispatch_response", {
 				registryAction,
-				handlerAction,
+				handlerAction: resolvedHandlerKey,
 				ok: result.ok,
 			});
 			sendResponse(result);
 		})
 		.catch((err: unknown) => {
-			const msg = err instanceof Error ? err.message : String(err);
+			const normalized = normalizeAgentError(err, { action: registryAction });
 			logger.debug("dispatch_error", {
 				registryAction,
-				handlerAction,
-				error: msg,
+				handlerAction: resolvedHandlerKey,
+				error: normalized.message,
 			});
-			sendResponse({ ok: false, error: msg || String(err) });
+			sendResponse({ ok: false, error: normalized });
 		});
 	return true;
 }
@@ -120,6 +136,14 @@ export function installMessageListener(): void {
 			return false;
 		}
 
-		return runHandler(action, action, requestRecord.params, sendResponse);
+		if (action === "ping") {
+			return runHandler("ping", "ping", requestRecord.params, sendResponse);
+		}
+
+		sendResponse({
+			ok: false,
+			error: "Use registryCall for content-script actions",
+		});
+		return false;
 	});
 }

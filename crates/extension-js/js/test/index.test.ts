@@ -671,6 +671,65 @@ describe("ExtensionSession fs namespace e2e", () => {
 		);
 	});
 
+	it("asyncRelay still delivers success when cancelled after CS completes", async () => {
+		let resolveRegistry: (value: unknown) => void = () => {};
+		const registryPromise = new Promise((resolve) => {
+			resolveRegistry = resolve;
+		});
+		globalThis.chrome = {
+			runtime: { id: "extension-test" },
+			tabs: {
+				get: vi.fn(() =>
+					Promise.resolve({
+						id: 1,
+						url: "https://example.com/",
+						title: "Example",
+						status: "complete",
+					}),
+				),
+				sendMessage: vi.fn(async (_tabId: number, msg: Record<string, unknown>) => {
+					if (msg.action === "ping") {
+						return { ok: true };
+					}
+					if (msg.type === "registryCall") {
+						return registryPromise;
+					}
+					return { ok: false, error: "unexpected message" };
+				}),
+				onActivated: { addListener: vi.fn(), removeListener: vi.fn() },
+				onUpdated: { addListener: vi.fn(), removeListener: vi.fn() },
+				query: vi.fn(() => Promise.resolve([{ id: 1 }])),
+			},
+			scripting: { executeScript: vi.fn() },
+		};
+		const [, , worker] = await initSession();
+		setActiveTabId(1);
+		await new Promise((resolve) => setTimeout(resolve, 0));
+
+		sendWorkerAsyncRelay(worker, "relay-abort-success", "page_click", "content-script");
+		await new Promise((resolve) => setTimeout(resolve, 0));
+
+		resolveRegistry({
+			ok: true,
+			value: { ok: true, action: "click", refId: "e1" },
+		});
+		await new Promise((resolve) => setTimeout(resolve, 0));
+
+		worker.onmessage?.({
+			data: { type: "relayCancel", id: "relay-abort-success" },
+		} as MessageEvent);
+		await new Promise((resolve) => setTimeout(resolve, 50));
+
+		const relayResult = postMessages.find(
+			(m): m is PostMessage & { result?: unknown } =>
+				typeof m === "object" &&
+				m !== null &&
+				(m as PostMessage).type === "asyncRelayResult" &&
+				(m as PostMessage).id === "relay-abort-success",
+		);
+		expect(relayResult?.result).toMatchObject({ ok: true });
+	});
+
 	it("init posts manifest entries with documentation metadata", async () => {
 		await initSession();
 

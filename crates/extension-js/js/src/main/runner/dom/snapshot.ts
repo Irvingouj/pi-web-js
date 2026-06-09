@@ -29,6 +29,16 @@ export async function handleDomSnapshot(
 	});
 	try {
 		await ensureDomSnapshot();
+		if (typeof document === "undefined" || !document.body) {
+			return {
+				ok: false,
+				error: {
+					message: "Document body not available for snapshot",
+					code: "E_SNAPSHOT",
+					category: "resource",
+				},
+			};
+		}
 		const options: Record<string, unknown> = {};
 		if (params) {
 			if (params.max_nodes != null) options.maxNodes = Number(params.max_nodes);
@@ -79,7 +89,7 @@ export async function handleDomFormat(
 	}
 }
 
-/** Local/test entry — production uses executeSnapshotInTab for MAIN-world injection. */
+/** Local/test entry — production snapshots use the content-script path. */
 export function buildSnapshotInTab(maxNodesArg: unknown) {
 	const maxNodesNum =
 		typeof maxNodesArg === "number" ? maxNodesArg : Number(maxNodesArg) || 500;
