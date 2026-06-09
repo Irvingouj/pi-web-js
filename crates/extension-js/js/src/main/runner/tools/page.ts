@@ -5,10 +5,11 @@ import * as schemas from "../../../shared/schemas.js";
 import {
 	dispatchTool,
 	registerJsCall,
-	registerContentScriptJsCall,
 	type CallContext,
 	type ToolDocParam,
 } from "../../../shared/tool-registry.js";
+import { CONTENT_SCRIPT_TOOL_SPECS } from "../../../shared/registry/content-script-tools.js";
+import { defineContentScriptTool } from "../../../shared/registry/define-content-script-tool.js";
 import type { DomFormatParams, DomSnapshotParams, FetchParams } from "../runtime.js";
 import {
 	makeError,
@@ -90,6 +91,11 @@ registerJsCall({
 	errorCode: "E_NO_TAB",
 	example: "page.title()",
 });
+
+for (const spec of CONTENT_SCRIPT_TOOL_SPECS.filter((s) => s.namespace === "page")) {
+	defineContentScriptTool(spec);
+}
+
 
 registerJsCall({
 	action: "page_goto",
@@ -197,18 +203,6 @@ registerJsCall({
 	example: "page.goto(\"https://example.com\")",
 });
 
-registerContentScriptJsCall({
-	action: "page_back",
-	namespace: "page",
-	name: "back",
-	description: "Go back in the active tab",
-	params: schemas.PageBackParamsSchema,
-	returns: schemas.PageActionResultSchema,
-	paramTypes: [],
-	returnDoc: "Navigation result",
-	errorCode: "E_NO_TAB",
-	example: "page.back()",
-});
 
 registerJsCall({
 	action: "page_health",
@@ -336,330 +330,17 @@ registerJsCall({
 	example: "page.wait(1000)",
 });
 
-registerContentScriptJsCall({
-	action: "page_click",
-	namespace: "page",
-	name: "click",
-	description: "Click an element in the active tab",
-	params: schemas.PageClickParamsSchema,
-	returns: schemas.PageActionResultSchema,
-	paramTypes: [
-		{
-			name: "refId",
-			type: "string",
-			required: false,
-			description: "Element reference ID (refId)",
-		},
-		{
-			name: "label",
-			type: "string",
-			required: false,
-			description: "Element label to click (label)",
-		},
-	],
-	returnDoc: "Click result",
-	errorCode: "E_MISSING_PARAM",
-	example: "page.click({ refId: \"e2\" })",
-});
 
-registerContentScriptJsCall({
-	action: "page_fill",
-	namespace: "page",
-	name: "fill",
-	description: "Fill an element in the active tab",
-	params: schemas.PageFillParamsSchema,
-	returns: schemas.PageActionResultSchema,
-	paramTypes: [
-		{
-			name: "refId",
-			type: "string",
-			required: false,
-			description: "Element reference ID (refId)",
-		},
-		{
-			name: "value",
-			type: "string",
-			required: false,
-			description: "Value to fill (literal)",
-		},
-		{
-			name: "label",
-			type: "string",
-			required: false,
-			description: "Element label (label)",
-		},
-	],
-	returnDoc: "Fill result",
-	errorCode: "E_MISSING_PARAM",
-	example: "page.fill({ refId: \"e2\", value: \"hello\" })",
-});
 
-registerContentScriptJsCall({
-	action: "page_type",
-	namespace: "page",
-	name: "type",
-	description: "Type into an element in the active tab",
-	params: schemas.PageTypeParamsSchema,
-	returns: schemas.PageActionResultSchema,
-	paramTypes: [
-		{
-			name: "refId",
-			type: "string",
-			required: false,
-			description: "Element reference ID (refId)",
-		},
-		{
-			name: "text",
-			type: "string",
-			required: false,
-			description: "Text to type (literal)",
-		},
-		{
-			name: "label",
-			type: "string",
-			required: false,
-			description: "Element label (label)",
-		},
-	],
-	returnDoc: "Type result",
-	errorCode: "E_MISSING_PARAM",
-	example: "page.type({ refId: \"e2\", text: \"hello\" })",
-});
 
-registerContentScriptJsCall({
-	action: "page_append",
-	namespace: "page",
-	name: "append",
-	description: "Append text to an element in the active tab",
-	params: schemas.PageAppendParamsSchema,
-	returns: schemas.PageActionResultSchema,
-	paramTypes: [
-		{
-			name: "refId",
-			type: "string",
-			required: false,
-			description: "Element reference ID (refId)",
-		},
-		{
-			name: "text",
-			type: "string",
-			required: false,
-			description: "Text to append (literal)",
-		},
-		{
-			name: "label",
-			type: "string",
-			required: false,
-			description: "Element label (label)",
-		},
-	],
-	returnDoc: "Append result",
-	errorCode: "E_MISSING_PARAM",
-	example: "page.append({ refId: \"e2\", text: \" world\" })",
-});
 
-registerContentScriptJsCall({
-	action: "page_press",
-	namespace: "page",
-	name: "press",
-	description: "Press a key in the active tab",
-	params: schemas.PagePressParamsSchema,
-	returns: schemas.PageActionResultSchema,
-	fields: ["key"],
-	paramTypes: [
-		{
-			name: "key",
-			type: "string",
-			required: true,
-			description: "Key to press (literal)",
-		},
-	],
-	returnDoc: "Press result",
-	errorCode: "E_NO_TAB",
-	example: "page.press(\"Enter\")",
-});
 
-registerContentScriptJsCall({
-	action: "page_select",
-	namespace: "page",
-	name: "select",
-	description: "Select an option in the active tab",
-	params: schemas.PageSelectParamsSchema,
-	returns: schemas.PageActionResultSchema,
-	paramTypes: [
-		{
-			name: "refId",
-			type: "string",
-			required: false,
-			description: "Element reference ID (refId)",
-		},
-		{
-			name: "label",
-			type: "string",
-			required: false,
-			description: "Element label (label)",
-		},
-		{
-			name: "value",
-			type: "string",
-			required: false,
-			description: "Option value to select (literal)",
-		},
-	],
-	returnDoc: "Select result",
-	errorCode: "E_MISSING_PARAM",
-	example: "page.select({ refId: \"e2\", value: \"option1\" })",
-});
 
-registerContentScriptJsCall({
-	action: "page_check",
-	namespace: "page",
-	name: "check",
-	description: "Check/uncheck an element in the active tab",
-	params: schemas.PageCheckParamsSchema,
-	returns: schemas.PageActionResultSchema,
-	paramTypes: [
-		{
-			name: "refId",
-			type: "string",
-			required: false,
-			description: "Element reference ID (refId)",
-		},
-		{
-			name: "label",
-			type: "string",
-			required: false,
-			description: "Element label (label)",
-		},
-		{
-			name: "checked",
-			type: "boolean",
-			required: false,
-			description: "Whether to check or uncheck (literal)",
-		},
-	],
-	returnDoc: "Check result",
-	errorCode: "E_MISSING_PARAM",
-	example: "page.check({ refId: \"e2\", checked: true })",
-});
 
-registerContentScriptJsCall({
-	action: "page_hover",
-	namespace: "page",
-	name: "hover",
-	description: "Hover over an element in the active tab",
-	params: schemas.PageHoverParamsSchema,
-	returns: schemas.PageActionResultSchema,
-	paramTypes: [
-		{
-			name: "refId",
-			type: "string",
-			required: false,
-			description: "Element reference ID (refId)",
-		},
-		{
-			name: "label",
-			type: "string",
-			required: false,
-			description: "Element label (label)",
-		},
-	],
-	returnDoc: "Hover result",
-	errorCode: "E_MISSING_PARAM",
-	example: "page.hover({ refId: \"e2\" })",
-});
 
-registerContentScriptJsCall({
-	action: "page_unhover",
-	namespace: "page",
-	name: "unhover",
-	description: "Unhover in the active tab",
-	params: schemas.PageUnhoverParamsSchema,
-	returns: schemas.PageActionResultSchema,
-	paramTypes: [],
-	returnDoc: "Unhover result",
-	errorCode: "E_NO_TAB",
-	example: "page.unhover()",
-});
 
-registerContentScriptJsCall({
-	action: "page_scroll",
-	namespace: "page",
-	name: "scroll",
-	description: "Scroll the active tab",
-	params: schemas.PageScrollParamsSchema,
-	returns: schemas.PageActionResultSchema,
-	fields: ["direction", "amount"],
-	paramTypes: [
-		{
-			name: "direction",
-			type: "string",
-			required: false,
-			description: "Scroll direction (up or down) (literal)",
-		},
-		{
-			name: "amount",
-			type: "number",
-			required: false,
-			description: "Scroll amount in pixels (literal)",
-		},
-	],
-	returnDoc: "Scroll result",
-	errorCode: "E_NO_TAB",
-	example: "page.scroll(\"down\", 500)",
-});
 
-registerContentScriptJsCall({
-	action: "page_scroll_to",
-	namespace: "page",
-	name: "scroll_to",
-	description: "Scroll to an element in the active tab",
-	params: schemas.PageScrollToParamsSchema,
-	returns: schemas.PageActionResultSchema,
-	paramTypes: [
-		{
-			name: "refId",
-			type: "string",
-			required: false,
-			description: "Element reference ID to scroll to (refId)",
-		},
-		{
-			name: "label",
-			type: "string",
-			required: false,
-			description: "Element label to scroll to (label)",
-		},
-	],
-	returnDoc: "Scroll to result",
-	errorCode: "E_MISSING_PARAM",
-	example: "page.scroll_to({ refId: \"e2\" })",
-});
 
-registerContentScriptJsCall({
-	action: "page_dblclick",
-	namespace: "page",
-	name: "dblclick",
-	description: "Double-click an element in the active tab",
-	params: schemas.PageDblClickParamsSchema,
-	returns: schemas.PageActionResultSchema,
-	paramTypes: [
-		{
-			name: "refId",
-			type: "string",
-			required: false,
-			description: "Element reference ID (refId)",
-		},
-		{
-			name: "label",
-			type: "string",
-			required: false,
-			description: "Element label (label)",
-		},
-	],
-	returnDoc: "Double-click result",
-	errorCode: "E_MISSING_PARAM",
-	example: "page.dblclick({ refId: \"e2\" })",
-});
 
 registerJsCall({
 	action: "page_find",

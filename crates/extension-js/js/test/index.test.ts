@@ -393,6 +393,62 @@ describe("ExtensionSession fs namespace e2e", () => {
 		expect(Array.isArray(result)).toBe(true);
 	});
 
+	it("apiDocs('markdown') manifest structure includes page.fill metadata", async () => {
+		const [session, , worker] = await initSession();
+
+		// Capture the real manifest sent during init
+		const initMsg = postMessages.find(
+			(m): m is { type: string; manifest?: unknown[] } =>
+				typeof m === "object" &&
+				m !== null &&
+				(m as { type?: string }).type === "init" &&
+				Array.isArray((m as { manifest?: unknown[] }).manifest),
+		);
+		const manifest = initMsg?.manifest ?? [];
+		const pageFill = manifest.find(
+			(e: any) => e.action === "page_fill",
+		);
+		expect(pageFill).toBeDefined();
+		expect(pageFill?.namespace).toBe("page");
+		expect(pageFill?.publicName).toBe("page.fill");
+		expect(typeof pageFill?.description).toBe("string");
+		expect(pageFill?.paramsDoc).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ name: "refId" }),
+				expect.objectContaining({ name: "value" }),
+			]),
+		);
+		expect(pageFill?.prerequisites).toEqual(
+			expect.arrayContaining(["Ensure the target tab is active and the content script is ready before mutating"]),
+		);
+		expect(pageFill?.notes).toEqual(
+			expect.arrayContaining([expect.any(String)]),
+		);
+		expect(pageFill?.tags).toEqual(
+			expect.arrayContaining(["mutation", "write"]),
+		);
+		expect(pageFill?.relatedApis).toEqual(
+			expect.arrayContaining([expect.any(String)]),
+		);
+
+		const promise = session.apiDocs("markdown");
+
+		const apiDocsMsg = postMessages.find(
+			(m): m is PostMessage => typeof m === "object" && m !== null && (m as PostMessage).type === "apiDocs",
+		);
+		expect(apiDocsMsg).toBeDefined();
+		expect(apiDocsMsg).toMatchObject({
+			type: "apiDocs",
+			format: "markdown",
+		});
+
+		// Minimal stub — the real generate_markdown() pipeline is covered in
+		// api-docs-integration.test.ts with the actual WASM module.
+		sendWorkerResult(worker, apiDocsMsg?.id ?? "", "## `page` module\n\npage.fill\n");
+		const result = await promise;
+		expect(typeof result).toBe("string");
+	});
+
 	it("preserves structured content-script error codes in asyncRelayResult", async () => {
 		globalThis.chrome = {
 			runtime: { id: "extension-test" },

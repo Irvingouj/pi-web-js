@@ -295,6 +295,10 @@ mod tests {
             aliases: vec![],
             permission: None,
             example: None,
+            prerequisites: None,
+            notes: None,
+            tags: None,
+            related_apis: None,
         };
         let _ = web_js_core::api_docs::register_manifest_entry(entry);
         // Register a handler so the binding is generated
@@ -336,6 +340,10 @@ mod tests {
             aliases: vec![],
             permission: None,
             example: None,
+            prerequisites: None,
+            notes: None,
+            tags: None,
+            related_apis: None,
         };
         let _ = web_js_core::api_docs::register_manifest_entry(entry2);
         // Register a handler so the binding is generated
@@ -507,6 +515,10 @@ mod tests {
                 aliases: vec![],
                 permission: None,
                 example: None,
+            prerequisites: None,
+            notes: None,
+            tags: None,
+            related_apis: None,
             },
         );
 
@@ -591,6 +603,10 @@ mod tests {
                 aliases: vec![],
                 permission: None,
                 example: None,
+            prerequisites: None,
+            notes: None,
+            tags: None,
+            related_apis: None,
             },
         );
 
@@ -665,6 +681,10 @@ mod tests {
                     aliases: vec![],
                     permission: None,
                     example: None,
+                    prerequisites: None,
+                    notes: None,
+                    tags: None,
+                    related_apis: None,
                 },
             );
         }
@@ -846,6 +866,10 @@ mod tests {
             }],
             permission: None,
             example: None,
+            prerequisites: None,
+            notes: None,
+            tags: None,
+            related_apis: None,
         };
         let _ = web_js_core::api_docs::register_manifest_entry(entry);
         let _ = web_js_core::api_docs::register_handler(
@@ -906,6 +930,10 @@ mod tests {
             aliases: vec![],
             permission: None,
             example: None,
+            prerequisites: None,
+            notes: None,
+            tags: None,
+            related_apis: None,
         };
         let _ = web_js_core::api_docs::register_manifest_entry(entry);
         let _ = web_js_core::api_docs::register_handler(

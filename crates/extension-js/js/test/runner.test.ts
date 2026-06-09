@@ -233,6 +233,10 @@ import {
 	dispatchContentScriptCall,
 	registerContentScriptSpec,
 } from "../src/content-script/registry.js";
+import {
+	addContentScriptAction,
+	getContentScriptActions,
+} from "../src/shared/registry/content-script-actions.js";
 import { buildContentScriptSpecs } from "../src/content-script/schemas.js";
 import { handlers } from "../src/content-script/handlers.js";
 
@@ -2781,6 +2785,26 @@ describe("registry core", () => {
 		expect(listTools().length).toBeGreaterThanOrEqual(2);
 		clearRegistry();
 		expect(listTools().length).toBe(0);
+	});
+
+	it("clearRegistry removes content-script actions", () => {
+		registerJsCall({
+			action: "test_cs_clear",
+			namespace: "test",
+			name: "cs_clear",
+			description: "Test CS clear",
+			params: z.object({}),
+			returns: z.null(),
+			owner: "content-script",
+			handler: async () => null,
+			errorCode: "E_TEST",
+			paramTypes: [],
+			returnDoc: "null",
+		});
+		addContentScriptAction("test_cs_clear");
+		expect(getContentScriptActions().length).toBeGreaterThan(0);
+		clearRegistry();
+		expect(getContentScriptActions().length).toBe(0);
 	});
 
 	it("listTools returns all registered tools", () => {
