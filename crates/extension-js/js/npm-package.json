@@ -1,0 +1,24 @@
+{
+	"name": "@pi-oxide/extension-js",
+	"type": "module",
+	"version": "0.5.0",
+	"license": "LicenseRef-PiccoloNotebook-Fair-BYOK-1.0",
+	"main": "index.js",
+	"types": "index.d.ts",
+	"files": [
+		"index.js",
+		"index.d.ts",
+		"worker.js",
+		"extension_js.js",
+		"extension_js.d.ts",
+		"content-script.js",
+		"*.d.ts"
+	],
+	"dependencies": {
+		"zod": "^3.23.8",
+		"@pi-oxide/dom-semantic-tree": "^0.1.1"
+	},
+	"sideEffects": [
+		"./snippets/*"
+	]
+}
