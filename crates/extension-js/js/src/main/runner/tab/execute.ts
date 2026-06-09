@@ -214,17 +214,17 @@ export async function pingTabContentScript(
 		}
 	}
 	log.debug("pingTabContentScript_error", { tabId, error: lastRaceMsg });
+	let url = "";
+	try {
+		const tab = await chrome.tabs.get(tabId);
+		url = tab.url ?? "";
+	} catch {
+		// ignore
+	}
 	if (
 		lastRaceMsg.includes("Could not establish connection") ||
 		lastRaceMsg.includes("Receiving end does not exist")
 	) {
-		let url = "";
-		try {
-			const tab = await chrome.tabs.get(tabId);
-			url = tab.url ?? "";
-		} catch {
-			// ignore
-		}
 		return {
 			ok: false,
 			error: contentScriptMissingError(tabId, url),
@@ -232,11 +232,7 @@ export async function pingTabContentScript(
 	}
 	return {
 		ok: false,
-		error: {
-			message: `Navigation timeout: content script did not respond in tab ${tabId}`,
-			code: "E_NAVIGATION",
-			category: "navigation",
-		},
+		error: contentScriptMissingError(tabId, url),
 	};
 }
 

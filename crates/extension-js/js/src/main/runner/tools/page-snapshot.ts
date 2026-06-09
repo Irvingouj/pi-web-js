@@ -178,12 +178,16 @@ registerJsCall({
 			description: "Snapshot options (literal)",
 		},
 	],
-	returnDoc: "Snapshot data",
+	returnDoc: "{ text, nodes, url, title, viewport } — nodes include refId, role, tag, name, value (inputs), checked (checkbox/radio), disabled/readOnly when readable",
 	errorCode: "E_SNAPSHOT",
 
 	example: "page.snapshot_data({ value: \"hello\" })",
 	agentMeta: {
-		notes: ["Uses script injection; does not guarantee mutations work"],
+		notes: [
+			"Uses script injection; does not guarantee mutations work",
+			"nodes[].value, checked, disabled, and readOnly are included for form controls when readable from the DOM",
+			"After fill or other mutations, call snapshot_data() again on the same tab to verify state changed",
+		],
 		tags: ["snapshot", "read"],
 		relatedApis: ["web.tab.snapshot_data"],
 	},

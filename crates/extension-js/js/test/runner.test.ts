@@ -1678,6 +1678,26 @@ describe("page actions", () => {
 			expect(result.error.message).not.toContain("Receiving end does not exist");
 		}
 	});
+
+	it("pingTabContentScript returns E_CONTENT_SCRIPT on ping timeout", async () => {
+		mockChrome.tabs.sendMessage.mockImplementation(
+			() => new Promise(() => {
+				/* hang until ping deadline */
+			}),
+		);
+		mockChrome.tabs.get.mockResolvedValue({
+			id: 1,
+			url: "https://www.google.com/",
+		});
+
+		const result = await pingTabContentScript(1, 50);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_CONTENT_SCRIPT");
+			expect(result.error.hint).toContain("page.snapshot()");
+			expect(result.error.recovery?.length).toBeGreaterThan(0);
+		}
+	});
 });
 
 // ─── 12. Tab action tests ────────────────────────────────────────
@@ -2400,6 +2420,24 @@ describe("snapshot refId contract", () => {
 		const result = buildSnapshotInTab(500);
 		const inputNode = result.nodes.find((n) => n.tag === "input");
 		expect(inputNode?.value).toBe("preset");
+	});
+
+	it("buildSnapshotInTab includes checked and disabled on form controls", () => {
+		const checkbox = document.createElement("input");
+		checkbox.type = "checkbox";
+		checkbox.checked = true;
+		document.body.appendChild(checkbox);
+
+		const disabled = document.createElement("input");
+		disabled.type = "text";
+		disabled.disabled = true;
+		document.body.appendChild(disabled);
+
+		const result = buildSnapshotInTab(500);
+		const checkboxNode = result.nodes.find((n) => n.tag === "input" && n.checked === true);
+		const disabledNode = result.nodes.find((n) => n.disabled === true);
+		expect(checkboxNode?.checked).toBe(true);
+		expect(disabledNode?.disabled).toBe(true);
 	});
 
 	it("buildSnapshotInTab emits string refIds in e{N} format", () => {

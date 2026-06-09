@@ -51,7 +51,7 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 				description: "Element label to click (label)",
 			},
 		],
-		returnDoc: "{ ok: true, action: 'page_click', refId? }",
+		returnDoc: "{ ok: true, action: 'click', refId? }",
 		errorCode: "E_MISSING_PARAM",
 		example: 'page.click({ refId: "e2" })',
 		agentMeta: {
@@ -92,7 +92,7 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 				description: "Element label (label)",
 			},
 		],
-		returnDoc: "{ ok: true, action: 'page_fill', refId?, value? }",
+		returnDoc: "{ ok: true, action: 'fill', refId?, value? }",
 		errorCode: "E_MISSING_PARAM",
 		example: 'page.fill({ refId: "e2", value: "hello" })',
 		agentMeta: {
@@ -133,7 +133,7 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 				description: "Element label (label)",
 			},
 		],
-		returnDoc: "{ ok: true, action: 'page_type', refId?, value? }",
+		returnDoc: "{ ok: true, action: 'type', refId?, value? }",
 		errorCode: "E_MISSING_PARAM",
 		example: 'page.type({ refId: "e2", text: "hello" })',
 		agentMeta: {
@@ -174,7 +174,7 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 				description: "Element label (label)",
 			},
 		],
-		returnDoc: "{ ok: true, action: 'page_append', refId?, value? }",
+		returnDoc: "{ ok: true, action: 'append', refId?, value? }",
 		errorCode: "E_MISSING_PARAM",
 		example: 'page.append({ refId: "e2", text: " world" })',
 		agentMeta: {
@@ -203,7 +203,7 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 				description: "Key to press (literal)",
 			},
 		],
-		returnDoc: "{ ok: true, action: 'page_press', key? }",
+		returnDoc: "{ ok: true, action: 'press', key? }",
 		errorCode: "E_NO_TAB",
 		example: 'page.press("Enter")',
 		agentMeta: {
@@ -244,7 +244,7 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 				description: "Option value to select (literal)",
 			},
 		],
-		returnDoc: "{ ok: true, action: 'page_select', refId?, value? }",
+		returnDoc: "{ ok: true, action: 'select', refId?, value? }",
 		errorCode: "E_MISSING_PARAM",
 		example: 'page.select({ refId: "e2", value: "option1" })',
 		agentMeta: {
@@ -285,7 +285,7 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 				description: "Whether to check or uncheck (literal)",
 			},
 		],
-		returnDoc: "{ ok: true, action: 'page_check', refId?, checked? }",
+		returnDoc: "{ ok: true, action: 'check', refId?, checked? }",
 		errorCode: "E_MISSING_PARAM",
 		example: 'page.check({ refId: "e2", checked: true })',
 		agentMeta: {
@@ -320,7 +320,7 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 				description: "Element label (label)",
 			},
 		],
-		returnDoc: "{ ok: true, action: 'page_hover', refId? }",
+		returnDoc: "{ ok: true, action: 'hover', refId? }",
 		errorCode: "E_MISSING_PARAM",
 		example: 'page.hover({ refId: "e2" })',
 		agentMeta: {
@@ -342,7 +342,7 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		params: schemas.PageUnhoverParamsSchema,
 		returns: schemas.PageActionResultSchema,
 		paramTypes: [],
-		returnDoc: "{ ok: true, action: 'page_unhover' }",
+		returnDoc: "{ ok: true, action: 'unhover' }",
 		errorCode: "E_NO_TAB",
 		example: "page.unhover()",
 		agentMeta: {
@@ -430,7 +430,7 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 				description: "Element label (label)",
 			},
 		],
-		returnDoc: "{ ok: true, action: 'page_dblclick', refId? }",
+		returnDoc: "{ ok: true, action: 'dblclick', refId? }",
 		errorCode: "E_MISSING_PARAM",
 		example: 'page.dblclick({ refId: "e2" })',
 		agentMeta: {
@@ -466,7 +466,7 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 				description: "Element label (label)",
 			},
 		],
-		returnDoc: "{ ok: true, action: 'tab_click', refId? }",
+		returnDoc: "{ ok: true, action: 'click', refId? }",
 		errorCode: "E_NO_TAB",
 		example: 'web.tab.click({ tabId: 123, refId: "e2" })',
 		agentMeta: {
@@ -505,7 +505,7 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 				description: "Element label (label)",
 			},
 		],
-		returnDoc: "{ ok: true, action: 'tab_fill', refId?, value? }",
+		returnDoc: "{ ok: true, action: 'fill', refId?, value? }",
 		errorCode: "E_NO_TAB",
 		example: 'web.tab.fill({ tabId: 123, refId: "e2", value: "hello" })',
 		agentMeta: {
@@ -573,7 +573,7 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 				description: "Element label (label)",
 			},
 		],
-		returnDoc: "{ ok: true, action: 'tab_type', refId?, value? }",
+		returnDoc: "{ ok: true, action: 'type', refId?, value? }",
 		errorCode: "E_NO_TAB",
 		example: 'web.tab.type({ tabId: 123, refId: "e2", text: "hello" })',
 		agentMeta: {
@@ -600,7 +600,7 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 				description: "Key to press (literal)",
 			},
 		],
-		returnDoc: "{ ok: true, action: 'tab_press', key? }",
+		returnDoc: "{ ok: true, action: 'press', key? }",
 		errorCode: "E_NO_TAB",
 		example: 'web.tab.press({ tabId: 123, key: "Enter" })',
 		agentMeta: {
@@ -639,7 +639,7 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 				description: "Option value to select (literal)",
 			},
 		],
-		returnDoc: "{ ok: true, action: 'tab_select', refId?, value? }",
+		returnDoc: "{ ok: true, action: 'select', refId?, value? }",
 		errorCode: "E_NO_TAB",
 		example: 'web.tab.select({ tabId: 123, refId: "e2", value: "option1" })',
 		agentMeta: {
@@ -678,7 +678,7 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 				description: "Whether to check or uncheck (literal)",
 			},
 		],
-		returnDoc: "{ ok: true, action: 'tab_check', refId?, checked? }",
+		returnDoc: "{ ok: true, action: 'check', refId?, checked? }",
 		errorCode: "E_NO_TAB",
 		example: 'web.tab.check({ tabId: 123, refId: "e2", checked: true })',
 		agentMeta: {
@@ -711,7 +711,7 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 				description: "Element label (label)",
 			},
 		],
-		returnDoc: "{ ok: true, action: 'tab_hover', refId? }",
+		returnDoc: "{ ok: true, action: 'hover', refId? }",
 		errorCode: "E_NO_TAB",
 		example: 'web.tab.hover({ tabId: 123, refId: "e2" })',
 		agentMeta: {
@@ -732,7 +732,7 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		paramTypes: [
 			{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
 		],
-		returnDoc: "{ ok: true, action: 'tab_unhover' }",
+		returnDoc: "{ ok: true, action: 'unhover' }",
 		errorCode: "E_NO_TAB",
 		example: 'web.tab.unhover({ tabId: 123 })',
 		agentMeta: {
@@ -792,7 +792,7 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 				description: "Element label (label)",
 			},
 		],
-		returnDoc: "{ ok: true, action: 'tab_dblclick', refId? }",
+		returnDoc: "{ ok: true, action: 'dblclick', refId? }",
 		errorCode: "E_NO_TAB",
 		example: 'web.tab.dblclick({ tabId: 123, refId: "e2" })',
 		agentMeta: {

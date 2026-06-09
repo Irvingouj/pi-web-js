@@ -43,39 +43,72 @@ if (typeof globalThis.CSS === "undefined" || !globalThis.CSS.escape) {
 
 const ALL_MANIFEST_PERMISSIONS = ["tabs", "scripting", "storage"] as const;
 
-function buildChromeMock(sendMessage: ReturnType<typeof vi.fn>) {
+function buildChromeMock(
+	sendMessage: ReturnType<typeof vi.fn>,
+	options?: {
+		getSnapshotInputValue?: () => string | undefined;
+		onTabsUpdate?: (tabId: number, info: Record<string, unknown>) => void;
+	},
+) {
+	const onUpdatedListeners: Array<
+		(tabId: number, changeInfo: { status?: string }) => void
+	> = [];
 	return {
 		runtime: { id: "extension-test" },
 		tabs: {
 			get: vi.fn(() =>
-				Promise.resolve({ id: 1, url: GOOGLE_URL, title: "Google" }),
+				Promise.resolve({
+					id: 1,
+					url: GOOGLE_URL,
+					title: "Google",
+					status: "complete",
+				}),
 			),
+			update: vi.fn(async (tabId: number, info: Record<string, unknown>) => {
+				options?.onTabsUpdate?.(tabId, info);
+				for (const listener of onUpdatedListeners) {
+					listener(tabId, { status: "loading" });
+					listener(tabId, { status: "complete" });
+				}
+				return { id: tabId, url: info.url ?? GOOGLE_URL, status: "complete" };
+			}),
 			sendMessage,
 			query: vi.fn(() => Promise.resolve([{ id: 1, url: GOOGLE_URL }])),
 			onActivated: { addListener: vi.fn(), removeListener: vi.fn() },
-			onUpdated: { addListener: vi.fn(), removeListener: vi.fn() },
+			onUpdated: {
+				addListener: vi.fn((fn: (tabId: number, changeInfo: { status?: string }) => void) => {
+					onUpdatedListeners.push(fn);
+				}),
+				removeListener: vi.fn((fn: (tabId: number, changeInfo: { status?: string }) => void) => {
+					const idx = onUpdatedListeners.indexOf(fn);
+					if (idx !== -1) onUpdatedListeners.splice(idx, 1);
+				}),
+			},
 		},
 		scripting: {
-			executeScript: vi.fn(() =>
-				Promise.resolve([
+			executeScript: vi.fn(() => {
+				const fillValue = options?.getSnapshotInputValue?.();
+				const node: Record<string, unknown> = {
+					refId: "e6",
+					role: "textbox",
+					tag: "input",
+					name: "Search",
+				};
+				if (fillValue !== undefined) {
+					node.value = fillValue;
+				}
+				return Promise.resolve([
 					{
 						result: {
 							text: "URL: https://www.google.com/\nTitle: Google\n\n- textbox [e6]",
-							nodes: [
-								{
-									refId: "e6",
-									role: "textbox",
-									tag: "input",
-									name: "Search",
-								},
-							],
+							nodes: [node],
 							url: GOOGLE_URL,
 							title: "Google",
 							viewport: { width: 800, height: 600 },
 						},
 					},
-				]),
-			),
+				]);
+			}),
 		},
 		permissions: {
 			getAll: vi.fn(() =>
@@ -166,6 +199,7 @@ describe("browsergent cold tab acceptance", () => {
 
 	it("pre-opened tab: snapshot ok, fill fails with E_CONTENT_SCRIPT, then fill succeeds after CS connects", async () => {
 		let csConnected = false;
+		let snapshotInputValue: string | undefined;
 		const sendMessage = vi.fn(async (_tabId: number, msg: Record<string, unknown>) => {
 			if (msg.action === "ping") {
 				if (!csConnected) {
@@ -187,7 +221,12 @@ describe("browsergent cold tab acceptance", () => {
 			throw new Error("Receiving end does not exist.");
 		});
 
-		vi.stubGlobal("chrome", buildChromeMock(sendMessage));
+		vi.stubGlobal(
+			"chrome",
+			buildChromeMock(sendMessage, {
+				getSnapshotInputValue: () => snapshotInputValue,
+			}),
+		);
 		await initCapabilities();
 
 		const snapResult = await executeMainThreadCommand({
@@ -205,6 +244,16 @@ describe("browsergent cold tab acceptance", () => {
 		expect(urlResult.ok).toBe(true);
 		if (urlResult.ok) {
 			expect(urlResult.value).toBe(GOOGLE_URL);
+		}
+
+		const titleResult = await executeMainThreadCommand({
+			action: "page_title",
+			params: {},
+			call_id: 3,
+		});
+		expect(titleResult.ok).toBe(true);
+		if (titleResult.ok) {
+			expect(titleResult.value).toBe("Google");
 		}
 
 		const worker = await initSession();
@@ -260,6 +309,19 @@ describe("browsergent cold tab acceptance", () => {
 			},
 		});
 
+		snapshotInputValue = "test search";
+		const snapAfterFill = await executeMainThreadCommand({
+			action: "page_snapshot_data",
+			params: {},
+			call_id: 4,
+		});
+		expect(snapAfterFill.ok).toBe(true);
+		if (snapAfterFill.ok && snapAfterFill.value && typeof snapAfterFill.value === "object") {
+			const nodes = (snapAfterFill.value as { nodes?: Array<{ value?: string }> }).nodes;
+			const inputNode = nodes?.find((n) => n.value === "test search");
+			expect(inputNode?.value).toBe("test search");
+		}
+
 		document.body.innerHTML = "";
 		const input = document.createElement("input");
 		input.type = "text";
@@ -280,4 +342,89 @@ describe("browsergent cold tab acceptance", () => {
 		const inputNode = data.nodes.find((n) => n.tag === "input");
 		expect(inputNode?.value).toBe("test search");
 	});
+
+	it("page.goto(currentUrl) reconnects content script so fill succeeds", async () => {
+		let csConnected = false;
+		const sendMessage = vi.fn(async (_tabId: number, msg: Record<string, unknown>) => {
+			if (msg.action === "ping") {
+				if (!csConnected) {
+					throw new Error("Receiving end does not exist.");
+				}
+				return { ok: true };
+			}
+			if (msg.type === "registryCall" && msg.action === "page_fill") {
+				return {
+					ok: true,
+					value: {
+						ok: true,
+						action: "fill",
+						refId: "e6",
+						value: "test search",
+					},
+				};
+			}
+			throw new Error("Receiving end does not exist.");
+		});
+
+		vi.stubGlobal(
+			"chrome",
+			buildChromeMock(sendMessage, {
+				onTabsUpdate: () => {
+					csConnected = true;
+				},
+			}),
+		);
+		await initCapabilities();
+
+		const worker = await initSession();
+		await new Promise((resolve) => setTimeout(resolve, 0));
+
+		relayAsync(worker, "cold-fill", "page_fill", {
+			refId: "e6",
+			value: "test search",
+		});
+		await new Promise((resolve) => setTimeout(resolve, 700));
+
+		const coldFill = postMessages.find(
+			(m): m is PostMessage =>
+				typeof m === "object" &&
+				m !== null &&
+				(m as PostMessage).type === "asyncRelayResult" &&
+				(m as PostMessage).id === "cold-fill",
+		);
+		expect(coldFill?.result).toMatchObject({
+			ok: false,
+			error: expect.objectContaining({ code: "E_CONTENT_SCRIPT" }),
+		});
+
+		const gotoResult = await executeMainThreadCommand({
+			action: "page_goto",
+			params: { url: GOOGLE_URL },
+			call_id: 10,
+		});
+		expect(gotoResult.ok).toBe(true);
+
+		relayAsync(worker, "goto-fill", "page_fill", {
+			refId: "e6",
+			value: "test search",
+		});
+		await new Promise((resolve) => setTimeout(resolve, 700));
+
+		const gotoFill = postMessages.find(
+			(m): m is PostMessage =>
+				typeof m === "object" &&
+				m !== null &&
+				(m as PostMessage).type === "asyncRelayResult" &&
+				(m as PostMessage).id === "goto-fill",
+		);
+		expect(gotoFill?.result).toMatchObject({
+			ok: true,
+			value: {
+				ok: true,
+				action: "fill",
+				refId: "e6",
+				value: "test search",
+			},
+		});
+	}, 10_000);
 });
