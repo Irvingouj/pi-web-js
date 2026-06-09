@@ -376,6 +376,17 @@ describe("manifest documentation export", () => {
 		}
 	});
 
+	it("no manifest entry has banned types in returnsDoc.type or paramsDoc[].type", () => {
+		const manifest = getSerializableJsManifest();
+		const banned = new Set(["unknown", "undefined", "any", "object", "lazy", "void", "record"]);
+		for (const entry of manifest) {
+			expect(banned.has(entry.returnsDoc.type)).toBe(false);
+			for (const param of entry.paramsDoc) {
+				expect(banned.has(param.type)).toBe(false);
+			}
+		}
+	});
+
 	it("forwards agentMeta from JsCallSpec through the manifest to WASM", () => {
 		clearRegistry();
 		registerJsCall({

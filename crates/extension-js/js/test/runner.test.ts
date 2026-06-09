@@ -117,10 +117,22 @@ const mockChrome = {
 	},
 	system: {
 		cpu: {
-			getInfo: vi.fn(() => Promise.resolve({})),
+			getInfo: vi.fn(() =>
+				Promise.resolve({
+					archName: "x86_64",
+					modelName: "Test CPU",
+					numOfProcessors: 4,
+					features: [],
+				}),
+			),
 		},
 		memory: {
-			getInfo: vi.fn(() => Promise.resolve({})),
+			getInfo: vi.fn(() =>
+				Promise.resolve({
+					capacity: 8589934592,
+					availableCapacity: 4294967296,
+				}),
+			),
 		},
 		storage: {
 			getInfo: vi.fn(() => Promise.resolve([])),

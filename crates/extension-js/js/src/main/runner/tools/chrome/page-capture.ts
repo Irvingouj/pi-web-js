@@ -7,4 +7,5 @@ regChrome(
 	"Save page as MHTML",
 	zChromeAny,
 	"chrome.pageCapture.saveAsMHTML({ tabId: 123 })",
+	"Blob",
 );

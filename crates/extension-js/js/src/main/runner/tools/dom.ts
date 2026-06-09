@@ -89,7 +89,7 @@ registerJsCall({
 	paramTypes: [
 		{
 			name: "snapshot",
-			type: "object",
+			type: "DOM snapshot data",
 			required: true,
 			description: "DOM snapshot data (literal)",
 		},

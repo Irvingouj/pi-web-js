@@ -20,7 +20,7 @@ registerChromePassthrough(
 		},
 		{
 			name: "options",
-			type: "object",
+			type: "{ type?: string, iconUrl?: string, title?: string, message?: string }",
 			required: false,
 			description: "Notification options (literal)",
 		},
@@ -56,7 +56,8 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.notifications.getAll()"
+	"chrome.notifications.getAll()",
+	"{ [id: string]: NotificationOptions }",
 );
 registerChromePassthrough(
 	"chrome_notifications_update",

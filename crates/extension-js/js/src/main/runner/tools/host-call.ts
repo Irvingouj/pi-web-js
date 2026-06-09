@@ -42,7 +42,7 @@ registerJsCall({
 	name: "call",
 	description: "Call a host handler",
 	params: schemas.HostCallParamsSchema,
-	returns: z.unknown(), // host handler result is arbitrary
+	returns: schemas.HostCallResultSchema,
 	fields: ["action", "params"],
 	owner: "main-thread",
 	handler: async (params, _ctx) => {
@@ -60,7 +60,7 @@ registerJsCall({
 		},
 		{
 			name: "params",
-			type: "object",
+			type: "host action parameters",
 			required: false,
 			description: "Parameters for the host action (literal)",
 		},

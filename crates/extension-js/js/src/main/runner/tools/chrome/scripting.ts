@@ -23,7 +23,8 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.scripting.insertCSS({ target: { tabId: 1 }, css: \"body { color: red; }\" })"
+	"chrome.scripting.insertCSS({ target: { tabId: 1 }, css: \"body { color: red; }\" })",
+	"null",
 );
 registerChromePassthrough(
 	"chrome_scripting_removeCSS",
@@ -34,5 +35,6 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.scripting.removeCSS({ target: { tabId: 1 }, css: \"body { color: red; }\" })"
+	"chrome.scripting.removeCSS({ target: { tabId: 1 }, css: \"body { color: red; }\" })",
+	"null",
 );

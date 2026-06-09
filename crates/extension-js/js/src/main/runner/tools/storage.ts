@@ -160,7 +160,7 @@ registerJsCall({
 	paramTypes: [
 		{
 			name: "items",
-			type: "object",
+			type: "{ [key: string]: string }",
 			required: true,
 			description: "Record of key-value pairs to set (literal)",
 		},
@@ -200,7 +200,7 @@ registerJsCall({
 		},
 		{
 			name: "defaults",
-			type: "object",
+			type: "{ [key: string]: string }",
 			required: false,
 			description: "Default values for missing keys (literal)",
 		},

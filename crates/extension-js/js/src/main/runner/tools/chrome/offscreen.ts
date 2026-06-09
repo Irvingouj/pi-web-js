@@ -7,6 +7,7 @@ regChrome(
 	"Close offscreen document",
 	zChromeNull,
 	"chrome.offscreen.closeDocument()",
+	"null",
 );
 regChrome(
 	"chrome_offscreen_createDocument",
@@ -14,4 +15,5 @@ regChrome(
 	"Create offscreen document",
 	zChromeAny,
 	"chrome.offscreen.createDocument({ url: \"offscreen.html\", reasons: [\"WORKERS\"] })",
+	"null",
 );

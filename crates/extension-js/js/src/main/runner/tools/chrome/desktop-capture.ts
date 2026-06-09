@@ -7,6 +7,7 @@ regChrome(
 	"Choose desktop media",
 	zChromeAny,
 	"chrome.desktopCapture.chooseDesktopMedia([\"screen\"], (id) => id)",
+	"string",
 );
 regChrome(
 	"chrome_desktopCapture_cancelChooseDesktopMedia",
@@ -14,4 +15,5 @@ regChrome(
 	"Cancel desktop media picker",
 	zChromeAny,
 	"chrome.desktopCapture.cancelChooseDesktopMedia(123)",
+	"null",
 );

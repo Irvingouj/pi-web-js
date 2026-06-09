@@ -101,7 +101,7 @@ registerJsCall({
 	paramTypes: [
 		{
 			name: "query",
-			type: "object",
+			type: "{ active?: boolean, currentWindow?: boolean, url?: string }",
 			required: false,
 			description: "Tab query object (literal)",
 		},
@@ -129,7 +129,7 @@ registerJsCall({
 		const tab = unwrapResult(
 			await dispatchTool("chrome_tabs_get", [tabId]),
 		) as Record<string, unknown>;
-		return { ...tab, tabId: tab.id ?? tabId };
+		return { ...tab, tabId: (typeof tab.id === "number" ? tab.id : tabId) };
 	},
 	paramTypes: [],
 	returnDoc: "Active tab object",
@@ -181,7 +181,7 @@ registerJsCall({
 	paramTypes: [
 		{
 			name: "query",
-			type: "object",
+			type: "{ active?: boolean, currentWindow?: boolean, url?: string }",
 			required: false,
 			description: "Tab query object (literal)",
 		},
@@ -351,7 +351,7 @@ registerJsCall({
 	name: "evaluate",
 	description: "Evaluate script in a tab",
 	params: schemas.TabEvaluateParamsSchema,
-	returns: z.unknown(), // eval result can be any JS value
+	returns: schemas.TabEvaluateResultSchema,
 	owner: "main-thread",
 	handler: async (params, _ctx) => {
 		const obj = asRecord(params);
@@ -467,7 +467,7 @@ registerJsCall({
 		},
 		{
 			name: "options",
-			type: "object",
+			type: "{ method?: string, headers?: { [key: string]: string }, body?: string }",
 			required: false,
 			description: "Fetch options (literal)",
 		},
@@ -507,7 +507,7 @@ registerJsCall({
 		},
 		{
 			name: "options",
-			type: "object",
+			type: "{ max_nodes?: number }",
 			required: false,
 			description: "Snapshot options (literal)",
 		},
@@ -547,7 +547,7 @@ registerJsCall({
 		},
 		{
 			name: "options",
-			type: "object",
+			type: "{ max_nodes?: number }",
 			required: false,
 			description: "Snapshot options (literal)",
 		},
@@ -579,7 +579,7 @@ registerJsCall({
 		},
 		{
 			name: "options",
-			type: "object",
+			type: "{ max_nodes?: number }",
 			required: false,
 			description: "Snapshot options (literal)",
 		},

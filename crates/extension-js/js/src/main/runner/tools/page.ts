@@ -449,7 +449,13 @@ registerJsCall({
 	name: "extract",
 	description: "Extract data from the active tab",
 	params: schemas.PageExtractParamsSchema,
-	returns: z.record(z.unknown()),
+	returns: z.object({
+		title: z.string().optional(),
+		url: z.string().optional(),
+		headings: z.array(z.object({ tag: z.string(), text: z.string() })).optional(),
+		links: z.array(z.object({ href: z.string().nullable(), text: z.string() })).optional(),
+		text: z.string().optional(),
+	}).passthrough(),
 	fields: ["fields"],
 	owner: "main-thread",
 	handler: async (params, _ctx) => {
@@ -546,7 +552,7 @@ registerJsCall({
 	paramTypes: [
 		{
 			name: "params",
-			type: "object",
+			type: "{ active?: boolean, currentWindow?: boolean, url?: string }",
 			required: false,
 			description: "Tab query filter (e.g. { active: true, currentWindow: true }) (literal)",
 		},
@@ -635,7 +641,7 @@ registerJsCall({
 		const tab = unwrapResult(
 			await dispatchTool("chrome_tabs_get", [tabId]),
 		) as Record<string, unknown>;
-		return { ...tab, tabId: tab.id ?? tabId };
+		return { ...tab, tabId: (typeof tab.id === "number" ? tab.id : tabId) };
 	},
 	paramTypes: [],
 	returnDoc: "Active tab object with tabId",
@@ -684,7 +690,7 @@ registerJsCall({
 		},
 		{
 			name: "options",
-			type: "object",
+			type: "{ method?: string, headers?: { [key: string]: string }, body?: string }",
 			required: false,
 			description: "Fetch options (literal)",
 		},

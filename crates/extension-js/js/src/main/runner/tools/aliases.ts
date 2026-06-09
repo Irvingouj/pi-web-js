@@ -279,7 +279,7 @@ registerAlias(
 		},
 		{
 			name: "options",
-			type: "object",
+			type: "{ type?: string, iconUrl?: string, title?: string, message?: string }",
 			required: false,
 			description: "Notification options (literal)",
 		},

@@ -78,14 +78,25 @@ export function describeSchema(
 	if (schema instanceof z.ZodNull) return "null";
 
 	if (schema instanceof z.ZodArray) {
-		return `${describeSchema(schema.element, depth + 1, maxDepth)}[]`;
+		const elementType = describeSchema(schema.element, depth + 1, maxDepth);
+		if (elementType === "unknown" || elementType === "any") {
+			return "array";
+		}
+		return `${elementType}[]`;
 	}
 
 	if (schema instanceof z.ZodTuple) {
 		return `[${schema.items.map((i: z.ZodTypeAny) => describeSchema(i, depth + 1, maxDepth)).join(", ")}]`;
 	}
 
-	if (schema instanceof z.ZodRecord) return "object";
+	if (schema instanceof z.ZodRecord) {
+		// ZodRecord does not expose a public valueType accessor; use _def.
+		const valueType = describeSchema((schema._def as { valueType: z.ZodTypeAny }).valueType, depth + 1, maxDepth);
+		if (valueType === "unknown" || valueType === "any") {
+			return "{ [key: string]: unknown }";
+		}
+		return `{ [key: string]: ${valueType} }`;
+	}
 	if (schema instanceof z.ZodOptional)
 		return `${describeSchema(schema.unwrap(), depth, maxDepth)}?`;
 	if (schema instanceof z.ZodLiteral) return JSON.stringify(schema.value);

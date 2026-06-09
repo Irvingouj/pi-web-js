@@ -103,12 +103,13 @@ registerChromePassthrough(
 		{ name: "tabId", type: "number", required: false, description: "Tab ID (literal)" },
 		{
 			name: "message",
-			type: "object",
+			type: "message payload",
 			required: false,
 			description: "Message to send (literal)",
 		},
 	],
-	"chrome.tabs.sendMessage(123, { greeting: \"hello\" })"
+	"chrome.tabs.sendMessage(123, { greeting: \"hello\" })",
+	"message response",
 );
 registerChromePassthrough(
 	"chrome_tabs_connect",
@@ -119,7 +120,8 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.tabs.connect(123, { name: \"myPort\" })"
+	"chrome.tabs.connect(123, { name: \"myPort\" })",
+	"Port",
 );
 registerChromePassthrough(
 	"chrome_tabs_group",

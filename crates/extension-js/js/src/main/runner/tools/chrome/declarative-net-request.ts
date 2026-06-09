@@ -7,6 +7,7 @@ regChrome(
 	"Get dynamic DNR rules",
 	zChromeAny,
 	"chrome.declarativeNetRequest.getDynamicRules()",
+	"Rule[]",
 );
 regChrome(
 	"chrome_declarativeNetRequest_getEnabledRulesets",
@@ -14,6 +15,7 @@ regChrome(
 	"Get enabled DNR rulesets",
 	zChromeAny,
 	"chrome.declarativeNetRequest.getEnabledRulesets()",
+	"RulesetInfo[]",
 );
 regChrome(
 	"chrome_declarativeNetRequest_getSessionRules",
@@ -21,6 +23,7 @@ regChrome(
 	"Get session DNR rules",
 	zChromeAny,
 	"chrome.declarativeNetRequest.getSessionRules()",
+	"Rule[]",
 );
 regChrome(
 	"chrome_declarativeNetRequest_updateDynamicRules",
@@ -28,6 +31,7 @@ regChrome(
 	"Update dynamic DNR rules",
 	zChromeAny,
 	"chrome.declarativeNetRequest.updateDynamicRules({ addRules: [] })",
+	"null",
 );
 regChrome(
 	"chrome_declarativeNetRequest_updateEnabledRulesets",
@@ -35,6 +39,7 @@ regChrome(
 	"Update enabled DNR rulesets",
 	zChromeAny,
 	"chrome.declarativeNetRequest.updateEnabledRulesets({ enableRulesetIds: [] })",
+	"null",
 );
 regChrome(
 	"chrome_declarativeNetRequest_updateSessionRules",
@@ -42,4 +47,5 @@ regChrome(
 	"Update session DNR rules",
 	zChromeAny,
 	"chrome.declarativeNetRequest.updateSessionRules({ addRules: [] })",
+	"null",
 );

@@ -65,7 +65,7 @@ registerJsCall({
 		},
 		{
 			name: "headers",
-			type: "object",
+			type: "{ [key: string]: string }",
 			required: false,
 			description: "Request headers (literal)",
 		},

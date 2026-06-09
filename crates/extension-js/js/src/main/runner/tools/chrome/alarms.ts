@@ -21,7 +21,7 @@ registerChromePassthrough(
 		},
 		{
 			name: "alarmInfo",
-			type: "object",
+			type: "{ when?: number, delayInMinutes?: number, periodInMinutes?: number }",
 			required: false,
 			description: "Alarm info (literal)",
 		},
@@ -64,7 +64,7 @@ registerChromePassthrough(
 	"chrome",
 	"Get all alarms",
 	["alarms"],
-	z.array(z.record(z.unknown())),
+	z.array(z.object({ name: z.string().optional(), periodInMinutes: z.number().optional(), scheduledTime: z.number().optional() }).passthrough()),
 	"ECHROME",
 	"extension",
 	[],

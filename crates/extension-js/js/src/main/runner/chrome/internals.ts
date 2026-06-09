@@ -90,6 +90,7 @@ export function registerChromePassthrough(
 	errorCategory: string | undefined,
 	paramTypes: ToolDocParam[] = [],
 	example?: string,
+	returnType?: string,
 ): void {
 	const name = chromeMethodName(action);
 	const namespace =
@@ -104,6 +105,7 @@ export function registerChromePassthrough(
 		returns: returnsSchema,
 		owner: "main-thread",
 		permission: manifestPermission ?? undefined,
+		returnType: returnType ?? undefined,
 		handler: async (params: unknown, _ctx: CallContext) => {
 			const log = logger.child("chrome");
 			const chrome = window.chrome;

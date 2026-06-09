@@ -73,7 +73,7 @@ registerJsCall({
 		},
 		{
 			name: "options",
-			type: "object",
+			type: "{ max_nodes?: number }",
 			required: false,
 			description: "Snapshot options (literal)",
 		},
@@ -126,7 +126,7 @@ registerJsCall({
 		},
 		{
 			name: "options",
-			type: "object",
+			type: "{ max_nodes?: number }",
 			required: false,
 			description: "Snapshot options (literal)",
 		},
@@ -173,7 +173,7 @@ registerJsCall({
 		},
 		{
 			name: "options",
-			type: "object",
+			type: "{ max_nodes?: number }",
 			required: false,
 			description: "Snapshot options (literal)",
 		},
