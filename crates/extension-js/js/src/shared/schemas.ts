@@ -11,6 +11,7 @@ import type {
 	PageCheckParams,
 	PageExtractParams,
 	PageFillParams,
+	PageSetFilesParams,
 	PageFindParams,
 	PageGotoParams,
 	PagePressParams,
@@ -101,6 +102,7 @@ export const FetchParamsSchema = z.object({
 	headers: z.record(z.string()).default({}).describe("Request headers as key-value pairs"),
 	body: z.string().nullable().default(null).describe("Request body string"),
 	timeout: bigintLike().default(30000n).describe("Timeout in milliseconds"),
+	store: z.boolean().optional().describe("When true, store binary responses as a handle instead of returning body bytes"),
 	options: z.object({}).passthrough().optional().describe("Fetch options"),
 }).passthrough();
 
@@ -209,7 +211,54 @@ export const PageWaitParamsSchema = z.object({
 });
 
 export const PageClickParamsSchema = elementTargetParams();
+
+const requireExactlyOneFileSource = (
+	data: { url?: string; path?: string; handle?: string },
+	ctx: z.RefinementCtx,
+) => {
+	const sources = [data.url, data.path, data.handle].filter(
+		(v) => typeof v === "string" && v.length > 0,
+	);
+	if (sources.length !== 1) {
+		ctx.addIssue({
+			code: z.ZodIssueCode.custom,
+			message: "Each file entry requires exactly one of url, path, or handle",
+		});
+	}
+};
+
+export const SetFileSourceSchema = z
+	.object({
+		name: z.string().optional().describe("File name including extension"),
+		mimeType: z.string().optional().describe("MIME type (defaults to application/octet-stream)"),
+		url: z.string().url().optional().describe("HTTP(S) URL to fetch in the target tab"),
+		path: z.string().min(1).optional().describe("Virtual filesystem path (resolved in worker)"),
+		handle: z.string().min(1).optional().describe("Binary handle from page.fetch({ store: true })"),
+	})
+	.superRefine(requireExactlyOneFileSource);
+
+export const ResolvedSetFileSchema = z.discriminatedUnion("kind", [
+	z.object({
+		kind: z.literal("bytes"),
+		name: z.string().min(1),
+		data: z.string().min(1),
+		mimeType: z.string().optional(),
+	}),
+	z.object({
+		kind: z.literal("url"),
+		url: z.string().url(),
+		name: z.string().min(1),
+		mimeType: z.string().optional(),
+	}),
+]);
+
 export const PageFillParamsSchema = elementTargetParams({ value: z.string().describe("Value to fill into the element") });
+export const PageSetFilesParamsSchema = elementTargetParams({
+	files: z.array(SetFileSourceSchema).min(1).describe("Files to attach to the input"),
+});
+export const ResolvedSetFilesParamsSchema = elementTargetParams({
+	files: z.array(ResolvedSetFileSchema).min(1).describe("Resolved files for content-script application"),
+});
 export const PageTypeParamsSchema = elementTargetParams({ text: z.string().describe("Text to type into the element") });
 export const PageAppendParamsSchema = elementTargetParams({ text: z.string().describe("Text to append into the element") });
 
@@ -297,6 +346,12 @@ export const TabCloseParamsSchema = tabIdScalarOrObject;
 
 export const TabClickParamsSchema = tabElementTargetParams();
 export const TabFillParamsSchema = tabElementTargetParams({ value: z.string().describe("Value to fill into the element") });
+export const TabSetFilesParamsSchema = tabElementTargetParams({
+	files: z.array(SetFileSourceSchema).min(1).describe("Files to attach to the input"),
+});
+export const TabResolvedSetFilesParamsSchema = tabElementTargetParams({
+	files: z.array(ResolvedSetFileSchema).min(1).describe("Resolved files for content-script application"),
+});
 export const TabScrollToParamsSchema = z.preprocess(
 	(val) => {
 		if (typeof val === "string" || typeof val === "number") {
@@ -648,6 +703,8 @@ export const PageActionResultSchema = z.object({
 	key: z.string().optional().describe("Key that was pressed (for press actions)"),
 	direction: z.string().optional().describe("Scroll direction (for scroll actions)"),
 	amount: z.number().optional().describe("Scroll amount in pixels (for scroll actions)"),
+	fileCount: z.number().optional().describe("Number of files attached (for setFiles actions)"),
+	fileNames: z.array(z.string()).optional().describe("Names of attached files (for setFiles actions)"),
 });
 
 export type PageActionResult = z.infer<typeof PageActionResultSchema>;
@@ -662,8 +719,9 @@ export const FetchValueSchema = z.object({
 	status: z.number().describe("HTTP response status code"),
 	ok: z.boolean().describe("Whether the response status is 2xx"),
 	headers: z.record(z.string()).describe("Response headers as key-value pairs"),
-	body: z.string().describe("Response body as string (text or base64-encoded bytes)"),
-	bodyEncoding: z.enum(["text", "base64"]).describe("Encoding of the body field"),
+	body: z.string().optional().describe("Response body (omitted when bodyEncoding is handle)"),
+	bodyEncoding: z.enum(["text", "base64", "handle"]).describe("Encoding of the body field"),
+	handle: z.string().optional().describe("Binary handle when bodyEncoding is handle"),
 	byteLength: z.number().describe("Length of the body in bytes"),
 	contentType: z.string().describe("Response Content-Type header"),
 	finalUrl: z.string().describe("Final URL after redirects"),
@@ -944,6 +1002,14 @@ type _AssertPageWaitReverse =
 
 type _AssertPageFill =
 	z.infer<typeof PageFillParamsSchema> extends PageFillParams ? true : never;
+type _AssertPageSetFiles =
+	z.infer<typeof PageSetFilesParamsSchema> extends PageSetFilesParams
+		? true
+		: never;
+type _AssertPageSetFilesReverse =
+	PageSetFilesParams extends z.infer<typeof PageSetFilesParamsSchema>
+		? true
+		: never;
 type _AssertPageType =
 	z.infer<typeof PageTypeParamsSchema> extends PageTypeParams ? true : never;
 type _AssertPageCheck =

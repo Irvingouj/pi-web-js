@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>File Upload Form</title>
+</head>
+<body>
+  <h1>File Upload Form</h1>
+  <form id="form" onsubmit="return false">
+    <label for="name">Name</label>
+    <input id="name" name="name" type="text" placeholder="Your name" />
+    <label for="file">File</label>
+    <input id="file" name="file" type="file" accept="image/*,.txt" />
+    <label for="files">Files (multiple)</label>
+    <input id="files" name="files" type="file" multiple accept="image/*,.txt" />
+    <button type="button" id="submit">Submit</button>
+  </form>
+  <p id="status" aria-live="polite">idle</p>
+  <!--
+    Test asset (fetched from sibling fixture in E2E):
+    testcases/media-download/assets/photo.jpg
+    Size: 6636 bytes
+    SHA-256: ea012fdbfb0cc17a2ee6c281efc094fd6f78381d831af03a7e658a9de04e936d
+  -->
+  <script>
+    function formatUpload(file) {
+      return "uploaded:" + file.name + ":" + file.size;
+    }
+
+    document.getElementById("file").addEventListener("change", function (e) {
+      var file = e.target.files && e.target.files[0];
+      document.getElementById("status").textContent = file ? formatUpload(file) : "empty";
+    });
+
+    document.getElementById("files").addEventListener("change", function (e) {
+      var list = e.target.files;
+      if (!list || list.length === 0) {
+        document.getElementById("status").textContent = "empty";
+        return;
+      }
+      var parts = [];
+      for (var i = 0; i < list.length; i++) {
+        parts.push(formatUpload(list[i]));
+      }
+      document.getElementById("status").textContent = parts.join("|");
+    });
+
+    document.getElementById("submit").addEventListener("click", function () {
+      var value = document.getElementById("name").value;
+      document.getElementById("status").textContent = value ? "filled:" + value : "empty";
+    });
+  </script>
+</body>
+</html>

@@ -1,7 +1,23 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it } from "vitest";
-import { arrayBufferToBase64 } from "../src/shared/array-buffer.js";
+import {
+	arrayBufferToBase64,
+	base64ToUint8Array,
+} from "../src/shared/array-buffer.js";
+
+describe("base64ToUint8Array", () => {
+	it("round-trips with arrayBufferToBase64", () => {
+		const bytes = new Uint8Array([0, 127, 255, 42]);
+		const encoded = arrayBufferToBase64(bytes);
+		const decoded = base64ToUint8Array(encoded);
+		expect(Array.from(decoded)).toEqual(Array.from(bytes));
+	});
+
+	it("throws on invalid base64", () => {
+		expect(() => base64ToUint8Array("not!!!valid")).toThrow();
+	});
+});
 
 describe("arrayBufferToBase64", () => {
 	it("round-trips 64KB+ random bytes", () => {

@@ -15,11 +15,17 @@ export function buildInfraContentScriptSpecs(): ContentScriptHandlerSpec[] {
 	];
 }
 
+const RESOLVED_SET_FILES_ACTIONS = new Set(["page_set_files", "tab_set_files"]);
+
 export function buildContentScriptSpecs(): ContentScriptHandlerSpec[] {
 	return CONTENT_SCRIPT_TOOL_SPECS.map((spec) => ({
 		registryAction: spec.action,
 		handlerKey: spec.handlerKey,
-		params: spec.params,
+		params: RESOLVED_SET_FILES_ACTIONS.has(spec.action)
+			? spec.action === "tab_set_files"
+				? schemas.TabResolvedSetFilesParamsSchema
+				: schemas.ResolvedSetFilesParamsSchema
+			: spec.params,
 		returns: spec.returns,
 	}));
 }

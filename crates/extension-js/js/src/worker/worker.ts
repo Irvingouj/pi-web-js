@@ -5,6 +5,8 @@ import init, {
   ExtensionSession,
   registerJsCallBatch as register_js_call_batch,
   setLogLevel as setWasmLogLevel,
+  takeCachedVfsWriteBase64 as take_cached_vfs_write_base64,
+  clearVfsWriteCache as clear_vfs_write_cache,
 } from "./extension_js.js";
 import type { FsAction, FsActionMap } from "../shared/fs-types.js";
 import * as schemas from "../shared/schemas.js";
@@ -20,6 +22,17 @@ import {
 } from "../shared/tool-registry.js";
 import { formatValidationError } from "../shared/registry/dispatch.js";
 import type { z } from "zod";
+import { clearAllBlobStores, clearRun } from "./binary-blob-store.js";
+import { maybeStoreFetchResult } from "./fetch-store.js";
+import { resolveSetFilesParams } from "./resolve-set-files.js";
+import {
+	cacheVfsWriteBase64,
+	clearVfsWriteCache,
+	takeCachedVfsWriteBase64,
+} from "./vfs-write-cache.js";
+
+const SET_FILES_ACTIONS = new Set(["page_set_files", "tab_set_files"]);
+const FETCH_STORE_ACTIONS = new Set(["page_fetch", "tab_fetch"]);
 
 let session: ExtensionSession | null = null;
 let initialized = false;
@@ -400,10 +413,15 @@ function relayBudgetForParamTimeout(action: string, paramTimeout: number): numbe
   return paramTimeout + RELAY_TIMEOUT_MARGIN_MS;
 }
 
+const SET_FILES_RELAY_TIMEOUT_MS = 60_000;
+
 export function resolveRelayTimeoutMs(
   action: string,
   params: unknown,
 ): number {
+  if (SET_FILES_ACTIONS.has(action)) {
+    return SET_FILES_RELAY_TIMEOUT_MS;
+  }
   const field = TIMEOUT_PARAM_FIELD_BY_ACTION[action];
   if (!field) return DEFAULT_RELAY_TIMEOUT_MS;
   let paramTimeout = extractParamTimeoutMs(params, field);
@@ -415,6 +433,50 @@ export function resolveRelayTimeoutMs(
     DEFAULT_RELAY_TIMEOUT_MS,
     relayBudgetForParamTimeout(action, paramTimeout),
   );
+}
+
+async function maybeResolveSetFilesParams(
+  action: string,
+  params: unknown,
+  runId?: string,
+): Promise<
+  | { ok: true; params: unknown }
+  | { ok: false; error: { message: string; code: string; category?: string } }
+> {
+  if (!SET_FILES_ACTIONS.has(action)) {
+    return { ok: true, params };
+  }
+  if (!session) {
+    return {
+      ok: false,
+      error: { message: "Session not initialized", code: "E_INTERNAL" },
+    };
+  }
+  const resolved = await resolveSetFilesParams(
+    action,
+    params,
+    runId,
+    async (path) => {
+      const wasmCached = take_cached_vfs_write_base64(path);
+      if (wasmCached !== undefined) {
+        return wasmCached;
+      }
+      const cached = takeCachedVfsWriteBase64(path);
+      if (cached !== undefined) {
+        return cached;
+      }
+      const handler = workerHandlerRegistry.get("readBase64");
+      if (!handler) {
+        throw new Error("readBase64 handler not registered");
+      }
+      const result = (await handler({ path })) as { data: string };
+      return result.data;
+    },
+  );
+  if (!resolved.ok) {
+    return resolved;
+  }
+  return { ok: true, params: resolved.value };
 }
 
 export function extensionDispatch(
@@ -430,6 +492,14 @@ export function extensionDispatch(
       error: { message: "Missing action in dispatch context", code: "E_MISSING_ACTION" },
     });
   }
+
+  const originalParams = params;
+  return (async () => {
+  const prepared = await maybeResolveSetFilesParams(action, params, context?.runId);
+  if (!prepared.ok) {
+    return prepared;
+  }
+  params = prepared.params;
 
   if (workerHandlerRegistry.has(action)) {
     const handler = workerHandlerRegistry.get(action)!;
@@ -466,12 +536,31 @@ export function extensionDispatch(
       resolveRelayTimeoutMs(action, relayParams),
     tabPolicy: route.tabPolicy,
   });
-  return remoteCall(params, {
+  const result = await remoteCall(params, {
     ...context,
     signal: context?.signal ?? (
       context?.runId ? runAbortControllers.get(context.runId)?.signal : undefined
     ),
   });
+  if (
+    FETCH_STORE_ACTIONS.has(action) &&
+    typeof result === "object" &&
+    result !== null &&
+    "ok" in result &&
+    (result as { ok: boolean }).ok
+  ) {
+    const okResult = result as { ok: true; value: unknown };
+    return {
+      ok: true,
+      value: maybeStoreFetchResult(
+        originalParams,
+        okResult.value,
+        context?.runId,
+      ),
+    };
+  }
+  return result;
+  })();
 }
 
 export function createExecutableCallback(entry: SerializableJsCallManifestEntry): (params: unknown, context?: { callId?: number; runId?: string; signal?: AbortSignal }) => Promise<unknown> {
@@ -508,12 +597,41 @@ export function createExecutableCallback(entry: SerializableJsCallManifestEntry)
       resolveTimeoutMs: (relayParams) =>
         resolveRelayTimeoutMs(entry.action, relayParams),
     });
-    return (params, context) => remoteCall(coerceWasmParams(params), {
-      ...context,
-      signal: context?.signal ?? (
-        context?.runId ? runAbortControllers.get(context.runId)?.signal : undefined
-      ),
-    });
+    return async (params, context) => {
+      const originalParams = coerceWasmParams(params);
+      const prepared = await maybeResolveSetFilesParams(
+        entry.action,
+        originalParams,
+        context?.runId,
+      );
+      if (!prepared.ok) {
+        return prepared;
+      }
+      const result = await remoteCall(prepared.params, {
+        ...context,
+        signal: context?.signal ?? (
+          context?.runId ? runAbortControllers.get(context.runId)?.signal : undefined
+        ),
+      });
+      if (
+        typeof result === "object" &&
+        result !== null &&
+        "ok" in result &&
+        (result as { ok: boolean }).ok &&
+        FETCH_STORE_ACTIONS.has(entry.action)
+      ) {
+        const okResult = result as { ok: true; value: unknown };
+        return {
+          ok: true,
+          value: maybeStoreFetchResult(
+            originalParams,
+            okResult.value,
+            context?.runId,
+          ),
+        };
+      }
+      return result;
+    };
   }
 }
 
@@ -530,7 +648,11 @@ function initFsRegistry(s: ExtensionSession) {
   registerWorkerHandlerValidated("move", schemas.FsCopyParamsSchema, (p) => s.fsMove(p as FsActionMap["move"]["params"]));
   registerWorkerHandlerValidated("write", schemas.FsWriteParamsSchema, (p) => s.fsWrite(p as FsActionMap["write"]["params"]));
   registerWorkerHandlerValidated("writeText", schemas.FsWriteParamsSchema, (p) => s.fsWriteText(p as FsActionMap["writeText"]["params"]));
-  registerWorkerHandlerValidated("writeBase64", schemas.FsWriteParamsSchema, (p) => s.fsWriteBase64(p as FsActionMap["writeBase64"]["params"]));
+  registerWorkerHandlerValidated("writeBase64", schemas.FsWriteParamsSchema, async (p) => {
+    const params = p as FsActionMap["writeBase64"]["params"];
+    cacheVfsWriteBase64(params.path, params.data);
+    return s.fsWriteBase64(params);
+  });
   registerWorkerHandlerValidated("append", schemas.FsWriteParamsSchema, (p) => s.fsAppend(p as FsActionMap["append"]["params"]));
   registerWorkerHandlerValidated("appendText", schemas.FsWriteParamsSchema, (p) => s.fsAppendText(p as FsActionMap["appendText"]["params"]));
   registerWorkerHandlerValidated("appendBase64", schemas.FsWriteParamsSchema, (p) => s.fsAppendBase64(p as FsActionMap["appendBase64"]["params"]));
@@ -696,7 +818,10 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
         if (activeRunCell?.id === msg.id) {
           activeRunCell = null;
         }
-        if (runId) runAbortControllers.delete(runId);
+        if (runId) {
+          runAbortControllers.delete(runId);
+          clearRun(runId);
+        }
       }
       break;
     }
@@ -704,6 +829,9 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
       activeSession.setAborted(true);
       for (const controller of runAbortControllers.values()) controller.abort();
       runAbortControllers.clear();
+      clearAllBlobStores();
+      clearVfsWriteCache();
+      clear_vfs_write_cache();
       settleAllPendingRelays("E_RESET", "Worker reset");
       try {
         activeSession.reset();
@@ -718,6 +846,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
       activeSession.setAborted(true);
       for (const controller of runAbortControllers.values()) controller.abort();
       runAbortControllers.clear();
+      clearAllBlobStores();
       settleAllPendingRelays("E_STOPPED", "Worker stopped");
       self.postMessage({ type: "result", id: msg.id, data: { ok: true } });
       break;

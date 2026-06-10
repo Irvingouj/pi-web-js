@@ -51,6 +51,7 @@ export type CommandParams =
 	| PageClickParams
 	| PageDblClickParams
 	| PageFillParams
+	| PageSetFilesParams
 	| PageTypeParams
 	| PagePressParams
 	| PageSelectParams
@@ -71,6 +72,7 @@ export type CommandParams =
 	| DomFormatParams
 	| TabClickParams
 	| TabFillParams
+	| TabSetFilesParams
 	| TabEvaluateParams
 	| TabBackParams
 	| TabWaitForLoadParams
@@ -124,6 +126,7 @@ export type FetchParams = {
 	headers: Record<string, string>;
 	body: string | null;
 	timeout: bigint;
+	store?: boolean;
 };
 
 export type FsCopyParams = { from: string; to: string };
@@ -160,6 +163,20 @@ export type PageFillParams = {
 	refId?: string;
 	label?: string;
 	value: string;
+};
+
+export type SetFileSource = {
+	name?: string;
+	mimeType?: string;
+	url?: string;
+	path?: string;
+	handle?: string;
+};
+
+export type PageSetFilesParams = {
+	refId?: string;
+	label?: string;
+	files: SetFileSource[];
 };
 
 export type PageFindParams = { selector: string };
@@ -226,6 +243,13 @@ export type TabDblClickParams = { tabId: bigint; refId: string };
 export type TabEvaluateParams = { tabId: bigint; script: string };
 
 export type TabFillParams = { tabId: bigint; refId: string; value: string };
+
+export type TabSetFilesParams = {
+	tabId?: number;
+	refId?: string;
+	label?: string;
+	files: SetFileSource[];
+};
 
 export type TabHoverParams = { tabId: bigint; refId: string };
 

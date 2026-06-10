@@ -240,6 +240,7 @@ pub async fn execute_fs_write_text(params: FsWriteParams) -> AsyncResponse {
 }
 
 pub async fn execute_fs_write_base64(params: FsWriteParams) -> AsyncResponse {
+    crate::vfs_write_cache::cache_write(&params.path, &params.data);
     let decoded = match data_encoding::BASE64.decode(params.data.as_bytes()) {
         Ok(b) => b,
         Err(_) => {

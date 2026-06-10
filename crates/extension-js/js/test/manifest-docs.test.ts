@@ -249,6 +249,14 @@ describe("manifest documentation export", () => {
 		expect(pageFill?.tags).toEqual(["mutation", "write"]);
 		expect(pageFill?.relatedApis).toEqual(["web.tab.fill"]);
 
+		const pageSetFiles = manifest.find((e) => e.action === "page_set_files");
+		expect(pageSetFiles?.tags).toEqual(["mutation", "write"]);
+		expect(pageSetFiles?.relatedApis).toEqual([
+			"web.tab.setFiles",
+			"page.fetch",
+			"fs.writeBase64",
+		]);
+
 		const pageClick = manifest.find((e) => e.action === "page_click");
 		expect(pageClick?.prerequisites).toEqual(["Ensure the target tab is active and the content script is ready before mutating"]);
 		expect(pageClick?.tags).toEqual(["mutation", "write"]);
@@ -306,6 +314,10 @@ describe("manifest documentation export", () => {
 		expect(tabFill?.notes).toContain("Explicit tabId required; same handlers as page.*");
 		expect(tabFill?.relatedApis).toEqual(["page.fill"]);
 
+		const tabSetFiles = manifest.find((e) => e.action === "tab_set_files");
+		expect(tabSetFiles?.tags).toEqual(["mutation", "write"]);
+		expect(tabSetFiles?.relatedApis).toEqual(["page.setFiles"]);
+
 		const tabClick = manifest.find((e) => e.action === "tab_click");
 		expect(tabClick?.prerequisites).toEqual(["Ensure the target tab exists and the content script is ready before mutating"]);
 		expect(tabClick?.tags).toEqual(["mutation", "write"]);
@@ -348,6 +360,14 @@ describe("manifest documentation export", () => {
 		expect(pageFill).toBeDefined();
 		expect(pageFill!.paramsDoc.some((p) => p.name === "refId")).toBe(true);
 		expect(pageFill!.paramsDoc.some((p) => p.name === "value")).toBe(true);
+	});
+
+	it("page_set_files paramsDoc contains files from hand-written paramTypes", () => {
+		const manifest = getSerializableJsManifest();
+		const pageSetFiles = manifest.find((entry) => entry.action === "page_set_files");
+		expect(pageSetFiles).toBeDefined();
+		expect(pageSetFiles!.paramsDoc.some((p) => p.name === "files")).toBe(true);
+		expect(pageSetFiles!.publicName).toBe("page.setFiles");
 	});
 
 	it("page_fill returnsDoc.type contains ok and action", () => {

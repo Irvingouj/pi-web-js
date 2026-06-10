@@ -17,12 +17,16 @@ import {
 	resolveContainerRefId,
 } from "../shared/snapshot-dom.js";
 import { allocateRefId, syncRefIdCounterFromDom } from "../shared/ref-id.js";
+import { base64ToUint8Array } from "../shared/array-buffer.js";
 import { encodeFetchResponse } from "../shared/fetch-response.js";
 import {
 	assertFillEffect,
 	makeActionResult,
 } from "./action-result.js";
-import { throwStructuredAgentError } from "../shared/registry/agent-errors.js";
+import {
+	notInteractableError,
+	throwStructuredAgentError,
+} from "../shared/registry/agent-errors.js";
 
 export const DEFAULT_FETCH_TIMEOUT_MS = 30_000;
 const DEFAULT_WAIT_FOR_TIMEOUT_MS = 30_000;
@@ -94,6 +98,156 @@ function sleepWithSignal(ms: number, signal?: AbortSignal): Promise<void> {
 	});
 }
 
+type ResolvedBytesFile = {
+	kind: "bytes";
+	name: string;
+	data: string;
+	mimeType?: string;
+};
+
+type ResolvedUrlFile = {
+	kind: "url";
+	url: string;
+	name: string;
+	mimeType?: string;
+};
+
+type ResolvedSetFile = ResolvedBytesFile | ResolvedUrlFile;
+
+function parseResolvedFiles(params: unknown): ResolvedSetFile[] {
+	const obj = asRecord(params);
+	const filesRaw = obj.files;
+	if (!Array.isArray(filesRaw) || filesRaw.length === 0) {
+		throwStructuredAgentError({
+			message: "setFiles requires a non-empty files array",
+			code: "E_INVALID_PARAMS",
+			category: "validation",
+		});
+	}
+	const files: ResolvedSetFile[] = [];
+	for (const item of filesRaw) {
+		const fileObj = asRecord(item);
+		const kind = fileObj.kind;
+		if (kind === "bytes") {
+			const name = typeof fileObj.name === "string" ? fileObj.name.trim() : "";
+			const data = typeof fileObj.data === "string" ? fileObj.data : "";
+			if (!name || !data) {
+				throwStructuredAgentError({
+					message: "Resolved bytes file requires name and data",
+					code: "E_INVALID_PARAMS",
+					category: "validation",
+				});
+			}
+			files.push({
+				kind: "bytes",
+				name,
+				data,
+				mimeType:
+					typeof fileObj.mimeType === "string" && fileObj.mimeType.length > 0
+						? fileObj.mimeType
+						: undefined,
+			});
+			continue;
+		}
+		if (kind === "url") {
+			const url = typeof fileObj.url === "string" ? fileObj.url : "";
+			const name = typeof fileObj.name === "string" ? fileObj.name.trim() : "";
+			if (!url || !name) {
+				throwStructuredAgentError({
+					message: "Resolved url file requires url and name",
+					code: "E_INVALID_PARAMS",
+					category: "validation",
+				});
+			}
+			files.push({
+				kind: "url",
+				url,
+				name,
+				mimeType:
+					typeof fileObj.mimeType === "string" && fileObj.mimeType.length > 0
+						? fileObj.mimeType
+						: undefined,
+			});
+		}
+	}
+	if (files.length !== filesRaw.length) {
+		throwStructuredAgentError({
+			message: "setFiles files must be worker-resolved (kind: bytes or url)",
+			code: "E_INVALID_PARAMS",
+			category: "validation",
+		});
+	}
+	return files;
+}
+
+function fileFromBytes(file: ResolvedBytesFile): File {
+	try {
+		const bytes = base64ToUint8Array(file.data);
+		return new File([bytes.slice()], file.name, {
+			type: file.mimeType ?? "application/octet-stream",
+		});
+	} catch {
+		throwStructuredAgentError({
+			message: `Invalid base64 data for file ${file.name}`,
+			code: "E_INVALID_PARAMS",
+			category: "validation",
+		});
+	}
+}
+
+async function fileFromUrl(file: ResolvedUrlFile): Promise<File> {
+	try {
+		const resp = await fetch(file.url);
+		if (!resp.ok) {
+			throwStructuredAgentError({
+				message: `Failed to fetch file URL ${file.url}: HTTP ${resp.status}`,
+				code: "E_NETWORK",
+				category: "network",
+			});
+		}
+		const bytes = new Uint8Array(await resp.arrayBuffer());
+		const type =
+			file.mimeType ||
+			resp.headers.get("content-type") ||
+			"application/octet-stream";
+		return new File([bytes.slice()], file.name, { type });
+	} catch (err: unknown) {
+		if (
+			typeof err === "object" &&
+			err !== null &&
+			"code" in err &&
+			typeof (err as { code?: string }).code === "string"
+		) {
+			throw err;
+		}
+		const message = err instanceof Error ? err.message : String(err);
+		throwStructuredAgentError({
+			message: `Failed to fetch file URL ${file.url}: ${message}`,
+			code: "E_NETWORK",
+			category: "network",
+		});
+	}
+}
+
+function assertSetFilesEffect(
+	el: HTMLInputElement,
+	refId: string,
+	expectedNames: string[],
+): void {
+	const actualNames = Array.from(el.files ?? []).map((f) => f.name);
+	if (
+		(el.files?.length ?? 0) !== expectedNames.length ||
+		!expectedNames.every((name, index) => actualNames[index] === name)
+	) {
+		throwStructuredAgentError(
+			notInteractableError("setFiles", refId, {
+				expectedNames,
+				actualNames,
+			}),
+		);
+	}
+}
+
 function resolveEvaluateCode(params: unknown): string {
 	const obj = asRecord(params);
 	const code = obj.script ?? obj.code ?? obj.js ?? "";
@@ -145,6 +299,46 @@ export const handlers: Record<string, Handler> = {
 			return makeActionResult("fill", el, { value: el.value });
 		}
 		throw new Error("Element is not an input");
+	},
+
+	set_files: async (params) => {
+		const refId = getStringParam(params, "refId");
+		const label = getStringParam(params, "label");
+		const files = parseResolvedFiles(params);
+		let el = refId ? getElementByRefId(refId) : null;
+		if (!el && label) {
+			el = findElementByLabel(label);
+		}
+		if (!el) {
+			throwElementNotFound(refId, label, true);
+		}
+		assertInteractable(el, "setFiles");
+		if (!(el instanceof HTMLInputElement) || el.type !== "file") {
+			const resolvedRefId = refId || el.getAttribute("data-ref-id") || "";
+			throwStructuredAgentError(
+				notInteractableError("setFiles", resolvedRefId, {
+					reason: "not_file_input",
+				}),
+			);
+		}
+		const dt = new DataTransfer();
+		const fileNames: string[] = [];
+		for (const payload of files) {
+			const file =
+				payload.kind === "bytes"
+					? fileFromBytes(payload)
+					: await fileFromUrl(payload);
+			dt.items.add(file);
+			fileNames.push(file.name);
+		}
+		el.files = dt.files;
+		el.dispatchEvent(new Event("change", { bubbles: true }));
+		const resolvedRefId = refId || el.getAttribute("data-ref-id") || "";
+		assertSetFilesEffect(el, resolvedRefId, fileNames);
+		return makeActionResult("setFiles", el, {
+			fileCount: fileNames.length,
+			fileNames,
+		});
 	},
 
 	type: (params) => {

@@ -246,6 +246,14 @@ export function freezeManifest(): void {
 	// mock
 }
 
+export function takeCachedVfsWriteBase64(_path: string): string | undefined {
+	return undefined;
+}
+
+export function clearVfsWriteCache(): void {
+	// mock
+}
+
 export default async function init(): Promise<void> {
 	// mock
 }

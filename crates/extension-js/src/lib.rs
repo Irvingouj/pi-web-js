@@ -2,6 +2,7 @@ pub mod browser_api;
 pub mod fs;
 pub mod log;
 pub mod session;
+pub mod vfs_write_cache;
 
 pub use log::set_log_level;
 pub use session::ExtensionSession;
@@ -101,4 +102,14 @@ pub fn register_js_call_batch(items: js_sys::Array) -> Result<(), JsValue> {
 #[wasm_bindgen(js_name = freezeManifest)]
 pub fn freeze_manifest() -> Result<(), JsValue> {
     web_js_core::api_docs::freeze_manifest().map_err(|e| JsValue::from_str(&e.to_string()))
+}
+
+#[wasm_bindgen(js_name = takeCachedVfsWriteBase64)]
+pub fn take_cached_vfs_write_base64(path: &str) -> Option<String> {
+    vfs_write_cache::take_write(path)
+}
+
+#[wasm_bindgen(js_name = clearVfsWriteCache)]
+pub fn clear_vfs_write_cache() {
+    vfs_write_cache::clear();
 }

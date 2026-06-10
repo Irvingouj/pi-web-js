@@ -6,6 +6,7 @@ import {
 	MutationReturnSchema,
 	FetchParamsSchema,
 	PageFillParamsSchema,
+	PageSetFilesParamsSchema,
 	FsWriteParamsSchema,
 } from "../src/shared/schemas.js";
 import {
@@ -149,6 +150,59 @@ describe("invalid parameter shapes produce E_INVALID_PARAMS (T-018)", () => {
 		if (!result.success) {
 			expect(result.error.issues.some((i) => i.message.includes("refId or label"))).toBe(true);
 		}
+	});
+
+	it("setFiles rejects positional string", () => {
+		const result = PageSetFilesParamsSchema.safeParse("e2");
+		expect(result.success).toBe(false);
+	});
+
+	it("setFiles rejects empty files array", () => {
+		const result = PageSetFilesParamsSchema.safeParse({
+			refId: "e2",
+			files: [],
+		});
+		expect(result.success).toBe(false);
+	});
+
+	it("setFiles rejects legacy data field", () => {
+		const result = PageSetFilesParamsSchema.safeParse({
+			refId: "e2",
+			files: [{ name: "a.txt", data: "YQ==" }],
+		});
+		expect(result.success).toBe(false);
+	});
+
+	it("setFiles accepts url source", () => {
+		const result = PageSetFilesParamsSchema.safeParse({
+			refId: "e2",
+			files: [{ url: "https://example.com/a.txt", name: "a.txt" }],
+		});
+		expect(result.success).toBe(true);
+	});
+
+	it("setFiles accepts path source", () => {
+		const result = PageSetFilesParamsSchema.safeParse({
+			refId: "e2",
+			files: [{ path: "/tmp/a.txt" }],
+		});
+		expect(result.success).toBe(true);
+	});
+
+	it("setFiles accepts handle source", () => {
+		const result = PageSetFilesParamsSchema.safeParse({
+			refId: "e2",
+			files: [{ handle: "blob_1", name: "a.txt" }],
+		});
+		expect(result.success).toBe(true);
+	});
+
+	it("setFiles rejects multiple sources on one file", () => {
+		const result = PageSetFilesParamsSchema.safeParse({
+			refId: "e2",
+			files: [{ url: "https://example.com/a.txt", path: "/tmp/a.txt" }],
+		});
+		expect(result.success).toBe(false);
 	});
 
 	it("fs.writeBase64 rejects null params", () => {

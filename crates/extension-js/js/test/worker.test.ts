@@ -18,6 +18,10 @@ import { ExtensionSession } from "../__mocks__/extension_js";
 
 const sentMessages: unknown[] = [];
 
+async function flushMicrotasks(): Promise<void> {
+	await Promise.resolve();
+}
+
 function makeEntry(
 	action: string,
 	owner: string,
@@ -108,6 +112,7 @@ describe("extensionDispatch", () => {
 			action: "chrome_bookmarks_search",
 			runId: "run-1",
 		});
+		await flushMicrotasks();
 		const message = sentMessages[0] as { command: { params: unknown } };
 		expect(message.command.params).toEqual(params);
 		resolveAsyncRelayResult((sentMessages[0] as { id: string }).id, {
@@ -120,6 +125,7 @@ describe("extensionDispatch", () => {
 	it("relays through the routing table for content-script endpoints", async () => {
 		setRoute("page_click", { endpoint: "content-script", tabPolicy: "active" });
 		const promise = extensionDispatch({ refId: "e1" }, { action: "page_click", runId: "run-1" });
+		await flushMicrotasks();
 		const message = sentMessages[0] as { id: string; owner: string; tabPolicy: string };
 		expect(message.owner).toBe("content-script");
 		expect(message.tabPolicy).toBe("active");
@@ -155,6 +161,7 @@ describe("worker executable callbacks", () => {
 	it("cross-context content-script callback posts owner, action, params, and resolves response", async () => {
 		const callback = createExecutableCallback(makeEntry("page_click", "content-script"));
 		const promise = callback({ refId: "e7" }, { runId: "run-1" });
+		await flushMicrotasks();
 		const message = sentMessages[0] as { id: string; owner: string; command: unknown; runId: string };
 		expect(message.owner).toBe("content-script");
 		expect(message.command).toEqual({ action: "page_click", params: { refId: "e7" }, runId: "run-1", callId: undefined });
@@ -239,6 +246,7 @@ describe("worker executable callbacks", () => {
 		registerWorkerPort("custom-worker", mockPort);
 		const callback = createExecutableCallback(makeEntry("custom_action", "custom-worker"));
 		const promise = callback({ test: true });
+		await flushMicrotasks();
 		const message = sentMessages[sentMessages.length - 1] as { id: string; owner: string; command: unknown };
 		expect(message.owner).toBe("custom-worker");
 		expect(message.command).toEqual({ action: "custom_action", params: { test: true }, runId: undefined, callId: undefined });

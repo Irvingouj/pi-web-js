@@ -112,6 +112,51 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		handlerKey: "fill",
 	},
 	{
+		action: "page_set_files",
+		namespace: "page",
+		name: "setFiles",
+		description: "Attach files to a file input in the active tab",
+		params: schemas.PageSetFilesParamsSchema,
+		returns: schemas.PageActionResultSchema,
+		paramTypes: [
+			{
+				name: "refId",
+				type: "string",
+				required: false,
+				description: "Element reference ID (refId)",
+			},
+			{
+				name: "label",
+				type: "string",
+				required: false,
+				description: "Element label (label)",
+			},
+			{
+				name: "files",
+				type: "{ name?: string, url?: string, path?: string, handle?: string, mimeType?: string }[]",
+				required: true,
+				description: "Each entry uses exactly one of url, path (vfs), or handle (from page.fetch store:true)",
+			},
+		],
+		returnDoc: "{ ok: true, action: 'setFiles', refId?, fileCount?, fileNames? }",
+		errorCode: "E_MISSING_PARAM",
+		example:
+			'page.setFiles({ refId: "e3", files: [{ url: "https://example.com/photo.jpg", name: "photo.jpg" }] })',
+		agentMeta: {
+			prerequisites: ["Ensure the target tab is active and the content script is ready before mutating"],
+			notes: [
+				AWAIT_PROMISE_NOTE,
+				"Target must be input[type=file]; prefer url, vfs path, or fetch handle — bytes are not passed through QuickJS",
+				"Use page.fetch({ url, store: true }) then setFiles({ files: [{ handle }] }) for downloaded binaries",
+				"Same content-script path as web.tab.*",
+				"Always operates on the active tab; use web.tab.* if you need to target a specific tabId",
+			],
+			tags: ["mutation", "write"],
+			relatedApis: ["web.tab.setFiles", "page.fetch", "fs.writeBase64"],
+		},
+		handlerKey: "set_files",
+	},
+	{
 		action: "page_type",
 		namespace: "page",
 		name: "type",
@@ -521,6 +566,46 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 			relatedApis: ["page.fill"],
 		},
 		handlerKey: "fill",
+	},
+	{
+		action: "tab_set_files",
+		namespace: "web.tab",
+		name: "setFiles",
+		description: "Attach files to a file input in a tab",
+		params: schemas.TabSetFilesParamsSchema,
+		returns: schemas.PageActionResultSchema,
+		paramTypes: [
+			{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
+			{
+				name: "refId",
+				type: "string",
+				required: false,
+				description: "Element reference ID (refId)",
+			},
+			{
+				name: "label",
+				type: "string",
+				required: false,
+				description: "Element label (label)",
+			},
+			{
+				name: "files",
+				type: "{ name?: string, url?: string, path?: string, handle?: string, mimeType?: string }[]",
+				required: true,
+				description: "Each entry uses exactly one of url, path (vfs), or handle",
+			},
+		],
+		returnDoc: "{ ok: true, action: 'setFiles', refId?, fileCount?, fileNames? }",
+		errorCode: "E_NO_TAB",
+		example:
+			'web.tab.setFiles({ tabId: 123, refId: "e3", files: [{ url: "https://example.com/photo.jpg" }] })',
+		agentMeta: {
+			prerequisites: ["Ensure the target tab exists and the content script is ready before mutating"],
+			notes: ["Explicit tabId required; same handlers as page.*"],
+			tags: ["mutation", "write"],
+			relatedApis: ["page.setFiles"],
+		},
+		handlerKey: "set_files",
 	},
 	{
 		action: "tab_scroll_to",
