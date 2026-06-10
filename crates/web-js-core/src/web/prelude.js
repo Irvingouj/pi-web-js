@@ -48,6 +48,79 @@ if (!globalThis.URLSearchParams) {
     }).join('&');
   };
 }
+if (!globalThis.btoa || !globalThis.atob) {
+  var base64chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  globalThis.btoa = function btoa(str) {
+    var bytes = [];
+    for (var i = 0; i < str.length; i++) bytes.push(str.charCodeAt(i) & 0xff);
+    var result = '';
+    for (var i = 0; i < bytes.length; i += 3) {
+      var b1 = bytes[i];
+      var b2 = bytes[i + 1] || 0;
+      var b3 = bytes[i + 2] || 0;
+      result += base64chars[b1 >> 2];
+      result += base64chars[((b1 & 0x03) << 4) | (b2 >> 4)];
+      result += (i + 1 < bytes.length) ? base64chars[((b2 & 0x0f) << 2) | (b3 >> 6)] : '=';
+      result += (i + 2 < bytes.length) ? base64chars[b3 & 0x3f] : '=';
+    }
+    return result;
+  };
+  globalThis.atob = function atob(str) {
+    var lookup = {};
+    for (var i = 0; i < base64chars.length; i++) lookup[base64chars[i]] = i;
+    var result = '';
+    var bytes = [];
+    for (var i = 0; i < str.length; i++) {
+      if (str[i] === '=') break;
+      var val = lookup[str[i]];
+      if (val === undefined) continue;
+      bytes.push(val);
+      if (bytes.length === 4) {
+        result += String.fromCharCode((bytes[0] << 2) | (bytes[1] >> 4));
+        result += String.fromCharCode(((bytes[1] & 0x0f) << 4) | (bytes[2] >> 2));
+        result += String.fromCharCode(((bytes[2] & 0x03) << 6) | bytes[3]);
+        bytes = [];
+      }
+    }
+    if (bytes.length >= 2) result += String.fromCharCode((bytes[0] << 2) | (bytes[1] >> 4));
+    if (bytes.length >= 3) result += String.fromCharCode(((bytes[1] & 0x0f) << 4) | (bytes[2] >> 2));
+    return result;
+  };
+}
+if (!globalThis.TextEncoder) {
+  globalThis.TextEncoder = function TextEncoder() {};
+  globalThis.TextEncoder.prototype.encode = function(str) {
+    var bytes = [];
+    for (var i = 0; i < str.length; i++) {
+      var code = str.charCodeAt(i);
+      if (code < 0x80) bytes.push(code);
+      else if (code < 0x800) {
+        bytes.push(0xc0 | (code >> 6), 0x80 | (code & 0x3f));
+      } else {
+        bytes.push(0xe0 | (code >> 12), 0x80 | ((code >> 6) & 0x3f), 0x80 | (code & 0x3f));
+      }
+    }
+    return new Uint8Array(bytes);
+  };
+}
+if (!globalThis.TextDecoder) {
+  globalThis.TextDecoder = function TextDecoder() {};
+  globalThis.TextDecoder.prototype.decode = function(bytes) {
+    var str = '';
+    for (var i = 0; i < bytes.length; i++) {
+      var byte = bytes[i];
+      if (byte < 0x80) str += String.fromCharCode(byte);
+      else if ((byte & 0xe0) === 0xc0) {
+        str += String.fromCharCode(((byte & 0x1f) << 6) | (bytes[i + 1] & 0x3f));
+        i++;
+      } else if ((byte & 0xf0) === 0xe0) {
+        str += String.fromCharCode(((byte & 0x0f) << 12) | ((bytes[i + 1] & 0x3f) << 6) | (bytes[i + 2] & 0x3f));
+        i += 2;
+      }
+    }
+    return str;
+  };
+}
 var URL = globalThis.URL;
 var URLSearchParams = globalThis.URLSearchParams;
 var path = {

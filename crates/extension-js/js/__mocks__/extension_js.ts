@@ -219,6 +219,7 @@ export class ExtensionSession {
 	set_fuel_limit(_limit: number): void {}
 	setAborted(_value: boolean): void {}
 	stopWith(): void {}
+	injectRegistryBindings(): void {}
 }
 
 export function setLogLevel(_level: number): void {
@@ -238,5 +239,13 @@ export function registerSharedDispatch(_callback: unknown): void {
 }
 
 export function importManifestEntries(_entries: unknown[]): void {
+	// mock
+}
+
+export function freezeManifest(): void {
+	// mock
+}
+
+export default async function init(): Promise<void> {
 	// mock
 }

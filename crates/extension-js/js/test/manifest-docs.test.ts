@@ -336,7 +336,7 @@ describe("manifest documentation export", () => {
 		const manifest = getSerializableJsManifest();
 		const pageFind = manifest.find((entry) => entry.action === "page_find");
 		expect(pageFind).toBeDefined();
-		// page_find returns z.array(z.object({ tag: z.string(), refId: z.string().nullable(), text: z.string() }))
+		// page_find returns z.array(z.object({ refId: refIdString(), role: z.string(), tag: z.string(), text: z.string().optional(), ... }))
 		expect(pageFind!.returnsDoc.type).toContain("tag");
 		expect(pageFind!.returnsDoc.type).toContain("refId");
 		expect(pageFind!.returnsDoc.type).toContain("text");
@@ -391,6 +391,39 @@ describe("manifest documentation export", () => {
 				expect(banned.has(param.type)).toBe(false);
 			}
 		}
+	});
+
+	it("T-019: banned types scan = 0 for AC-used page/tab APIs", () => {
+		const manifest = getSerializableJsManifest();
+		const AC_USED = new Set([
+			"page_find",
+			"page_snapshot",
+			"page_snapshot_data",
+			"page_fetch",
+			"page_health",
+			"page_goto",
+			"page_click",
+			"page_fill",
+			"tab_click",
+			"tab_fill",
+			"tab_snapshot",
+			"tab_snapshot_data",
+			"tab_fetch",
+		]);
+		const banned = new Set(["unknown", "undefined", "any", "object", "lazy", "void", "record"]);
+		const violations: string[] = [];
+		for (const entry of manifest) {
+			if (!AC_USED.has(entry.action)) continue;
+			if (banned.has(entry.returnsDoc.type)) {
+				violations.push(`${entry.action} returnsDoc.type="${entry.returnsDoc.type}"`);
+			}
+			for (const param of entry.paramsDoc) {
+				if (banned.has(param.type)) {
+					violations.push(`${entry.action} paramsDoc[${param.name}].type="${param.type}"`);
+				}
+			}
+		}
+		expect(violations).toEqual([]);
 	});
 
 	it("forwards agentMeta from JsCallSpec through the manifest to WASM", () => {

@@ -220,6 +220,7 @@ import {
 	registerHostHandlers,
 } from "../src/main/runner/index.js";
 import {
+	handleFetch,
 	pingTabContentScript,
 	waitForTabLoad,
 } from "../src/main/runner/runtime.js";
@@ -789,8 +790,11 @@ describe("network", () => {
 			Promise.resolve({
 				status: 200,
 				ok: true,
-				headers: new Map([["content-type", "text/plain"]]),
+				url: "https://example.com",
+				headers: new Headers({ "content-type": "text/plain" }),
 				text: () => Promise.resolve("hello"),
+				arrayBuffer: () =>
+					Promise.resolve(new TextEncoder().encode("hello").buffer),
 			}),
 		) as unknown as typeof fetch;
 
@@ -806,6 +810,68 @@ describe("network", () => {
 			expect(result.value.status).toBe(200);
 			expect(result.value.ok).toBe(true);
 			expect(result.value.body).toBe("hello");
+			expect(result.value.bodyEncoding).toBe("text");
+			expect(result.value.byteLength).toBe(5);
+			expect(result.value.contentType).toBe("text/plain");
+			expect(result.value.finalUrl).toBe("https://example.com");
+		}
+	});
+
+	it("fetch returns base64 for binary content", async () => {
+		// Mock a Response with binary data
+		const jpegBytes = new Uint8Array([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46]);
+		const mockResponse = {
+			ok: true,
+			status: 200,
+			url: "http://example.com/photo.jpg",
+			headers: new Map([["content-type", "image/jpeg"]]),
+			arrayBuffer: async () => jpegBytes.buffer,
+			text: async () => { throw new Error("Should not call text() for binary"); },
+		};
+
+		// Mock global fetch
+		const originalFetch = globalThis.fetch;
+		globalThis.fetch = async () => mockResponse as any;
+
+		try {
+			const result = await handleFetch({ url: "http://example.com/photo.jpg" });
+			expect(result.ok).toBe(true);
+			if (result.ok) {
+				expect(result.value.bodyEncoding).toBe("base64");
+				expect(result.value.byteLength).toBe(10);
+				expect(result.value.contentType).toBe("image/jpeg");
+				// Verify base64 is valid by decoding
+				const decoded = atob(result.value.body);
+				expect(decoded.length).toBe(10);
+			}
+		} finally {
+			globalThis.fetch = originalFetch;
+		}
+	});
+
+	it("fetch returns base64 for mislabeled binary text/plain", async () => {
+		const jpegBytes = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]);
+		const mockResponse = {
+			ok: true,
+			status: 200,
+			url: "http://example.com/photo.jpg",
+			headers: new Map([["content-type", "text/plain"]]),
+			arrayBuffer: async () => jpegBytes.buffer,
+			text: async () => "should not be used",
+		};
+
+		const originalFetch = globalThis.fetch;
+		globalThis.fetch = async () => mockResponse as any;
+
+		try {
+			const result = await handleFetch({ url: "http://example.com/photo.jpg" });
+			expect(result.ok).toBe(true);
+			if (result.ok) {
+				expect(result.value.bodyEncoding).toBe("base64");
+				expect(result.value.byteLength).toBe(6);
+			}
+		} finally {
+			globalThis.fetch = originalFetch;
 		}
 	});
 });
@@ -1387,9 +1453,11 @@ describe("page actions", () => {
 		);
 		expect(result.ok).toBe(true);
 		if (result.ok) {
-			expect(result.value).toEqual([
-				{ tag: "H1", refId: null, text: "Hi" },
-			]);
+			expect(result.value).toHaveLength(1);
+			expect(result.value[0].tag).toBe("h1");
+			expect(result.value[0].refId).toMatch(/^e\d+$/);
+			expect(result.value[0].text).toBe("Hi");
+			expect(result.value[0].role).toBe("heading");
 		}
 	});
 

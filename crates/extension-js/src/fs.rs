@@ -97,6 +97,13 @@ pub struct FsHashResult {
     pub hash: String,
 }
 
+#[derive(Tsify, Serialize, Deserialize)]
+#[tsify(into_wasm_abi)]
+pub struct FsWriteResult {
+    pub path: String,
+    pub bytes_written: u64,
+}
+
 // ─── Macro ────────────────────────────────────────────────────────
 
 #[macro_export]
@@ -243,72 +250,96 @@ macro_rules! impl_extension_session_fs {
             pub async fn fs_write(
                 &self,
                 params: $crate::fs::FsWriteParams,
-            ) -> Result<$crate::fs::FsBoolResult, String> {
+            ) -> Result<$crate::fs::FsWriteResult, String> {
                 let bytes = data_encoding::BASE64
                     .decode(params.data.as_bytes())
                     .map_err(|_| "Invalid base64".to_string())?;
                 web_fs::write(&params.path, &bytes)
                     .await
                     .map_err(|e| e.wire_message())?;
-                Ok($crate::fs::FsBoolResult { ok: true })
+                Ok($crate::fs::FsWriteResult {
+                    path: params.path,
+                    bytes_written: bytes.len() as u64,
+                })
             }
 
             #[wasm_bindgen(js_name = fsWriteText)]
             pub async fn fs_write_text(
                 &self,
                 params: $crate::fs::FsWriteParams,
-            ) -> Result<$crate::fs::FsBoolResult, String> {
+            ) -> Result<$crate::fs::FsWriteResult, String> {
                 web_fs::write_text(&params.path, &params.data)
                     .await
                     .map_err(|e| e.wire_message())?;
-                Ok($crate::fs::FsBoolResult { ok: true })
+                Ok($crate::fs::FsWriteResult {
+                    path: params.path.clone(),
+                    bytes_written: params.data.len() as u64,
+                })
             }
 
             #[wasm_bindgen(js_name = fsWriteBase64)]
             pub async fn fs_write_base64(
                 &self,
                 params: $crate::fs::FsWriteParams,
-            ) -> Result<$crate::fs::FsBoolResult, String> {
+            ) -> Result<$crate::fs::FsWriteResult, String> {
+                let decoded = data_encoding::BASE64
+                    .decode(params.data.as_bytes())
+                    .map_err(|_| "Invalid base64".to_string())?;
                 web_fs::write_base64(&params.path, &params.data)
                     .await
                     .map_err(|e| e.wire_message())?;
-                Ok($crate::fs::FsBoolResult { ok: true })
+                Ok($crate::fs::FsWriteResult {
+                    path: params.path.clone(),
+                    bytes_written: decoded.len() as u64,
+                })
             }
 
             #[wasm_bindgen(js_name = fsAppend)]
             pub async fn fs_append(
                 &self,
                 params: $crate::fs::FsWriteParams,
-            ) -> Result<$crate::fs::FsBoolResult, String> {
+            ) -> Result<$crate::fs::FsWriteResult, String> {
                 let bytes = data_encoding::BASE64
                     .decode(params.data.as_bytes())
                     .map_err(|_| "Invalid base64".to_string())?;
                 web_fs::append(&params.path, &bytes)
                     .await
                     .map_err(|e| e.wire_message())?;
-                Ok($crate::fs::FsBoolResult { ok: true })
+                Ok($crate::fs::FsWriteResult {
+                    path: params.path,
+                    bytes_written: bytes.len() as u64,
+                })
             }
 
             #[wasm_bindgen(js_name = fsAppendText)]
             pub async fn fs_append_text(
                 &self,
                 params: $crate::fs::FsWriteParams,
-            ) -> Result<$crate::fs::FsBoolResult, String> {
+            ) -> Result<$crate::fs::FsWriteResult, String> {
                 web_fs::append_text(&params.path, &params.data)
                     .await
                     .map_err(|e| e.wire_message())?;
-                Ok($crate::fs::FsBoolResult { ok: true })
+                Ok($crate::fs::FsWriteResult {
+                    path: params.path.clone(),
+                    bytes_written: params.data.len() as u64,
+                })
             }
 
             #[wasm_bindgen(js_name = fsAppendBase64)]
             pub async fn fs_append_base64(
                 &self,
                 params: $crate::fs::FsWriteParams,
-            ) -> Result<$crate::fs::FsBoolResult, String> {
+            ) -> Result<$crate::fs::FsWriteResult, String> {
+                let decoded = data_encoding::BASE64
+                    .decode(params.data.as_bytes())
+                    .map_err(|_| "Invalid base64".to_string())?;
                 web_fs::append_base64(&params.path, &params.data)
                     .await
                     .map_err(|e| e.wire_message())?;
-                Ok($crate::fs::FsBoolResult { ok: true })
+                Ok($crate::fs::FsWriteResult {
+                    path: params.path.clone(),
+                    bytes_written: decoded.len() as u64,
+                })
             }
 
             // ─── Path + offset + len ─────────────────────────────────────────

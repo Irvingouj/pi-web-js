@@ -4,7 +4,7 @@ const CONTENT_SCRIPT_HINT =
 	"Content script is not connected on this tab. " +
 	"This tab was likely open before the extension loaded (MV3 does not retro-inject).";
 
-function contentScriptRecovery(url: string): string[] {
+function contentScriptRecovery(url?: string): string[] {
 	const quoted = JSON.stringify(url || "");
 	return [
 		`await page.goto(${quoted})`,
@@ -13,18 +13,24 @@ function contentScriptRecovery(url: string): string[] {
 }
 
 export function contentScriptMissingError(
-	tabId: number,
-	url: string,
+	tabId?: number,
+	url?: string,
 ): AsyncError {
 	const displayUrl = url || "unknown url";
-	return {
-		message: `Content script is not connected on tab ${tabId} (${displayUrl}).`,
+	const error: AsyncError = {
+		message:
+			tabId !== undefined
+				? `Content script is not connected on tab ${tabId} (${displayUrl}).`
+				: `Content script is not connected on this tab (${displayUrl}).`,
 		code: "E_CONTENT_SCRIPT",
 		category: "content-script",
 		hint: CONTENT_SCRIPT_HINT,
 		recovery: contentScriptRecovery(url),
-		details: { tabId, url: displayUrl },
 	};
+	if (tabId !== undefined) {
+		error.details = { tabId, url: displayUrl };
+	}
+	return error;
 }
 
 export function noTabError(action: string): AsyncError {
@@ -107,7 +113,8 @@ export function isContentScriptConnectionError(msg: string): boolean {
 		msg.includes("Could not establish connection") ||
 		msg.includes("Receiving end does not exist") ||
 		msg.includes("Timeout waiting for content-script ping") ||
-		msg.includes("content script not available")
+		msg.includes("content script not available") ||
+		msg.includes("message port closed before a response was received")
 	);
 }
 

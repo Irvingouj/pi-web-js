@@ -928,9 +928,20 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		params: schemas.PageFindParamsSchema,
 		returns: z.array(
 			z.object({
+				refId: schemas.refIdString(),
+				role: z.string(),
 				tag: z.string(),
-				refId: z.string().nullable(),
-				text: z.string(),
+				name: z.string().optional(),
+				text: z.string().optional(),
+				value: z.string().optional(),
+				checked: z.boolean().optional(),
+				disabled: z.boolean().optional(),
+				readOnly: z.boolean().optional(),
+				href: z.string().optional(),
+				src: z.string().optional(),
+				alt: z.string().optional(),
+				title: z.string().optional(),
+				parentRefId: schemas.refIdString().optional(),
 			}),
 		),
 		aliases: [{ namespace: "page", name: "query" }],
@@ -943,10 +954,13 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 				description: "CSS selector to find elements (selector)",
 			},
 		],
-		returnDoc: "Array of elements",
+		returnDoc: "Array of elements with refId, role, name, href/src, alt, and parentRefId",
 		errorCode: "E_NO_TAB",
 		example: 'page.find("h1")',
 		agentMeta: {
+			notes: [
+				"Assigns data-ref-id on matched elements when missing so results include actionable refIds",
+			],
 			tags: ["read"],
 		},
 		handlerKey: "find",
@@ -1028,7 +1042,7 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		namespace: "page",
 		name: "fetch",
 		description: "Fetch in the active tab",
-		params: z.record(z.unknown()),
+		params: schemas.FetchParamsSchema,
 		returns: schemas.FetchValueSchema,
 		fields: ["url", "options"],
 		paramTypes: [
@@ -1040,7 +1054,7 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 			},
 			{
 				name: "options",
-				type: "{ method?: string, headers?: object, body?: string }",
+				type: "{ method?: string, headers?: { [key: string]: string }, body?: string }",
 				required: false,
 				description: "Fetch options (literal)",
 			},
@@ -1049,7 +1063,11 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		errorCode: "E_NO_TAB",
 		example: 'page.fetch({ url: "https://api.example.com/data" })',
 		agentMeta: {
-			notes: [AWAIT_PROMISE_NOTE],
+			notes: [
+				AWAIT_PROMISE_NOTE,
+				"Runtime binary globals available: Uint8Array, ArrayBuffer, TextEncoder, TextDecoder, atob, btoa",
+				"For binary responses bodyEncoding is 'base64'; use atob() or fs.writeBase64 to handle bytes",
+			],
 			tags: ["read"],
 		},
 		handlerKey: "fetch",

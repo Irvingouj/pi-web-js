@@ -1,5 +1,9 @@
 /** Shared DOM helpers for inline snapshots (content script + MAIN-world injection). */
 
+import { allocateRefId } from "./ref-id.js";
+
+export { allocateRefId, getNextRefId, syncRefIdCounterFromDom } from "./ref-id.js";
+
 export const INTERACTIVE_SELECTOR =
 	'input, textarea, select, button, a, [role="button"], [role="link"]';
 
@@ -52,7 +56,9 @@ export function readFormFields(el: Element): {
 		readOnly?: boolean;
 	} = {};
 	if (el instanceof HTMLInputElement) {
-		out.value = el.value;
+		if (el.type !== "password" && el.type !== "hidden") {
+			out.value = el.value;
+		}
 		if (el.type === "checkbox" || el.type === "radio") {
 			out.checked = el.checked;
 		}
@@ -71,13 +77,48 @@ export function readFormFields(el: Element): {
 
 export function enrichFormNode(
 	el: Element,
-	node: Record<string, unknown>,
+	node: {
+		value?: string;
+		checked?: boolean;
+		disabled?: boolean;
+		readOnly?: boolean;
+	},
 ): void {
 	const tag = el.tagName.toLowerCase();
 	if (tag !== "input" && tag !== "textarea" && tag !== "select") {
 		return;
 	}
 	Object.assign(node, readFormFields(el));
+}
+
+const ALLOWED_URL_SCHEMES = new Set(["http:", "https:", "file:"]);
+
+export function resolveAbsoluteUrl(attr: string | null): string | undefined {
+	if (!attr) return undefined;
+	try {
+		const url = new URL(attr, window.location.href);
+		if (ALLOWED_URL_SCHEMES.has(url.protocol)) {
+			return url.href;
+		}
+		return undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+export function resolveContainerRefId(el: Element): string | undefined {
+	const container = el.closest("article[data-post-id], [data-post-id]");
+	if (!container) return undefined;
+	return allocateRefId(container);
+}
+
+export function resolvePermalinkLink(el: Element): HTMLAnchorElement | null {
+	const scoped = el.querySelector(
+		":scope > h2 a[href], a[data-permalink], a[rel='permalink']",
+	);
+	if (scoped instanceof HTMLAnchorElement) return scoped;
+	const fallback = el.querySelector("a[href]");
+	return fallback instanceof HTMLAnchorElement ? fallback : null;
 }
 
 export function getAccessibleRole(el: Element): string {

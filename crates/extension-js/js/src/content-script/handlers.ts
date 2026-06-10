@@ -1,6 +1,7 @@
 import { logger } from "./logger.js";
 import {
 	asRecord,
+	assertInteractable,
 	findElementByLabel,
 	getElementByRefId,
 	getNumberParam,
@@ -8,6 +9,15 @@ import {
 	throwElementNotFound,
 } from "./dom-utils.js";
 import { inlineSnapshot } from "./snapshot.js";
+import {
+	getAccessibleName,
+	getAccessibleRole,
+	readFormFields,
+	resolveAbsoluteUrl,
+	resolveContainerRefId,
+} from "../shared/snapshot-dom.js";
+import { allocateRefId, syncRefIdCounterFromDom } from "../shared/ref-id.js";
+import { encodeFetchResponse } from "../shared/fetch-response.js";
 import {
 	assertFillEffect,
 	makeActionResult,
@@ -109,6 +119,7 @@ export const handlers: Record<string, Handler> = {
 		if (!el) {
 			throwElementNotFound(refId, label, true);
 		}
+		assertInteractable(el, "click");
 		(el as HTMLElement).click();
 		return makeActionResult("click", el);
 	},
@@ -124,6 +135,7 @@ export const handlers: Record<string, Handler> = {
 		if (!el) {
 			throwElementNotFound(refId, label, true);
 		}
+		assertInteractable(el, "fill");
 		if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
 			el.value = value;
 			const ev = new InputEvent("input", { bubbles: true });
@@ -146,6 +158,7 @@ export const handlers: Record<string, Handler> = {
 		if (!el) {
 			throwElementNotFound(refId, label, true);
 		}
+		assertInteractable(el, "type");
 		if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
 			el.value = text;
 			const ev = new InputEvent("input", { bubbles: true });
@@ -168,6 +181,7 @@ export const handlers: Record<string, Handler> = {
 		if (!el) {
 			throwElementNotFound(refId, label, true);
 		}
+		assertInteractable(el, "append");
 		if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
 			const before = el.value;
 			const expected = before + text;
@@ -201,6 +215,7 @@ export const handlers: Record<string, Handler> = {
 		if (!el) {
 			throwElementNotFound(refId, label, true);
 		}
+		assertInteractable(el, "select");
 		if (el instanceof HTMLSelectElement) {
 			el.value = value;
 			el.dispatchEvent(new Event("change", { bubbles: true }));
@@ -223,6 +238,7 @@ export const handlers: Record<string, Handler> = {
 		if (!el) {
 			throwElementNotFound(refId, label, true);
 		}
+		assertInteractable(el, "check");
 		if (
 			el instanceof HTMLInputElement &&
 			(el.type === "checkbox" || el.type === "radio")
@@ -244,6 +260,7 @@ export const handlers: Record<string, Handler> = {
 		if (!el) {
 			throwElementNotFound(refId, label, true);
 		}
+		assertInteractable(el, "hover");
 		const ev = new MouseEvent("mouseenter", { bubbles: true });
 		el.dispatchEvent(ev);
 		return makeActionResult("hover", el);
@@ -339,6 +356,8 @@ export const handlers: Record<string, Handler> = {
 				message: "Document body not available for snapshot",
 				code: "E_SNAPSHOT",
 				category: "resource",
+				details: { cause: "document.body is null" },
+				recovery: ["Wait for the page to load fully before taking a snapshot."],
 			});
 		}
 		const maxNodes = resolveMaxNodes(params);
@@ -354,6 +373,8 @@ export const handlers: Record<string, Handler> = {
 				message: "Document body not available for snapshot",
 				code: "E_SNAPSHOT",
 				category: "resource",
+				details: { cause: "document.body is null" },
+				recovery: ["Wait for the page to load fully before taking a snapshot."],
 			});
 		}
 		const maxNodes = resolveMaxNodes(params);
@@ -362,13 +383,46 @@ export const handlers: Record<string, Handler> = {
 	},
 
 	find: (params) => {
+		syncRefIdCounterFromDom();
 		const selector = getStringParam(params, "selector");
 		const elements = Array.from(document.querySelectorAll(selector));
-		return elements.map((el) => ({
-			tag: el.tagName,
-			refId: el.getAttribute("data-ref-id"),
-			text: el.textContent?.slice(0, 100) || "",
-		}));
+		return elements.map((el) => {
+			const refId = allocateRefId(el);
+			const role = getAccessibleRole(el);
+			const name = getAccessibleName(el);
+			const node: Record<string, unknown> = {
+				tag: el.tagName.toLowerCase(),
+				refId,
+				role,
+				text: el.textContent?.slice(0, 100) || "",
+				...readFormFields(el),
+			};
+			if (name) node.name = name;
+
+			const tag = el.tagName.toLowerCase();
+			if (tag === "a") {
+				const href = resolveAbsoluteUrl(el.getAttribute("href"));
+				if (href) node.href = href;
+			}
+			if (tag === "img") {
+				const src = resolveAbsoluteUrl(el.getAttribute("src"));
+				if (src) node.src = src;
+				node.alt = el.getAttribute("alt") || "";
+			}
+			if (tag === "input") {
+				const title = el.getAttribute("title");
+				if (title) node.title = title;
+			}
+
+			if (tag === "img" || tag === "a") {
+				const containerRefId = resolveContainerRefId(el);
+				if (containerRefId) {
+					node.parentRefId = containerRefId;
+				}
+			}
+
+			return node;
+		});
 	},
 
 	wait_for: async (params, signal) => {
@@ -454,13 +508,7 @@ export const handlers: Record<string, Handler> = {
 				fetchOpts.body = body;
 			}
 			const resp = await fetch(url, fetchOpts);
-			const text = await resp.text();
-			return {
-				status: resp.status,
-				ok: resp.ok,
-				headers: Object.fromEntries(resp.headers.entries()),
-				body: text,
-			};
+			return encodeFetchResponse(resp);
 		} finally {
 			clearTimeout(timeoutId);
 			signal?.removeEventListener("abort", onRelayAbort);

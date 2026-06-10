@@ -146,10 +146,7 @@ impl WebSession {
             |cmd| async move {
                 WebSession::handle_command(&cmd)
                     .await
-                    .map_err(|e| WasmAsyncError {
-                        message: e,
-                        code: "E_UNSUPPORTED".into(),
-                    })
+                    .map_err(|e| WasmAsyncError::new(e, "E_UNSUPPORTED"))
             },
             Some(&self.aborted),
         )
@@ -400,10 +397,7 @@ impl WebSession {
         let wasm_result = result.map(|resp| WasmAsyncResponse {
             ok: resp.ok,
             value: resp.value,
-            error: resp.error.map(|e| WasmAsyncError {
-                message: e.message,
-                code: e.code,
-            }),
+            error: resp.error.map(|e| WasmAsyncError::new(e.message, e.code)),
         });
 
         match &wasm_result {

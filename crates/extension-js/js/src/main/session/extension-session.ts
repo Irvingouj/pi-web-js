@@ -41,7 +41,7 @@ type WorkerRequest =
   | { type: "apiDocs"; id: string; format: string }
   | { type: "loadLibrary"; id: string; source: string }
   | { type: "setLogLevel"; level: number }
-  | { type: "asyncRelayResult"; id: string; result: unknown }
+  | { type: "asyncRelayResult"; id: string; result: unknown; callId?: number }
   | { type: "registerWorkerPort"; owner: string }
   | { type: "fsCall"; id: string; action: string; params: unknown };
 
@@ -56,7 +56,7 @@ type WorkerResponse =
   }
   | { type: "relayCancel"; id: string; owner?: string }
   | { type: "result"; id: string; data?: unknown; runId?: string }
-  | { type: "error"; id?: string; error: string; runId?: string }
+  | { type: "error"; id?: string; error: string | { name?: string; message: string; stack?: string; line?: number }; runId?: string }
   | { type: "ready" };
 
 export class ExtensionSession {
@@ -148,7 +148,8 @@ export class ExtensionSession {
           break;
         }
         case "error": {
-          readyReject(new Error(msg.error || "Worker init error"));
+          const errMsg = typeof msg.error === "string" ? msg.error : msg.error?.message || "Worker init error";
+          readyReject(new Error(errMsg));
           break;
         }
       }
@@ -184,17 +185,29 @@ export class ExtensionSession {
       }
       case "error": {
         const callId = msg.id;
-        logger.trace("error", { callId, error: msg.error, runId: msg.runId });
+        const errorPayload = msg.error;
+        const errorText = typeof errorPayload === "string" ? errorPayload : errorPayload?.message || "Worker error";
+        logger.trace("error", { callId, error: errorText, runId: msg.runId });
+        const enrichedError = (() => {
+          if (typeof errorPayload === "object" && errorPayload !== null) {
+            const e = new Error(errorPayload.message || "Worker error");
+            e.name = errorPayload.name || "Error";
+            if (errorPayload.stack) e.stack = errorPayload.stack;
+            if (errorPayload.line) (e as Error & { line?: number }).line = errorPayload.line;
+            return e;
+          }
+          return new Error(errorText);
+        })();
         if (callId) {
           const pending = this.pendingCalls.get(callId);
           if (pending) {
             this.pendingCalls.delete(callId);
-            pending.reject(new Error(msg.error || "Worker error"));
+            pending.reject(enrichedError);
             break;
           }
         }
         // Global worker errors without a matching call
-        logger.error("worker_error", { error: msg.error });
+        logger.error("worker_error", { error: errorText });
         break;
       }
       case "ready": {
@@ -252,6 +265,7 @@ export class ExtensionSession {
                 type: "asyncRelayResult",
                 id: relayId,
                 result,
+                callId: cmd.call_id,
               });
             } catch (postErr: unknown) {
               const message = postErr instanceof Error ? postErr.message : String(postErr);
@@ -276,6 +290,7 @@ export class ExtensionSession {
                   ok: false,
                   error: { message, code: "E_RUNNER" },
                 },
+                callId: cmd.call_id,
               });
             } catch (postErr: unknown) {
               const postMessage = postErr instanceof Error ? postErr.message : String(postErr);

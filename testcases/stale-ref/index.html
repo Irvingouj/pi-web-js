@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stale Reference</title>
+  <style>
+    body { font-family: system-ui, sans-serif; padding: 1rem; }
+    #slot { padding: 1rem; border: 2px dashed #ccc; min-height: 60px; }
+    button { padding: 0.5rem 1rem; font-size: 1rem; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>Stale Reference Testcase</h1>
+  <p>Click "Rerender" to replace the button with a new DOM element in the same visual slot.</p>
+  <div id="slot">
+    <button id="action-btn" data-version="v1">Action Button</button>
+  </div>
+  <button id="rerender">Rerender</button>
+  <script>
+    (function () {
+      const slot = document.getElementById("slot");
+      const rerenderBtn = document.getElementById("rerender");
+      let version = 1;
+
+      rerenderBtn.addEventListener("click", function () {
+        version++;
+        slot.innerHTML = "";
+        const newBtn = document.createElement("button");
+        newBtn.id = "action-btn";
+        newBtn.setAttribute("data-version", "v" + version);
+        newBtn.textContent = "Action Button";
+        slot.appendChild(newBtn);
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -49,5 +49,11 @@ describe("apiDocs real WASM pipeline", () => {
 		expect(markdown).toContain("mutation");
 		expect(markdown).toContain("write");
 		expect(markdown).toContain("Related APIs");
+		expect(markdown).toContain("Uint8Array");
+		expect(markdown).toContain("ArrayBuffer");
+		expect(markdown).toContain("TextEncoder");
+		expect(markdown).toContain("TextDecoder");
+		expect(markdown).toContain("atob");
+		expect(markdown).toContain("btoa");
 	});
 });

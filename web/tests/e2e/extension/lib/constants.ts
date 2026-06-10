@@ -22,6 +22,10 @@ export const FIXTURE_URL = `${FIXTURE_ORIGIN}/fixture`;
 export const TESTCASE_SERVER_PORT = Number(process.env.TESTCASE_SERVER_PORT ?? "9292");
 export const TESTCASE_SERVER_HOST = process.env.TESTCASE_SERVER_HOST ?? "127.0.0.1";
 export const SIMPLE_FORM_1_URL = `http://${TESTCASE_SERVER_HOST}:${TESTCASE_SERVER_PORT}/testcases/simple-form-1/`;
+export const DYNAMIC_FEED_URL = `http://${TESTCASE_SERVER_HOST}:${TESTCASE_SERVER_PORT}/testcases/dynamic-feed/`;
+export const LARGE_DOM_URL = `http://${TESTCASE_SERVER_HOST}:${TESTCASE_SERVER_PORT}/testcases/large-dom/`;
+export const MEDIA_DOWNLOAD_URL = `http://${TESTCASE_SERVER_HOST}:${TESTCASE_SERVER_PORT}/testcases/media-download/`;
+export const STALE_REF_URL = `http://${TESTCASE_SERVER_HOST}:${TESTCASE_SERVER_PORT}/testcases/stale-ref/`;
 export const RESULT_PREFIX = "__EXTENSION_CONTRACT_RESULT__";
 
 export const EXT_CONTRACT_APIS = process.env.EXT_CONTRACT_APIS === "1";
@@ -94,13 +98,13 @@ export const FIXTURE_HTML = `<!DOCTYPE html>
 <head><title>extension-js contract fixture</title></head>
 <body>
   <h1 id="title">Fixture Page</h1>
-  <button data-ref-id="btn" id="btn">Click</button>
-  <input data-ref-id="input" id="input" value="" />
-  <input type="checkbox" data-ref-id="checkbox" id="checkbox" />
-  <select data-ref-id="select" id="select"><option value="a">A</option><option value="b">B</option></select>
-  <a data-ref-id="link" href="/next">Next</a>
-  <div id="appears" data-ref-id="appears">Ready</div>
-  <div id="scroll-target" data-ref-id="scroll-target" style="margin-top:2000px">Scroll target</div>
+  <button data-ref-id="e1" id="btn">Click</button>
+  <input data-ref-id="e2" id="input" value="" />
+  <input type="checkbox" data-ref-id="e3" id="checkbox" />
+  <select data-ref-id="e4" id="select"><option value="a">A</option><option value="b">B</option></select>
+  <a data-ref-id="e5" href="/next">Next</a>
+  <div id="appears" data-ref-id="e6">Ready</div>
+  <div id="scroll-target" data-ref-id="e7" style="margin-top:2000px">Scroll target</div>
 </body>
 </html>`;
 

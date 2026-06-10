@@ -391,6 +391,122 @@ describe("stale refId errors", () => {
 		}
 	});
 
+	it("click with stale refId returns E_STALE with candidates", async () => {
+		const btn = document.createElement("button");
+		btn.textContent = "Target";
+		document.body.appendChild(btn);
+		const otherBtn = document.createElement("button");
+		otherBtn.textContent = "Other";
+		document.body.appendChild(otherBtn);
+		inlineSnapshot(500);
+		const staleRefId = btn.getAttribute("data-ref-id")!;
+		btn.remove();
+
+		const result = await dispatchContentScriptCall(
+			"page_click",
+			"click",
+			handlers.click,
+			{ refId: staleRefId },
+		);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_STALE");
+			expect(result.error.details?.staleRefId).toBe(staleRefId);
+			expect(Array.isArray(result.error.details?.candidates)).toBe(true);
+			expect(result.error.details?.candidates.length).toBeGreaterThan(0);
+		}
+	});
+
+	it("fill with stale refId returns E_STALE", async () => {
+		const input = document.createElement("input");
+		input.type = "text";
+		document.body.appendChild(input);
+		inlineSnapshot(500);
+		const staleRefId = input.getAttribute("data-ref-id")!;
+		input.remove();
+
+		const result = await dispatchContentScriptCall(
+			"page_fill",
+			"fill",
+			handlers.fill,
+			{ refId: staleRefId, value: "x" },
+		);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_STALE");
+			expect(result.error.details?.staleRefId).toBe(staleRefId);
+		}
+	});
+
+	it("fill disabled input returns E_NOT_INTERACTABLE", async () => {
+		const input = document.createElement("input");
+		input.setAttribute("data-ref-id", "e98");
+		input.disabled = true;
+		document.body.appendChild(input);
+
+		const result = await dispatchContentScriptCall(
+			"page_fill",
+			"fill",
+			handlers.fill,
+			{ refId: "e98", value: "hello" },
+		);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_NOT_INTERACTABLE");
+			expect(result.error.message).toContain("fill");
+		}
+		document.body.removeChild(input);
+	});
+
+	it("click disabled element returns E_NOT_INTERACTABLE", async () => {
+		const btn = document.createElement("button");
+		btn.setAttribute("data-ref-id", "e99");
+		btn.textContent = "Disabled";
+		btn.disabled = true;
+		document.body.appendChild(btn);
+
+		const result = await dispatchContentScriptCall(
+			"page_click",
+			"click",
+			handlers.click,
+			{ refId: "e99" },
+		);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_NOT_INTERACTABLE");
+			expect(result.error.message).toContain("click");
+		}
+		document.body.removeChild(btn);
+	});
+
+	it("click on aria-disabled element returns E_NOT_INTERACTABLE", async () => {
+		document.body.innerHTML = `<button aria-disabled="true" data-ref-id="e1">Click</button>`;
+		const result = await dispatchContentScriptCall(
+			"page_click",
+			"click",
+			handlers.click,
+			{ refId: "e1" },
+		);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_NOT_INTERACTABLE");
+		}
+	});
+
+	it("find by non-existent label returns label-not-found error", async () => {
+		const result = await dispatchContentScriptCall(
+			"page_click",
+			"click",
+			handlers.click,
+			{ label: "NonExistentLabelXYZ" },
+		);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_NOT_FOUND");
+			expect(result.error.message).toContain("NonExistentLabelXYZ");
+		}
+	});
+
 	it.each([
 		["down", { top: 300, left: 0 }],
 		["up", { top: -300, left: 0 }],
@@ -477,7 +593,7 @@ describe("stale refId errors", () => {
 		document.body.removeChild(select);
 	});
 
-	it("find returns matching elements", async () => {
+	it("find returns matching elements with refId and role", async () => {
 		document.body.innerHTML = "<h1>Title</h1>";
 		const result = await dispatchContentScriptCall(
 			"page_find",
@@ -487,9 +603,11 @@ describe("stale refId errors", () => {
 		);
 		expect(result.ok).toBe(true);
 		if (result.ok) {
-			expect(result.value).toEqual([
-				{ tag: "H1", refId: null, text: "Title" },
-			]);
+			expect(result.value).toHaveLength(1);
+			expect(result.value[0].tag).toBe("h1");
+			expect(result.value[0].refId).toMatch(/^e\d+$/);
+			expect(result.value[0].text).toBe("Title");
+			expect(result.value[0].role).toBe("heading");
 		}
 	});
 

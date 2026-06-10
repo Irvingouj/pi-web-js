@@ -7,7 +7,7 @@ export default defineConfig({
 	workers: 1,
 	webServer: {
 		command: "node ../scripts/serve-testcases.mjs",
-		url: "http://127.0.0.1:9292/testcases/simple-form-1/",
+		url: "http://127.0.0.1:9292/testcases/dynamic-feed/",
 		reuseExistingServer: !process.env.CI,
 		timeout: 30_000,
 	},

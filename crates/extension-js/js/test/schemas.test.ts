@@ -1,10 +1,21 @@
-// @vitest-environment node
+// @vitest-environment jsdom
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
 	PageActionResultSchema,
 	MutationReturnSchema,
+	FetchParamsSchema,
+	PageFillParamsSchema,
+	FsWriteParamsSchema,
 } from "../src/shared/schemas.js";
+import {
+	dispatchContentScriptCall,
+	registerContentScriptSpec,
+} from "../src/content-script/registry.js";
+import {
+	extensionDispatch,
+	registerWorkerHandlerValidated,
+} from "../src/worker/worker.js";
 
 describe("PageActionResultSchema", () => {
 	it("parses a valid structured result", () => {
@@ -88,5 +99,224 @@ describe("MutationReturnSchema", () => {
 			action: "page_fill",
 		});
 		expect(result.success).toBe(false);
+	});
+});
+
+describe("invalid parameter shapes produce E_INVALID_PARAMS (T-018)", () => {
+	it("fetch rejects null params", () => {
+		const result = FetchParamsSchema.safeParse(null);
+		expect(result.success).toBe(false);
+		if (!result.success) {
+			expect(result.error.issues.length).toBeGreaterThan(0);
+		}
+	});
+
+	it("fetch rejects string instead of object", () => {
+		const result = FetchParamsSchema.safeParse("http://example.com");
+		expect(result.success).toBe(false);
+		if (!result.success) {
+			expect(result.error.issues.some((i) => i.path.length === 0)).toBe(true);
+		}
+	});
+
+	it("fetch rejects missing url", () => {
+		const result = FetchParamsSchema.safeParse({ method: "GET" });
+		expect(result.success).toBe(false);
+		if (!result.success) {
+			expect(result.error.issues.some((i) => i.path.includes("url"))).toBe(true);
+		}
+	});
+
+	it("fill rejects positional string", () => {
+		const result = PageFillParamsSchema.safeParse("e2");
+		expect(result.success).toBe(false);
+		if (!result.success) {
+			expect(result.error.issues.length).toBeGreaterThan(0);
+		}
+	});
+
+	it("fill rejects positional number", () => {
+		const result = PageFillParamsSchema.safeParse(42);
+		expect(result.success).toBe(false);
+		if (!result.success) {
+			expect(result.error.issues.length).toBeGreaterThan(0);
+		}
+	});
+
+	it("fill rejects missing refId and label", () => {
+		const result = PageFillParamsSchema.safeParse({ value: "hello" });
+		expect(result.success).toBe(false);
+		if (!result.success) {
+			expect(result.error.issues.some((i) => i.message.includes("refId or label"))).toBe(true);
+		}
+	});
+
+	it("fs.writeBase64 rejects null params", () => {
+		const result = FsWriteParamsSchema.safeParse(null);
+		expect(result.success).toBe(false);
+		if (!result.success) {
+			expect(result.error.issues.length).toBeGreaterThan(0);
+		}
+	});
+
+	it("fs.writeBase64 rejects missing path", () => {
+		const result = FsWriteParamsSchema.safeParse({ data: "base64data" });
+		expect(result.success).toBe(false);
+		if (!result.success) {
+			expect(result.error.issues.some((i) => i.path.includes("path"))).toBe(true);
+		}
+	});
+
+	it("fs.writeBase64 rejects missing data", () => {
+		const result = FsWriteParamsSchema.safeParse({ path: "/tmp/file.jpg" });
+		expect(result.success).toBe(false);
+		if (!result.success) {
+			expect(result.error.issues.some((i) => i.path.includes("data"))).toBe(true);
+		}
+	});
+
+	it("fs.writeBase64 rejects string instead of object", () => {
+		const result = FsWriteParamsSchema.safeParse("/tmp/file.jpg");
+		expect(result.success).toBe(false);
+		if (!result.success) {
+			expect(result.error.issues.some((i) => i.path.length === 0)).toBe(true);
+		}
+	});
+});
+
+describe("invalid parameter shapes produce E_INVALID_PARAMS through real dispatch path (T-018 integration)", () => {
+	it("page_fetch via dispatchContentScriptCall rejects null params with E_INVALID_PARAMS", async () => {
+		registerContentScriptSpec({
+			registryAction: "page_fetch",
+			handlerKey: "fetch",
+			params: FetchParamsSchema,
+			returns: PageActionResultSchema,
+		});
+
+		const result = await dispatchContentScriptCall(
+			"page_fetch",
+			"fetch",
+			async () => ({ ok: true, action: "page_fetch" }),
+			null,
+		);
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_INVALID_PARAMS");
+			expect(result.error.message).toContain("Invalid parameters for page_fetch");
+		}
+	});
+
+	it("page_fetch via dispatchContentScriptCall rejects missing url with E_INVALID_PARAMS", async () => {
+		registerContentScriptSpec({
+			registryAction: "page_fetch_missing_url",
+			handlerKey: "fetch",
+			params: FetchParamsSchema,
+			returns: PageActionResultSchema,
+		});
+
+		const result = await dispatchContentScriptCall(
+			"page_fetch_missing_url",
+			"fetch",
+			async () => ({ ok: true, action: "page_fetch" }),
+			{ method: "GET" },
+		);
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_INVALID_PARAMS");
+			expect(result.error.message).toContain("url");
+		}
+	});
+
+	it("page_fetch via dispatchContentScriptCall preserves options field", async () => {
+		registerContentScriptSpec({
+			registryAction: "page_fetch_options",
+			handlerKey: "fetch",
+			params: FetchParamsSchema,
+			returns: PageActionResultSchema,
+		});
+
+		const handler = vi.fn(async () => ({ ok: true, action: "page_fetch" }));
+
+		const result = await dispatchContentScriptCall(
+			"page_fetch_options",
+			"fetch",
+			handler,
+			{
+				url: "https://example.com",
+				options: { method: "POST", headers: { "X-Custom": "value" }, body: "data" },
+			},
+		);
+
+		expect(result.ok).toBe(true);
+		expect(handler).toHaveBeenCalled();
+		const validatedParams = handler.mock.calls[0][0] as Record<string, unknown>;
+		expect(validatedParams.url).toBe("https://example.com");
+		expect(validatedParams.options).toEqual({
+			method: "POST",
+			headers: { "X-Custom": "value" },
+			body: "data",
+		});
+	});
+
+	it("fs_write_base64 via extensionDispatch rejects null params with E_INVALID_PARAMS", async () => {
+		registerWorkerHandlerValidated(
+			"fs_write_base64",
+			FsWriteParamsSchema,
+			async () => ({ path: "/tmp/file.jpg", bytes_written: 100 }),
+		);
+
+		const result = await extensionDispatch(null, { action: "fs_write_base64" });
+
+		expect(result).toEqual({
+			ok: false,
+			error: {
+				message: expect.stringContaining("Invalid parameters for fs_write_base64"),
+				code: "E_INVALID_PARAMS",
+			},
+		});
+	});
+
+	it("fs_write_base64 via extensionDispatch rejects missing path with E_INVALID_PARAMS", async () => {
+		registerWorkerHandlerValidated(
+			"fs_write_base64_missing_path",
+			FsWriteParamsSchema,
+			async () => ({ path: "/tmp/file.jpg", bytes_written: 100 }),
+		);
+
+		const result = await extensionDispatch(
+			{ data: "base64data" },
+			{ action: "fs_write_base64_missing_path" },
+		);
+
+		expect(result).toEqual({
+			ok: false,
+			error: {
+				message: expect.stringContaining("path"),
+				code: "E_INVALID_PARAMS",
+			},
+		});
+	});
+
+	it("fs_write_base64 via extensionDispatch rejects missing data with E_INVALID_PARAMS", async () => {
+		registerWorkerHandlerValidated(
+			"fs_write_base64_missing_data",
+			FsWriteParamsSchema,
+			async () => ({ path: "/tmp/file.jpg", bytes_written: 100 }),
+		);
+
+		const result = await extensionDispatch(
+			{ path: "/tmp/file.jpg" },
+			{ action: "fs_write_base64_missing_data" },
+		);
+
+		expect(result).toEqual({
+			ok: false,
+			error: {
+				message: expect.stringContaining("data"),
+				code: "E_INVALID_PARAMS",
+			},
+		});
 	});
 });

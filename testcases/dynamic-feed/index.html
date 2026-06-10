@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dynamic Feed</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0; padding: 1rem; background: #f5f5f5; }
+    .feed { display: grid; gap: 1rem; max-width: 800px; margin: 0 auto; }
+    article { background: #fff; border-radius: 8px; padding: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    article img { width: 100%; height: 180px; object-fit: cover; border-radius: 4px; display: block; }
+    article h2 { margin: 0.5rem 0 0.25rem; font-size: 1.1rem; }
+    article a { color: #0066cc; text-decoration: none; }
+    article a:hover { text-decoration: underline; }
+    article p { margin: 0.25rem 0 0; color: #555; font-size: 0.9rem; }
+    #rerender-btn { margin: 1rem auto; display: block; padding: 0.5rem 1rem; font-size: 1rem; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>Dynamic Feed</h1>
+  <button id="rerender-btn">Rerender Feed</button>
+  <div class="feed" id="feed">
+    <article data-post-id="post-001">
+      <img src="http://127.0.0.1:9292/testcases/media-download/assets/photo.jpg" alt="Sunset over mountains" />
+      <h2><a href="http://127.0.0.1:9292/testcases/dynamic-feed/post-001.html">First Post</a></h2>
+      <p>A beautiful sunset captured in the hills.</p>
+    </article>
+    <article data-post-id="post-002">
+      <img src="http://127.0.0.1:9292/testcases/media-download/assets/photo.jpg" alt="City skyline at night" />
+      <h2><a href="http://127.0.0.1:9292/testcases/dynamic-feed/post-002.html">Second Post</a></h2>
+      <p>The city lights reflecting off the river.</p>
+    </article>
+    <article data-post-id="post-003">
+      <img src="http://127.0.0.1:9292/testcases/media-download/assets/photo.jpg" alt="Forest trail in autumn" />
+      <h2><a href="http://127.0.0.1:9292/testcases/dynamic-feed/post-003.html">Third Post</a></h2>
+      <p>Golden leaves covering the winding path.</p>
+    </article>
+    <article data-post-id="post-004">
+      <img src="http://127.0.0.1:9292/testcases/media-download/assets/photo.jpg" alt="Ocean waves crashing" />
+      <h2><a href="http://127.0.0.1:9292/testcases/dynamic-feed/post-004.html">Fourth Post</a></h2>
+      <p>Powerful waves hitting the rocky shore.</p>
+    </article>
+    <article data-post-id="post-005">
+      <img src="http://127.0.0.1:9292/testcases/media-download/assets/photo.jpg" alt="Snowy mountain peak" />
+      <h2><a href="http://127.0.0.1:9292/testcases/dynamic-feed/post-005.html">Fifth Post</a></h2>
+      <p>Fresh powder on the summit at dawn.</p>
+    </article>
+    <article data-post-id="post-006">
+      <img src="http://127.0.0.1:9292/testcases/media-download/assets/photo.jpg" alt="Desert dunes at noon" />
+      <h2><a href="http://127.0.0.1:9292/testcases/dynamic-feed/post-006.html">Sixth Post</a></h2>
+      <p>Endless sand stretching to the horizon.</p>
+    </article>
+    <article data-post-id="post-007">
+      <img src="http://127.0.0.1:9292/testcases/media-download/assets/photo.jpg" alt="Tropical waterfall" />
+      <h2><a href="http://127.0.0.1:9292/testcases/dynamic-feed/post-007.html">Seventh Post</a></h2>
+      <p>Crystal clear water falling into the pool.</p>
+    </article>
+    <article data-post-id="post-008">
+      <img src="http://127.0.0.1:9292/testcases/media-download/assets/photo.jpg" alt="Northern lights display" />
+      <h2><a href="http://127.0.0.1:9292/testcases/dynamic-feed/post-008.html">Eighth Post</a></h2>
+      <p>Aurora borealis dancing across the sky.</p>
+    </article>
+    <article data-post-id="post-009">
+      <img src="http://127.0.0.1:9292/testcases/media-download/assets/photo.jpg" alt="Cherry blossom trees" />
+      <h2><a href="http://127.0.0.1:9292/testcases/dynamic-feed/post-009.html">Ninth Post</a></h2>
+      <p>Pink petals floating on the spring breeze.</p>
+    </article>
+    <article data-post-id="post-010">
+      <img src="http://127.0.0.1:9292/testcases/media-download/assets/photo.jpg" alt="Lighthouse on cliff" />
+      <h2><a href="http://127.0.0.1:9292/testcases/dynamic-feed/post-010.html">Tenth Post</a></h2>
+      <p>Guiding light standing against the storm.</p>
+    </article>
+    <article data-post-id="post-011">
+      <img src="http://127.0.0.1:9292/testcases/media-download/assets/photo.jpg" alt="Hot air balloons at sunrise" />
+      <h2><a href="http://127.0.0.1:9292/testcases/dynamic-feed/post-011.html">Eleventh Post</a></h2>
+      <p>Colorful balloons rising with the morning sun.</p>
+    </article>
+    <article data-post-id="post-012">
+      <img src="http://127.0.0.1:9292/testcases/media-download/assets/photo.jpg" alt="Underwater coral reef" />
+      <h2><a href="http://127.0.0.1:9292/testcases/dynamic-feed/post-012.html">Twelfth Post</a></h2>
+      <p>Vibrant marine life in the shallow lagoon.</p>
+    </article>
+  </div>
+  <script>
+    (function() {
+      const feed = document.getElementById('feed');
+      const btn = document.getElementById('rerender-btn');
+
+      function readFeedData() {
+        const articles = Array.from(feed.querySelectorAll('article'));
+        return articles.map(function(article) {
+          const img = article.querySelector('img');
+          const link = article.querySelector('h2 a');
+          const p = article.querySelector('p');
+          return {
+            postId: article.getAttribute('data-post-id'),
+            imgSrc: img ? img.src : '',
+            imgAlt: img ? img.alt : '',
+            href: link ? link.href : '',
+            title: link ? link.textContent : '',
+            text: p ? p.textContent : ''
+          };
+        });
+      }
+
+      function renderFeed(data) {
+        feed.removeAttribute('data-rerender-complete');
+        feed.innerHTML = '';
+
+        for (const post of data) {
+          const article = document.createElement('article');
+          article.setAttribute('data-post-id', post.postId);
+
+          const img = document.createElement('img');
+          img.src = post.imgSrc;
+          img.alt = post.imgAlt;
+
+          const h2 = document.createElement('h2');
+          const a = document.createElement('a');
+          a.href = post.href;
+          a.textContent = post.title;
+          h2.appendChild(a);
+
+          const p = document.createElement('p');
+          p.textContent = post.text;
+
+          article.appendChild(img);
+          article.appendChild(h2);
+          article.appendChild(p);
+
+          feed.appendChild(article);
+        }
+
+        window.scrollTo(0, document.body.scrollHeight);
+        feed.setAttribute('data-rerender-complete', 'true');
+      }
+
+      btn.addEventListener('click', function() {
+        const data = readFeedData();
+        renderFeed(data);
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -21,6 +21,10 @@ export type FetchValue = {
 	ok: boolean;
 	headers: Record<string, string>;
 	body: string;
+	bodyEncoding: "text" | "base64";
+	byteLength: number;
+	contentType: string;
+	finalUrl: string;
 };
 
 export type DomSnapshotValue = {

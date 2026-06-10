@@ -21,6 +21,18 @@ export {
 	type StaleRefCandidate,
 };
 
+function extractErrorDetails(err: unknown): { name?: string; stack?: string; line?: number } {
+	if (!(err instanceof Error)) return {};
+	const name = err.name !== "Error" ? err.name : undefined;
+	const stack = err.stack;
+	let line: number | undefined;
+	if (stack) {
+		const match = stack.match(/:(\d+):\d+\)?$/m);
+		if (match) line = parseInt(match[1], 10);
+	}
+	return { name, stack, line };
+}
+
 export function normalizeAgentError(
 	err: unknown,
 	context?: { tabId?: number; url?: string; action?: string },
@@ -37,38 +49,29 @@ export function normalizeAgentError(
 		if (existing.hint || existing.recovery) {
 			return existing;
 		}
-		if (existing.code === "E_CONTENT_SCRIPT" && context?.tabId != null) {
-			return contentScriptMissingError(context.tabId, context.url ?? "");
+		if (existing.code === "E_CONTENT_SCRIPT") {
+			return contentScriptMissingError(context?.tabId, context?.url);
 		}
 		return existing;
 	}
 
 	const msg = (err instanceof Error ? err.message : String(err)) || "";
+	const { name, stack, line } = extractErrorDetails(err);
 
 	if (isContentScriptConnectionError(msg)) {
-		if (context?.tabId != null) {
-			return contentScriptMissingError(context.tabId, context.url ?? "");
-		}
-		return {
-			message: "Content script is not connected on this tab.",
-			code: "E_CONTENT_SCRIPT",
-			category: "content-script",
-			hint:
-				"Content script is not connected on this tab. " +
-				"This tab was likely open before the extension loaded (MV3 does not retro-inject).",
-			recovery: [
-				`await page.goto(${JSON.stringify(context?.url ?? "")})`,
-				"Or ask the user to refresh the target tab, then retry fill/click",
-			],
-		};
+		return contentScriptMissingError(context?.tabId, context?.url);
 	}
 
 	if (msg.includes("permission") || msg.includes("Permission")) {
-		return {
+		const error: AsyncError = {
 			message: msg,
 			code: "E_PERMISSION",
 			category: "permission",
 		};
+		if (name || stack || line) {
+			error.details = { name, stack, line };
+		}
+		return error;
 	}
 
 	if (
@@ -76,18 +79,26 @@ export function normalizeAgentError(
 		msg.includes("No tab") ||
 		msg.includes("No active tab")
 	) {
-		return {
+		const error: AsyncError = {
 			message: msg,
 			code: "E_NOT_FOUND",
 			category: "resource",
 		};
+		if (name || stack || line) {
+			error.details = { name, stack, line };
+		}
+		return error;
 	}
 
-	return {
+	const error: AsyncError = {
 		message: msg,
 		code: "E_EXTENSION",
 		category: "extension",
 	};
+	if (name || stack || line) {
+		error.details = { name, stack, line };
+	}
+	return error;
 }
 
 export function agentErrorResponse(

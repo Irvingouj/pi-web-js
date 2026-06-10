@@ -13,6 +13,10 @@ fn wasm_to_core(resp: WasmAsyncResponse) -> web_js_core::AsyncResponse {
         error: resp.error.map(|e| web_js_core::AsyncError {
             message: e.message,
             code: e.code,
+            category: e.category,
+            hint: e.hint,
+            recovery: e.recovery,
+            details: e.details,
         }),
     }
 }
@@ -69,10 +73,7 @@ fn no_window_response() -> WasmAsyncResponse {
     WasmAsyncResponse {
         ok: false,
         value: None,
-        error: Some(WasmAsyncError {
-            message: "DOM APIs not available in this context".into(),
-            code: "E_NO_WINDOW".into(),
-        }),
+        error: Some(WasmAsyncError::new("DOM APIs not available in this context", "E_NO_WINDOW")),
     }
 }
 
@@ -126,10 +127,7 @@ async fn resolve_ref_id_or_selector(
         return Err(WasmAsyncResponse {
             ok: false,
             value: None,
-            error: Some(WasmAsyncError {
-                message: format!("No element matching: {}", sel_str),
-                code: "E_AGENT".into(),
-            }),
+            error: Some(WasmAsyncError::new(format!("No element matching: {}", sel_str), "E_AGENT")),
         });
     }
     Ok(ref_id.to_string())
@@ -178,10 +176,7 @@ pub async fn execute_fetch(params: FetchParams) -> WasmAsyncResponse {
                 return WasmAsyncResponse {
                     ok: false,
                     value: None,
-                    error: Some(WasmAsyncError {
-                        message: "Failed to create Headers object".into(),
-                        code: "E_HEADERS".into(),
-                    }),
+                    error: Some(WasmAsyncError::new("Failed to create Headers object", "E_HEADERS")),
                 }
             }
         };
@@ -230,10 +225,7 @@ pub async fn execute_fetch(params: FetchParams) -> WasmAsyncResponse {
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: format!("Invalid request: {:?}", e),
-                    code: "E_BAD_REQUEST".into(),
-                }),
+                error: Some(WasmAsyncError::new(format!("Invalid request: {:?}", e), "E_BAD_REQUEST")),
             };
         }
     };
@@ -250,14 +242,14 @@ pub async fn execute_fetch(params: FetchParams) -> WasmAsyncResponse {
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: msg,
-                    code: if is_timeout {
-                        "ETIMEDOUT".into()
+                error: Some(WasmAsyncError::new(
+                    msg,
+                    if is_timeout {
+                        "ETIMEDOUT"
                     } else {
                         "ENETWORK".into()
                     },
-                }),
+                )),
             };
         }
     };
@@ -268,10 +260,7 @@ pub async fn execute_fetch(params: FetchParams) -> WasmAsyncResponse {
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: "Invalid response from fetch".into(),
-                    code: "E_RESPONSE".into(),
-                }),
+                error: Some(WasmAsyncError::new("Invalid response from fetch", "E_RESPONSE")),
             };
         }
     };
@@ -364,19 +353,13 @@ pub async fn execute_storage_get(params: StorageGetParams) -> WasmAsyncResponse 
             Err(e) => WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: format!("{:?}", e),
-                    code: "E_STORAGE".into(),
-                }),
+                error: Some(WasmAsyncError::new(format!("{:?}", e), "E_STORAGE")),
             },
         },
         Err(e) => WasmAsyncResponse {
             ok: false,
             value: None,
-            error: Some(WasmAsyncError {
-                message: e,
-                code: "E_STORAGE".into(),
-            }),
+            error: Some(WasmAsyncError::new(e, "E_STORAGE")),
         },
     }
 }
@@ -392,19 +375,13 @@ pub async fn execute_storage_set(params: StorageSetParams) -> WasmAsyncResponse 
             Err(e) => WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: format!("{:?}", e),
-                    code: "E_STORAGE".into(),
-                }),
+                error: Some(WasmAsyncError::new(format!("{:?}", e), "E_STORAGE")),
             },
         },
         Err(e) => WasmAsyncResponse {
             ok: false,
             value: None,
-            error: Some(WasmAsyncError {
-                message: e,
-                code: "E_STORAGE".into(),
-            }),
+            error: Some(WasmAsyncError::new(e, "E_STORAGE")),
         },
     }
 }
@@ -420,19 +397,13 @@ pub async fn execute_storage_delete(params: StorageDeleteParams) -> WasmAsyncRes
             Err(e) => WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: format!("{:?}", e),
-                    code: "E_STORAGE".into(),
-                }),
+                error: Some(WasmAsyncError::new(format!("{:?}", e), "E_STORAGE")),
             },
         },
         Err(e) => WasmAsyncResponse {
             ok: false,
             value: None,
-            error: Some(WasmAsyncError {
-                message: e,
-                code: "E_STORAGE".into(),
-            }),
+            error: Some(WasmAsyncError::new(e, "E_STORAGE")),
         },
     }
 }
@@ -446,10 +417,7 @@ pub async fn execute_host_call(_action: &str, params: serde_json::Value) -> Wasm
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: "host.call requires an action name".into(),
-                    code: "E_HOST_NO_ACTION".into(),
-                }),
+                error: Some(WasmAsyncError::new("host.call requires an action name", "E_HOST_NO_ACTION")),
             };
         }
     };
@@ -464,10 +432,7 @@ pub async fn execute_host_call(_action: &str, params: serde_json::Value) -> Wasm
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: "No window available".into(),
-                    code: "E_HOST".into(),
-                }),
+                error: Some(WasmAsyncError::new("No window available", "E_HOST")),
             }
         }
     };
@@ -478,10 +443,7 @@ pub async fn execute_host_call(_action: &str, params: serde_json::Value) -> Wasm
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: format!("No handler registered for '{}'", handler_name),
-                    code: "E_HOST_NO_HANDLER".into(),
-                }),
+                error: Some(WasmAsyncError::new(format!("No handler registered for '{}'", handler_name), "E_HOST_NO_HANDLER")),
             }
         }
     };
@@ -491,10 +453,7 @@ pub async fn execute_host_call(_action: &str, params: serde_json::Value) -> Wasm
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: format!("No handler registered for '{}'", handler_name),
-                    code: "E_HOST_NO_HANDLER".into(),
-                }),
+                error: Some(WasmAsyncError::new(format!("No handler registered for '{}'", handler_name), "E_HOST_NO_HANDLER")),
             }
         }
     };
@@ -507,10 +466,7 @@ pub async fn execute_host_call(_action: &str, params: serde_json::Value) -> Wasm
         return WasmAsyncResponse {
             ok: false,
             value: None,
-            error: Some(WasmAsyncError {
-                message: format!("Action '{}' is not whitelisted", handler_name),
-                code: "E_NOT_WHITELISTED".into(),
-            }),
+            error: Some(WasmAsyncError::new(format!("Action '{}' is not whitelisted", handler_name), "E_NOT_WHITELISTED")),
         };
     }
 
@@ -520,10 +476,7 @@ pub async fn execute_host_call(_action: &str, params: serde_json::Value) -> Wasm
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: format!("No handler registered for '{}'", handler_name),
-                    code: "E_HOST_NO_HANDLER".into(),
-                }),
+                error: Some(WasmAsyncError::new(format!("No handler registered for '{}'", handler_name), "E_HOST_NO_HANDLER")),
             }
         }
     };
@@ -536,10 +489,7 @@ pub async fn execute_host_call(_action: &str, params: serde_json::Value) -> Wasm
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: format!("Failed to serialize params: {}", e),
-                    code: "E_HOST".into(),
-                }),
+                error: Some(WasmAsyncError::new(format!("Failed to serialize params: {}", e), "E_HOST")),
             }
         }
     };
@@ -549,10 +499,7 @@ pub async fn execute_host_call(_action: &str, params: serde_json::Value) -> Wasm
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: format!("Failed to parse params JSON: {:?}", e),
-                    code: "E_HOST".into(),
-                }),
+                error: Some(WasmAsyncError::new(format!("Failed to parse params JSON: {:?}", e), "E_HOST")),
             }
         }
     };
@@ -567,10 +514,7 @@ pub async fn execute_host_call(_action: &str, params: serde_json::Value) -> Wasm
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: msg,
-                    code: "E_HOST".into(),
-                }),
+                error: Some(WasmAsyncError::new(msg, "E_HOST")),
             };
         }
     };
@@ -587,10 +531,7 @@ pub async fn execute_host_call(_action: &str, params: serde_json::Value) -> Wasm
                 return WasmAsyncResponse {
                     ok: false,
                     value: None,
-                    error: Some(WasmAsyncError {
-                        message: msg,
-                        code: "E_HOST".into(),
-                    }),
+                    error: Some(WasmAsyncError::new(msg, "E_HOST")),
                 };
             }
         }
@@ -638,10 +579,7 @@ pub fn execute_dom_snapshot(params: DomSnapshotParams) -> WasmAsyncResponse {
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: "Failed to serialize snapshot data".into(),
-                    code: "E_SNAPSHOT".into(),
-                }),
+                error: Some(WasmAsyncError::new("Failed to serialize snapshot data", "E_SNAPSHOT")),
             }
         }
     };
@@ -667,10 +605,7 @@ pub fn execute_dom_format(params: DomFormatParams) -> WasmAsyncResponse {
                 return WasmAsyncResponse {
                     ok: false,
                     value: None,
-                    error: Some(WasmAsyncError {
-                        message: "Failed to parse snapshot for formatting".into(),
-                        code: "E_FORMAT".into(),
-                    }),
+                    error: Some(WasmAsyncError::new("Failed to parse snapshot for formatting", "E_FORMAT")),
                 }
             }
         };
@@ -698,10 +633,7 @@ pub async fn execute_page_url(_params: EmptyParams) -> WasmAsyncResponse {
         Err(e) => WasmAsyncResponse {
             ok: false,
             value: None,
-            error: Some(WasmAsyncError {
-                message: format!("{:?}", e),
-                code: "E_AGENT".into(),
-            }),
+            error: Some(WasmAsyncError::new(format!("{:?}", e), "E_AGENT")),
         },
     }
 }
@@ -713,10 +645,7 @@ pub async fn execute_page_title(_params: EmptyParams) -> WasmAsyncResponse {
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: "No document available".into(),
-                    code: "E_AGENT".into(),
-                }),
+                error: Some(WasmAsyncError::new("No document available", "E_AGENT")),
             }
         }
     };
@@ -741,10 +670,7 @@ pub async fn execute_page_goto(params: PageGotoParams) -> WasmAsyncResponse {
         Err(e) => WasmAsyncResponse {
             ok: false,
             value: None,
-            error: Some(WasmAsyncError {
-                message: format!("{:?}", e),
-                code: "E_AGENT".into(),
-            }),
+            error: Some(WasmAsyncError::new(format!("{:?}", e), "E_AGENT")),
         },
     }
 }
@@ -764,19 +690,13 @@ pub async fn execute_page_back(_params: EmptyParams) -> WasmAsyncResponse {
             Err(msg) => WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: msg,
-                    code: "E_AGENT".into(),
-                }),
+                error: Some(WasmAsyncError::new(msg, "E_AGENT")),
             },
         },
         Err(msg) => WasmAsyncResponse {
             ok: false,
             value: None,
-            error: Some(WasmAsyncError {
-                message: msg,
-                code: "E_AGENT".into(),
-            }),
+            error: Some(WasmAsyncError::new(msg, "E_AGENT")),
         },
     }
 }
@@ -796,19 +716,13 @@ pub async fn execute_page_forward(_params: EmptyParams) -> WasmAsyncResponse {
             Err(msg) => WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: msg,
-                    code: "E_AGENT".into(),
-                }),
+                error: Some(WasmAsyncError::new(msg, "E_AGENT")),
             },
         },
         Err(msg) => WasmAsyncResponse {
             ok: false,
             value: None,
-            error: Some(WasmAsyncError {
-                message: msg,
-                code: "E_AGENT".into(),
-            }),
+            error: Some(WasmAsyncError::new(msg, "E_AGENT")),
         },
     }
 }
@@ -827,10 +741,7 @@ pub async fn execute_page_reload(_params: EmptyParams) -> WasmAsyncResponse {
         Err(e) => WasmAsyncResponse {
             ok: false,
             value: None,
-            error: Some(WasmAsyncError {
-                message: format!("{:?}", e),
-                code: "E_AGENT".into(),
-            }),
+            error: Some(WasmAsyncError::new(format!("{:?}", e), "E_AGENT")),
         },
     }
 }
@@ -842,10 +753,7 @@ pub async fn execute_page_click(params: PageClickParams) -> WasmAsyncResponse {
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: "No document available".into(),
-                    code: "E_AGENT".into(),
-                }),
+                error: Some(WasmAsyncError::new("No document available", "E_AGENT")),
             }
         }
     };
@@ -863,10 +771,7 @@ pub async fn execute_page_click(params: PageClickParams) -> WasmAsyncResponse {
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: format!("{:?}", e),
-                    code: "E_AGENT".into(),
-                }),
+                error: Some(WasmAsyncError::new(format!("{:?}", e), "E_AGENT")),
             }
         }
     };
@@ -877,10 +782,7 @@ pub async fn execute_page_click(params: PageClickParams) -> WasmAsyncResponse {
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: format!("Element with ref_id '{}' not found", ref_id),
-                    code: "E_AGENT".into(),
-                }),
+                error: Some(WasmAsyncError::new(format!("Element with ref_id '{}' not found", ref_id), "E_AGENT")),
             }
         }
     };
@@ -896,10 +798,7 @@ pub async fn execute_page_click(params: PageClickParams) -> WasmAsyncResponse {
         None => WasmAsyncResponse {
             ok: false,
             value: None,
-            error: Some(WasmAsyncError {
-                message: "Element is not clickable".into(),
-                code: "E_AGENT".into(),
-            }),
+            error: Some(WasmAsyncError::new("Element is not clickable", "E_AGENT")),
         },
     }
 }
@@ -911,10 +810,7 @@ pub async fn execute_page_fill(params: PageFillParams) -> WasmAsyncResponse {
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: "No document available".into(),
-                    code: "E_AGENT".into(),
-                }),
+                error: Some(WasmAsyncError::new("No document available", "E_AGENT")),
             }
         }
     };
@@ -932,10 +828,7 @@ pub async fn execute_page_fill(params: PageFillParams) -> WasmAsyncResponse {
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: format!("{:?}", e),
-                    code: "E_AGENT".into(),
-                }),
+                error: Some(WasmAsyncError::new(format!("{:?}", e), "E_AGENT")),
             }
         }
     };
@@ -946,10 +839,7 @@ pub async fn execute_page_fill(params: PageFillParams) -> WasmAsyncResponse {
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: format!("Element with ref_id '{}' not found", ref_id),
-                    code: "E_AGENT".into(),
-                }),
+                error: Some(WasmAsyncError::new(format!("Element with ref_id '{}' not found", ref_id), "E_AGENT")),
             }
         }
     };
@@ -959,10 +849,7 @@ pub async fn execute_page_fill(params: PageFillParams) -> WasmAsyncResponse {
         return WasmAsyncResponse {
             ok: false,
             value: None,
-            error: Some(WasmAsyncError {
-                message: "Element is not an input".into(),
-                code: "E_AGENT".into(),
-            }),
+            error: Some(WasmAsyncError::new("Element is not an input", "E_AGENT")),
         };
     }
     match web_sys::Event::new("input") {
@@ -977,10 +864,7 @@ pub async fn execute_page_fill(params: PageFillParams) -> WasmAsyncResponse {
         Err(e) => WasmAsyncResponse {
             ok: false,
             value: None,
-            error: Some(WasmAsyncError {
-                message: format!("{:?}", e),
-                code: "E_AGENT".into(),
-            }),
+            error: Some(WasmAsyncError::new(format!("{:?}", e), "E_AGENT")),
         },
     }
 }
@@ -992,10 +876,7 @@ pub async fn execute_page_append(params: PageAppendParams) -> WasmAsyncResponse 
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: "No document available".into(),
-                    code: "E_AGENT".into(),
-                }),
+                error: Some(WasmAsyncError::new("No document available", "E_AGENT")),
             }
         }
     };
@@ -1013,10 +894,7 @@ pub async fn execute_page_append(params: PageAppendParams) -> WasmAsyncResponse 
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: format!("{:?}", e),
-                    code: "E_AGENT".into(),
-                }),
+                error: Some(WasmAsyncError::new(format!("{:?}", e), "E_AGENT")),
             }
         }
     };
@@ -1027,10 +905,7 @@ pub async fn execute_page_append(params: PageAppendParams) -> WasmAsyncResponse 
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: format!("Element with ref_id '{}' not found", ref_id),
-                    code: "E_AGENT".into(),
-                }),
+                error: Some(WasmAsyncError::new(format!("Element with ref_id '{}' not found", ref_id), "E_AGENT")),
             }
         }
     };
@@ -1041,10 +916,7 @@ pub async fn execute_page_append(params: PageAppendParams) -> WasmAsyncResponse 
         return WasmAsyncResponse {
             ok: false,
             value: None,
-            error: Some(WasmAsyncError {
-                message: "Element is not an input".into(),
-                code: "E_AGENT".into(),
-            }),
+            error: Some(WasmAsyncError::new("Element is not an input", "E_AGENT")),
         };
     }
     match web_sys::Event::new("input") {
@@ -1059,10 +931,7 @@ pub async fn execute_page_append(params: PageAppendParams) -> WasmAsyncResponse 
         Err(e) => WasmAsyncResponse {
             ok: false,
             value: None,
-            error: Some(WasmAsyncError {
-                message: format!("{:?}", e),
-                code: "E_AGENT".into(),
-            }),
+            error: Some(WasmAsyncError::new(format!("{:?}", e), "E_AGENT")),
         },
     }
 }
@@ -1074,10 +943,7 @@ pub async fn execute_page_hover(params: PageHoverParams) -> WasmAsyncResponse {
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: "No document available".into(),
-                    code: "E_AGENT".into(),
-                }),
+                error: Some(WasmAsyncError::new("No document available", "E_AGENT")),
             }
         }
     };
@@ -1094,10 +960,7 @@ pub async fn execute_page_hover(params: PageHoverParams) -> WasmAsyncResponse {
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: format!("{:?}", e),
-                    code: "E_AGENT".into(),
-                }),
+                error: Some(WasmAsyncError::new(format!("{:?}", e), "E_AGENT")),
             }
         }
     };
@@ -1107,10 +970,7 @@ pub async fn execute_page_hover(params: PageHoverParams) -> WasmAsyncResponse {
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: format!("Element with ref_id '{}' not found", ref_id),
-                    code: "E_AGENT".into(),
-                }),
+                error: Some(WasmAsyncError::new(format!("Element with ref_id '{}' not found", ref_id), "E_AGENT")),
             }
         }
     };
@@ -1123,10 +983,7 @@ pub async fn execute_page_hover(params: PageHoverParams) -> WasmAsyncResponse {
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: format!("{:?}", e),
-                    code: "E_AGENT".into(),
-                }),
+                error: Some(WasmAsyncError::new(format!("{:?}", e), "E_AGENT")),
             }
         }
     };
@@ -1145,10 +1002,7 @@ pub async fn execute_page_unhover(_params: EmptyParams) -> WasmAsyncResponse {
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: "No document available".into(),
-                    code: "E_AGENT".into(),
-                }),
+                error: Some(WasmAsyncError::new("No document available", "E_AGENT")),
             }
         }
     };
@@ -1175,10 +1029,7 @@ pub async fn execute_page_scroll(params: PageScrollParams) -> WasmAsyncResponse 
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: "No window available".into(),
-                    code: "E_AGENT".into(),
-                }),
+                error: Some(WasmAsyncError::new("No window available", "E_AGENT")),
             }
         }
     };
@@ -1210,10 +1061,7 @@ pub async fn execute_page_scroll_to(params: PageScrollToParams) -> WasmAsyncResp
         return WasmAsyncResponse {
             ok: false,
             value: None,
-            error: Some(WasmAsyncError {
-                message: "No window available".into(),
-                code: "E_AGENT".into(),
-            }),
+            error: Some(WasmAsyncError::new("No window available", "E_AGENT")),
         };
     }
 
@@ -1223,10 +1071,7 @@ pub async fn execute_page_scroll_to(params: PageScrollToParams) -> WasmAsyncResp
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: "No document available".into(),
-                    code: "E_AGENT".into(),
-                }),
+                error: Some(WasmAsyncError::new("No document available", "E_AGENT")),
             }
         }
     };
@@ -1244,10 +1089,7 @@ pub async fn execute_page_scroll_to(params: PageScrollToParams) -> WasmAsyncResp
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: format!("{:?}", e),
-                    code: "E_AGENT".into(),
-                }),
+                error: Some(WasmAsyncError::new(format!("{:?}", e), "E_AGENT")),
             }
         }
     };
@@ -1258,10 +1100,7 @@ pub async fn execute_page_scroll_to(params: PageScrollToParams) -> WasmAsyncResp
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: format!("Element with ref_id '{}' not found", ref_id),
-                    code: "E_AGENT".into(),
-                }),
+                error: Some(WasmAsyncError::new(format!("Element with ref_id '{}' not found", ref_id), "E_AGENT")),
             }
         }
     };
@@ -1280,10 +1119,7 @@ pub async fn execute_page_dblclick(params: PageDblClickParams) -> WasmAsyncRespo
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: "No document available".into(),
-                    code: "E_AGENT".into(),
-                }),
+                error: Some(WasmAsyncError::new("No document available", "E_AGENT")),
             }
         }
     };
@@ -1300,10 +1136,7 @@ pub async fn execute_page_dblclick(params: PageDblClickParams) -> WasmAsyncRespo
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: format!("{:?}", e),
-                    code: "E_AGENT".into(),
-                }),
+                error: Some(WasmAsyncError::new(format!("{:?}", e), "E_AGENT")),
             }
         }
     };
@@ -1313,10 +1146,7 @@ pub async fn execute_page_dblclick(params: PageDblClickParams) -> WasmAsyncRespo
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: format!("Element with ref_id '{}' not found", ref_id),
-                    code: "E_AGENT".into(),
-                }),
+                error: Some(WasmAsyncError::new(format!("Element with ref_id '{}' not found", ref_id), "E_AGENT")),
             }
         }
     };
@@ -1329,10 +1159,7 @@ pub async fn execute_page_dblclick(params: PageDblClickParams) -> WasmAsyncRespo
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: format!("{:?}", e),
-                    code: "E_AGENT".into(),
-                }),
+                error: Some(WasmAsyncError::new(format!("{:?}", e), "E_AGENT")),
             }
         }
     };
@@ -1351,10 +1178,7 @@ pub async fn execute_page_type(params: PageTypeParams) -> WasmAsyncResponse {
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: "No document available".into(),
-                    code: "E_AGENT".into(),
-                }),
+                error: Some(WasmAsyncError::new("No document available", "E_AGENT")),
             }
         }
     };
@@ -1371,10 +1195,7 @@ pub async fn execute_page_type(params: PageTypeParams) -> WasmAsyncResponse {
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: format!("{:?}", e),
-                    code: "E_AGENT".into(),
-                }),
+                error: Some(WasmAsyncError::new(format!("{:?}", e), "E_AGENT")),
             }
         }
     };
@@ -1384,10 +1205,7 @@ pub async fn execute_page_type(params: PageTypeParams) -> WasmAsyncResponse {
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: format!("Element with ref_id '{}' not found", ref_id),
-                    code: "E_AGENT".into(),
-                }),
+                error: Some(WasmAsyncError::new(format!("Element with ref_id '{}' not found", ref_id), "E_AGENT")),
             }
         }
     };
@@ -1401,10 +1219,7 @@ pub async fn execute_page_type(params: PageTypeParams) -> WasmAsyncResponse {
         return WasmAsyncResponse {
             ok: false,
             value: None,
-            error: Some(WasmAsyncError {
-                message: "Element is not a text input".into(),
-                code: "E_AGENT".into(),
-            }),
+            error: Some(WasmAsyncError::new("Element is not a text input", "E_AGENT")),
         };
     }
     WasmAsyncResponse {
@@ -1421,10 +1236,7 @@ pub async fn execute_page_press(params: PagePressParams) -> WasmAsyncResponse {
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: "No document available".into(),
-                    code: "E_AGENT".into(),
-                }),
+                error: Some(WasmAsyncError::new("No document available", "E_AGENT")),
             }
         }
     };
@@ -1436,10 +1248,7 @@ pub async fn execute_page_press(params: PagePressParams) -> WasmAsyncResponse {
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: format!("{:?}", e),
-                    code: "E_AGENT".into(),
-                }),
+                error: Some(WasmAsyncError::new(format!("{:?}", e), "E_AGENT")),
             }
         }
     };
@@ -1458,10 +1267,7 @@ pub async fn execute_page_select(params: PageSelectParams) -> WasmAsyncResponse 
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: "No document available".into(),
-                    code: "E_AGENT".into(),
-                }),
+                error: Some(WasmAsyncError::new("No document available", "E_AGENT")),
             }
         }
     };
@@ -1478,10 +1284,7 @@ pub async fn execute_page_select(params: PageSelectParams) -> WasmAsyncResponse 
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: format!("{:?}", e),
-                    code: "E_AGENT".into(),
-                }),
+                error: Some(WasmAsyncError::new(format!("{:?}", e), "E_AGENT")),
             }
         }
     };
@@ -1491,10 +1294,7 @@ pub async fn execute_page_select(params: PageSelectParams) -> WasmAsyncResponse 
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: format!("Element with ref_id '{}' not found", ref_id),
-                    code: "E_AGENT".into(),
-                }),
+                error: Some(WasmAsyncError::new(format!("Element with ref_id '{}' not found", ref_id), "E_AGENT")),
             }
         }
     };
@@ -1504,10 +1304,7 @@ pub async fn execute_page_select(params: PageSelectParams) -> WasmAsyncResponse 
         return WasmAsyncResponse {
             ok: false,
             value: None,
-            error: Some(WasmAsyncError {
-                message: "Element is not a select".into(),
-                code: "E_AGENT".into(),
-            }),
+            error: Some(WasmAsyncError::new("Element is not a select", "E_AGENT")),
         };
     }
     WasmAsyncResponse {
@@ -1524,10 +1321,7 @@ pub async fn execute_page_check(params: PageCheckParams) -> WasmAsyncResponse {
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: "No document available".into(),
-                    code: "E_AGENT".into(),
-                }),
+                error: Some(WasmAsyncError::new("No document available", "E_AGENT")),
             }
         }
     };
@@ -1544,10 +1338,7 @@ pub async fn execute_page_check(params: PageCheckParams) -> WasmAsyncResponse {
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: format!("{:?}", e),
-                    code: "E_AGENT".into(),
-                }),
+                error: Some(WasmAsyncError::new(format!("{:?}", e), "E_AGENT")),
             }
         }
     };
@@ -1557,10 +1348,7 @@ pub async fn execute_page_check(params: PageCheckParams) -> WasmAsyncResponse {
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: format!("Element with ref_id '{}' not found", ref_id),
-                    code: "E_AGENT".into(),
-                }),
+                error: Some(WasmAsyncError::new(format!("Element with ref_id '{}' not found", ref_id), "E_AGENT")),
             }
         }
     };
@@ -1570,10 +1358,7 @@ pub async fn execute_page_check(params: PageCheckParams) -> WasmAsyncResponse {
         return WasmAsyncResponse {
             ok: false,
             value: None,
-            error: Some(WasmAsyncError {
-                message: "Element is not a checkbox".into(),
-                code: "E_AGENT".into(),
-            }),
+            error: Some(WasmAsyncError::new("Element is not a checkbox", "E_AGENT")),
         };
     }
     WasmAsyncResponse {
@@ -1602,10 +1387,7 @@ pub async fn execute_storage_list(_params: EmptyParams) -> WasmAsyncResponse {
         Err(e) => WasmAsyncResponse {
             ok: false,
             value: None,
-            error: Some(WasmAsyncError {
-                message: e,
-                code: "E_STORAGE".into(),
-            }),
+            error: Some(WasmAsyncError::new(e, "E_STORAGE")),
         },
     }
 }
@@ -1613,10 +1395,7 @@ pub async fn execute_storage_list(_params: EmptyParams) -> WasmAsyncResponse {
 // ─── fs.* helpers ───────────────────────────────────────────────
 
 fn fs_err_to_wasm(err: web_fs::FsError) -> WasmAsyncError {
-    WasmAsyncError {
-        message: err.wire_message(),
-        code: err.wire_code().into(),
-    }
+    WasmAsyncError::new(err.wire_message(), err.wire_code())
 }
 
 pub async fn execute_fs_exists(
@@ -1643,10 +1422,7 @@ pub async fn execute_fs_stat(
             Err(e) => WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: format!("Failed to serialize metadata: {}", e),
-                    code: "E_IO".into(),
-                }),
+                error: Some(WasmAsyncError::new(format!("Failed to serialize metadata: {}", e), "E_IO")),
             },
         },
         Err(e) => WasmAsyncResponse {
@@ -1670,10 +1446,7 @@ pub async fn execute_fs_list(
             Err(e) => WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: format!("Failed to serialize entries: {}", e),
-                    code: "E_IO".into(),
-                }),
+                error: Some(WasmAsyncError::new(format!("Failed to serialize entries: {}", e), "E_IO")),
             },
         },
         Err(e) => WasmAsyncResponse {
@@ -1833,10 +1606,7 @@ pub async fn execute_fs_write(
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: "Invalid base64 data".into(),
-                    code: "E_INVALID_ENCODING".into(),
-                }),
+                error: Some(WasmAsyncError::new("Invalid base64 data", "E_INVALID_ENCODING")),
             };
         }
     };
@@ -1897,10 +1667,7 @@ pub async fn execute_fs_append(
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: "Invalid base64 data".into(),
-                    code: "E_INVALID_ENCODING".into(),
-                }),
+                error: Some(WasmAsyncError::new("Invalid base64 data", "E_INVALID_ENCODING")),
             };
         }
     };
@@ -1961,10 +1728,7 @@ pub async fn execute_fs_update(
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: "Invalid base64 data".into(),
-                    code: "E_INVALID_ENCODING".into(),
-                }),
+                error: Some(WasmAsyncError::new("Invalid base64 data", "E_INVALID_ENCODING")),
             };
         }
     };
@@ -2016,10 +1780,7 @@ pub async fn execute_page_find(params: PageFindParams) -> WasmAsyncResponse {
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: "No document available".into(),
-                    code: "E_AGENT".into(),
-                }),
+                error: Some(WasmAsyncError::new("No document available", "E_AGENT")),
             }
         }
     };
@@ -2029,10 +1790,7 @@ pub async fn execute_page_find(params: PageFindParams) -> WasmAsyncResponse {
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: format!("{:?}", e),
-                    code: "E_AGENT".into(),
-                }),
+                error: Some(WasmAsyncError::new(format!("{:?}", e), "E_AGENT")),
             }
         }
     };
@@ -2078,10 +1836,7 @@ pub async fn execute_page_wait_for(params: PageWaitForParams) -> WasmAsyncRespon
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: "No document available".into(),
-                    code: "E_AGENT".into(),
-                }),
+                error: Some(WasmAsyncError::new("No document available", "E_AGENT")),
             }
         }
     };
@@ -2102,10 +1857,7 @@ pub async fn execute_page_wait_for(params: PageWaitForParams) -> WasmAsyncRespon
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: format!("Timeout waiting for selector: {}", params.selector),
-                    code: "E_TIMEOUT".into(),
-                }),
+                error: Some(WasmAsyncError::new(format!("Timeout waiting for selector: {}", params.selector), "E_TIMEOUT")),
             };
         }
         let promise = js_sys::Promise::new(
@@ -2128,10 +1880,7 @@ pub async fn execute_page_extract(params: PageExtractParams) -> WasmAsyncRespons
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError {
-                    message: "No document available".into(),
-                    code: "E_AGENT".into(),
-                }),
+                error: Some(WasmAsyncError::new("No document available", "E_AGENT")),
             }
         }
     };
@@ -2151,10 +1900,7 @@ pub async fn execute_page_extract(params: PageExtractParams) -> WasmAsyncRespons
                         return WasmAsyncResponse {
                             ok: false,
                             value: None,
-                            error: Some(WasmAsyncError {
-                                message: "No window available".into(),
-                                code: "E_AGENT".into(),
-                            }),
+                            error: Some(WasmAsyncError::new("No window available", "E_AGENT")),
                         }
                     }
                 };
@@ -2167,10 +1913,7 @@ pub async fn execute_page_extract(params: PageExtractParams) -> WasmAsyncRespons
                         return WasmAsyncResponse {
                             ok: false,
                             value: None,
-                            error: Some(WasmAsyncError {
-                                message: format!("{:?}", e),
-                                code: "E_AGENT".into(),
-                            }),
+                            error: Some(WasmAsyncError::new(format!("{:?}", e), "E_AGENT")),
                         }
                     }
                 };
@@ -2194,10 +1937,7 @@ pub async fn execute_page_extract(params: PageExtractParams) -> WasmAsyncRespons
                         return WasmAsyncResponse {
                             ok: false,
                             value: None,
-                            error: Some(WasmAsyncError {
-                                message: format!("{:?}", e),
-                                code: "E_AGENT".into(),
-                            }),
+                            error: Some(WasmAsyncError::new(format!("{:?}", e), "E_AGENT")),
                         }
                     }
                 };
@@ -2239,10 +1979,7 @@ pub async fn execute_page_screenshot(_params: EmptyParams) -> WasmAsyncResponse 
     WasmAsyncResponse {
         ok: false,
         value: None,
-        error: Some(WasmAsyncError {
-            message: "screenshot not yet implemented in web-js".into(),
-            code: "E_NOT_IMPLEMENTED".into(),
-        }),
+        error: Some(WasmAsyncError::new("screenshot not yet implemented in web-js", "E_NOT_IMPLEMENTED")),
     }
 }
 
@@ -3559,10 +3296,7 @@ pub async fn dispatch_command(
     Ok(web_js_base::types::WasmAsyncResponse {
         ok: core_resp.ok,
         value: core_resp.value,
-        error: core_resp.error.map(|e| web_js_base::types::WasmAsyncError {
-            message: e.message,
-            code: e.code,
-        }),
+        error: core_resp.error.map(|e| web_js_base::types::WasmAsyncError::new(e.message, e.code)),
     })
 }
 

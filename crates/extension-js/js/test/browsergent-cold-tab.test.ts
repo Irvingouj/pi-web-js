@@ -465,4 +465,141 @@ describe("browsergent cold tab acceptance", () => {
 			},
 		});
 	}, 10_000);
+
+	it("page.health() returns accurate state on cold tab and after recovery", async () => {
+		let csConnected = false;
+		const sendMessage = vi.fn(async (_tabId: number, msg: Record<string, unknown>) => {
+			if (msg.action === "ping") {
+				if (!csConnected) {
+					throw new Error("Receiving end does not exist.");
+				}
+				return { ok: true };
+			}
+			if (msg.type === "registryCall" && msg.action === "page_fill") {
+				return {
+					ok: true,
+					value: {
+						ok: true,
+						action: "fill",
+						refId: "e6",
+						value: "test search",
+					},
+				};
+			}
+			throw new Error("Receiving end does not exist.");
+		});
+
+		vi.stubGlobal(
+			"chrome",
+			buildChromeMock(sendMessage, {
+				onTabsUpdate: () => {
+					csConnected = true;
+				},
+			}),
+		);
+		await initCapabilities();
+
+		const worker = await initSession();
+		await new Promise((resolve) => setTimeout(resolve, 0));
+
+		// Cold tab health
+		const coldHealth = await executeMainThreadCommand({
+			action: "page_health",
+			params: {},
+			call_id: 20,
+		});
+		expect(coldHealth.ok).toBe(true);
+		if (coldHealth.ok) {
+			expect(coldHealth.value).toMatchObject({
+				tabId: 1,
+				url: GOOGLE_URL,
+				title: "Google",
+				contentScript: "missing",
+				domApis: "ok",
+				mutationsReady: false,
+				hint: expect.stringContaining("Content script is not connected"),
+				recovery: expect.arrayContaining([
+					expect.stringContaining("page.goto"),
+				]),
+			});
+		}
+
+		// Mutation without content script → E_CONTENT_SCRIPT
+		relayAsync(worker, "cold-fill-health", "page_fill", {
+			refId: "e6",
+			value: "test search",
+		});
+		await new Promise((resolve) => setTimeout(resolve, 700));
+
+		const coldFill = postMessages.find(
+			(m): m is PostMessage =>
+				typeof m === "object" &&
+				m !== null &&
+				(m as PostMessage).type === "asyncRelayResult" &&
+				(m as PostMessage).id === "cold-fill-health",
+		);
+		expect(coldFill?.result).toMatchObject({
+			ok: false,
+			error: expect.objectContaining({
+				code: "E_CONTENT_SCRIPT",
+				hint: expect.stringContaining("Content script is not connected"),
+				recovery: expect.arrayContaining([
+					expect.stringContaining("page.goto"),
+				]),
+			}),
+		});
+		const coldErr = (coldFill?.result as { error?: { message?: string } }).error;
+		expect(coldErr?.message).not.toContain("Receiving end does not exist");
+
+		// Recovery via page.goto(currentUrl)
+		const gotoResult = await executeMainThreadCommand({
+			action: "page_goto",
+			params: { url: GOOGLE_URL },
+			call_id: 21,
+		});
+		expect(gotoResult.ok).toBe(true);
+
+		// Health after recovery
+		const warmHealth = await executeMainThreadCommand({
+			action: "page_health",
+			params: {},
+			call_id: 22,
+		});
+		expect(warmHealth.ok).toBe(true);
+		if (warmHealth.ok) {
+			expect(warmHealth.value).toMatchObject({
+				tabId: 1,
+				url: GOOGLE_URL,
+				contentScript: "connected",
+				domApis: "ok",
+				mutationsReady: true,
+			});
+			expect(warmHealth.value.hint).toBeUndefined();
+			expect(warmHealth.value.recovery).toBeUndefined();
+		}
+
+		// Mutation after recovery succeeds with explicit receipt
+		relayAsync(worker, "warm-fill-health", "page_fill", {
+			refId: "e6",
+			value: "test search",
+		});
+		await new Promise((resolve) => setTimeout(resolve, 700));
+
+		const warmFill = postMessages.find(
+			(m): m is PostMessage =>
+				typeof m === "object" &&
+				m !== null &&
+				(m as PostMessage).type === "asyncRelayResult" &&
+				(m as PostMessage).id === "warm-fill-health",
+		);
+		expect(warmFill?.result).toMatchObject({
+			ok: true,
+			value: {
+				ok: true,
+				action: "fill",
+				refId: "e6",
+				value: "test search",
+			},
+		});
+	}, 10_000);
 });

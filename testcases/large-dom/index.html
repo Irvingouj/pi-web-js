@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Large DOM</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0; padding: 1rem; }
+    .controls { position: sticky; top: 0; background: #fff; padding: 0.5rem; border-bottom: 1px solid #ddd; z-index: 10; }
+    .node { padding: 2px 4px; border: 1px solid #eee; margin: 1px; }
+  </style>
+</head>
+<body>
+  <div class="controls">
+    <button id="rerender">Rerender</button>
+    <span id="node-count">Nodes: 0</span>
+  </div>
+  <div id="container"></div>
+  <script>
+    (function () {
+      const container = document.getElementById("container");
+      const countLabel = document.getElementById("node-count");
+      const rerenderBtn = document.getElementById("rerender");
+
+      function getTargetNodes() {
+        const params = new URLSearchParams(window.location.search);
+        const n = parseInt(params.get("nodes") || "5000", 10);
+        return Math.max(100, Math.min(20000, n));
+      }
+
+      function buildTree(targetNodes) {
+        document.body.removeAttribute("data-rerender-complete");
+        container.innerHTML = "";
+        let created = 0;
+        const batchSize = 100;
+
+        function createBatch() {
+          const fragment = document.createDocumentFragment();
+          for (let i = 0; i < batchSize && created < targetNodes; i++) {
+            const div = document.createElement("div");
+            div.className = "node";
+            div.textContent = "Node " + created;
+            div.setAttribute("data-index", String(created));
+            fragment.appendChild(div);
+            created++;
+          }
+          container.appendChild(fragment);
+          if (created < targetNodes) {
+            requestAnimationFrame(createBatch);
+          } else {
+            countLabel.textContent = "Nodes: " + created;
+            document.body.setAttribute("data-rerender-complete", "true");
+          }
+        }
+        createBatch();
+      }
+
+      rerenderBtn.addEventListener("click", function () {
+        buildTree(getTargetNodes());
+      });
+
+      buildTree(getTargetNodes());
+    })();
+  </script>
+</body>
+</html>

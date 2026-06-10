@@ -90,7 +90,8 @@ export async function pingTabContentScript(
 			log.debug("pingTabContentScript_retry", { tabId, error: msg });
 			if (
 				msg.includes("Could not establish connection") ||
-				msg.includes("Receiving end does not exist")
+				msg.includes("Receiving end does not exist") ||
+				msg.includes("message port closed before a response was received")
 			) {
 				await sleep(
 					Math.min(DEFAULT_POLL_INTERVAL_MS, deadline - Date.now()),
@@ -110,15 +111,6 @@ export async function pingTabContentScript(
 		url = tab.url ?? "";
 	} catch {
 		// ignore
-	}
-	if (
-		lastRaceMsg.includes("Could not establish connection") ||
-		lastRaceMsg.includes("Receiving end does not exist")
-	) {
-		return {
-			ok: false,
-			error: contentScriptMissingError(tabId, url),
-		};
 	}
 	return {
 		ok: false,

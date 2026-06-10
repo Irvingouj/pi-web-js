@@ -7,6 +7,7 @@ import init, {
   setLogLevel as setWasmLogLevel,
 } from "./extension_js.js";
 import type { FsAction, FsActionMap } from "../shared/fs-types.js";
+import * as schemas from "../shared/schemas.js";
 import type { LogLevel } from "../shared/logger.js";
 import { logger, registerWasmSetLogLevel, setLogLevel, numericToLogLevel } from "../shared/logger.js";
 import type { DispatchContext } from "../shared/registry/types.js";
@@ -17,6 +18,8 @@ import {
   manifestEntryToWasm,
   type SerializableJsCallManifestEntry,
 } from "../shared/tool-registry.js";
+import { formatValidationError } from "../shared/registry/dispatch.js";
+import type { z } from "zod";
 
 let session: ExtensionSession | null = null;
 let initialized = false;
@@ -126,6 +129,28 @@ export function registerWorkerHandler(
   handler: (params: unknown, context?: unknown) => Promise<unknown>,
 ): void {
   workerHandlerRegistry.set(action, handler);
+}
+
+export function registerWorkerHandlerValidated<P>(
+  action: string,
+  paramsSchema: z.ZodSchema<P>,
+  handler: (params: P, context?: unknown) => Promise<unknown>,
+): void {
+  registerWorkerHandler(action, async (params, context) => {
+    const parseResult = paramsSchema.safeParse(coerceWasmParams(params));
+    if (!parseResult.success) {
+      const message = formatValidationError(
+        action,
+        paramsSchema,
+        parseResult.error.issues,
+        params,
+      );
+      const err = new Error(message) as Error & { code: string };
+      err.code = "E_INVALID_PARAMS";
+      throw err;
+    }
+    return await handler(parseResult.data, context);
+  });
 }
 
 function generateId(): string {
@@ -493,25 +518,25 @@ export function createExecutableCallback(entry: SerializableJsCallManifestEntry)
 }
 
 function initFsRegistry(s: ExtensionSession) {
-  registerWorkerHandler("exists", (p) => s.fsExists(p as FsActionMap["exists"]["params"]));
-  registerWorkerHandler("stat", (p) => s.fsStat(p as FsActionMap["stat"]["params"]));
-  registerWorkerHandler("read", (p) => s.fsRead(p as FsActionMap["read"]["params"]));
-  registerWorkerHandler("readText", (p) => s.fsReadText(p as FsActionMap["readText"]["params"]));
-  registerWorkerHandler("readBase64", (p) => s.fsReadBase64(p as FsActionMap["readBase64"]["params"]));
-  registerWorkerHandler("list", (p) => s.fsList(p as FsActionMap["list"]["params"]));
-  registerWorkerHandler("mkdir", (p) => s.fsMkdir(p as FsActionMap["mkdir"]["params"]));
-  registerWorkerHandler("delete", (p) => s.fsDelete(p as FsActionMap["delete"]["params"]));
-  registerWorkerHandler("copy", (p) => s.fsCopy(p as FsActionMap["copy"]["params"]));
-  registerWorkerHandler("move", (p) => s.fsMove(p as FsActionMap["move"]["params"]));
-  registerWorkerHandler("write", (p) => s.fsWrite(p as FsActionMap["write"]["params"]));
-  registerWorkerHandler("writeText", (p) => s.fsWriteText(p as FsActionMap["writeText"]["params"]));
-  registerWorkerHandler("writeBase64", (p) => s.fsWriteBase64(p as FsActionMap["writeBase64"]["params"]));
-  registerWorkerHandler("append", (p) => s.fsAppend(p as FsActionMap["append"]["params"]));
-  registerWorkerHandler("appendText", (p) => s.fsAppendText(p as FsActionMap["appendText"]["params"]));
-  registerWorkerHandler("appendBase64", (p) => s.fsAppendBase64(p as FsActionMap["appendBase64"]["params"]));
-  registerWorkerHandler("readRange", (p) => s.fsReadRange(p as FsActionMap["readRange"]["params"]));
-  registerWorkerHandler("update", (p) => s.fsUpdate(p as FsActionMap["update"]["params"]));
-  registerWorkerHandler("hash", (p) => s.fsHash(p as FsActionMap["hash"]["params"]));
+  registerWorkerHandlerValidated("exists", schemas.FsPathParamsSchema, (p) => s.fsExists(p as FsActionMap["exists"]["params"]));
+  registerWorkerHandlerValidated("stat", schemas.FsPathParamsSchema, (p) => s.fsStat(p as FsActionMap["stat"]["params"]));
+  registerWorkerHandlerValidated("read", schemas.FsPathParamsSchema, (p) => s.fsRead(p as FsActionMap["read"]["params"]));
+  registerWorkerHandlerValidated("readText", schemas.FsPathParamsSchema, (p) => s.fsReadText(p as FsActionMap["readText"]["params"]));
+  registerWorkerHandlerValidated("readBase64", schemas.FsPathParamsSchema, (p) => s.fsReadBase64(p as FsActionMap["readBase64"]["params"]));
+  registerWorkerHandlerValidated("list", schemas.FsPathParamsSchema, (p) => s.fsList(p as FsActionMap["list"]["params"]));
+  registerWorkerHandlerValidated("mkdir", schemas.FsPathParamsSchema, (p) => s.fsMkdir(p as FsActionMap["mkdir"]["params"]));
+  registerWorkerHandlerValidated("delete", schemas.FsPathParamsSchema, (p) => s.fsDelete(p as FsActionMap["delete"]["params"]));
+  registerWorkerHandlerValidated("copy", schemas.FsCopyParamsSchema, (p) => s.fsCopy(p as FsActionMap["copy"]["params"]));
+  registerWorkerHandlerValidated("move", schemas.FsCopyParamsSchema, (p) => s.fsMove(p as FsActionMap["move"]["params"]));
+  registerWorkerHandlerValidated("write", schemas.FsWriteParamsSchema, (p) => s.fsWrite(p as FsActionMap["write"]["params"]));
+  registerWorkerHandlerValidated("writeText", schemas.FsWriteParamsSchema, (p) => s.fsWriteText(p as FsActionMap["writeText"]["params"]));
+  registerWorkerHandlerValidated("writeBase64", schemas.FsWriteParamsSchema, (p) => s.fsWriteBase64(p as FsActionMap["writeBase64"]["params"]));
+  registerWorkerHandlerValidated("append", schemas.FsWriteParamsSchema, (p) => s.fsAppend(p as FsActionMap["append"]["params"]));
+  registerWorkerHandlerValidated("appendText", schemas.FsWriteParamsSchema, (p) => s.fsAppendText(p as FsActionMap["appendText"]["params"]));
+  registerWorkerHandlerValidated("appendBase64", schemas.FsWriteParamsSchema, (p) => s.fsAppendBase64(p as FsActionMap["appendBase64"]["params"]));
+  registerWorkerHandlerValidated("readRange", schemas.FsReadRangeParamsSchema, (p) => s.fsReadRange(p as FsActionMap["readRange"]["params"]));
+  registerWorkerHandlerValidated("update", schemas.FsUpdateParamsSchema, (p) => s.fsUpdate(p as FsActionMap["update"]["params"]));
+  registerWorkerHandlerValidated("hash", schemas.FsHashParamsSchema, (p) => s.fsHash(p as FsActionMap["hash"]["params"]));
 }
 
 async function initWasm(
@@ -574,7 +599,7 @@ export type WorkerMessage =
   | { type: "loadLibrary"; id: string; source: string }
   | { type: "fsCall"; id: string; action: string; params: unknown }
   | { type: "setLogLevel"; level: number }
-  | { type: "asyncRelayResult"; id: string; result: unknown }
+  | { type: "asyncRelayResult"; id: string; result: unknown; callId?: number }
   | { type: "registerWorkerPort"; owner: string };
 
 self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
@@ -650,11 +675,21 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
         });
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
-        logger.error("runCell_error", { runId, error: message });
+        const name = err instanceof Error ? err.name : undefined;
+        const stack = err instanceof Error ? err.stack : undefined;
+        let line: number | undefined;
+        if (stack) {
+          const match = stack.match(/:(\d+):\d+\)?$/m);
+          if (match) line = parseInt(match[1], 10);
+        }
+        logger.error("runCell_error", { runId, error: message, name, line });
+        const errorPayload = err instanceof Error
+          ? { name, message, stack, ...(line !== undefined ? { line } : {}) }
+          : { message };
         self.postMessage({
           type: "error",
           id: msg.id,
-          error: message,
+          error: errorPayload,
           runId,
         });
       } finally {

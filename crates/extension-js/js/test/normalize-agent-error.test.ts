@@ -62,6 +62,33 @@ describe("normalizeAgentError", () => {
 		expect(err.category).toBe("extension");
 	});
 
+	it("preserves Error name, message, and stack fields (T-016)", () => {
+		const original = new Error("Something broke");
+		original.name = "CustomError";
+		const err = normalizeAgentError(original);
+		expect(err.message).toBe("Something broke");
+		expect(err.code).toBe("E_EXTENSION");
+		expect(err.details?.name).toBe("CustomError");
+		expect(typeof err.details?.stack).toBe("string");
+		expect(err.details?.stack).toContain("Error");
+	});
+
+	it("extracts line number from stack trace (T-016)", () => {
+		const original = new Error("Line error");
+		original.stack = "Error: Line error\n    at foo (file.js:42:10)";
+		const err = normalizeAgentError(original);
+		expect(err.details?.line).toBe(42);
+	});
+
+	it("QuickJS ReferenceError includes message + line (T-016)", () => {
+		const refError = new ReferenceError("foo is not defined");
+		refError.stack = "ReferenceError: foo is not defined\n    at eval (cell.js:7:5)";
+		const err = normalizeAgentError(refError);
+		expect(err.details?.name).toBe("ReferenceError");
+		expect(err.details?.line).toBe(7);
+		expect(err.message).toContain("foo is not defined");
+	});
+
 	it("contentScriptMissingError never mentions page.wake", () => {
 		const err = contentScriptMissingError(1, "https://example.com/");
 		expect(err.recovery?.join(" ")).not.toContain("page.wake");

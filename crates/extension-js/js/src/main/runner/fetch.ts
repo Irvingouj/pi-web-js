@@ -3,7 +3,7 @@ import type { FetchParams, FetchValue } from "./lib/types.js";
 import type { AsyncResponse } from "../../shared/tool-registry.js";
 import { throwIfAborted } from "../../shared/tool-registry.js";
 import { DEFAULT_TIMEOUT_MS } from "./lib/constants.js";
-import { makeError } from "./lib/types.js";
+import { encodeFetchResponse } from "../../shared/fetch-response.js";
 
 // ─── Fetch handler ───────────────────────────────────────────────
 
@@ -32,20 +32,8 @@ export async function handleFetch(
 		}
 		const response = await fetch(url, fetchOpts);
 		clearTimeout(timeoutId);
-		const responseBody = await response.text();
-		const responseHeaders: Record<string, string> = {};
-		response.headers.forEach((value, key) => {
-			responseHeaders[key] = value;
-		});
-		return {
-			ok: true,
-			value: {
-				status: response.status,
-				ok: response.ok,
-				headers: responseHeaders,
-				body: responseBody,
-			},
-		};
+		const value = await encodeFetchResponse(response);
+		return { ok: true, value };
 	} catch (err: unknown) {
 		if (err instanceof Error && err.name === "AbortError") {
 			return {

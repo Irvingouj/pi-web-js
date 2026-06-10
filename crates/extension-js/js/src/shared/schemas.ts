@@ -101,7 +101,8 @@ export const FetchParamsSchema = z.object({
 	headers: z.record(z.string()).default({}).describe("Request headers as key-value pairs"),
 	body: z.string().nullable().default(null).describe("Request body string"),
 	timeout: bigintLike().default(30000n).describe("Timeout in milliseconds"),
-});
+	options: z.object({}).passthrough().optional().describe("Fetch options"),
+}).passthrough();
 
 export const SleepParamsSchema = z.object({
 	duration: bigintLike().describe("Duration to sleep in milliseconds"),
@@ -661,7 +662,11 @@ export const FetchValueSchema = z.object({
 	status: z.number().describe("HTTP response status code"),
 	ok: z.boolean().describe("Whether the response status is 2xx"),
 	headers: z.record(z.string()).describe("Response headers as key-value pairs"),
-	body: z.string().describe("Response body as string"),
+	body: z.string().describe("Response body as string (text or base64-encoded bytes)"),
+	bodyEncoding: z.enum(["text", "base64"]).describe("Encoding of the body field"),
+	byteLength: z.number().describe("Length of the body in bytes"),
+	contentType: z.string().describe("Response Content-Type header"),
+	finalUrl: z.string().describe("Final URL after redirects"),
 });
 
 export const DomSnapshotValueSchema = z.object({
@@ -689,10 +694,19 @@ export const SnapshotNodeSchema = z.object({
 	role: z.string().describe("ARIA role of the element"),
 	tag: z.string().describe("HTML tag name"),
 	name: z.string().optional().describe("Accessible name of the element"),
+	text: z.string().optional().describe("Visible text content of the element"),
 	value: z.string().optional().describe("Element value"),
 	checked: z.boolean().optional().describe("Checked state"),
 	disabled: z.boolean().optional().describe("Whether the element is disabled"),
 	readOnly: z.boolean().optional().describe("Whether the element is read-only"),
+	href: z.string().optional().describe("Absolute URL for link elements"),
+	src: z.string().optional().describe("Absolute URL for image elements"),
+	alt: z.string().optional().describe("Alternative text for image elements"),
+	title: z.string().optional().describe("Title attribute"),
+	parentRefId: refIdString().optional().describe("Reference ID of the parent container element"),
+	postId: z.string().optional().describe("Stable post identifier from data-post-id attribute"),
+	permalink: z.string().optional().describe("Stable permalink URL from anchor element"),
+	imageUrls: z.array(z.string()).optional().describe("Image URLs contained within this element"),
 });
 
 export const SnapshotResultSchema = z.object({

@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Media Download</title>
+  <style>
+    body { font-family: system-ui, sans-serif; padding: 1rem; max-width: 600px; margin: 0 auto; }
+    img { max-width: 100%; border-radius: 4px; display: block; margin: 1rem 0; }
+  </style>
+</head>
+<body>
+  <h1>Media Download Testcase</h1>
+  <p>This page contains an in-page image and a same-origin JPEG asset.</p>
+  <img
+    id="test-image"
+    src="./assets/photo.jpg"
+    alt="A test photo for media download validation"
+    width="400"
+    height="300"
+  />
+  <p>
+    <a id="direct-link" href="./assets/photo.jpg" download>Download photo.jpg</a>
+  </p>
+  <!--
+    Asset: testcases/media-download/assets/photo.jpg
+    SHA-256: ea012fdbfb0cc17a2ee6c281efc094fd6f78381d831af03a7e658a9de04e936d
+    Description: A small 400x300 colored JPEG (~6.6KB) generated for binary-safe fetch tests.
+  -->
+</body>
+</html>

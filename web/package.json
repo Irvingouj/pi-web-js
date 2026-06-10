@@ -18,7 +18,7 @@
     "test:e2e": "playwright test --config playwright.config.ts",
     "test:e2e:web": "playwright test --config playwright.config.ts",
     "serve:testcases": "node ../scripts/serve-testcases.mjs",
-    "test:e2e:extension": "npm run copy-ext-assets && npm run copy-e2e-assets && npm run build && playwright test --config playwright.extension.config.ts",
+    "test:e2e:extension": "npm run copy-ext-assets && npm run copy-e2e-assets && npm run build:extension && playwright test --config playwright.extension.config.ts",
     "test:e2e:extension:apis": "EXT_CONTRACT_APIS=1 npm run test:e2e:extension",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:debug": "playwright test --debug"

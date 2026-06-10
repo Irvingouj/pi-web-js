@@ -207,7 +207,10 @@ pub async fn execute_fs_write(params: FsWriteParams) -> AsyncResponse {
     match web_fs::write(&params.path, &bytes).await {
         Ok(_) => AsyncResponse {
             ok: true,
-            value: Some(serde_json::Value::Bool(true)),
+            value: Some(serde_json::json!({
+                "path": params.path,
+                "bytes_written": bytes.len() as u64,
+            })),
             error: None,
         },
         Err(e) => AsyncResponse {
@@ -222,7 +225,10 @@ pub async fn execute_fs_write_text(params: FsWriteParams) -> AsyncResponse {
     match web_fs::write_text(&params.path, &params.data).await {
         Ok(_) => AsyncResponse {
             ok: true,
-            value: Some(serde_json::Value::Bool(true)),
+            value: Some(serde_json::json!({
+                "path": params.path.clone(),
+                "bytes_written": params.data.len() as u64,
+            })),
             error: None,
         },
         Err(e) => AsyncResponse {
@@ -234,10 +240,26 @@ pub async fn execute_fs_write_text(params: FsWriteParams) -> AsyncResponse {
 }
 
 pub async fn execute_fs_write_base64(params: FsWriteParams) -> AsyncResponse {
+    let decoded = match data_encoding::BASE64.decode(params.data.as_bytes()) {
+        Ok(b) => b,
+        Err(_) => {
+            return AsyncResponse {
+                ok: false,
+                value: None,
+                error: Some(AsyncError::new(
+                    "Invalid base64 data",
+                    "E_INVALID_ENCODING",
+                )),
+            };
+        }
+    };
     match web_fs::write_base64(&params.path, &params.data).await {
         Ok(_) => AsyncResponse {
             ok: true,
-            value: Some(serde_json::Value::Bool(true)),
+            value: Some(serde_json::json!({
+                "path": params.path.clone(),
+                "bytes_written": decoded.len() as u64,
+            })),
             error: None,
         },
         Err(e) => AsyncResponse {
@@ -265,7 +287,10 @@ pub async fn execute_fs_append(params: FsWriteParams) -> AsyncResponse {
     match web_fs::append(&params.path, &bytes).await {
         Ok(_) => AsyncResponse {
             ok: true,
-            value: Some(serde_json::Value::Bool(true)),
+            value: Some(serde_json::json!({
+                "path": params.path.clone(),
+                "bytes_written": bytes.len() as u64,
+            })),
             error: None,
         },
         Err(e) => AsyncResponse {
@@ -280,7 +305,10 @@ pub async fn execute_fs_append_text(params: FsWriteParams) -> AsyncResponse {
     match web_fs::append_text(&params.path, &params.data).await {
         Ok(_) => AsyncResponse {
             ok: true,
-            value: Some(serde_json::Value::Bool(true)),
+            value: Some(serde_json::json!({
+                "path": params.path.clone(),
+                "bytes_written": params.data.len() as u64,
+            })),
             error: None,
         },
         Err(e) => AsyncResponse {
@@ -292,10 +320,26 @@ pub async fn execute_fs_append_text(params: FsWriteParams) -> AsyncResponse {
 }
 
 pub async fn execute_fs_append_base64(params: FsWriteParams) -> AsyncResponse {
+    let decoded = match data_encoding::BASE64.decode(params.data.as_bytes()) {
+        Ok(b) => b,
+        Err(_) => {
+            return AsyncResponse {
+                ok: false,
+                value: None,
+                error: Some(AsyncError::new(
+                    "Invalid base64 data",
+                    "E_INVALID_ENCODING",
+                )),
+            };
+        }
+    };
     match web_fs::append_base64(&params.path, &params.data).await {
         Ok(_) => AsyncResponse {
             ok: true,
-            value: Some(serde_json::Value::Bool(true)),
+            value: Some(serde_json::json!({
+                "path": params.path.clone(),
+                "bytes_written": decoded.len() as u64,
+            })),
             error: None,
         },
         Err(e) => AsyncResponse {
@@ -388,7 +432,7 @@ pub fn init_fs_registry() {
         params: [
             path: "string", "required", "Path to stat",
         ],
-        returns: "object" => "Metadata object",
+        returns: "{ path: string, name: string, kind: \"file\" | \"directory\", size: number, mime?: string, created_at?: number, modified_at?: number }" => "Metadata object",
         param_struct: FsPathParams,
         handler: execute_fs_stat,
         fields: ["path"],
@@ -402,7 +446,7 @@ pub fn init_fs_registry() {
         params: [
             path: "string", "required", "Directory path",
         ],
-        returns: "object[]" => "Array of entry objects",
+        returns: "{ name: string, kind: \"file\" | \"directory\" }[]" => "Array of entry objects",
         param_struct: FsPathParams,
         handler: execute_fs_list,
         fields: ["path"],
@@ -536,7 +580,7 @@ pub fn init_fs_registry() {
             path: "string", "required", "File path",
             data: "string", "required", "Base64-encoded data",
         ],
-        returns: "boolean" => "Whether write succeeded",
+        returns: "{ path: string, bytes_written: number }" => "{ path, bytes_written }",
         param_struct: FsWriteParams,
         handler: execute_fs_write,
         fields: ["path", "data"],
@@ -551,7 +595,7 @@ pub fn init_fs_registry() {
             path: "string", "required", "File path",
             data: "string", "required", "Text data",
         ],
-        returns: "boolean" => "Whether write succeeded",
+        returns: "{ path: string, bytes_written: number }" => "{ path, bytes_written }",
         param_struct: FsWriteParams,
         handler: execute_fs_write_text,
         fields: ["path", "data"],
@@ -567,7 +611,7 @@ pub fn init_fs_registry() {
             path: "string", "required", "File path",
             data: "string", "required", "Base64-encoded data",
         ],
-        returns: "boolean" => "Whether write succeeded",
+        returns: "{ path: string, bytes_written: number }" => "{ path, bytes_written }",
         param_struct: FsWriteParams,
         handler: execute_fs_write_base64,
         fields: ["path", "data"],
@@ -583,7 +627,7 @@ pub fn init_fs_registry() {
             path: "string", "required", "File path",
             data: "string", "required", "Base64-encoded data",
         ],
-        returns: "boolean" => "Whether append succeeded",
+        returns: "{ path: string, bytes_written: number }" => "{ path, bytes_written }",
         param_struct: FsWriteParams,
         handler: execute_fs_append,
         fields: ["path", "data"],
@@ -598,7 +642,7 @@ pub fn init_fs_registry() {
             path: "string", "required", "File path",
             data: "string", "required", "Text data",
         ],
-        returns: "boolean" => "Whether append succeeded",
+        returns: "{ path: string, bytes_written: number }" => "{ path, bytes_written }",
         param_struct: FsWriteParams,
         handler: execute_fs_append_text,
         fields: ["path", "data"],
@@ -614,7 +658,7 @@ pub fn init_fs_registry() {
             path: "string", "required", "File path",
             data: "string", "required", "Base64-encoded data",
         ],
-        returns: "boolean" => "Whether append succeeded",
+        returns: "{ path: string, bytes_written: number }" => "{ path, bytes_written }",
         param_struct: FsWriteParams,
         handler: execute_fs_append_base64,
         fields: ["path", "data"],

@@ -1,5 +1,6 @@
 import {
 	labelNotFoundError,
+	notInteractableError,
 	staleRefError,
 	throwStructuredAgentError,
 } from "../shared/registry/normalize-agent-error.js";
@@ -24,6 +25,18 @@ export {
  */
 export function getElementByRefId(refId: string): Element | null {
 	return document.querySelector(`[data-ref-id='${CSS.escape(refId)}']`);
+}
+
+export function assertInteractable(el: Element, action: string): void {
+	if (
+		(el as HTMLElement).hasAttribute("disabled") ||
+		(el as HTMLElement).getAttribute("aria-disabled") === "true"
+	) {
+		const refId = el.getAttribute("data-ref-id") || undefined;
+		throwStructuredAgentError(
+			notInteractableError(action, refId ?? "", { reason: "disabled" }),
+		);
+	}
 }
 
 export function findElementByLabel(query: string): Element | null {
@@ -122,13 +135,52 @@ export function getNumberParam(
 	return typeof val === "number" ? val : fallback;
 }
 
+export function findCandidatesByRefId(refId: string): SemanticCandidate[] {
+	// Try to find the original element to determine similarity criteria
+	const original = document.querySelector(
+		`[data-ref-id='${CSS.escape(refId)}']`,
+	);
+	let targetTagName: string | undefined;
+	let targetRole: string | undefined;
+
+	if (original) {
+		targetTagName = original.tagName.toLowerCase();
+		targetRole = getAccessibleRole(original);
+	}
+
+	const all = Array.from(document.querySelectorAll(INTERACTIVE_SELECTOR));
+	const matches: SemanticCandidate[] = [];
+	for (const el of all) {
+		const elRefId = el.getAttribute("data-ref-id");
+		if (!elRefId) continue;
+
+		// If we know the original element's properties, filter by similarity
+		if (targetTagName || targetRole) {
+			const elTagName = el.tagName.toLowerCase();
+			const elRole = getAccessibleRole(el);
+			if (elTagName !== targetTagName && elRole !== targetRole) {
+				continue;
+			}
+		}
+
+		matches.push({
+			refId: elRefId,
+			role: getAccessibleRole(el),
+			name: getAccessibleName(el) || undefined,
+		});
+		if (matches.length >= 5) break;
+	}
+	return matches;
+}
+
 export function throwElementNotFound(
 	refId: string | undefined,
 	label: string | undefined,
 	includeCandidates = false,
 ): never {
 	if (refId) {
-		throwStructuredAgentError(staleRefError(refId));
+		const candidates = includeCandidates ? findCandidatesByRefId(refId) : [];
+		throwStructuredAgentError(staleRefError(refId, { candidates }));
 	}
 	if (label) {
 		const candidates = includeCandidates ? findSemanticCandidates(label) : [];
