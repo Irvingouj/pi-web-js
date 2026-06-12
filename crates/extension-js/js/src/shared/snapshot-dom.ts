@@ -193,7 +193,11 @@ export function getOwnVisibleText(el: Element, maxLen = 60): string {
 			if (text) parts.push(text);
 		}
 	}
-	return parts.join(" ").slice(0, maxLen);
+	if (parts.length > 0) {
+		return parts.join(" ").slice(0, maxLen);
+	}
+	const full = el.textContent?.trim();
+	return full ? full.slice(0, maxLen) : "";
 }
 
 function isHiddenElement(el: Element): boolean {

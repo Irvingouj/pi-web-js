@@ -88,4 +88,37 @@ describe("snapshot-dom markdown visibility", () => {
 
 		expect(isMarkdownVisible(decorative)).toBe(false);
 	});
+
+	it("returns nested text when no direct text nodes exist", () => {
+		const btn = document.createElement("button");
+		const span = document.createElement("span");
+		span.textContent = "Sign in";
+		btn.appendChild(span);
+		document.body.appendChild(btn);
+
+		expect(getOwnVisibleText(btn)).toBe("Sign in");
+	});
+
+	it("prefers direct text nodes over full textContent fallback", () => {
+		const div = document.createElement("div");
+		div.appendChild(document.createTextNode("hello "));
+		const span = document.createElement("span");
+		span.textContent = "world";
+		div.appendChild(span);
+		document.body.appendChild(div);
+
+		expect(getOwnVisibleText(div)).toBe("hello");
+	});
+
+	it("returns deeply nested text via fallback", () => {
+		const div = document.createElement("div");
+		const span = document.createElement("span");
+		const em = document.createElement("em");
+		em.textContent = "deep";
+		span.appendChild(em);
+		div.appendChild(span);
+		document.body.appendChild(div);
+
+		expect(getOwnVisibleText(div)).toBe("deep");
+	});
 });
