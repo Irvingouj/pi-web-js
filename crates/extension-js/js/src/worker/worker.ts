@@ -405,9 +405,9 @@ function extractParamTimeoutMs(
 
 function relayBudgetForParamTimeout(action: string, paramTimeout: number): number {
   if (COMPOUND_TIMEOUT_ACTIONS.has(action)) {
-    // page_goto: waitForTabLoad(timeout) + pingTabContentScript(timeout) + grace
+    // page_goto: waitForTabLoad(timeout) + [waitForNetworkIdle(timeout)] + pingTabContentScript(timeout) + grace
     return (
-      paramTimeout * 2 + CONTENT_SCRIPT_GRACE_MS + RELAY_TIMEOUT_MARGIN_MS
+      paramTimeout * 3 + CONTENT_SCRIPT_GRACE_MS + RELAY_TIMEOUT_MARGIN_MS
     );
   }
   return paramTimeout + RELAY_TIMEOUT_MARGIN_MS;

@@ -22,6 +22,7 @@ export {
 	CS_FAST_PING_MS,
 	DEFAULT_SCROLL_AMOUNT,
 	DEFAULT_POLL_INTERVAL_MS,
+	NETWORK_IDLE_QUIET_MS,
 } from "./lib/constants.js";
 
 export type { DomFormatParams, DomSnapshotParams, FetchParams } from "./lib/types.js";

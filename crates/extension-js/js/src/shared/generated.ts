@@ -181,7 +181,7 @@ export type PageSetFilesParams = {
 
 export type PageFindParams = { selector: string };
 
-export type PageGotoParams = { url: string; timeout?: bigint };
+export type PageGotoParams = { url: string; timeout?: bigint; waitUntil?: "load" | "networkidle" };
 
 export type PageHoverParams = { refId?: string; label?: string };
 

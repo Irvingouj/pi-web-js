@@ -56,7 +56,7 @@ describe("coerceWasmParams", () => {
 describe("resolveRelayTimeoutMs", () => {
 	it("uses compound default budget for page_goto when params omit timeout", () => {
 		expect(resolveRelayTimeoutMs("page_goto", { url: "https://example.com" })).toBe(
-			65_500,
+			95_500,
 		);
 	});
 
@@ -66,7 +66,7 @@ describe("resolveRelayTimeoutMs", () => {
 				url: "https://example.com",
 				timeout: 60_000n,
 			}),
-		).toBe(125_500);
+		).toBe(185_500);
 	});
 
 	it("uses single-phase budget for page_wait_for", () => {

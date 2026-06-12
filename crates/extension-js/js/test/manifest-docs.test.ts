@@ -150,7 +150,7 @@ describe("manifest documentation export", () => {
 
 		expect(pageGoto?.owner).toBe("main-thread");
 		expect(pageGoto?.fields).toEqual(["url"]);
-		expect(pageGoto?.example).toBe('page.goto("https://example.com")');
+		expect(pageGoto?.example).toBe('page.goto("https://example.com", { waitUntil: "networkidle" })');
 		expect(pageClick?.owner).toBe("content-script");
 		expect(pageClick?.paramsDoc[0]?.description).toContain("(refId)");
 		expect(pageFind?.description).toContain("CSS selector");

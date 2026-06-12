@@ -27,6 +27,7 @@ export const LARGE_DOM_URL = `http://${TESTCASE_SERVER_HOST}:${TESTCASE_SERVER_P
 export const MEDIA_DOWNLOAD_URL = `http://${TESTCASE_SERVER_HOST}:${TESTCASE_SERVER_PORT}/testcases/media-download/`;
 export const STALE_REF_URL = `http://${TESTCASE_SERVER_HOST}:${TESTCASE_SERVER_PORT}/testcases/stale-ref/`;
 export const FILE_UPLOAD_FORM_URL = `http://${TESTCASE_SERVER_HOST}:${TESTCASE_SERVER_PORT}/testcases/file-upload-form/`;
+export const SLOW_NETWORK_URL = `http://${TESTCASE_SERVER_HOST}:${TESTCASE_SERVER_PORT}/testcases/slow-network/`;
 export const RESULT_PREFIX = "__EXTENSION_CONTRACT_RESULT__";
 
 export const EXT_CONTRACT_APIS = process.env.EXT_CONTRACT_APIS === "1";

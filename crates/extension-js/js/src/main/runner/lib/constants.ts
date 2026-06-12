@@ -11,3 +11,5 @@ export const NAVIGATION_SETTLE_MS = 100;
 export const CONTENT_SCRIPT_GRACE_MS = 500;
 /** Fast fail-fast ping before content-script mutations (health, relay). */
 export const CS_FAST_PING_MS = 500;
+/** Quiet period with no in-flight requests before declaring network idle. */
+export const NETWORK_IDLE_QUIET_MS = 500;

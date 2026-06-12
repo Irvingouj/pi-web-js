@@ -200,6 +200,7 @@ export const PageTitleParamsSchema = z.object({});
 export const PageGotoParamsSchema = z.object({
 	url: z.string().describe("URL to navigate to"),
 	timeout: bigintLike().optional().describe("Navigation timeout in milliseconds"),
+	waitUntil: z.enum(["load", "networkidle"]).optional().describe("When to consider navigation complete: 'load' (tab status complete) or 'networkidle' (no in-flight requests for 500ms)"),
 });
 
 export const PageBackParamsSchema = z.object({});

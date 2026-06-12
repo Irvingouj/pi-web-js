@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Slow Network Test</title>
+  <style>
+    body { font-family: system-ui; margin: 2rem; }
+    #status { margin: 1rem 0; padding: 0.5rem; background: #eee; }
+    #data { margin: 1rem 0; padding: 0.5rem; background: #eef; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>Slow Network Test Page</h1>
+  <div id="status">Loading...</div>
+  <div id="data">No data yet</div>
+  <script>
+    document.getElementById('status').textContent = 'DOMContentLoaded fired';
+
+    // Delayed fetch 1: starts 200ms after load, takes ~300ms
+    setTimeout(async () => {
+      try {
+        const resp = await fetch('./api/data1.json');
+        const json = await resp.json();
+        document.getElementById('data').textContent += 'Data 1: ' + json.message + '\n';
+        document.getElementById('status').textContent = 'Data loaded';
+      } catch (e) {
+        document.getElementById('data').textContent += 'Data 1 failed: ' + e + '\n';
+      }
+    }, 200);
+
+    // Delayed fetch 2: starts 100ms after load, takes ~300ms
+    setTimeout(async () => {
+      try {
+        const resp = await fetch('./api/data2.json');
+        const json = await resp.json();
+        document.getElementById('data').textContent += 'Data 2: ' + json.message + '\n';
+      } catch (e) {
+        document.getElementById('data').textContent += 'Data 2 failed: ' + e + '\n';
+      }
+    }, 100);
+  </script>
+</body>
+</html>

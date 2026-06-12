@@ -24,7 +24,9 @@ import {
 	CONTENT_SCRIPT_GRACE_MS,
 	CS_FAST_PING_MS,
 	DEFAULT_TIMEOUT_MS,
+	NETWORK_IDLE_QUIET_MS,
 } from "../runtime.js";
+import { NetworkTracker } from "../lib/network-tracker.js";
 import { noTabError, contentScriptMissingError } from "../../../shared/registry/normalize-agent-error.js";
 
 async function requireActiveTab(action: string): Promise<number> {
@@ -166,6 +168,25 @@ registerJsCall({
 				);
 			}
 		}
+		if (params.waitUntil === "networkidle") {
+			const tracker = new NetworkTracker(activeTab);
+			try {
+				tracker.start();
+				const networkTimeout = Math.max(
+					NETWORK_IDLE_QUIET_MS * 2,
+					timeoutMs,
+				);
+				await tracker.waitForIdle(networkTimeout);
+			} catch (idleErr) {
+				throw makeError(
+					idleErr instanceof Error ? idleErr.message : String(idleErr),
+					"E_NAVIGATION",
+					"navigation",
+				);
+			} finally {
+				tracker.dispose();
+			}
+		}
 		const pingResult = await pingTabContentScript(activeTab, timeoutMs);
 		if (!pingResult.ok) {
 			return unwrapResult(pingResult);
@@ -183,11 +204,17 @@ registerJsCall({
 			required: true,
 			description: "URL to navigate to (url)",
 		},
+		{
+			name: "waitUntil",
+			type: '"load" | "networkidle"',
+			required: false,
+			description: "When to consider navigation complete. 'load' waits for tab status complete (default). 'networkidle' waits until no in-flight requests for 500ms.",
+		},
 	],
 	returnDoc: "Tab update result",
 	errorCode: "E_NAVIGATION",
 	errorCategory: "navigation",
-	example: "page.goto(\"https://example.com\")",
+	example: 'page.goto("https://example.com", { waitUntil: "networkidle" })',
 });
 
 

@@ -1,6 +1,6 @@
 import { test, expect } from "./fixtures.ts";
 import { executeCell } from "./lib/harness.ts";
-import { RESULT_PREFIX } from "./lib/constants.ts";
+import { RESULT_PREFIX, SLOW_NETWORK_URL } from "./lib/constants.ts";
 import type { ContractResult } from "./lib/types.ts";
 
 test.describe.serial("navigation stability", () => {
@@ -194,6 +194,80 @@ print(RESULT_PREFIX + JSON.stringify(result));
 		if (!exec.result?.ok) {
 			expect(exec.result.error.code).toBe("E_NAVIGATION");
 			expect(exec.result.error.message).toContain("Navigation blocked");
+		}
+	});
+
+	test("goto with waitUntil networkidle waits for delayed fetches", async ({ harness }) => {
+		const source = `
+var RESULT_PREFIX = "${RESULT_PREFIX}";
+
+// Navigate to the slow-network testcase with networkidle
+await page.goto({
+  url: "${SLOW_NETWORK_URL}",
+  waitUntil: "networkidle",
+  timeout: 15000n,
+});
+
+// At networkidle, the delayed fetches should have completed
+// and the #data div should contain both data payloads
+const snapshot = await page.snapshot();
+var RESULT_PREFIX = "${RESULT_PREFIX}";
+print(RESULT_PREFIX + JSON.stringify({
+  ok: true,
+  value: {
+    hasData1: snapshot.includes("Delayed data payload 1"),
+    hasData2: snapshot.includes("Delayed data payload 2"),
+    statusComplete: snapshot.includes("Data loaded"),
+  }
+}));
+`;
+
+		const exec = await executeCell<
+			ContractResult<{ hasData1: boolean; hasData2: boolean; statusComplete: boolean }>
+		>(harness.sidepanel, source, 30_000);
+
+		expect(exec.status, `${exec.stderr}\n${exec.stdout}`).toBe("success");
+		expect(exec.result?.ok).toBe(true);
+		if (exec.result?.ok) {
+			expect(exec.result.value.hasData1).toBe(true);
+			expect(exec.result.value.hasData2).toBe(true);
+			expect(exec.result.value.statusComplete).toBe(true);
+		}
+	});
+
+	test("goto with waitUntil load returns before delayed fetches complete", async ({ harness }) => {
+		const source = `
+var RESULT_PREFIX = "${RESULT_PREFIX}";
+
+// Navigate with default waitUntil: "load" — should return before fetches finish
+await page.goto({
+  url: "${SLOW_NETWORK_URL}",
+  timeout: 15000n,
+});
+
+// Immediately snapshot — fetches are delayed 100-200ms after load,
+// so with load-only wait, the data div should still be empty
+const snapshot = await page.snapshot();
+var RESULT_PREFIX = "${RESULT_PREFIX}";
+print(RESULT_PREFIX + JSON.stringify({
+  ok: true,
+  value: {
+    hasData1: snapshot.includes("Delayed data payload 1"),
+    hasData2: snapshot.includes("Delayed data payload 2"),
+  }
+}));
+`;
+
+		const exec = await executeCell<
+			ContractResult<{ hasData1: boolean; hasData2: boolean }>
+		>(harness.sidepanel, source, 30_000);
+
+		expect(exec.status, `${exec.stderr}\n${exec.stdout}`).toBe("success");
+		expect(exec.result?.ok).toBe(true);
+		if (exec.result?.ok) {
+			// With waitUntil: "load", delayed fetches have NOT completed yet
+			expect(exec.result.value.hasData1).toBe(false);
+			expect(exec.result.value.hasData2).toBe(false);
 		}
 	});
 });
