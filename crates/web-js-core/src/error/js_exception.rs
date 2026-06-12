@@ -71,7 +71,7 @@ fn is_artifact_message(message: &str) -> bool {
         || message == "<no details available>"
 }
 
-fn split_name_message(text: &str) -> (Option<String>, String) {
+pub(crate) fn split_name_message(text: &str) -> (Option<String>, String) {
     let trimmed = text.trim();
     if let Some(colon_idx) = trimmed.find(": ") {
         let name = trimmed[..colon_idx].trim();
@@ -95,7 +95,7 @@ fn resolve_message_fallback<'js>(
                 let s = s.replace('\0', "").trim().to_string();
                 if !s.is_empty() && s != "[object Object]" {
                     let (_, message) = split_name_message(&s);
-                    if !is_artifact_message(&message) {
+                    if !is_artifact_message(&message) && name.as_deref() != Some(message.trim()) {
                         return message;
                     }
                 }
@@ -112,7 +112,7 @@ fn resolve_message_fallback<'js>(
                 let s = s.replace('\0', "").trim().to_string();
                 if !s.is_empty() && s != "[object Object]" {
                     let (_, message) = split_name_message(&s);
-                    if !is_artifact_message(&message) {
+                    if !is_artifact_message(&message) && name.as_deref() != Some(message.trim()) {
                         return message;
                     }
                 }
@@ -120,16 +120,25 @@ fn resolve_message_fallback<'js>(
         }
     }
 
+    // Try stack trace lines for richer context than just the error name.
     if let Some(stack) = stack {
-        if let Some(first_line) = stack.lines().find(|line| !line.trim().is_empty()) {
-            let trimmed = first_line.trim();
-            if !is_artifact_message(trimmed) {
-                return trimmed.to_string();
+        let stack_lines: Vec<&str> = stack.lines()
+            .map(|l| l.trim())
+            .filter(|l| !l.is_empty() && !is_artifact_message(l))
+            .take(3)
+            .collect();
+        if !stack_lines.is_empty() {
+            let combined = stack_lines.join("\n");
+            // Avoid returning something identical to name to prevent "TypeError: TypeError".
+            if name.as_deref() != Some(combined.trim()) {
+                return combined;
             }
         }
     }
 
-    name.clone().unwrap_or_else(|| format_js_value(value))
+    // Last resort: return empty rather than duplicating the name.
+    // format_name_message(Some("TypeError"), "") produces "TypeError" cleanly.
+    String::new()
 }
 
 /// Parse a JavaScript exception value into structured fields once.
@@ -212,5 +221,120 @@ pub(crate) fn parse_js_exception<'js>(value: &Value<'js>) -> JsException {
         code,
         hint,
         recovery,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── extract_line_number ──────────────────────────────────────────────
+
+    #[test]
+    fn extract_line_number_at_line_prefix() {
+        assert_eq!(extract_line_number("at line 42"), Some(42));
+    }
+
+    #[test]
+    fn extract_line_number_line_prefix() {
+        assert_eq!(extract_line_number("line 7"), Some(7));
+    }
+
+    #[test]
+    fn extract_line_number_mid_sentence() {
+        assert_eq!(
+            extract_line_number("something at line 3 and more"),
+            Some(3)
+        );
+    }
+
+    #[test]
+    fn extract_line_number_none_when_absent() {
+        assert_eq!(extract_line_number("no line info"), None);
+    }
+
+    #[test]
+    fn extract_line_number_stack_trace_colon_format() {
+        // The colon-based parser requires digits-only after the last colon.
+        // "script:10:5)" fails because "5)" is not a valid u32.
+        // "script:10:5" (no trailing paren) succeeds.
+        assert_eq!(extract_line_number("    at foo (script:10:5)"), None);
+        assert_eq!(extract_line_number("    at foo (script:10:5"), Some(10));
+    }
+
+    #[test]
+    fn extract_line_number_paren_line_format() {
+        assert_eq!(extract_line_number("(line 15)"), Some(15));
+    }
+
+    #[test]
+    fn extract_line_number_empty_string() {
+        assert_eq!(extract_line_number(""), None);
+    }
+
+    // ── split_name_message ───────────────────────────────────────────────
+
+    #[test]
+    fn split_name_message_standard() {
+        let (name, message) = split_name_message("TypeError: x is not a function");
+        assert_eq!(name, Some("TypeError".to_string()));
+        assert_eq!(message, "x is not a function");
+    }
+
+    #[test]
+    fn split_name_message_no_colon() {
+        let (name, message) = split_name_message("no colon here");
+        assert_eq!(name, None);
+        assert_eq!(message, "no colon here");
+    }
+
+    #[test]
+    fn split_name_message_empty_message_after_colon() {
+        // "Name: " trimmed becomes "Name:" which no longer contains ": ",
+        // so the colon-space pattern is not found and the whole trimmed string is returned.
+        let (name, message) = split_name_message("Name: ");
+        assert_eq!(name, None);
+        assert_eq!(message, "Name:");
+    }
+
+    #[test]
+    fn split_name_message_empty_name_before_colon() {
+        let (name, message) = split_name_message(": message only");
+        assert_eq!(name, None);
+        assert_eq!(message, ": message only");
+    }
+
+    #[test]
+    fn split_name_message_extraneous_whitespace() {
+        let (name, message) = split_name_message("  TypeError:  some message  ");
+        assert_eq!(name, Some("TypeError".to_string()));
+        assert_eq!(message, "some message");
+    }
+
+    // ── is_artifact_message ─────────────────────────────────────────────
+
+    #[test]
+    fn is_artifact_message_empty() {
+        assert!(is_artifact_message(""));
+    }
+
+    #[test]
+    fn is_artifact_message_closing_paren() {
+        assert!(is_artifact_message(")"));
+    }
+
+    #[test]
+    fn is_artifact_message_no_message_tag() {
+        assert!(is_artifact_message("<no message>"));
+    }
+
+    #[test]
+    fn is_artifact_message_no_details_tag() {
+        assert!(is_artifact_message("<no details available>"));
+    }
+
+    #[test]
+    fn is_artifact_message_real_text_false() {
+        assert!(!is_artifact_message("actual error text"));
     }
 }

@@ -1400,6 +1400,24 @@ console.log(result)"#;
     }
 
     #[test]
+    fn test_bare_type_error_no_duplication() {
+        let mut session = JsSession::new();
+        let result = session.run_cell("throw new TypeError()", "");
+        assert!(result.error.is_some(), "{:?}", result.error);
+        match result.error.unwrap() {
+            crate::types::CellError::Runtime { name, message, .. } => {
+                assert_eq!(name.as_deref(), Some("TypeError"));
+                // Must NOT produce "TypeError: TypeError" — the name should appear once.
+                assert!(
+                    !message.contains("TypeError: TypeError"),
+                    "message should not double-count the error name: {message}"
+                );
+            }
+            other => panic!("bare TypeError should be runtime, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn test_syntax_error_classification_parity_eval_and_throw() {
         let mut session = JsSession::new();
 
@@ -1623,5 +1641,93 @@ console.log(result)"#;
         let result = session.run_cell("print(new Promise(() => {}))", "");
         assert!(result.error.is_none(), "{:?}", result.error);
         assert_eq!(result.stdout, vec!["[Promise pending]"]);
+    }
+
+    #[test]
+    fn test_bare_reference_error_no_duplication() {
+        let mut session = JsSession::new();
+        let result = session.run_cell("nonexistent_var", "");
+        assert!(result.error.is_some(), "{:?}", result.error);
+        match result.error.unwrap() {
+            crate::types::CellError::Runtime { name, message, .. } => {
+                assert_eq!(name.as_deref(), Some("ReferenceError"));
+                assert!(
+                    !message.contains("ReferenceError: ReferenceError"),
+                    "message should not double-count the error name: {message}"
+                );
+            }
+            other => panic!("ReferenceError should be runtime, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_type_error_with_message_includes_name() {
+        let mut session = JsSession::new();
+        let result = session.run_cell(r#"throw new TypeError("x is not a function")"#, "");
+        assert!(result.error.is_some(), "{:?}", result.error);
+        match result.error.unwrap() {
+            crate::types::CellError::Runtime { name, message, .. } => {
+                assert_eq!(name.as_deref(), Some("TypeError"));
+                assert_eq!(message, "x is not a function");
+                // Display should include the name prefix
+                let display = crate::format_cell_error_text(
+                    &crate::types::CellError::Runtime {
+                        name: name.clone(),
+                        message: message.clone(),
+                        line: None,
+                        action: None,
+                        code: None,
+                    },
+                );
+                assert_eq!(display, "TypeError: x is not a function");
+            }
+            other => panic!("expected runtime error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_range_error_includes_name() {
+        let mut session = JsSession::new();
+        let result = session.run_cell(r#"throw new RangeError("out of bounds")"#, "");
+        assert!(result.error.is_some(), "{:?}", result.error);
+        match result.error.unwrap() {
+            crate::types::CellError::Runtime { name, message, .. } => {
+                assert_eq!(name.as_deref(), Some("RangeError"));
+                assert_eq!(message, "out of bounds");
+            }
+            other => panic!("expected runtime error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_error_display_no_artifact_strings() {
+        let mut session = JsSession::new();
+        for code in [
+            r#"throw new TypeError()"#,
+            r#"throw new Error()"#,
+            r#"throw new RangeError()"#,
+            r#"throw new SyntaxError()"#,
+        ] {
+            let result = session.run_cell(code, "");
+            assert!(result.error.is_some(), "expected error for: {code}");
+            let msg = format!("{}", result.error.unwrap());
+            assert!(!msg.contains("<no message>"), "artifact '<no message>' in: {msg} (from: {code})");
+            assert!(!msg.contains("<no details available>"), "artifact '<no details>' in: {msg} (from: {code})");
+        }
+    }
+
+    #[test]
+    fn test_null_property_access_type_error() {
+        let mut session = JsSession::new();
+        let result = session.run_cell("null.foo", "");
+        assert!(result.error.is_some(), "{:?}", result.error);
+        match result.error.unwrap() {
+            crate::types::CellError::Runtime { name, message, .. } => {
+                assert_eq!(name.as_deref(), Some("TypeError"));
+                // Should have some diagnostic info, not just "TypeError"
+                assert!(!message.is_empty(), "message should not be empty: {message}");
+            }
+            other => panic!("expected runtime error, got {other:?}"),
+        }
     }
 }

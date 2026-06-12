@@ -1,5 +1,5 @@
 use crate::error::format::format_js_exception;
-use crate::error::js_exception::{extract_line_number, parse_js_exception, JsException};
+use crate::error::js_exception::{extract_line_number, parse_js_exception, split_name_message, JsException};
 use crate::types::CellError;
 use rquickjs::{Ctx, Value};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -84,9 +84,9 @@ pub(crate) fn cell_error_from_js_exception(exc: JsException) -> CellError {
             || exc.hint.is_some()
             || exc.recovery.as_ref().is_some_and(|r| !r.is_empty())
         {
-            format_js_exception(&exc)
+            full_text
         } else {
-            exc.message.clone()
+            exc.message
         };
         CellError::Runtime {
             name: exc.name,
@@ -109,20 +109,7 @@ pub(crate) fn cell_error_from_text(msg: &str) -> CellError {
         return CellError::FuelExhausted;
     }
 
-    let (name, message) = {
-        let trimmed = msg.trim();
-        if let Some(colon_idx) = trimmed.find(": ") {
-            let name = trimmed[..colon_idx].trim();
-            let message = trimmed[colon_idx + 2..].trim();
-            if !name.is_empty() && !message.is_empty() {
-                (Some(name.to_string()), message.to_string())
-            } else {
-                (None, trimmed.to_string())
-            }
-        } else {
-            (None, trimmed.to_string())
-        }
-    };
+    let (name, message) = split_name_message(msg);
 
     cell_error_from_js_exception(JsException {
         name,
@@ -145,5 +132,166 @@ pub(crate) fn cell_error_from_rquickjs_error<'js>(
         cell_error_from_exception(&exc)
     } else {
         cell_error_from_text(&error.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::error::js_exception::JsException;
+    use crate::format_cell_error_text;
+
+    fn js_exc(name: Option<&str>, message: &str) -> JsException {
+        JsException {
+            name: name.map(String::from),
+            message: message.to_string(),
+            line: None,
+            action: None,
+            code: None,
+            hint: None,
+            recovery: None,
+        }
+    }
+
+    // ── is_fuel_exhausted_text ──────────────────────────────────────
+
+    #[test]
+    fn fuel_text_interrupted() {
+        assert!(is_fuel_exhausted_text("interrupted"));
+    }
+
+    #[test]
+    fn fuel_text_prefixed_interrupted() {
+        assert!(is_fuel_exhausted_text("Error: interrupted"));
+    }
+
+    #[test]
+    fn fuel_text_interrupted_by_host() {
+        assert!(is_fuel_exhausted_text("something interrupted by host"));
+    }
+
+    #[test]
+    fn fuel_text_normal_error() {
+        assert!(!is_fuel_exhausted_text("normal error"));
+    }
+
+    // ── cell_error_from_js_exception ─────────────────────────────────
+
+    #[test]
+    fn js_exc_plain_type_error() {
+        let exc = js_exc(Some("TypeError"), "x is not a function");
+        let err = cell_error_from_js_exception(exc);
+        match err {
+            CellError::Runtime { name, message, .. } => {
+                assert_eq!(name.as_deref(), Some("TypeError"));
+                assert_eq!(message, "x is not a function");
+            }
+            other => panic!("expected Runtime, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn js_exc_with_action_and_code() {
+        let exc = JsException {
+            name: Some("Error".into()),
+            message: "Cannot execute script".into(),
+            line: None,
+            action: Some("tab_snapshot".into()),
+            code: Some("E_SCRIPTING".into()),
+            hint: None,
+            recovery: None,
+        };
+        let err = cell_error_from_js_exception(exc);
+        match err {
+            CellError::Runtime { message, action, code, .. } => {
+                assert_eq!(message, "[tab_snapshot] (E_SCRIPTING): Cannot execute script");
+                assert_eq!(action.as_deref(), Some("tab_snapshot"));
+                assert_eq!(code.as_deref(), Some("E_SCRIPTING"));
+            }
+            other => panic!("expected Runtime, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn js_exc_fuel_exhausted() {
+        let exc = js_exc(Some("Error"), "interrupted");
+        assert!(matches!(cell_error_from_js_exception(exc), CellError::FuelExhausted));
+    }
+
+    #[test]
+    fn js_exc_syntax_error_with_parse_diagnostic() {
+        let exc = js_exc(Some("SyntaxError"), "unexpected token )");
+        let err = cell_error_from_js_exception(exc);
+        match err {
+            CellError::Compile { name, message, .. } => {
+                assert_eq!(name.as_deref(), Some("SyntaxError"));
+                assert_eq!(message, "unexpected token )");
+            }
+            other => panic!("expected Compile, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn js_exc_bare_type_error_empty_message() {
+        let exc = JsException {
+            name: Some("TypeError".into()),
+            message: String::new(),
+            line: None,
+            action: None,
+            code: None,
+            hint: None,
+            recovery: None,
+        };
+        let err = cell_error_from_js_exception(exc);
+        match err {
+            CellError::Runtime { ref name, ref message, .. } => {
+                assert_eq!(name.as_deref(), Some("TypeError"));
+                assert_eq!(message, "");
+                // Display should produce "TypeError" without duplication
+                let display = format_cell_error_text(&err);
+                assert_eq!(display, "TypeError");
+                assert!(!display.contains("TypeError: TypeError"));
+            }
+            other => panic!("expected Runtime, got {other:?}"),
+        }
+    }
+
+    // ── cell_error_from_text ─────────────────────────────────────────
+
+    #[test]
+    fn text_type_error() {
+        let err = cell_error_from_text("TypeError: x is not a function");
+        match err {
+            CellError::Runtime { name, message, .. } => {
+                assert_eq!(name.as_deref(), Some("TypeError"));
+                assert_eq!(message, "x is not a function");
+            }
+            other => panic!("expected Runtime, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn text_interrupted() {
+        assert!(matches!(cell_error_from_text("interrupted"), CellError::FuelExhausted));
+    }
+
+    #[test]
+    fn text_syntax_error_with_parse_diagnostic() {
+        let err = cell_error_from_text("SyntaxError: unexpected token");
+        match err {
+            CellError::Compile { name, message, .. } => {
+                assert_eq!(name.as_deref(), Some("SyntaxError"));
+                assert_eq!(message, "unexpected token");
+            }
+            other => panic!("expected Compile, got {other:?}"),
+        }
+    }
+
+    // Regression: format_cell_error_text must not double-prefix the error name.
+    #[test]
+    fn display_no_double_prefix() {
+        let err = cell_error_from_text("TypeError: x is not a function");
+        let display = format_cell_error_text(&err);
+        assert_eq!(display, "TypeError: x is not a function");
     }
 }
