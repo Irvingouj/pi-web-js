@@ -1,7 +1,4 @@
-import {
-	CHROME_FIXTURE_PREFIX,
-	RESULT_PREFIX,
-} from "./constants.ts";
+import { CHROME_FIXTURE_PREFIX, RESULT_PREFIX } from "./constants.ts";
 import { executeCell } from "./harness.ts";
 import { parseSentinelLine } from "./sentinels.ts";
 import type { ExtensionHarness } from "./types.ts";

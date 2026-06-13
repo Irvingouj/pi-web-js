@@ -1,8 +1,8 @@
 #!/usr/bin/env node
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { transformSync } from "esbuild";
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "..");
@@ -43,8 +43,10 @@ const QUICKJS_SUPPORTED = {
 };
 
 function transpileForQuickJS(source) {
-	return transformSync(source, { target: "es2015", supported: QUICKJS_SUPPORTED })
-		.code;
+	return transformSync(source, {
+		target: "es2015",
+		supported: QUICKJS_SUPPORTED,
+	}).code;
 }
 
 contract = transpileForQuickJS(contract);
@@ -58,7 +60,10 @@ fs.writeFileSync(
 );
 fs.writeFileSync(path.join(publicE2eDir, "contract-batch-runner.js"), runner);
 
-const returnOneSrc = path.join(rootDir, "tests/e2e/extension/fixtures/return-one.js");
+const returnOneSrc = path.join(
+	rootDir,
+	"tests/e2e/extension/fixtures/return-one.js",
+);
 fs.copyFileSync(returnOneSrc, path.join(publicE2eDir, "return-one.js"));
 
 console.log("Copied e2e contract assets → public/e2e/");

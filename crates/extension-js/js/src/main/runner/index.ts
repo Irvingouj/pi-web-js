@@ -2,16 +2,19 @@
 // Main-thread runner entry.
 
 export {
-	registerHostHandler,
-	registerHostHandlers,
-	isValidMainThreadAction,
-	normalizeParams,
+	type Command,
+	setRunnerAbortController,
+} from "../../shared/tool-registry.js";
+export {
+	executeMainThreadCommand,
 	getActiveTabId,
 	initExtensionListeners,
+	isValidMainThreadAction,
+	normalizeParams,
+	registerHostHandler,
+	registerHostHandlers,
 	removeExtensionListeners,
-	executeMainThreadCommand,
 } from "./runtime.js";
-export { type Command, setRunnerAbortController } from "../../shared/tool-registry.js";
 
 import "./tools/storage.js";
 import "./tools/chrome-storage.js";

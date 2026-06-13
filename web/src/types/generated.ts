@@ -57,7 +57,12 @@ export type AsyncCommand = {
 };
 
 export type CellError =
-	| { kind: "compile"; name: string | null; message: string; line: number | null }
+	| {
+			kind: "compile";
+			name: string | null;
+			message: string;
+			line: number | null;
+	  }
 	| {
 			kind: "runtime";
 			name: string | null;

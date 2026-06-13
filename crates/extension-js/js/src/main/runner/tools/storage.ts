@@ -1,37 +1,8 @@
 /// <reference types="chrome" />
 import { z } from "zod";
-import { logger } from "../../../shared/logger.js";
 import * as schemas from "../../../shared/schemas.js";
-import {
-	dispatchTool,
-	registerJsCall,
-	type CallContext,
-	type ToolDocParam,
-} from "../../../shared/tool-registry.js";
-import type { DomFormatParams, DomSnapshotParams, FetchParams } from "../runtime.js";
-import {
-	makeError,
-	asRecord,
-	extractTabId,
-	unwrapResult,
-	getActiveTabId,
-	resolveActiveTabId,
-	waitForTabLoad,
-	handleFetch,
-	handleHostCallAction,
-	registerChromePassthrough,
-	getElementByRefId,
-	extractRefId,
-	handleDomSnapshot,
-	handleDomFormat,
-	ensureDomSnapshot,
-	buildSnapshotInTab,
-	throwIfAborted,
-	DEFAULT_TIMEOUT_MS,
-	DEFAULT_MAX_NODES,
-	DEFAULT_SCROLL_AMOUNT,
-	DEFAULT_POLL_INTERVAL_MS,
-} from "../runtime.js";
+import { registerJsCall } from "../../../shared/tool-registry.js";
+import { asRecord } from "../runtime.js";
 
 // ─── Storage ─────────────────────────────────────────────────────
 
@@ -49,13 +20,18 @@ registerJsCall({
 		return localStorage.getItem(params.key);
 	},
 	paramTypes: [
-		{ name: "key", type: "string", required: true, description: "Storage key (literal)" },
+		{
+			name: "key",
+			type: "string",
+			required: true,
+			description: "Storage key (literal)",
+		},
 	],
 	returnDoc: "Stored value or null",
 	errorCode: "ESTORAGE",
 	errorCategory: "storage",
 
-	example: "storage.get(\"myKey\")",
+	example: 'storage.get("myKey")',
 });
 
 registerJsCall({
@@ -66,14 +42,21 @@ registerJsCall({
 	params: schemas.StorageSetParamsSchema,
 	returns: z.null(),
 	fields: ["key", "value"],
-	aliases: [{ namespace: "web.storage", name: "set", fields: ["key", "value"] }],
+	aliases: [
+		{ namespace: "web.storage", name: "set", fields: ["key", "value"] },
+	],
 	owner: "main-thread",
 	handler: async (params, _ctx) => {
 		localStorage.setItem(params.key, params.value);
 		return null;
 	},
 	paramTypes: [
-		{ name: "key", type: "string", required: true, description: "Storage key (literal)" },
+		{
+			name: "key",
+			type: "string",
+			required: true,
+			description: "Storage key (literal)",
+		},
 		{
 			name: "value",
 			type: "string",
@@ -85,7 +68,7 @@ registerJsCall({
 	errorCode: "ESTORAGE",
 	errorCategory: "storage",
 
-	example: "storage.set(\"myKey\", \"myValue\")",
+	example: 'storage.set("myKey", "myValue")',
 });
 
 registerJsCall({
@@ -103,13 +86,18 @@ registerJsCall({
 		return null;
 	},
 	paramTypes: [
-		{ name: "key", type: "string", required: true, description: "Storage key (literal)" },
+		{
+			name: "key",
+			type: "string",
+			required: true,
+			description: "Storage key (literal)",
+		},
 	],
 	returnDoc: "null",
 	errorCode: "ESTORAGE",
 	errorCategory: "storage",
 
-	example: "storage.delete(\"myKey\")",
+	example: 'storage.delete("myKey")',
 });
 
 registerJsCall({
@@ -168,7 +156,7 @@ registerJsCall({
 	errorCode: "ESTORAGE",
 	errorCategory: "storage",
 
-	example: "storage.set_many({ key1: \"val1\", key2: \"val2\" })",
+	example: 'storage.set_many({ key1: "val1", key2: "val2" })',
 });
 
 registerJsCall({
@@ -207,7 +195,7 @@ registerJsCall({
 	returnDoc: "Record of values",
 	errorCode: "ESTORAGE",
 	errorCategory: "storage",
-	example: "storage.get_many([\"key1\", \"key2\"])",
+	example: 'storage.get_many(["key1", "key2"])',
 });
 
 registerJsCall({
@@ -264,7 +252,7 @@ registerJsCall({
 	errorCode: "ESTORAGE",
 	errorCategory: "storage",
 
-	example: "storage.delete_many([\"key1\", \"key2\"])",
+	example: 'storage.delete_many(["key1", "key2"])',
 });
 
 registerJsCall({

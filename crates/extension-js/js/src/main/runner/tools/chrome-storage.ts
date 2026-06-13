@@ -15,7 +15,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.storage.local.set({ key: \"value\" })"
+	'chrome.storage.local.set({ key: "value" })',
 );
 registerChromePassthrough(
 	"chrome_storage_local_get",
@@ -26,7 +26,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.storage.local.get(\"key\")"
+	'chrome.storage.local.get("key")',
 );
 registerChromePassthrough(
 	"chrome_storage_local_remove",
@@ -37,7 +37,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.storage.local.remove(\"key\")"
+	'chrome.storage.local.remove("key")',
 );
 registerChromePassthrough(
 	"chrome_storage_local_clear",
@@ -48,7 +48,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.storage.local.clear()"
+	"chrome.storage.local.clear()",
 );
 registerChromePassthrough(
 	"chrome_storage_sync_set",
@@ -59,7 +59,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.storage.sync.set({ key: \"value\" })"
+	'chrome.storage.sync.set({ key: "value" })',
 );
 registerChromePassthrough(
 	"chrome_storage_sync_get",
@@ -70,7 +70,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.storage.sync.get(\"key\")"
+	'chrome.storage.sync.get("key")',
 );
 registerChromePassthrough(
 	"chrome_storage_sync_remove",
@@ -81,7 +81,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.storage.sync.remove(\"key\")"
+	'chrome.storage.sync.remove("key")',
 );
 registerChromePassthrough(
 	"chrome_storage_sync_clear",
@@ -92,5 +92,5 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.storage.sync.clear()"
+	"chrome.storage.sync.clear()",
 );

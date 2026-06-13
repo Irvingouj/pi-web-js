@@ -118,7 +118,9 @@ describe("fetch binary detection (T-010)", () => {
 		vi.stubGlobal(
 			"fetch",
 			vi.fn(() =>
-				Promise.resolve(makeBinaryResponse("application/octet-stream", binaryData)),
+				Promise.resolve(
+					makeBinaryResponse("application/octet-stream", binaryData),
+				),
 			),
 		);
 
@@ -140,7 +142,9 @@ describe("fetch binary detection (T-010)", () => {
 	it("text responses still work with bodyEncoding: text", async () => {
 		vi.stubGlobal(
 			"fetch",
-			vi.fn(() => Promise.resolve(makeTextResponse("<html><body>Hello</body></html>"))),
+			vi.fn(() =>
+				Promise.resolve(makeTextResponse("<html><body>Hello</body></html>")),
+			),
 		);
 
 		const result = await dispatchContentScriptCall(
@@ -153,7 +157,9 @@ describe("fetch binary detection (T-010)", () => {
 		if (result.ok) {
 			expect(result.value.bodyEncoding).toBe("text");
 			expect(result.value.body).toBe("<html><body>Hello</body></html>");
-			expect(result.value.byteLength).toBe("<html><body>Hello</body></html>".length);
+			expect(result.value.byteLength).toBe(
+				"<html><body>Hello</body></html>".length,
+			);
 			expect(result.value.status).toBe(200);
 			expect(result.value.ok).toBe(true);
 		}
@@ -161,7 +167,10 @@ describe("fetch binary detection (T-010)", () => {
 
 	it.each([
 		["audio/mpeg", new Uint8Array([0x49, 0x44, 0x33])],
-		["video/mp4", new Uint8Array([0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70])],
+		[
+			"video/mp4",
+			new Uint8Array([0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70]),
+		],
 		["application/zip", new Uint8Array([0x50, 0x4b, 0x03, 0x04])],
 	])("binary content-type %s returns base64", async (contentType, body) => {
 		vi.stubGlobal(
@@ -206,7 +215,9 @@ describe("fetch binary detection (T-010)", () => {
 		const pdfBytes = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]);
 		vi.stubGlobal(
 			"fetch",
-			vi.fn(() => Promise.resolve(makeBinaryResponse("application/pdf", pdfBytes))),
+			vi.fn(() =>
+				Promise.resolve(makeBinaryResponse("application/pdf", pdfBytes)),
+			),
 		);
 
 		const result = await dispatchContentScriptCall(

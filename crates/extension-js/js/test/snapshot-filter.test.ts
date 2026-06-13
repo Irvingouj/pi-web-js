@@ -1,22 +1,66 @@
 import { describe, expect, it } from "vitest";
-import { filterNodes } from "../src/shared/snapshot-filter.js";
 import type { InlineSnapshotNode } from "../src/shared/collect-inline-snapshot.js";
+import { filterNodes } from "../src/shared/snapshot-filter.js";
 
 function node(
-	overrides: Partial<InlineSnapshotNode> & Pick<InlineSnapshotNode, "refId" | "role" | "tag">,
+	overrides: Partial<InlineSnapshotNode> &
+		Pick<InlineSnapshotNode, "refId" | "role" | "tag">,
 ): InlineSnapshotNode {
 	return overrides;
 }
 
 const allNodes: InlineSnapshotNode[] = [
-	node({ refId: "e1", role: "button", tag: "button", name: "Sign in", text: "Sign in" }),
-	node({ refId: "e2", role: "link", tag: "a", name: "Home", text: "Home", href: "https://example.com/" }),
+	node({
+		refId: "e1",
+		role: "button",
+		tag: "button",
+		name: "Sign in",
+		text: "Sign in",
+	}),
+	node({
+		refId: "e2",
+		role: "link",
+		tag: "a",
+		name: "Home",
+		text: "Home",
+		href: "https://example.com/",
+	}),
 	node({ refId: "e3", role: "textbox", tag: "input", name: "Email", text: "" }),
-	node({ refId: "e4", role: "heading", tag: "h1", name: "Welcome", text: "Welcome" }),
-	node({ refId: "e5", role: "generic", tag: "div", text: "Some paragraph text" }),
-	node({ refId: "e6", role: "img", tag: "img", name: "Logo", src: "https://example.com/logo.png" }),
-	node({ refId: "e7", role: "checkbox", tag: "input", name: "Remember me", text: "" }),
-	node({ refId: "e8", role: "link", tag: "a", name: "Documentation", text: "Docs", href: "https://example.com/docs" }),
+	node({
+		refId: "e4",
+		role: "heading",
+		tag: "h1",
+		name: "Welcome",
+		text: "Welcome",
+	}),
+	node({
+		refId: "e5",
+		role: "generic",
+		tag: "div",
+		text: "Some paragraph text",
+	}),
+	node({
+		refId: "e6",
+		role: "img",
+		tag: "img",
+		name: "Logo",
+		src: "https://example.com/logo.png",
+	}),
+	node({
+		refId: "e7",
+		role: "checkbox",
+		tag: "input",
+		name: "Remember me",
+		text: "",
+	}),
+	node({
+		refId: "e8",
+		role: "link",
+		tag: "a",
+		name: "Documentation",
+		text: "Docs",
+		href: "https://example.com/docs",
+	}),
 ];
 
 describe("filterNodes", () => {
@@ -106,7 +150,10 @@ describe("filterNodes", () => {
 	});
 
 	it("combines interactiveOnly with text filter", () => {
-		const result = filterNodes(allNodes, { interactiveOnly: true, text: "sign" });
+		const result = filterNodes(allNodes, {
+			interactiveOnly: true,
+			text: "sign",
+		});
 		expect(result).toHaveLength(1);
 		expect(result[0].refId).toBe("e1");
 	});

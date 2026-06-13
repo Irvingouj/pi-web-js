@@ -1,6 +1,7 @@
 /// <reference types="chrome" />
-import { asRecord } from "../lib/params.js";
+
 import { refIdString } from "../../../shared/schemas.js";
+import { asRecord } from "../lib/params.js";
 
 /**
  * Find an element by its opaque reference ID.

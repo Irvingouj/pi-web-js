@@ -1,5 +1,3 @@
-/// <reference types="chrome" />
-import { z } from "zod";
 import * as schemas from "../../../../shared/schemas.js";
 import { registerChromePassthrough } from "../../chrome/internals.js";
 import { zChromeVoid } from "./register-helpers.js";
@@ -13,7 +11,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.history.search({ text: \"example\" })"
+	'chrome.history.search({ text: "example" })',
 );
 registerChromePassthrough(
 	"chrome_history_deleteUrl",
@@ -31,7 +29,7 @@ registerChromePassthrough(
 			description: "URL to delete from history (url)",
 		},
 	],
-	"chrome.history.deleteUrl({ url: \"https://example.com\" })"
+	'chrome.history.deleteUrl({ url: "https://example.com" })',
 );
 registerChromePassthrough(
 	"chrome_history_addUrl",
@@ -42,7 +40,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.history.addUrl({ url: \"https://example.com\" })"
+	'chrome.history.addUrl({ url: "https://example.com" })',
 );
 registerChromePassthrough(
 	"chrome_history_deleteAll",
@@ -53,7 +51,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.history.deleteAll()"
+	"chrome.history.deleteAll()",
 );
 registerChromePassthrough(
 	"chrome_history_deleteRange",
@@ -64,7 +62,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.history.deleteRange({ startTime: 0, endTime: Date.now() })"
+	"chrome.history.deleteRange({ startTime: 0, endTime: Date.now() })",
 );
 registerChromePassthrough(
 	"chrome_history_getVisits",
@@ -75,5 +73,5 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.history.getVisits({ url: \"https://example.com\" })"
+	'chrome.history.getVisits({ url: "https://example.com" })',
 );

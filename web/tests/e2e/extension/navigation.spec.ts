@@ -1,37 +1,44 @@
-import { test, expect } from "./fixtures.ts";
+import { expect, test } from "./fixtures.ts";
+import {
+	RESULT_PREFIX,
+	SLOW_NETWORK_URL,
+	SNAPSHOT_QUERY_URL,
+} from "./lib/constants.ts";
 import { executeCell } from "./lib/harness.ts";
-import { RESULT_PREFIX, SLOW_NETWORK_URL, SNAPSHOT_QUERY_URL } from "./lib/constants.ts";
 import type { ContractResult } from "./lib/types.ts";
 
-test.describe.serial("navigation stability", () => {
-	test.setTimeout(20_000);
+test.describe
+	.serial("navigation stability", () => {
+		test.setTimeout(20_000);
 
-	test("concurrent public run requests are serialized", async ({ harness }) => {
-		const results = await harness.sidepanel.evaluate(async () => {
-			const session = (
-				window as Window & {
-					__extensionSession?: {
-						runCellAsync(code: string, stdin?: string): Promise<unknown>;
-					};
-				}
-			).__extensionSession;
-			if (!session) throw new Error("Extension session not exposed");
+		test("concurrent public run requests are serialized", async ({
+			harness,
+		}) => {
+			const results = await harness.sidepanel.evaluate(async () => {
+				const session = (
+					window as Window & {
+						__extensionSession?: {
+							runCellAsync(code: string, stdin?: string): Promise<unknown>;
+						};
+					}
+				).__extensionSession;
+				if (!session) throw new Error("Extension session not exposed");
 
-			return Promise.all([
-				session.runCellAsync(
-					'await web.sleep(200); print("first");',
-				),
-				session.runCellAsync('print("second");'),
-			]);
+				return Promise.all([
+					session.runCellAsync('await web.sleep(200); print("first");'),
+					session.runCellAsync('print("second");'),
+				]);
+			});
+
+			expect(results).toHaveLength(2);
+			expect(results[0]).toMatchObject({ status: "ok", stdout: ["first"] });
+			expect(results[1]).toMatchObject({ status: "ok", stdout: ["second"] });
 		});
 
-		expect(results).toHaveLength(2);
-		expect(results[0]).toMatchObject({ status: "ok", stdout: ["first"] });
-		expect(results[1]).toMatchObject({ status: "ok", stdout: ["second"] });
-	});
-
-	test("goto positional URL -> extract positional fields", async ({ harness }) => {
-		const source = `
+		test("goto positional URL -> extract positional fields", async ({
+			harness,
+		}) => {
+			const source = `
 var RESULT_PREFIX = "${RESULT_PREFIX}";
 
 const tabs = await chrome.tabs.query({ url: "https://extension-js.test/fixture" });
@@ -45,22 +52,24 @@ let result = await page.extract(["title", "url"]);
 print(RESULT_PREFIX + JSON.stringify({ ok: true, value: result }));
 `;
 
-		const exec = await executeCell<
-			ContractResult<{ title: string; url: string }>
-		>(harness.sidepanel, source, 20_000);
+			const exec = await executeCell<
+				ContractResult<{ title: string; url: string }>
+			>(harness.sidepanel, source, 20_000);
 
-		expect(exec.status, `${exec.stderr}\n${exec.stdout}`).toBe("success");
-		expect(exec.result).toEqual({
-			ok: true,
-			value: {
-				title: "Next page",
-				url: "https://extension-js.test/next",
-			},
+			expect(exec.status, `${exec.stderr}\n${exec.stdout}`).toBe("success");
+			expect(exec.result).toEqual({
+				ok: true,
+				value: {
+					title: "Next page",
+					url: "https://extension-js.test/next",
+				},
+			});
 		});
-	});
 
-	test("bare top-level await without let/const is wrapped safely", async ({ harness }) => {
-		const source = `
+		test("bare top-level await without let/const is wrapped safely", async ({
+			harness,
+		}) => {
+			const source = `
 var RESULT_PREFIX = "${RESULT_PREFIX}";
 
 const tabs = await chrome.tabs.query({ url: "https://extension-js.test/*" });
@@ -73,18 +82,20 @@ await page.goto("https://extension-js.test/next");
 print(RESULT_PREFIX + JSON.stringify({ ok: true, value: "bare-await" }));
 `;
 
-		const exec = await executeCell<ContractResult<string>>(
-			harness.sidepanel,
-			source,
-			20_000,
-		);
+			const exec = await executeCell<ContractResult<string>>(
+				harness.sidepanel,
+				source,
+				20_000,
+			);
 
-		expect(exec.status, `${exec.stderr}\n${exec.stdout}`).toBe("success");
-		expect(exec.result).toEqual({ ok: true, value: "bare-await" });
-	});
+			expect(exec.status, `${exec.stderr}\n${exec.stdout}`).toBe("success");
+			expect(exec.result).toEqual({ ok: true, value: "bare-await" });
+		});
 
-	test("goto -> url -> title -> snapshot without manual sleep", async ({ harness }) => {
-		const source = `
+		test("goto -> url -> title -> snapshot without manual sleep", async ({
+			harness,
+		}) => {
+			const source = `
 var RESULT_PREFIX = "${RESULT_PREFIX}";
 
 // Find any extension test tab (prior cells may have navigated away from /fixture)
@@ -117,29 +128,33 @@ print(RESULT_PREFIX + JSON.stringify({
 }));
 `;
 
-		const exec = await executeCell<ContractResult<{
-			url: string;
-			title: string;
-			hasSnapshot: boolean;
-			nodeCount: number;
-			refId: string;
-			clicked: boolean;
-		}>>(harness.sidepanel, source, 20_000);
+			const exec = await executeCell<
+				ContractResult<{
+					url: string;
+					title: string;
+					hasSnapshot: boolean;
+					nodeCount: number;
+					refId: string;
+					clicked: boolean;
+				}>
+			>(harness.sidepanel, source, 20_000);
 
-		expect(exec.status, `${exec.stderr}\n${exec.stdout}`).toBe("success");
-		expect(exec.result?.ok).toBe(true);
-		if (exec.result?.ok) {
-			expect(exec.result.value.url).toContain("/next");
-			expect(exec.result.value.title).toBe("Next page");
-			expect(exec.result.value.hasSnapshot).toBe(true);
-			expect(exec.result.value.nodeCount).toBeGreaterThan(0);
-			expect(exec.result.value.refId).toMatch(/^e\d+$/);
-			expect(exec.result.value.clicked).toBe(true);
-		}
-	});
+			expect(exec.status, `${exec.stderr}\n${exec.stdout}`).toBe("success");
+			expect(exec.result?.ok).toBe(true);
+			if (exec.result?.ok) {
+				expect(exec.result.value.url).toContain("/next");
+				expect(exec.result.value.title).toBe("Next page");
+				expect(exec.result.value.hasSnapshot).toBe(true);
+				expect(exec.result.value.nodeCount).toBeGreaterThan(0);
+				expect(exec.result.value.refId).toMatch(/^e\d+$/);
+				expect(exec.result.value.clicked).toBe(true);
+			}
+		});
 
-	test("goto then extract matches user notebook snippet", async ({ harness }) => {
-		const source = `
+		test("goto then extract matches user notebook snippet", async ({
+			harness,
+		}) => {
+			const source = `
 var RESULT_PREFIX = "${RESULT_PREFIX}";
 
 const tabs = await chrome.tabs.query({ url: "https://extension-js.test/*" });
@@ -153,20 +168,22 @@ let result = await page.extract(["title", "url"]);
 print(RESULT_PREFIX + JSON.stringify({ ok: true, value: result }));
 `;
 
-		const exec = await executeCell<
-			ContractResult<{ title: string; url: string }>
-		>(harness.sidepanel, source, 20_000);
+			const exec = await executeCell<
+				ContractResult<{ title: string; url: string }>
+			>(harness.sidepanel, source, 20_000);
 
-		expect(exec.status, `${exec.stderr}\n${exec.stdout}`).toBe("success");
-		expect(exec.result?.ok).toBe(true);
-		if (exec.result?.ok) {
-			expect(exec.result.value.title).toBe("Next page");
-			expect(exec.result.value.url).toContain("/next");
-		}
-	});
+			expect(exec.status, `${exec.stderr}\n${exec.stdout}`).toBe("success");
+			expect(exec.result?.ok).toBe(true);
+			if (exec.result?.ok) {
+				expect(exec.result.value.title).toBe("Next page");
+				expect(exec.result.value.url).toContain("/next");
+			}
+		});
 
-	test("goto to non-scriptable page returns structured E_NAVIGATION", async ({ harness }) => {
-		const source = `
+		test("goto to non-scriptable page returns structured E_NAVIGATION", async ({
+			harness,
+		}) => {
+			const source = `
 var RESULT_PREFIX = "${RESULT_PREFIX}";
 var result = { ok: true, value: null };
 try {
@@ -183,22 +200,24 @@ try {
 print(RESULT_PREFIX + JSON.stringify(result));
 `;
 
-		const exec = await executeCell<ContractResult<null>>(
-			harness.sidepanel,
-			source,
-			15_000,
-		);
+			const exec = await executeCell<ContractResult<null>>(
+				harness.sidepanel,
+				source,
+				15_000,
+			);
 
-		expect(exec.status, `${exec.stderr}\n${exec.stdout}`).toBe("success");
-		expect(exec.result?.ok).toBe(false);
-		if (!exec.result?.ok) {
-			expect(exec.result.error.code).toBe("E_NAVIGATION");
-			expect(exec.result.error.message).toContain("Navigation blocked");
-		}
-	});
+			expect(exec.status, `${exec.stderr}\n${exec.stdout}`).toBe("success");
+			expect(exec.result?.ok).toBe(false);
+			if (!exec.result?.ok) {
+				expect(exec.result.error.code).toBe("E_NAVIGATION");
+				expect(exec.result.error.message).toContain("Navigation blocked");
+			}
+		});
 
-	test("goto with waitUntil networkidle waits for delayed fetches", async ({ harness }) => {
-		const source = `
+		test("goto with waitUntil networkidle waits for delayed fetches", async ({
+			harness,
+		}) => {
+			const source = `
 var RESULT_PREFIX = "${RESULT_PREFIX}";
 
 // Navigate to the slow-network testcase with networkidle
@@ -222,21 +241,27 @@ print(RESULT_PREFIX + JSON.stringify({
 }));
 `;
 
-		const exec = await executeCell<
-			ContractResult<{ hasData1: boolean; hasData2: boolean; statusComplete: boolean }>
-		>(harness.sidepanel, source, 30_000);
+			const exec = await executeCell<
+				ContractResult<{
+					hasData1: boolean;
+					hasData2: boolean;
+					statusComplete: boolean;
+				}>
+			>(harness.sidepanel, source, 30_000);
 
-		expect(exec.status, `${exec.stderr}\n${exec.stdout}`).toBe("success");
-		expect(exec.result?.ok).toBe(true);
-		if (exec.result?.ok) {
-			expect(exec.result.value.hasData1).toBe(true);
-			expect(exec.result.value.hasData2).toBe(true);
-			expect(exec.result.value.statusComplete).toBe(true);
-		}
-	});
+			expect(exec.status, `${exec.stderr}\n${exec.stdout}`).toBe("success");
+			expect(exec.result?.ok).toBe(true);
+			if (exec.result?.ok) {
+				expect(exec.result.value.hasData1).toBe(true);
+				expect(exec.result.value.hasData2).toBe(true);
+				expect(exec.result.value.statusComplete).toBe(true);
+			}
+		});
 
-	test("goto with waitUntil load returns before delayed fetches complete", async ({ harness }) => {
-		const source = `
+		test("goto with waitUntil load returns before delayed fetches complete", async ({
+			harness,
+		}) => {
+			const source = `
 var RESULT_PREFIX = "${RESULT_PREFIX}";
 
 // Navigate with default waitUntil: "load" — should return before fetches finish
@@ -258,25 +283,26 @@ print(RESULT_PREFIX + JSON.stringify({
 }));
 `;
 
-		const exec = await executeCell<
-			ContractResult<{ hasData1: boolean; hasData2: boolean }>
-		>(harness.sidepanel, source, 30_000);
+			const exec = await executeCell<
+				ContractResult<{ hasData1: boolean; hasData2: boolean }>
+			>(harness.sidepanel, source, 30_000);
 
-		expect(exec.status, `${exec.stderr}\n${exec.stdout}`).toBe("success");
-		expect(exec.result?.ok).toBe(true);
-		if (exec.result?.ok) {
-			// With waitUntil: "load", delayed fetches have NOT completed yet
-			expect(exec.result.value.hasData1).toBe(false);
-			expect(exec.result.value.hasData2).toBe(false);
-		}
+			expect(exec.status, `${exec.stderr}\n${exec.stdout}`).toBe("success");
+			expect(exec.result?.ok).toBe(true);
+			if (exec.result?.ok) {
+				// With waitUntil: "load", delayed fetches have NOT completed yet
+				expect(exec.result.value.hasData1).toBe(false);
+				expect(exec.result.value.hasData2).toBe(false);
+			}
+		});
 	});
-});
 
-test.describe.serial("snapshot_query semantic filtering", () => {
-	test.setTimeout(30_000);
+test.describe
+	.serial("snapshot_query semantic filtering", () => {
+		test.setTimeout(30_000);
 
-	test("filter by role returns only buttons", async ({ harness }) => {
-		const source = `
+		test("filter by role returns only buttons", async ({ harness }) => {
+			const source = `
 var RESULT_PREFIX = "${RESULT_PREFIX}";
 
 const tabs = await chrome.tabs.query({ url: "http://*/*" });
@@ -289,109 +315,116 @@ await page.goto({ url: "${SNAPSHOT_QUERY_URL}", timeout: 15000n });
 let result = await page.snapshot_query({ filter: { role: "button" } });
 print(RESULT_PREFIX + JSON.stringify({ ok: true, value: result }));
 `;
-		const exec = await executeCell<
-			ContractResult<{ nodes: Array<{ role: string; text: string }>; nodeCount: number }>
-		>(harness.sidepanel, source, 30_000);
+			const exec = await executeCell<
+				ContractResult<{
+					nodes: Array<{ role: string; text: string }>;
+					nodeCount: number;
+				}>
+			>(harness.sidepanel, source, 30_000);
 
-		expect(exec.status, `${exec.stderr}\n${exec.stdout}`).toBe("success");
-		expect(exec.result?.ok).toBe(true);
-		if (exec.result?.ok) {
-			const nodes = exec.result.value.nodes;
-			for (const node of nodes) {
-				expect(node.role).toBe("button");
+			expect(exec.status, `${exec.stderr}\n${exec.stdout}`).toBe("success");
+			expect(exec.result?.ok).toBe(true);
+			if (exec.result?.ok) {
+				const nodes = exec.result.value.nodes;
+				for (const node of nodes) {
+					expect(node.role).toBe("button");
+				}
+				expect(nodes.length).toBe(2);
 			}
-			expect(nodes.length).toBe(2);
-		}
-	});
+		});
 
-	test("filter by interactiveOnly returns only interactive elements", async ({ harness }) => {
-		const source = `
+		test("filter by interactiveOnly returns only interactive elements", async ({
+			harness,
+		}) => {
+			const source = `
 var RESULT_PREFIX = "${RESULT_PREFIX}";
 
 await page.goto({ url: "${SNAPSHOT_QUERY_URL}", timeout: 15000n });
 let result = await page.snapshot_query({ filter: { interactiveOnly: true } });
 print(RESULT_PREFIX + JSON.stringify({ ok: true, value: result }));
 `;
-		const exec = await executeCell<
-			ContractResult<{ nodes: Array<{ role: string }> }>
-		>(harness.sidepanel, source, 30_000);
+			const exec = await executeCell<
+				ContractResult<{ nodes: Array<{ role: string }> }>
+			>(harness.sidepanel, source, 30_000);
 
-		expect(exec.status, `${exec.stderr}\n${exec.stdout}`).toBe("success");
-		expect(exec.result?.ok).toBe(true);
-		if (exec.result?.ok) {
-			const nonInteractive = exec.result.value.nodes.filter(
-				(n) => n.role === "heading" || n.role === "generic",
-			);
-			expect(nonInteractive).toHaveLength(0);
-			expect(exec.result.value.nodes.length).toBeGreaterThan(0);
-		}
-	});
+			expect(exec.status, `${exec.stderr}\n${exec.stdout}`).toBe("success");
+			expect(exec.result?.ok).toBe(true);
+			if (exec.result?.ok) {
+				const nonInteractive = exec.result.value.nodes.filter(
+					(n) => n.role === "heading" || n.role === "generic",
+				);
+				expect(nonInteractive).toHaveLength(0);
+				expect(exec.result.value.nodes.length).toBeGreaterThan(0);
+			}
+		});
 
-	test("filter by tag returns links with hrefs", async ({ harness }) => {
-		const source = `
+		test("filter by tag returns links with hrefs", async ({ harness }) => {
+			const source = `
 var RESULT_PREFIX = "${RESULT_PREFIX}";
 
 await page.goto({ url: "${SNAPSHOT_QUERY_URL}", timeout: 15000n });
 let result = await page.snapshot_query({ filter: { tag: "a" } });
 print(RESULT_PREFIX + JSON.stringify({ ok: true, value: result }));
 `;
-		const exec = await executeCell<
-			ContractResult<{ nodes: Array<{ tag: string; href?: string }> }>
-		>(harness.sidepanel, source, 30_000);
+			const exec = await executeCell<
+				ContractResult<{ nodes: Array<{ tag: string; href?: string }> }>
+			>(harness.sidepanel, source, 30_000);
 
-		expect(exec.status, `${exec.stderr}\n${exec.stdout}`).toBe("success");
-		expect(exec.result?.ok).toBe(true);
-		if (exec.result?.ok) {
-			expect(exec.result.value.nodes).toHaveLength(2);
-			for (const node of exec.result.value.nodes) {
-				expect(node.tag).toBe("a");
-				expect(node.href).toBeDefined();
+			expect(exec.status, `${exec.stderr}\n${exec.stdout}`).toBe("success");
+			expect(exec.result?.ok).toBe(true);
+			if (exec.result?.ok) {
+				expect(exec.result.value.nodes).toHaveLength(2);
+				for (const node of exec.result.value.nodes) {
+					expect(node.tag).toBe("a");
+					expect(node.href).toBeDefined();
+				}
 			}
-		}
-	});
+		});
 
-	test("filter by text returns matching element", async ({ harness }) => {
-		const source = `
+		test("filter by text returns matching element", async ({ harness }) => {
+			const source = `
 var RESULT_PREFIX = "${RESULT_PREFIX}";
 
 await page.goto({ url: "${SNAPSHOT_QUERY_URL}", timeout: 15000n });
 let result = await page.snapshot_query({ filter: { text: "sign" } });
 print(RESULT_PREFIX + JSON.stringify({ ok: true, value: result }));
 `;
-		const exec = await executeCell<
-			ContractResult<{ nodes: Array<{ text: string }> }>
-		>(harness.sidepanel, source, 30_000);
+			const exec = await executeCell<
+				ContractResult<{ nodes: Array<{ text: string }> }>
+			>(harness.sidepanel, source, 30_000);
 
-		expect(exec.status, `${exec.stderr}\n${exec.stdout}`).toBe("success");
-		expect(exec.result?.ok).toBe(true);
-		if (exec.result?.ok) {
-			expect(exec.result.value.nodes).toHaveLength(1);
-			expect(exec.result.value.nodes[0].text.toLowerCase()).toContain("sign");
-		}
-	});
+			expect(exec.status, `${exec.stderr}\n${exec.stdout}`).toBe("success");
+			expect(exec.result?.ok).toBe(true);
+			if (exec.result?.ok) {
+				expect(exec.result.value.nodes).toHaveLength(1);
+				expect(exec.result.value.nodes[0].text.toLowerCase()).toContain("sign");
+			}
+		});
 
-	test("filter by href returns matching link", async ({ harness }) => {
-		const source = `
+		test("filter by href returns matching link", async ({ harness }) => {
+			const source = `
 var RESULT_PREFIX = "${RESULT_PREFIX}";
 
 await page.goto({ url: "${SNAPSHOT_QUERY_URL}", timeout: 15000n });
 let result = await page.snapshot_query({ filter: { href: "/docs" } });
 print(RESULT_PREFIX + JSON.stringify({ ok: true, value: result }));
 `;
-		const exec = await executeCell<
-			ContractResult<{ nodes: Array<{ href: string }> }>
-		>(harness.sidepanel, source, 30_000);
+			const exec = await executeCell<
+				ContractResult<{ nodes: Array<{ href: string }> }>
+			>(harness.sidepanel, source, 30_000);
 
-		expect(exec.status, `${exec.stderr}\n${exec.stdout}`).toBe("success");
-		expect(exec.result?.ok).toBe(true);
-		if (exec.result?.ok) {
-			expect(exec.result.value.nodes).toHaveLength(1);
-			expect(exec.result.value.nodes[0].href).toContain("/docs");
-		}
-	});
+			expect(exec.status, `${exec.stderr}\n${exec.stdout}`).toBe("success");
+			expect(exec.result?.ok).toBe(true);
+			if (exec.result?.ok) {
+				expect(exec.result.value.nodes).toHaveLength(1);
+				expect(exec.result.value.nodes[0].href).toContain("/docs");
+			}
+		});
 
-	test("empty filter returns same count as snapshot_data", async ({ harness }) => {
-		const source = `
+		test("empty filter returns same count as snapshot_data", async ({
+			harness,
+		}) => {
+			const source = `
 var RESULT_PREFIX = "${RESULT_PREFIX}";
 
 await page.goto({ url: "${SNAPSHOT_QUERY_URL}", timeout: 15000n });
@@ -405,35 +438,39 @@ print(RESULT_PREFIX + JSON.stringify({
   }
 }));
 `;
-		const exec = await executeCell<
-			ContractResult<{ dataNodeCount: number; queryNodeCount: number }>
-		>(harness.sidepanel, source, 30_000);
+			const exec = await executeCell<
+				ContractResult<{ dataNodeCount: number; queryNodeCount: number }>
+			>(harness.sidepanel, source, 30_000);
 
-		expect(exec.status, `${exec.stderr}\n${exec.stdout}`).toBe("success");
-		expect(exec.result?.ok).toBe(true);
-		if (exec.result?.ok) {
-			expect(exec.result.value.queryNodeCount).toBe(exec.result.value.dataNodeCount);
-		}
-	});
+			expect(exec.status, `${exec.stderr}\n${exec.stdout}`).toBe("success");
+			expect(exec.result?.ok).toBe(true);
+			if (exec.result?.ok) {
+				expect(exec.result.value.queryNodeCount).toBe(
+					exec.result.value.dataNodeCount,
+				);
+			}
+		});
 
-	test("combined role + href filter", async ({ harness }) => {
-		const source = `
+		test("combined role + href filter", async ({ harness }) => {
+			const source = `
 var RESULT_PREFIX = "${RESULT_PREFIX}";
 
 await page.goto({ url: "${SNAPSHOT_QUERY_URL}", timeout: 15000n });
 let result = await page.snapshot_query({ filter: { role: "link", href: "/api" } });
 print(RESULT_PREFIX + JSON.stringify({ ok: true, value: result }));
 `;
-		const exec = await executeCell<
-			ContractResult<{ nodes: Array<{ role: string; name: string; href: string }> }>
-		>(harness.sidepanel, source, 30_000);
+			const exec = await executeCell<
+				ContractResult<{
+					nodes: Array<{ role: string; name: string; href: string }>;
+				}>
+			>(harness.sidepanel, source, 30_000);
 
-		expect(exec.status, `${exec.stderr}\n${exec.stdout}`).toBe("success");
-		expect(exec.result?.ok).toBe(true);
-		if (exec.result?.ok) {
-			expect(exec.result.value.nodes).toHaveLength(1);
-			expect(exec.result.value.nodes[0].role).toBe("link");
-			expect(exec.result.value.nodes[0].href).toContain("/api");
-		}
+			expect(exec.status, `${exec.stderr}\n${exec.stdout}`).toBe("success");
+			expect(exec.result?.ok).toBe(true);
+			if (exec.result?.ok) {
+				expect(exec.result.value.nodes).toHaveLength(1);
+				expect(exec.result.value.nodes[0].role).toBe("link");
+				expect(exec.result.value.nodes[0].href).toContain("/api");
+			}
+		});
 	});
-});

@@ -1,13 +1,12 @@
 /// <reference types="chrome" />
-import type { AsyncResponse } from "../../../shared/tool-registry.js";
+
 import { logger } from "../../../shared/logger.js";
+import { unwrapContentScriptMessage } from "../../../shared/registry/content-script-response.js";
+import { contentScriptMissingError } from "../../../shared/registry/normalize-agent-error.js";
+import type { AsyncResponse } from "../../../shared/tool-registry.js";
 import { throwIfAborted } from "../../../shared/tool-registry.js";
 import { normalizeChromeError } from "../chrome/internals.js";
-import { contentScriptMissingError } from "../../../shared/registry/normalize-agent-error.js";
-import { unwrapContentScriptMessage } from "../../../shared/registry/content-script-response.js";
-import {
-	DEFAULT_POLL_INTERVAL_MS,
-} from "../lib/constants.js";
+import { DEFAULT_POLL_INTERVAL_MS } from "../lib/constants.js";
 
 function sleep(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
@@ -79,7 +78,10 @@ export async function pingTabContentScript(
 			]);
 			const parsed = unwrapContentScriptMessage(result);
 			if (!parsed.ok) {
-				log.debug("pingTabContentScript_rejected", { tabId, error: parsed.error });
+				log.debug("pingTabContentScript_rejected", {
+					tabId,
+					error: parsed.error,
+				});
 				return parsed;
 			}
 			log.debug("pingTabContentScript_success", { tabId, result });
@@ -93,9 +95,7 @@ export async function pingTabContentScript(
 				msg.includes("Receiving end does not exist") ||
 				msg.includes("message port closed before a response was received")
 			) {
-				await sleep(
-					Math.min(DEFAULT_POLL_INTERVAL_MS, deadline - Date.now()),
-				);
+				await sleep(Math.min(DEFAULT_POLL_INTERVAL_MS, deadline - Date.now()));
 				continue;
 			}
 			if (msg.includes("Timeout waiting for content-script ping")) {
@@ -161,10 +161,13 @@ export async function waitForTabLoad(
 		};
 	}
 
-	const shouldSettleOnComplete = (tab: {
-		status?: string;
-		url?: string;
-	}, sawLoading: boolean): boolean => {
+	const shouldSettleOnComplete = (
+		tab: {
+			status?: string;
+			url?: string;
+		},
+		sawLoading: boolean,
+	): boolean => {
 		if (tab.status !== "complete") return false;
 		if (preNavigationUrl === undefined) return true;
 		const urlChanged = tab.url !== preNavigationUrl;

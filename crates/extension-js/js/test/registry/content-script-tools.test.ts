@@ -1,15 +1,15 @@
 // @vitest-environment node
 
-import { describe, expect, it, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
-import { defineContentScriptTool } from "../../src/shared/registry/define-content-script-tool.js";
+import { getContentScriptSpec } from "../../src/content-script/registry.js";
 import {
 	addContentScriptAction,
 	clearContentScriptActions,
 	getContentScriptActions,
 	isContentScriptAction,
 } from "../../src/shared/registry/content-script-actions.js";
-import { getContentScriptSpec } from "../../src/content-script/registry.js";
+import { defineContentScriptTool } from "../../src/shared/registry/define-content-script-tool.js";
 import {
 	clearJsRegistry,
 	freezeJsRegistry,

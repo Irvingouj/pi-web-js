@@ -2,20 +2,19 @@
 
 import { describe, expect, it, vi } from "vitest";
 import {
-	PageActionResultSchema,
-	MutationReturnSchema,
-	FetchParamsSchema,
-	PageFillParamsSchema,
-	PageSetFilesParamsSchema,
-	FsWriteParamsSchema,
-	PageSnapshotQueryParamsSchema,
-	SnapshotQueryFilterSchema,
-	TabSnapshotQueryParamsSchema,
-} from "../src/shared/schemas.js";
-import {
 	dispatchContentScriptCall,
 	registerContentScriptSpec,
 } from "../src/content-script/registry.js";
+import {
+	FetchParamsSchema,
+	FsWriteParamsSchema,
+	MutationReturnSchema,
+	PageActionResultSchema,
+	PageFillParamsSchema,
+	PageSetFilesParamsSchema,
+	PageSnapshotQueryParamsSchema,
+	TabSnapshotQueryParamsSchema,
+} from "../src/shared/schemas.js";
 import {
 	extensionDispatch,
 	registerWorkerHandlerValidated,
@@ -127,7 +126,9 @@ describe("invalid parameter shapes produce E_INVALID_PARAMS (T-018)", () => {
 		const result = FetchParamsSchema.safeParse({ method: "GET" });
 		expect(result.success).toBe(false);
 		if (!result.success) {
-			expect(result.error.issues.some((i) => i.path.includes("url"))).toBe(true);
+			expect(result.error.issues.some((i) => i.path.includes("url"))).toBe(
+				true,
+			);
 		}
 	});
 
@@ -151,7 +152,9 @@ describe("invalid parameter shapes produce E_INVALID_PARAMS (T-018)", () => {
 		const result = PageFillParamsSchema.safeParse({ value: "hello" });
 		expect(result.success).toBe(false);
 		if (!result.success) {
-			expect(result.error.issues.some((i) => i.message.includes("refId or label"))).toBe(true);
+			expect(
+				result.error.issues.some((i) => i.message.includes("refId or label")),
+			).toBe(true);
 		}
 	});
 
@@ -220,7 +223,9 @@ describe("invalid parameter shapes produce E_INVALID_PARAMS (T-018)", () => {
 		const result = FsWriteParamsSchema.safeParse({ data: "base64data" });
 		expect(result.success).toBe(false);
 		if (!result.success) {
-			expect(result.error.issues.some((i) => i.path.includes("path"))).toBe(true);
+			expect(result.error.issues.some((i) => i.path.includes("path"))).toBe(
+				true,
+			);
 		}
 	});
 
@@ -228,7 +233,9 @@ describe("invalid parameter shapes produce E_INVALID_PARAMS (T-018)", () => {
 		const result = FsWriteParamsSchema.safeParse({ path: "/tmp/file.jpg" });
 		expect(result.success).toBe(false);
 		if (!result.success) {
-			expect(result.error.issues.some((i) => i.path.includes("data"))).toBe(true);
+			expect(result.error.issues.some((i) => i.path.includes("data"))).toBe(
+				true,
+			);
 		}
 	});
 
@@ -260,7 +267,9 @@ describe("invalid parameter shapes produce E_INVALID_PARAMS through real dispatc
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.code).toBe("E_INVALID_PARAMS");
-			expect(result.error.message).toContain("Invalid parameters for page_fetch");
+			expect(result.error.message).toContain(
+				"Invalid parameters for page_fetch",
+			);
 		}
 	});
 
@@ -302,7 +311,11 @@ describe("invalid parameter shapes produce E_INVALID_PARAMS through real dispatc
 			handler,
 			{
 				url: "https://example.com",
-				options: { method: "POST", headers: { "X-Custom": "value" }, body: "data" },
+				options: {
+					method: "POST",
+					headers: { "X-Custom": "value" },
+					body: "data",
+				},
 			},
 		);
 
@@ -329,7 +342,9 @@ describe("invalid parameter shapes produce E_INVALID_PARAMS through real dispatc
 		expect(result).toEqual({
 			ok: false,
 			error: {
-				message: expect.stringContaining("Invalid parameters for fs_write_base64"),
+				message: expect.stringContaining(
+					"Invalid parameters for fs_write_base64",
+				),
 				code: "E_INVALID_PARAMS",
 			},
 		});
@@ -380,22 +395,31 @@ describe("invalid parameter shapes produce E_INVALID_PARAMS through real dispatc
 
 describe("PageSnapshotQueryParamsSchema", () => {
 	it("parses valid params with role filter", () => {
-		const result = PageSnapshotQueryParamsSchema.parse({ filter: { role: "button" } });
+		const result = PageSnapshotQueryParamsSchema.parse({
+			filter: { role: "button" },
+		});
 		expect(result.filter).toEqual({ role: "button" });
 	});
 
 	it("parses valid params with multiple roles", () => {
-		const result = PageSnapshotQueryParamsSchema.parse({ filter: { role: ["button", "link"] } });
+		const result = PageSnapshotQueryParamsSchema.parse({
+			filter: { role: ["button", "link"] },
+		});
 		expect(result.filter).toEqual({ role: ["button", "link"] });
 	});
 
 	it("parses valid params with interactiveOnly", () => {
-		const result = PageSnapshotQueryParamsSchema.parse({ filter: { interactiveOnly: true } });
+		const result = PageSnapshotQueryParamsSchema.parse({
+			filter: { interactiveOnly: true },
+		});
 		expect(result.filter).toEqual({ interactiveOnly: true });
 	});
 
 	it("parses valid params with max_nodes and filter", () => {
-		const result = PageSnapshotQueryParamsSchema.parse({ max_nodes: 100, filter: { tag: "a" } });
+		const result = PageSnapshotQueryParamsSchema.parse({
+			max_nodes: 100,
+			filter: { tag: "a" },
+		});
 		expect(result.max_nodes).toBe(100);
 		expect(result.filter).toEqual({ tag: "a" });
 	});
@@ -406,14 +430,19 @@ describe("PageSnapshotQueryParamsSchema", () => {
 	});
 
 	it("rejects invalid interactiveOnly type", () => {
-		const result = PageSnapshotQueryParamsSchema.safeParse({ filter: { interactiveOnly: "yes" } });
+		const result = PageSnapshotQueryParamsSchema.safeParse({
+			filter: { interactiveOnly: "yes" },
+		});
 		expect(result.success).toBe(false);
 	});
 });
 
 describe("TabSnapshotQueryParamsSchema", () => {
 	it("parses valid params with tabId and filter", () => {
-		const result = TabSnapshotQueryParamsSchema.safeParse({ tabId: 1, filter: { role: "button" } });
+		const result = TabSnapshotQueryParamsSchema.safeParse({
+			tabId: 1,
+			filter: { role: "button" },
+		});
 		expect(result.success).toBe(true);
 		if (result.success) {
 			expect(result.data.tabId).toBe(1);
@@ -422,12 +451,17 @@ describe("TabSnapshotQueryParamsSchema", () => {
 	});
 
 	it("rejects missing tabId", () => {
-		const result = TabSnapshotQueryParamsSchema.safeParse({ filter: { role: "button" } });
+		const result = TabSnapshotQueryParamsSchema.safeParse({
+			filter: { role: "button" },
+		});
 		expect(result.success).toBe(false);
 	});
 
 	it("rejects non-number tabId", () => {
-		const result = TabSnapshotQueryParamsSchema.safeParse({ tabId: "bad", filter: { role: "button" } });
+		const result = TabSnapshotQueryParamsSchema.safeParse({
+			tabId: "bad",
+			filter: { role: "button" },
+		});
 		expect(result.success).toBe(false);
 	});
 });

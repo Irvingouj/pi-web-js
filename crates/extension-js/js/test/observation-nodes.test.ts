@@ -2,12 +2,6 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { inlineSnapshot } from "../src/content-script/snapshot.js";
-import {
-	dispatchContentScriptCall,
-	registerContentScriptSpec,
-} from "../src/content-script/registry.js";
-import { buildContentScriptSpecs } from "../src/content-script/schemas.js";
-import { handlers } from "../src/content-script/handlers.js";
 
 const mockAddListener = vi.fn();
 
@@ -60,7 +54,9 @@ describe("T-001: snapshot node includes src/href absolute for IMG/A", () => {
 		expect(imgNode).toBeDefined();
 		expect(imgNode?.src).toBeDefined();
 		expect(imgNode?.src).toMatch(/^http/);
-		expect(imgNode?.src).toContain("/testcases/media-download/assets/photo.jpg");
+		expect(imgNode?.src).toContain(
+			"/testcases/media-download/assets/photo.jpg",
+		);
 		expect(imgNode?.alt).toBe("Sunset over mountains");
 	});
 
@@ -110,9 +106,15 @@ describe("T-001: snapshot node includes src/href absolute for IMG/A", () => {
 			<input type="text" value="visible" title="text">
 		`;
 		const result = inlineSnapshot(100);
-		const pwd = result.nodes.find((n) => n.tag === "input" && n.title === "pwd");
-		const hidden = result.nodes.find((n) => n.tag === "input" && n.title === "hidden");
-		const text = result.nodes.find((n) => n.tag === "input" && n.title === "text");
+		const pwd = result.nodes.find(
+			(n) => n.tag === "input" && n.title === "pwd",
+		);
+		const hidden = result.nodes.find(
+			(n) => n.tag === "input" && n.title === "hidden",
+		);
+		const text = result.nodes.find(
+			(n) => n.tag === "input" && n.title === "text",
+		);
 		expect(pwd?.value).toBeUndefined();
 		expect(hidden?.value).toBeUndefined();
 		expect(text?.value).toBe("visible");
@@ -135,7 +137,10 @@ describe("T-003: parentRefId links image to article", () => {
 		const article = document.createElement("article");
 		article.setAttribute("data-post-id", "post-001");
 		const img = document.createElement("img");
-		img.setAttribute("src", "http://127.0.0.1:9292/testcases/media-download/assets/photo.jpg");
+		img.setAttribute(
+			"src",
+			"http://127.0.0.1:9292/testcases/media-download/assets/photo.jpg",
+		);
 		img.setAttribute("alt", "Sunset");
 		article.appendChild(img);
 		document.body.appendChild(article);
@@ -151,7 +156,10 @@ describe("T-003: parentRefId links image to article", () => {
 
 	it("snapshot does not set parentRefId on top-level elements", () => {
 		const img = document.createElement("img");
-		img.setAttribute("src", "http://127.0.0.1:9292/testcases/media-download/assets/photo.jpg");
+		img.setAttribute(
+			"src",
+			"http://127.0.0.1:9292/testcases/media-download/assets/photo.jpg",
+		);
 		img.setAttribute("alt", "Standalone");
 		document.body.appendChild(img);
 
@@ -169,7 +177,10 @@ describe("T-003: parentRefId links image to article", () => {
 			const article = document.createElement("article");
 			article.setAttribute("data-post-id", `post-00${i}`);
 			const img = document.createElement("img");
-			img.setAttribute("src", `http://127.0.0.1:9292/testcases/media-download/assets/photo${i}.jpg`);
+			img.setAttribute(
+				"src",
+				`http://127.0.0.1:9292/testcases/media-download/assets/photo${i}.jpg`,
+			);
 			img.setAttribute("alt", `Photo ${i}`);
 			article.appendChild(img);
 			feed.appendChild(article);

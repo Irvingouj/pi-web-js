@@ -73,8 +73,7 @@ export function staleRefError(
 		message,
 		code: "E_STALE",
 		category: "resource",
-		hint:
-			"RefIds are ephemeral. They are assigned at snapshot time and invalidated when the DOM is replaced (navigation, SPA rerender, autocomplete).",
+		hint: "RefIds are ephemeral. They are assigned at snapshot time and invalidated when the DOM is replaced (navigation, SPA rerender, autocomplete).",
 		recovery: [
 			"const d = await page.snapshot_data(); find the target in d.nodes",
 			"Use a fresh refId from that snapshot only",
@@ -97,8 +96,7 @@ export function notInteractableError(
 		message: `${action} on ${refId} returned no effect.`,
 		code: "E_NOT_INTERACTABLE",
 		category: "resource",
-		hint:
-			"Some sites ignore programmatic value assignment; value may not appear in snapshot_data.",
+		hint: "Some sites ignore programmatic value assignment; value may not appear in snapshot_data.",
 		recovery: [
 			`await page.click({ refId: ${JSON.stringify(refId)} }) then await page.type({ refId: ${JSON.stringify(refId)}, text: "..." })`,
 			'Or await page.press({ key: "Enter" }) after fill',
@@ -147,8 +145,7 @@ export function labelNotFoundError(
 		message,
 		code: "E_NOT_FOUND",
 		category: "resource",
-		hint:
-			"No element matched this label. Check candidates or snapshot for visible controls.",
+		hint: "No element matched this label. Check candidates or snapshot for visible controls.",
 		recovery: [
 			"const d = await page.snapshot_data(); find the target in d.nodes",
 			"Try a more specific label or use refId from snapshot",

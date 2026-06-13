@@ -1,22 +1,15 @@
 /// <reference types="chrome" />
 import { z } from "zod";
-import { logger } from "../../../shared/logger.js";
-import * as schemas from "../../../shared/schemas.js";
-import {
-	dispatchTool,
-	registerJsCall,
-	type CallContext,
-	type ToolDocParam,
-} from "../../../shared/tool-registry.js";
 import { CONTENT_SCRIPT_TOOL_SPECS } from "../../../shared/registry/content-script-tools.js";
 import { defineContentScriptTool } from "../../../shared/registry/define-content-script-tool.js";
-import type { DomFormatParams, DomSnapshotParams, FetchParams } from "../runtime.js";
+import * as schemas from "../../../shared/schemas.js";
+import { dispatchTool, registerJsCall } from "../../../shared/tool-registry.js";
 import {
-	makeError,
 	asRecord,
 	extractTabId,
-	unwrapResult,
+	makeError,
 	resolveActiveTabId,
+	unwrapResult,
 	waitForTabLoad,
 } from "../runtime.js";
 
@@ -75,7 +68,7 @@ registerJsCall({
 		const tab = unwrapResult(
 			await dispatchTool("chrome_tabs_get", [tabId]),
 		) as Record<string, unknown>;
-		return { ...tab, tabId: (typeof tab.id === "number" ? tab.id : tabId) };
+		return { ...tab, tabId: typeof tab.id === "number" ? tab.id : tabId };
 	},
 	paramTypes: [],
 	returnDoc: "Active tab object",
@@ -135,7 +128,7 @@ registerJsCall({
 	returnDoc: "Matching tabs",
 	errorCode: "ECHROME",
 	errorCategory: "extension",
-	example: "web.tab.find({ url: \"*://example.com/*\" })",
+	example: 'web.tab.find({ url: "*://example.com/*" })',
 });
 
 registerJsCall({
@@ -187,7 +180,7 @@ registerJsCall({
 	returnDoc: "Created tab",
 	errorCode: "ECHROME",
 	errorCategory: "extension",
-	example: "web.tab.create(\"https://example.com\")",
+	example: 'web.tab.create("https://example.com")',
 });
 
 registerJsCall({
@@ -248,21 +241,11 @@ registerJsCall({
 	example: "web.tab.close(123)",
 });
 
-for (const spec of CONTENT_SCRIPT_TOOL_SPECS.filter((s) => s.namespace === "web.tab")) {
+for (const spec of CONTENT_SCRIPT_TOOL_SPECS.filter(
+	(s) => s.namespace === "web.tab",
+)) {
 	defineContentScriptTool(spec);
 }
-
-
-
-
-
-
-
-
-
-
-
-
 
 registerJsCall({
 	action: "tab_wait_for_load",
@@ -279,7 +262,12 @@ registerJsCall({
 		return unwrapResult(await waitForTabLoad(tabId, timeout));
 	},
 	paramTypes: [
-		{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
+		{
+			name: "tabId",
+			type: "number",
+			required: true,
+			description: "Tab ID (literal)",
+		},
 		{
 			name: "timeout",
 			type: "number",
@@ -291,4 +279,3 @@ registerJsCall({
 	errorCode: "E_NO_TAB",
 	example: "web.tab.wait_for_load({ tabId: 123, timeout: 5000 })",
 });
-

@@ -4,6 +4,7 @@ import { loadFromIndexedDB, useAutoSave } from "../hooks/useAutoSave";
 import { useExtensionKernel } from "../hooks/useExtensionKernel";
 import { useKernel } from "../hooks/useKernel";
 import { useTheme } from "../hooks/useTheme";
+import { formatCellError } from "../lib/formatCellError";
 import type { CellKind, Cell as CellType, Notebook } from "../notebook";
 import {
 	createCell,
@@ -13,7 +14,6 @@ import {
 } from "../notebook";
 import type { WorkerRunResult } from "../types";
 import Cell from "./Cell";
-import { formatCellError } from "../lib/formatCellError";
 import Toolbar from "./Toolbar";
 import TopBar from "./TopBar";
 

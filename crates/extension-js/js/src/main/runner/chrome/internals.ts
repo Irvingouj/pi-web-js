@@ -1,34 +1,37 @@
 /// <reference types="chrome" />
 import { z } from "zod";
 import { logger } from "../../../shared/logger.js";
+import type { AsyncError } from "../../../shared/tool-registry.js";
 import {
-	registerJsCall,
 	type CallContext,
+	registerJsCall,
 	type ToolDocParam,
 } from "../../../shared/tool-registry.js";
-import type { AsyncError } from "../../../shared/tool-registry.js";
 import { makeError } from "../lib/types.js";
-import {
-	invokeNative,
-	normalizeParityArgs,
-	requireArgumentArray,
-	resolveChromeMethod,
-} from "./native.js";
 import {
 	checkPermission,
 	manifestPermissionForApiPath,
 } from "../tools/chrome/capability.js";
+import {
+	invokeNative,
+	normalizeParityArgs,
+	requireArgumentArray,
+	resolveChromeMethod,
+} from "./native.js";
 
 export {
 	invokeNative,
 	isNativeParityAction,
+	type NativeArgs,
 	normalizeParityArgs,
 	requireArgumentArray,
 	resolveChromeMethod,
-	type NativeArgs,
 } from "./native.js";
 
-export function normalizeChromeError(err: unknown): { ok: false; error: AsyncError } {
+export function normalizeChromeError(err: unknown): {
+	ok: false;
+	error: AsyncError;
+} {
 	const msg = (err instanceof Error ? err.message : String(err)) || "";
 	if (msg.includes("permission") || msg.includes("Permission")) {
 		return {
@@ -60,9 +63,7 @@ function toPlainObject(value: unknown): unknown {
 	if (value === null || typeof value !== "object") return value;
 	if (Array.isArray(value)) return value.map(toPlainObject);
 	// Chrome runtime/tabs Port objects expose postMessage; serialize a minimal stub.
-	if (
-		typeof (value as { postMessage?: unknown }).postMessage === "function"
-	) {
+	if (typeof (value as { postMessage?: unknown }).postMessage === "function") {
 		const port = value as { name?: string; sender?: unknown };
 		return {
 			name: port.name ?? "",

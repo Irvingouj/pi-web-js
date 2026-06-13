@@ -8,18 +8,14 @@ import {
 	EXTENSION_TIMER_GAP_APIS,
 	GRANTED_PERMISSIONS,
 } from "./constants.ts";
+import { buildStrictRunnerSource } from "./runner-source.ts";
+import { parseAllSentinels } from "./sentinels.ts";
 import type {
 	ApiCase,
 	ApiExpectation,
 	ApiGroup,
-	CellExecution,
 	ContractItemMeta,
-	ContractResult,
-	ExtensionFixture,
-	ExtensionHarness,
 } from "./types.ts";
-import { buildStrictRunnerSource } from "./runner-source.ts";
-import { parseAllSentinels } from "./sentinels.ts";
 
 function loadContractMetadata(): {
 	items: ContractItemMeta[];
@@ -129,10 +125,18 @@ function mapExpectation(item: ContractItemMeta): ApiExpectation {
 		return { kind: "permission_error", permission: permissionGap };
 	}
 	if (EXTENSION_TIMER_GAP_APIS.has(item.action)) {
-		return { kind: "error", code: "E_TIMER_UNSUPPORTED", category: "typed_error" };
+		return {
+			kind: "error",
+			code: "E_TIMER_UNSUPPORTED",
+			category: "typed_error",
+		};
 	}
 	if (EXTENSION_GLOBAL_GAP_APIS.has(item.action)) {
-		return { kind: "error", code: "E_GLOBAL_UNSUPPORTED", category: "typed_error" };
+		return {
+			kind: "error",
+			code: "E_GLOBAL_UNSUPPORTED",
+			category: "typed_error",
+		};
 	}
 	if (item.expected === "success") return { kind: "success" };
 	return {
@@ -146,7 +150,9 @@ function defaultAssert(apiCase: ApiCase): ApiCase["assert"] {
 	return async (execution) => {
 		expect(execution.status, `${apiCase.api} cell status`).toBe("success");
 		const parsed = parseAllSentinels(execution.stdout);
-		const entry = parsed.find((p) => (p as { api?: string }).api === apiCase.api);
+		const entry = parsed.find(
+			(p) => (p as { api?: string }).api === apiCase.api,
+		);
 		expect(entry, `${apiCase.api} sentinel`).toBeTruthy();
 		if (
 			apiCase.expectation.kind === "error" &&
@@ -174,9 +180,10 @@ function defaultAssert(apiCase: ApiCase): ApiCase["assert"] {
 			expect(entry?.ok, `${apiCase.api} ok`).toBe(true);
 			return;
 		}
-		expect(entry?.ok, `${apiCase.api} expected ${apiCase.contractExpected}`).toBe(
-			true,
-		);
+		expect(
+			entry?.ok,
+			`${apiCase.api} expected ${apiCase.contractExpected}`,
+		).toBe(true);
 		if (apiCase.expectedCode && entry && "value" in entry && entry.ok) {
 			const value = entry.value as Record<string, unknown>;
 			const err =

@@ -1,14 +1,18 @@
 /// <reference types="chrome" />
-import { collectDocument, formatSnapshot, init as initDomSnapshot } from "@pi-oxide/dom-semantic-tree";
+import {
+	collectDocument,
+	formatSnapshot,
+	init as initDomSnapshot,
+} from "@pi-oxide/dom-semantic-tree";
+import { collectInlineSnapshot } from "../../../shared/collect-inline-snapshot.js";
 import type { TreeSnapshot } from "../../../shared/generated.js";
+import { logger } from "../../../shared/logger.js";
+import type { AsyncResponse } from "../../../shared/tool-registry.js";
 import type {
 	DomFormatParams,
 	DomSnapshotParams,
 	DomSnapshotValue,
 } from "../lib/types.js";
-import type { AsyncResponse } from "../../../shared/tool-registry.js";
-import { logger } from "../../../shared/logger.js";
-import { collectInlineSnapshot } from "../../../shared/collect-inline-snapshot.js";
 
 let domSnapshotReady: Promise<void> | null = null;
 

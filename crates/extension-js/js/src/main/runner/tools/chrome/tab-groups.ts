@@ -1,5 +1,3 @@
-/// <reference types="chrome" />
-import { z } from "zod";
 import * as schemas from "../../../../shared/schemas.js";
 import { registerChromePassthrough } from "../../chrome/internals.js";
 
@@ -12,7 +10,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.tabGroups.query({})"
+	"chrome.tabGroups.query({})",
 );
 registerChromePassthrough(
 	"chrome_tabGroups_get",
@@ -23,7 +21,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.tabGroups.get(1)"
+	"chrome.tabGroups.get(1)",
 );
 registerChromePassthrough(
 	"chrome_tabGroups_update",
@@ -34,7 +32,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.tabGroups.update(1, { title: \"Work\" })"
+	'chrome.tabGroups.update(1, { title: "Work" })',
 );
 registerChromePassthrough(
 	"chrome_tabGroups_move",
@@ -45,5 +43,5 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.tabGroups.move(1, { index: 0 })"
+	"chrome.tabGroups.move(1, { index: 0 })",
 );

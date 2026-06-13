@@ -1,6 +1,10 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ExtensionSession } from "../__mocks__/extension_js";
+import { coerceWasmParams } from "../src/shared/registry/manifest.js";
+import { clearRoutes, setRoute } from "../src/shared/registry/routes.js";
+import type { SerializableJsCallManifestEntry } from "../src/shared/tool-registry.js";
 import {
 	createExecutableCallback,
 	extensionDispatch,
@@ -11,10 +15,6 @@ import {
 	safePostAsCall,
 	settleAllPendingRelays,
 } from "../src/worker/worker.js";
-import { clearRoutes, setRoute } from "../src/shared/registry/routes.js";
-import type { SerializableJsCallManifestEntry } from "../src/shared/tool-registry.js";
-import { coerceWasmParams } from "../src/shared/registry/manifest.js";
-import { ExtensionSession } from "../__mocks__/extension_js";
 
 const sentMessages: unknown[] = [];
 
@@ -55,9 +55,9 @@ describe("coerceWasmParams", () => {
 
 describe("resolveRelayTimeoutMs", () => {
 	it("uses compound default budget for page_goto when params omit timeout", () => {
-		expect(resolveRelayTimeoutMs("page_goto", { url: "https://example.com" })).toBe(
-			95_500,
-		);
+		expect(
+			resolveRelayTimeoutMs("page_goto", { url: "https://example.com" }),
+		).toBe(95_500);
 	});
 
 	it("extends page_goto relay for load + ping + grace phases", () => {
@@ -99,9 +99,14 @@ describe("extensionDispatch", () => {
 	});
 
 	it("returns E_NO_ROUTE when action is not registered", async () => {
-		await expect(extensionDispatch({}, { action: "missing_action" })).resolves.toEqual({
+		await expect(
+			extensionDispatch({}, { action: "missing_action" }),
+		).resolves.toEqual({
 			ok: false,
-			error: { message: "No route registered for action: missing_action", code: "E_NO_ROUTE" },
+			error: {
+				message: "No route registered for action: missing_action",
+				code: "E_NO_ROUTE",
+			},
 		});
 	});
 
@@ -124,14 +129,24 @@ describe("extensionDispatch", () => {
 
 	it("relays through the routing table for content-script endpoints", async () => {
 		setRoute("page_click", { endpoint: "content-script", tabPolicy: "active" });
-		const promise = extensionDispatch({ refId: "e1" }, { action: "page_click", runId: "run-1" });
+		const promise = extensionDispatch(
+			{ refId: "e1" },
+			{ action: "page_click", runId: "run-1" },
+		);
 		await flushMicrotasks();
-		const message = sentMessages[0] as { id: string; owner: string; tabPolicy: string };
+		const message = sentMessages[0] as {
+			id: string;
+			owner: string;
+			tabPolicy: string;
+		};
 		expect(message.owner).toBe("content-script");
 		expect(message.tabPolicy).toBe("active");
 		const pageClickResult = { ok: true, action: "click", refId: "e1" };
 		resolveAsyncRelayResult(message.id, { ok: true, value: pageClickResult });
-		await expect(promise).resolves.toEqual({ ok: true, value: pageClickResult });
+		await expect(promise).resolves.toEqual({
+			ok: true,
+			value: pageClickResult,
+		});
 	});
 });
 
@@ -151,7 +166,9 @@ describe("worker executable callbacks", () => {
 
 	it("same-worker executable callback returns a real handler result", async () => {
 		registerWorkerHandler("worker_echo", async (params) => ({ params }));
-		const callback = createExecutableCallback(makeEntry("worker_echo", "worker"));
+		const callback = createExecutableCallback(
+			makeEntry("worker_echo", "worker"),
+		);
 		await expect(callback({ hello: "world" })).resolves.toEqual({
 			ok: true,
 			value: { params: { hello: "world" } },
@@ -159,46 +176,78 @@ describe("worker executable callbacks", () => {
 	});
 
 	it("cross-context content-script callback posts owner, action, params, and resolves response", async () => {
-		const callback = createExecutableCallback(makeEntry("page_click", "content-script"));
+		const callback = createExecutableCallback(
+			makeEntry("page_click", "content-script"),
+		);
 		const promise = callback({ refId: "e7" }, { runId: "run-1" });
 		await flushMicrotasks();
-		const message = sentMessages[0] as { id: string; owner: string; command: unknown; runId: string };
+		const message = sentMessages[0] as {
+			id: string;
+			owner: string;
+			command: unknown;
+			runId: string;
+		};
 		expect(message.owner).toBe("content-script");
-		expect(message.command).toEqual({ action: "page_click", params: { refId: "e7" }, runId: "run-1", callId: undefined });
+		expect(message.command).toEqual({
+			action: "page_click",
+			params: { refId: "e7" },
+			runId: "run-1",
+			callId: undefined,
+		});
 		resolveAsyncRelayResult(message.id, { ok: true, value: "clicked" });
 		await expect(promise).resolves.toEqual({ ok: true, value: "clicked" });
 	});
 
 	it("timeout settles once and ignores a late response", async () => {
-		const callback = safePostAsCall({ owner: "content-script", action: "page_click", timeoutMs: 10 });
+		const callback = safePostAsCall({
+			owner: "content-script",
+			action: "page_click",
+			timeoutMs: 10,
+		});
 		const promise = callback({});
 		const message = sentMessages[0] as { id: string };
-		const expected = expect(promise).rejects.toThrow("Relay timeout for action: page_click");
+		const expected = expect(promise).rejects.toThrow(
+			"Relay timeout for action: page_click",
+		);
 		await vi.advanceTimersByTimeAsync(11);
 		await expected;
-		expect(sentMessages.some((m) => {
-			const entry = m as { type?: string; id?: string };
-			return entry.type === "relayCancel" && entry.id === message.id;
-		})).toBe(true);
+		expect(
+			sentMessages.some((m) => {
+				const entry = m as { type?: string; id?: string };
+				return entry.type === "relayCancel" && entry.id === message.id;
+			}),
+		).toBe(true);
 		resolveAsyncRelayResult(message.id, { ok: true, value: "late" });
 	});
 
 	it("abort cancellation settles once and ignores a late response", async () => {
 		const controller = new AbortController();
-		const callback = safePostAsCall({ owner: "content-script", action: "page_fill", timeoutMs: 1000 });
+		const callback = safePostAsCall({
+			owner: "content-script",
+			action: "page_fill",
+			timeoutMs: 1000,
+		});
 		const promise = callback({}, { signal: controller.signal });
 		const message = sentMessages[0] as { id: string; type: string };
 		controller.abort();
-		await expect(promise).rejects.toThrow("Relay aborted for action: page_fill");
-		expect(sentMessages.some((m) => {
-			const entry = m as { type?: string; id?: string };
-			return entry.type === "relayCancel" && entry.id === message.id;
-		})).toBe(true);
+		await expect(promise).rejects.toThrow(
+			"Relay aborted for action: page_fill",
+		);
+		expect(
+			sentMessages.some((m) => {
+				const entry = m as { type?: string; id?: string };
+				return entry.type === "relayCancel" && entry.id === message.id;
+			}),
+		).toBe(true);
 		resolveAsyncRelayResult(message.id, { ok: true, value: "late" });
 	});
 
 	it("concurrent calls settle independently exactly once", async () => {
-		const callback = safePostAsCall({ owner: "content-script", action: "page_type", timeoutMs: 1000 });
+		const callback = safePostAsCall({
+			owner: "content-script",
+			action: "page_type",
+			timeoutMs: 1000,
+		});
 		const first = callback({ text: "a" });
 		const second = callback({ text: "b" });
 		const firstMessage = sentMessages[0] as { id: string };
@@ -210,27 +259,47 @@ describe("worker executable callbacks", () => {
 	});
 
 	it("reset settles all pending relays exactly once with E_RESET", async () => {
-		const callback = safePostAsCall({ owner: "content-script", action: "page_click", timeoutMs: 1000 });
+		const callback = safePostAsCall({
+			owner: "content-script",
+			action: "page_click",
+			timeoutMs: 1000,
+		});
 		const promise = callback({});
 		const message = sentMessages[0] as { id: string; type: string };
 		settleAllPendingRelays("E_RESET", "Worker reset");
-		expect(sentMessages.some((m) => {
-			const entry = m as { type?: string; id?: string };
-			return entry.type === "relayCancel" && entry.id === message.id;
-		})).toBe(true);
-		await expect(promise).resolves.toEqual({ ok: false, error: { message: "Worker reset", code: "E_RESET" } });
+		expect(
+			sentMessages.some((m) => {
+				const entry = m as { type?: string; id?: string };
+				return entry.type === "relayCancel" && entry.id === message.id;
+			}),
+		).toBe(true);
+		await expect(promise).resolves.toEqual({
+			ok: false,
+			error: { message: "Worker reset", code: "E_RESET" },
+		});
 		// Late response must be ignored — relay entry was removed, so resolveAsyncRelayResult returns false
-		expect(resolveAsyncRelayResult(message.id, { ok: true, value: "late" })).toBe(false);
+		expect(
+			resolveAsyncRelayResult(message.id, { ok: true, value: "late" }),
+		).toBe(false);
 	});
 
 	it("stop settles all pending relays exactly once with E_STOPPED", async () => {
-		const callback = safePostAsCall({ owner: "content-script", action: "page_fill", timeoutMs: 1000 });
+		const callback = safePostAsCall({
+			owner: "content-script",
+			action: "page_fill",
+			timeoutMs: 1000,
+		});
 		const promise = callback({});
 		const message = sentMessages[0] as { id: string };
 		settleAllPendingRelays("E_STOPPED", "Worker stopped");
-		await expect(promise).resolves.toEqual({ ok: false, error: { message: "Worker stopped", code: "E_STOPPED" } });
+		await expect(promise).resolves.toEqual({
+			ok: false,
+			error: { message: "Worker stopped", code: "E_STOPPED" },
+		});
 		// Late response must be ignored — relay entry was removed, so resolveAsyncRelayResult returns false
-		expect(resolveAsyncRelayResult(message.id, { ok: true, value: "late" })).toBe(false);
+		expect(
+			resolveAsyncRelayResult(message.id, { ok: true, value: "late" }),
+		).toBe(false);
 	});
 
 	it("arbitrary registered context routes through workerPortRegistry and returns real results", async () => {
@@ -239,17 +308,30 @@ describe("worker executable callbacks", () => {
 			postMessage: vi.fn((message: unknown) => {
 				sentMessages.push(message);
 			}),
-			addEventListener: vi.fn((_type: "message", listener: (event: MessageEvent) => void) => {
-				onMessage = listener;
-			}),
+			addEventListener: vi.fn(
+				(_type: "message", listener: (event: MessageEvent) => void) => {
+					onMessage = listener;
+				},
+			),
 		} as unknown as typeof self;
 		registerWorkerPort("custom-worker", mockPort);
-		const callback = createExecutableCallback(makeEntry("custom_action", "custom-worker"));
+		const callback = createExecutableCallback(
+			makeEntry("custom_action", "custom-worker"),
+		);
 		const promise = callback({ test: true });
 		await flushMicrotasks();
-		const message = sentMessages[sentMessages.length - 1] as { id: string; owner: string; command: unknown };
+		const message = sentMessages[sentMessages.length - 1] as {
+			id: string;
+			owner: string;
+			command: unknown;
+		};
 		expect(message.owner).toBe("custom-worker");
-		expect(message.command).toEqual({ action: "custom_action", params: { test: true }, runId: undefined, callId: undefined });
+		expect(message.command).toEqual({
+			action: "custom_action",
+			params: { test: true },
+			runId: undefined,
+			callId: undefined,
+		});
 		onMessage?.({
 			data: {
 				type: "registryCallResult",
@@ -257,42 +339,73 @@ describe("worker executable callbacks", () => {
 				result: { ok: true, value: "custom-result" },
 			},
 		} as MessageEvent);
-		await expect(promise).resolves.toEqual({ ok: true, value: "custom-result" });
+		await expect(promise).resolves.toEqual({
+			ok: true,
+			value: "custom-result",
+		});
 	});
 
 	it("timeout settles once and ignores a late response — idempotent proof", async () => {
-		const callback = safePostAsCall({ owner: "content-script", action: "page_click", timeoutMs: 10 });
+		const callback = safePostAsCall({
+			owner: "content-script",
+			action: "page_click",
+			timeoutMs: 10,
+		});
 		const promise = callback({});
 		const message = sentMessages[0] as { id: string };
-		const expected = expect(promise).rejects.toThrow("Relay timeout for action: page_click");
+		const expected = expect(promise).rejects.toThrow(
+			"Relay timeout for action: page_click",
+		);
 		await vi.advanceTimersByTimeAsync(11);
 		await expected;
 		// Calling resolveAsyncRelayResult after timeout should not re-settle or throw
 		resolveAsyncRelayResult(message.id, { ok: true, value: "late" });
 		// Promise should remain in rejected state; no additional errors
-		await expect(promise).rejects.toThrow("Relay timeout for action: page_click");
+		await expect(promise).rejects.toThrow(
+			"Relay timeout for action: page_click",
+		);
 	});
 
 	it("abort cancellation settles once and ignores a late response — idempotent proof", async () => {
 		const controller = new AbortController();
-		const callback = safePostAsCall({ owner: "content-script", action: "page_fill", timeoutMs: 1000 });
+		const callback = safePostAsCall({
+			owner: "content-script",
+			action: "page_fill",
+			timeoutMs: 1000,
+		});
 		const promise = callback({}, { signal: controller.signal });
 		const message = sentMessages[0] as { id: string };
 		controller.abort();
-		await expect(promise).rejects.toThrow("Relay aborted for action: page_fill");
+		await expect(promise).rejects.toThrow(
+			"Relay aborted for action: page_fill",
+		);
 		// Calling resolveAsyncRelayResult after abort should not re-settle or throw
-		expect(resolveAsyncRelayResult(message.id, { ok: true, value: "late" })).toBe(false);
-		await expect(promise).rejects.toThrow("Relay aborted for action: page_fill");
+		expect(
+			resolveAsyncRelayResult(message.id, { ok: true, value: "late" }),
+		).toBe(false);
+		await expect(promise).rejects.toThrow(
+			"Relay aborted for action: page_fill",
+		);
 	});
 
 	it("pre-aborted signal rejects immediately without posting a message", async () => {
 		const controller = new AbortController();
 		controller.abort();
-		const callback = safePostAsCall({ owner: "content-script", action: "page_click", timeoutMs: 1000 });
+		const callback = safePostAsCall({
+			owner: "content-script",
+			action: "page_click",
+			timeoutMs: 1000,
+		});
 		const promise = callback({}, { signal: controller.signal });
-		await expect(promise).rejects.toThrow("Relay aborted for action: page_click");
+		await expect(promise).rejects.toThrow(
+			"Relay aborted for action: page_click",
+		);
 		// No message should have been posted because the relay was rejected immediately
-		expect(sentMessages.filter((m) => (m as { command?: unknown }).command?.action === "page_click")).toHaveLength(0);
+		expect(
+			sentMessages.filter(
+				(m) => (m as { command?: unknown }).command?.action === "page_click",
+			),
+		).toHaveLength(0);
 	});
 
 	it("resolveTimeoutMs callback controls relay deadline", async () => {
@@ -305,7 +418,9 @@ describe("worker executable callbacks", () => {
 		const expected = expect(promise).rejects.toThrow(
 			"Relay timeout for action: page_goto",
 		);
-		await vi.advanceTimersByTimeAsync(125_499);
+		// page_goto budget = timeout(60s) * 3 [load + networkidle + content-script ping]
+		// + CONTENT_SCRIPT_GRACE_MS(500) + RELAY_TIMEOUT_MARGIN_MS(5000) = 185_500ms
+		await vi.advanceTimersByTimeAsync(185_499);
 		await vi.advanceTimersByTimeAsync(2);
 		await expected;
 	});
@@ -328,61 +443,116 @@ describe("T-022: trace and lifecycle correctness", () => {
 	});
 
 	it("runCell result includes matching callId", async () => {
-		self.onmessage?.(new MessageEvent("message", { data: { type: "init", manifest: [] } }));
+		self.onmessage?.(
+			new MessageEvent("message", { data: { type: "init", manifest: [] } }),
+		);
 		await new Promise((resolve) => setTimeout(resolve, 50));
 
 		const callId = "test-call-123";
-		self.onmessage?.(new MessageEvent("message", {
-			data: { type: "runCell", id: callId, code: "1+1", stdin: "", runId: "run-1" },
-		}));
+		self.onmessage?.(
+			new MessageEvent("message", {
+				data: {
+					type: "runCell",
+					id: callId,
+					code: "1+1",
+					stdin: "",
+					runId: "run-1",
+				},
+			}),
+		);
 		await new Promise((resolve) => setTimeout(resolve, 50));
 
-		const resultMsg = sentMessages.find((m) => (m as { type?: string; id?: string }).type === "result" && (m as { type?: string; id?: string }).id === callId);
+		const resultMsg = sentMessages.find(
+			(m) =>
+				(m as { type?: string; id?: string }).type === "result" &&
+				(m as { type?: string; id?: string }).id === callId,
+		);
 		expect(resultMsg).toBeDefined();
 		expect((resultMsg as { id: string }).id).toBe(callId);
 		expect((resultMsg as { runId: string }).runId).toBe("run-1");
 	});
 
 	it("runCell error includes matching callId", async () => {
-		ExtensionSession.prototype.runCellAsync = vi.fn().mockRejectedValue(new Error("Test cell error"));
+		ExtensionSession.prototype.runCellAsync = vi
+			.fn()
+			.mockRejectedValue(new Error("Test cell error"));
 
-		self.onmessage?.(new MessageEvent("message", { data: { type: "init", manifest: [] } }));
+		self.onmessage?.(
+			new MessageEvent("message", { data: { type: "init", manifest: [] } }),
+		);
 		await new Promise((resolve) => setTimeout(resolve, 50));
 
 		const callId = "test-call-456";
-		self.onmessage?.(new MessageEvent("message", {
-			data: { type: "runCell", id: callId, code: "throw 1", stdin: "", runId: "run-2" },
-		}));
+		self.onmessage?.(
+			new MessageEvent("message", {
+				data: {
+					type: "runCell",
+					id: callId,
+					code: "throw 1",
+					stdin: "",
+					runId: "run-2",
+				},
+			}),
+		);
 		await new Promise((resolve) => setTimeout(resolve, 50));
 
-		const errorMsg = sentMessages.find((m) => (m as { type?: string; id?: string }).type === "error" && (m as { type?: string; id?: string }).id === callId);
+		const errorMsg = sentMessages.find(
+			(m) =>
+				(m as { type?: string; id?: string }).type === "error" &&
+				(m as { type?: string; id?: string }).id === callId,
+		);
 		expect(errorMsg).toBeDefined();
 		expect((errorMsg as { id: string }).id).toBe(callId);
 		expect((errorMsg as { runId: string }).runId).toBe("run-2");
-		expect((errorMsg as { error: { message: string } }).error.message).toBe("Test cell error");
+		expect((errorMsg as { error: { message: string } }).error.message).toBe(
+			"Test cell error",
+		);
 	});
 
 	it("stopped or timed-out cell is not running after 2s", async () => {
 		vi.useFakeTimers({ shouldAdvanceTime: true });
 
-		let resolveCell: (value: { status: string; stdout: string[]; stderr: string[]; result: string; error: null; execution_count: number }) => void;
+		let resolveCell: (value: {
+			status: string;
+			stdout: string[];
+			stderr: string[];
+			result: string;
+			error: null;
+			execution_count: number;
+		}) => void;
 		ExtensionSession.prototype.runCellAsync = vi.fn().mockImplementation(() => {
 			return new Promise((resolve) => {
 				resolveCell = resolve;
 			});
 		});
 
-		self.onmessage?.(new MessageEvent("message", { data: { type: "init", manifest: [] } }));
+		self.onmessage?.(
+			new MessageEvent("message", { data: { type: "init", manifest: [] } }),
+		);
 		await new Promise((resolve) => setTimeout(resolve, 50));
 
 		const callId = "test-call-timeout";
-		self.onmessage?.(new MessageEvent("message", {
-			data: { type: "runCell", id: callId, code: "sleep(3000)", stdin: "", runId: "run-3" },
-		}));
+		self.onmessage?.(
+			new MessageEvent("message", {
+				data: {
+					type: "runCell",
+					id: callId,
+					code: "sleep(3000)",
+					stdin: "",
+					runId: "run-3",
+				},
+			}),
+		);
 		await new Promise((resolve) => setTimeout(resolve, 10));
 
 		// Cell is still running; no result yet
-		expect(sentMessages.some((m) => (m as { type?: string; id?: string }).type === "result" && (m as { type?: string; id?: string }).id === callId)).toBe(false);
+		expect(
+			sentMessages.some(
+				(m) =>
+					(m as { type?: string; id?: string }).type === "result" &&
+					(m as { type?: string; id?: string }).id === callId,
+			),
+		).toBe(false);
 
 		// Resolve the cell after 2.5s simulated time
 		await vi.advanceTimersByTimeAsync(2500);
@@ -397,9 +567,15 @@ describe("T-022: trace and lifecycle correctness", () => {
 		await new Promise((resolve) => setTimeout(resolve, 10));
 
 		// Result should now be posted
-		const resultMsg = sentMessages.find((m) => (m as { type?: string; id?: string }).type === "result" && (m as { type?: string; id?: string }).id === callId);
+		const resultMsg = sentMessages.find(
+			(m) =>
+				(m as { type?: string; id?: string }).type === "result" &&
+				(m as { type?: string; id?: string }).id === callId,
+		);
 		expect(resultMsg).toBeDefined();
-		expect((resultMsg as { data: { result: string } }).data.result).toBe("done");
+		expect((resultMsg as { data: { result: string } }).data.result).toBe(
+			"done",
+		);
 
 		// A subsequent cell should run successfully, proving activeRunCell was cleared
 		ExtensionSession.prototype.runCellAsync = vi.fn().mockResolvedValue({
@@ -412,14 +588,28 @@ describe("T-022: trace and lifecycle correctness", () => {
 		});
 
 		const nextCallId = "test-call-next";
-		self.onmessage?.(new MessageEvent("message", {
-			data: { type: "runCell", id: nextCallId, code: "2+2", stdin: "", runId: "run-4" },
-		}));
+		self.onmessage?.(
+			new MessageEvent("message", {
+				data: {
+					type: "runCell",
+					id: nextCallId,
+					code: "2+2",
+					stdin: "",
+					runId: "run-4",
+				},
+			}),
+		);
 		await new Promise((resolve) => setTimeout(resolve, 50));
 
-		const nextResult = sentMessages.find((m) => (m as { type?: string; id?: string }).type === "result" && (m as { type?: string; id?: string }).id === nextCallId);
+		const nextResult = sentMessages.find(
+			(m) =>
+				(m as { type?: string; id?: string }).type === "result" &&
+				(m as { type?: string; id?: string }).id === nextCallId,
+		);
 		expect(nextResult).toBeDefined();
-		expect((nextResult as { data: { result: string } }).data.result).toBe("next");
+		expect((nextResult as { data: { result: string } }).data.result).toBe(
+			"next",
+		);
 	});
 
 	it("tool events have deterministic chronological ordering", async () => {
@@ -436,26 +626,50 @@ describe("T-022: trace and lifecycle correctness", () => {
 			});
 		});
 
-		self.onmessage?.(new MessageEvent("message", { data: { type: "init", manifest: [] } }));
+		self.onmessage?.(
+			new MessageEvent("message", { data: { type: "init", manifest: [] } }),
+		);
 		await new Promise((resolve) => setTimeout(resolve, 50));
 
 		const firstId = "test-call-first";
 		const secondId = "test-call-second";
 
-		self.onmessage?.(new MessageEvent("message", {
-			data: { type: "runCell", id: firstId, code: "1", stdin: "", runId: "run-a" },
-		}));
-		self.onmessage?.(new MessageEvent("message", {
-			data: { type: "runCell", id: secondId, code: "2", stdin: "", runId: "run-b" },
-		}));
+		self.onmessage?.(
+			new MessageEvent("message", {
+				data: {
+					type: "runCell",
+					id: firstId,
+					code: "1",
+					stdin: "",
+					runId: "run-a",
+				},
+			}),
+		);
+		self.onmessage?.(
+			new MessageEvent("message", {
+				data: {
+					type: "runCell",
+					id: secondId,
+					code: "2",
+					stdin: "",
+					runId: "run-b",
+				},
+			}),
+		);
 
 		await new Promise((resolve) => setTimeout(resolve, 100));
 
-		const resultMessages = sentMessages.filter((m) => (m as { type?: string }).type === "result");
+		const resultMessages = sentMessages.filter(
+			(m) => (m as { type?: string }).type === "result",
+		);
 		expect(resultMessages).toHaveLength(2);
 		expect((resultMessages[0] as { id: string }).id).toBe(firstId);
-		expect((resultMessages[0] as { data: { result: string } }).data.result).toBe("cell-1");
+		expect(
+			(resultMessages[0] as { data: { result: string } }).data.result,
+		).toBe("cell-1");
 		expect((resultMessages[1] as { id: string }).id).toBe(secondId);
-		expect((resultMessages[1] as { data: { result: string } }).data.result).toBe("cell-2");
+		expect(
+			(resultMessages[1] as { data: { result: string } }).data.result,
+		).toBe("cell-2");
 	});
 });

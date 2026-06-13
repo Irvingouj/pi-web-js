@@ -14,6 +14,6 @@ regChrome(
 	["offscreen"],
 	"Create offscreen document",
 	zChromeAny,
-	"chrome.offscreen.createDocument({ url: \"offscreen.html\", reasons: [\"WORKERS\"] })",
+	'chrome.offscreen.createDocument({ url: "offscreen.html", reasons: ["WORKERS"] })',
 	"null",
 );

@@ -1,14 +1,14 @@
-import type { AsyncError } from "./manifest.js";
 import {
 	contentScriptMissingError,
 	isContentScriptConnectionError,
 	labelNotFoundError,
 	noTabError,
 	notInteractableError,
+	type StaleRefCandidate,
 	staleRefError,
 	throwStructuredAgentError,
-	type StaleRefCandidate,
 } from "./agent-errors.js";
+import type { AsyncError } from "./manifest.js";
 
 export {
 	contentScriptMissingError,
@@ -16,12 +16,16 @@ export {
 	labelNotFoundError,
 	noTabError,
 	notInteractableError,
+	type StaleRefCandidate,
 	staleRefError,
 	throwStructuredAgentError,
-	type StaleRefCandidate,
 };
 
-function extractErrorDetails(err: unknown): { name?: string; stack?: string; line?: number } {
+function extractErrorDetails(err: unknown): {
+	name?: string;
+	stack?: string;
+	line?: number;
+} {
 	if (!(err instanceof Error)) return {};
 	const name = err.name !== "Error" ? err.name : undefined;
 	const stack = err.stack;

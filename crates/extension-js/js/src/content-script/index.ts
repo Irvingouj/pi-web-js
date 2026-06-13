@@ -1,13 +1,12 @@
 // Content script entry — registers handlers and listens for extension messages.
+
+import { initContentScriptLogger } from "./logger.js";
+import { installMessageListener } from "./message-router.js";
 import { registerContentScriptSpecs } from "./registry.js";
 import {
 	buildContentScriptSpecs,
 	buildInfraContentScriptSpecs,
 } from "./schemas.js";
-import { initContentScriptLogger } from "./logger.js";
-import { installMessageListener } from "./message-router.js";
-
-export {};
 
 declare global {
 	interface Window {

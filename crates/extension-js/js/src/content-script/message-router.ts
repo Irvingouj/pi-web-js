@@ -1,13 +1,13 @@
-import { normalizeAgentError } from "../shared/registry/normalize-agent-error.js";
 import { toHandlerAction } from "../shared/registry/content-script-actions.js";
+import { normalizeAgentError } from "../shared/registry/normalize-agent-error.js";
+import { asRecord } from "./dom-utils.js";
+import { handlers } from "./handlers.js";
+import { logger } from "./logger.js";
 import {
 	cancelContentScriptCall,
 	dispatchContentScriptCall,
 	getContentScriptSpec,
 } from "./registry.js";
-import { asRecord } from "./dom-utils.js";
-import { handlers } from "./handlers.js";
-import { logger } from "./logger.js";
 
 function resolveRegistryAction(
 	registryAction: string,
@@ -23,10 +23,7 @@ function resolveRegistryAction(
 	return registryAction;
 }
 
-function resolveHandlerKey(
-	registryAction: string,
-	fallback: string,
-): string {
+function resolveHandlerKey(registryAction: string, fallback: string): string {
 	const spec = getContentScriptSpec(registryAction);
 	return spec?.handlerKey ?? fallback;
 }

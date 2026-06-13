@@ -209,7 +209,13 @@ async function stubChromeWithGrantedPermissions(): Promise<void> {
 
 // ─── Imports ─────────────────────────────────────────────────────
 
-import { logger } from "../src/shared/logger.js";
+import { handlers } from "../src/content-script/handlers.js";
+import {
+	dispatchContentScriptCall,
+	registerContentScriptSpec,
+} from "../src/content-script/registry.js";
+import { buildContentScriptSpecs } from "../src/content-script/schemas.js";
+import { buildSnapshotInTab } from "../src/main/runner/dom/snapshot.js";
 // runner.ts registers all tools at module load time; initExtensionListeners()
 // is a no-op because chrome is not yet stubbed.  We stub it before tests
 // that need it.
@@ -224,12 +230,15 @@ import {
 	pingTabContentScript,
 	waitForTabLoad,
 } from "../src/main/runner/runtime.js";
-import { buildSnapshotInTab } from "../src/main/runner/dom/snapshot.js";
 import {
 	initCapabilities,
 	resetCapabilities,
 } from "../src/main/runner/tools/chrome/capability.js";
-
+import { logger } from "../src/shared/logger.js";
+import {
+	addContentScriptAction,
+	getContentScriptActions,
+} from "../src/shared/registry/content-script-actions.js";
 import {
 	clearJsRegistry,
 	clearRegistry,
@@ -242,16 +251,6 @@ import {
 	setRunnerAbortController,
 	throwIfAborted,
 } from "../src/shared/tool-registry.js";
-import {
-	dispatchContentScriptCall,
-	registerContentScriptSpec,
-} from "../src/content-script/registry.js";
-import {
-	addContentScriptAction,
-	getContentScriptActions,
-} from "../src/shared/registry/content-script-actions.js";
-import { buildContentScriptSpecs } from "../src/content-script/schemas.js";
-import { handlers } from "../src/content-script/handlers.js";
 
 // ─── Polyfills ───────────────────────────────────────────────────
 
@@ -554,9 +553,13 @@ describe("schema validation", () => {
 		if (!result.ok) {
 			// The error message should mention the API name, field path, and issue,
 			// but should NOT contain the raw invalid value in a way that leaks sensitive data.
-			expect(result.error.message).toContain("Invalid parameters for storage_set");
+			expect(result.error.message).toContain(
+				"Invalid parameters for storage_set",
+			);
 			expect(result.error.message).toContain("at 'value'");
-			expect(result.error.message).toContain("Expected string, received number");
+			expect(result.error.message).toContain(
+				"Expected string, received number",
+			);
 			expect(result.error.message).not.toContain("12345");
 		}
 	});
@@ -615,7 +618,9 @@ describe("WU-9: actionable validation errors", () => {
 		);
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
-			expect(result.error.message).toContain("Invalid parameters for page_unhover");
+			expect(result.error.message).toContain(
+				"Invalid parameters for page_unhover",
+			);
 			expect(result.error.message).toContain("expected { } or no args");
 			expect(result.error.message).toContain("received string");
 		}
@@ -625,8 +630,12 @@ describe("WU-9: actionable validation errors", () => {
 		const result = await dispatchTool("mock_async", 123);
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
-			expect(result.error.message).toContain("Invalid parameters for mock_async");
-			expect(result.error.message).toContain("expected string or { label?: string }");
+			expect(result.error.message).toContain(
+				"Invalid parameters for mock_async",
+			);
+			expect(result.error.message).toContain(
+				"expected string or { label?: string }",
+			);
 			expect(result.error.message).toContain("received number");
 		}
 	});
@@ -640,9 +649,13 @@ describe("WU-9: actionable validation errors", () => {
 		);
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
-			expect(result.error.message).toContain("Invalid parameters for page_extract");
+			expect(result.error.message).toContain(
+				"Invalid parameters for page_extract",
+			);
 			expect(result.error.message).toContain("at 'fields.0'");
-			expect(result.error.message).toContain("Expected string, received number");
+			expect(result.error.message).toContain(
+				"Expected string, received number",
+			);
 		}
 	});
 });
@@ -819,14 +832,18 @@ describe("network", () => {
 
 	it("fetch returns base64 for binary content", async () => {
 		// Mock a Response with binary data
-		const jpegBytes = new Uint8Array([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46]);
+		const jpegBytes = new Uint8Array([
+			0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46,
+		]);
 		const mockResponse = {
 			ok: true,
 			status: 200,
 			url: "http://example.com/photo.jpg",
 			headers: new Map([["content-type", "image/jpeg"]]),
 			arrayBuffer: async () => jpegBytes.buffer,
-			text: async () => { throw new Error("Should not call text() for binary"); },
+			text: async () => {
+				throw new Error("Should not call text() for binary");
+			},
 		};
 
 		// Mock global fetch
@@ -1055,7 +1072,9 @@ describe("chrome passthrough", () => {
 	});
 
 	it("history_delete alias normalizes string url to chrome object arg", async () => {
-		const result = await dispatchTool("history_delete", ["https://example.com"]);
+		const result = await dispatchTool("history_delete", [
+			"https://example.com",
+		]);
 		expect(result.ok).toBe(true);
 		expect(mockChrome.history.deleteUrl).toHaveBeenCalledWith({
 			url: "https://example.com",
@@ -1131,7 +1150,10 @@ describe("capability gating", () => {
 		};
 		vi.stubGlobal("chrome", minimalChrome);
 		await initCapabilities();
-		const result = await dispatchTool("chrome_notifications_create", ["", { title: "Test" }]);
+		const result = await dispatchTool("chrome_notifications_create", [
+			"",
+			{ title: "Test" },
+		]);
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.code).toBe("E_PERMISSION");
@@ -1144,12 +1166,17 @@ describe("capability gating", () => {
 			...mockChrome,
 			notifications: undefined,
 			permissions: {
-				getAll: vi.fn(() => Promise.resolve({ permissions: ["notifications"] })),
+				getAll: vi.fn(() =>
+					Promise.resolve({ permissions: ["notifications"] }),
+				),
 			},
 		};
 		vi.stubGlobal("chrome", minimalChrome);
 		await initCapabilities();
-		const result = await dispatchTool("chrome_notifications_create", ["", { title: "Test" }]);
+		const result = await dispatchTool("chrome_notifications_create", [
+			"",
+			{ title: "Test" },
+		]);
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.code).toBe("E_UNAVAILABLE");
@@ -1217,7 +1244,10 @@ describe("capability gating", () => {
 		};
 		vi.stubGlobal("chrome", minimalChrome);
 		await initCapabilities();
-		const result = await dispatchTool("notifications_create", ["", { title: "Test" }]);
+		const result = await dispatchTool("notifications_create", [
+			"",
+			{ title: "Test" },
+		]);
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.code).toBe("E_PERMISSION");
@@ -1229,12 +1259,17 @@ describe("capability gating", () => {
 		const fullChrome = {
 			...mockChrome,
 			permissions: {
-				getAll: vi.fn(() => Promise.resolve({ permissions: ["notifications"] })),
+				getAll: vi.fn(() =>
+					Promise.resolve({ permissions: ["notifications"] }),
+				),
 			},
 		};
 		vi.stubGlobal("chrome", fullChrome);
 		await initCapabilities();
-		const result = await dispatchTool("notifications_create", ["", { title: "Test" }]);
+		const result = await dispatchTool("notifications_create", [
+			"",
+			{ title: "Test" },
+		]);
 		expect(result.ok).toBe(true);
 		if (result.ok) {
 			expect(result.value).toBe("notif-id");
@@ -1242,7 +1277,9 @@ describe("capability gating", () => {
 	});
 
 	it("normalizeChromeError maps permission messages to E_PERMISSION", async () => {
-		const { normalizeChromeError } = await import("../src/main/runner/chrome/internals.js");
+		const { normalizeChromeError } = await import(
+			"../src/main/runner/chrome/internals.js"
+		);
 		const result = normalizeChromeError(new Error("User denied permission"));
 		expect(result.error.code).toBe("E_PERMISSION");
 		expect(result.error.category).toBe("permission");
@@ -1438,7 +1475,9 @@ describe("page actions", () => {
 		if (result.ok) {
 			expect(Array.isArray(result.value)).toBe(false);
 			expect((result.value as { tabId: number }).tabId).toBe(42);
-			expect((result.value as { url: string }).url).toBe("https://example.com/");
+			expect((result.value as { url: string }).url).toBe(
+				"https://example.com/",
+			);
 			expect((result.value as { title: string }).title).toBe("Example");
 		}
 	});
@@ -1573,9 +1612,21 @@ describe("page actions", () => {
 
 	it("page_goto awaits tab complete and ping success", async () => {
 		mockChrome.tabs.get
-			.mockResolvedValueOnce({ id: 1, status: "complete", url: "https://old.example" })
-			.mockResolvedValueOnce({ id: 1, status: "loading", url: "https://example.com" })
-			.mockResolvedValue({ id: 1, status: "complete", url: "https://example.com" });
+			.mockResolvedValueOnce({
+				id: 1,
+				status: "complete",
+				url: "https://old.example",
+			})
+			.mockResolvedValueOnce({
+				id: 1,
+				status: "loading",
+				url: "https://example.com",
+			})
+			.mockResolvedValue({
+				id: 1,
+				status: "complete",
+				url: "https://example.com",
+			});
 		mockChrome.tabs.sendMessage.mockResolvedValue({ ok: true });
 		const onUpdatedListeners: Array<
 			(tabId: number, changeInfo: { status?: string }) => void
@@ -1588,7 +1639,9 @@ describe("page actions", () => {
 			if (idx !== -1) onUpdatedListeners.splice(idx, 1);
 		});
 
-		const dispatchPromise = dispatchTool("page_goto", { url: "https://example.com" });
+		const dispatchPromise = dispatchTool("page_goto", {
+			url: "https://example.com",
+		});
 
 		setTimeout(() => {
 			mockChrome.tabs.get.mockResolvedValue({
@@ -1647,8 +1700,16 @@ describe("page actions", () => {
 
 	it("page_goto succeeds when final URL differs after redirect", async () => {
 		mockChrome.tabs.get
-			.mockResolvedValueOnce({ id: 1, status: "complete", url: "https://old.example" })
-			.mockResolvedValue({ id: 1, status: "complete", url: "https://redirected.com/" });
+			.mockResolvedValueOnce({
+				id: 1,
+				status: "complete",
+				url: "https://old.example",
+			})
+			.mockResolvedValue({
+				id: 1,
+				status: "complete",
+				url: "https://redirected.com/",
+			});
 		mockChrome.tabs.sendMessage.mockResolvedValue({ ok: true });
 		const onUpdatedListeners: Array<
 			(tabId: number, changeInfo: { status?: string }) => void
@@ -1767,15 +1828,18 @@ describe("page actions", () => {
 			expect(result.error.code).toBe("E_CONTENT_SCRIPT");
 			expect(result.error.hint).toContain("Content script is not connected");
 			expect(result.error.recovery?.[0]).toContain("page.goto");
-			expect(result.error.message).not.toContain("Receiving end does not exist");
+			expect(result.error.message).not.toContain(
+				"Receiving end does not exist",
+			);
 		}
 	});
 
 	it("pingTabContentScript returns E_CONTENT_SCRIPT on ping timeout", async () => {
 		mockChrome.tabs.sendMessage.mockImplementation(
-			() => new Promise(() => {
-				/* hang until ping deadline */
-			}),
+			() =>
+				new Promise(() => {
+					/* hang until ping deadline */
+				}),
 		);
 		mockChrome.tabs.get.mockResolvedValue({
 			id: 1,
@@ -2036,7 +2100,11 @@ describe("WU-5: unambiguous element action arguments", () => {
 		);
 		expect(result.ok).toBe(true);
 		if (result.ok) {
-			expect(result.value).toMatchObject({ ok: true, action: "click", refId: "e2" });
+			expect(result.value).toMatchObject({
+				ok: true,
+				action: "click",
+				refId: "e2",
+			});
 		}
 		document.body.removeChild(btn);
 	});
@@ -2120,7 +2188,10 @@ describe("WU-5: unambiguous element action arguments", () => {
 
 	it("page_scroll_to accepts coordinate-only params", async () => {
 		const scrollTo = vi.fn();
-		Object.defineProperty(window, "scrollTo", { value: scrollTo, configurable: true });
+		Object.defineProperty(window, "scrollTo", {
+			value: scrollTo,
+			configurable: true,
+		});
 		const result = await dispatchContentScriptCall(
 			"page_scroll_to",
 			"scroll_to",
@@ -2430,7 +2501,9 @@ describe("WU-5: unambiguous element action arguments", () => {
 		const btn = document.createElement("button");
 		btn.textContent = "SidepanelBtn";
 		document.body.appendChild(btn);
-		const result = await dispatchTool("sidepanel_click", { label: "SidepanelBtn" });
+		const result = await dispatchTool("sidepanel_click", {
+			label: "SidepanelBtn",
+		});
 		expect(result.ok).toBe(true);
 		document.body.removeChild(btn);
 	});
@@ -2531,7 +2604,9 @@ describe("snapshot refId contract", () => {
 		document.body.appendChild(disabled);
 
 		const result = buildSnapshotInTab(500);
-		const checkboxNode = result.nodes.find((n) => n.tag === "input" && n.checked === true);
+		const checkboxNode = result.nodes.find(
+			(n) => n.tag === "input" && n.checked === true,
+		);
 		const disabledNode = result.nodes.find((n) => n.disabled === true);
 		expect(checkboxNode?.checked).toBe(true);
 		expect(disabledNode?.disabled).toBe(true);
@@ -2585,9 +2660,7 @@ describe("snapshot refId contract", () => {
 		const refId = snapshot.nodes[0].refId;
 		expect(refId).toMatch(/^e\d+$/);
 
-		const el = document.querySelector(
-			`[data-ref-id='${CSS.escape(refId)}']`,
-		);
+		const el = document.querySelector(`[data-ref-id='${CSS.escape(refId)}']`);
 		expect(el).toBe(btn);
 		(el as HTMLElement).click();
 		expect(clicked).toBe(true);
@@ -2833,7 +2906,7 @@ describe("registry contract", () => {
 				description: "Should fail",
 				params: z.object({}),
 				returns: z.null(),
-			owner: "main-thread",
+				owner: "main-thread",
 				handler: async () => null,
 				paramTypes: [],
 				returnDoc: "null",

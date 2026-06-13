@@ -2,8 +2,8 @@ import {
 	notInteractableError,
 	throwStructuredAgentError,
 } from "../shared/registry/normalize-agent-error.js";
-import { readFormFields } from "../shared/snapshot-dom.js";
 import type { PageActionResult } from "../shared/schemas.js";
+import { readFormFields } from "../shared/snapshot-dom.js";
 
 export { readFormFields };
 
@@ -33,9 +33,11 @@ export function assertFillEffect(
 		return;
 	}
 	if (el.value !== requested) {
-		throwStructuredAgentError(notInteractableError(action, refId, {
-			requested,
-			actual: el.value,
-		}));
+		throwStructuredAgentError(
+			notInteractableError(action, refId, {
+				requested,
+				actual: el.value,
+			}),
+		);
 	}
 }

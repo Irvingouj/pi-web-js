@@ -1,17 +1,17 @@
 // @vitest-environment jsdom
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { inlineSnapshot } from "../src/content-script/snapshot.js";
 import {
 	getElementByRefId,
 	throwElementNotFound,
 } from "../src/content-script/dom-utils.js";
+import { handlers } from "../src/content-script/handlers.js";
 import {
 	dispatchContentScriptCall,
 	registerContentScriptSpec,
 } from "../src/content-script/registry.js";
 import { buildContentScriptSpecs } from "../src/content-script/schemas.js";
-import { handlers } from "../src/content-script/handlers.js";
+import { inlineSnapshot } from "../src/content-script/snapshot.js";
 
 const mockAddListener = vi.fn();
 
@@ -143,7 +143,10 @@ describe("content-script onMessage handler", () => {
 			sendResponse,
 		);
 		await new Promise((resolve) => setTimeout(resolve, 0));
-		expect(sendResponse).toHaveBeenCalledWith({ ok: true, value: { ok: true } });
+		expect(sendResponse).toHaveBeenCalledWith({
+			ok: true,
+			value: { ok: true },
+		});
 	});
 
 	it("returns error for unknown actions", async () => {
@@ -343,28 +346,45 @@ describe("snapshot_query handler", () => {
 		const sendResponse = vi.fn();
 		const listener = mockAddListener.mock.calls[0][0];
 		listener(
-			{ type: "registryCall", action: "page_snapshot_query", params: { filter: { role: "button" } }, id: "sq-1" },
+			{
+				type: "registryCall",
+				action: "page_snapshot_query",
+				params: { filter: { role: "button" } },
+				id: "sq-1",
+			},
 			{ id: globalThis.chrome.runtime.id },
 			sendResponse,
 		);
 		await new Promise((resolve) => setTimeout(resolve, 10));
-		const response = sendResponse.mock.calls[0][0] as { ok: boolean; value: { nodes: Array<{ role: string }> } };
+		const response = sendResponse.mock.calls[0][0] as {
+			ok: boolean;
+			value: { nodes: Array<{ role: string }> };
+		};
 		expect(response.ok).toBe(true);
 		expect(response.value.nodes).toHaveLength(1);
 		expect(response.value.nodes[0].role).toBe("button");
 	});
 
 	it("filter by multiple roles", async () => {
-		document.body.innerHTML = "<button>A</button><a href='#'>B</a><input type='text'>";
+		document.body.innerHTML =
+			"<button>A</button><a href='#'>B</a><input type='text'>";
 		const sendResponse = vi.fn();
 		const listener = mockAddListener.mock.calls[0][0];
 		listener(
-			{ type: "registryCall", action: "page_snapshot_query", params: { filter: { role: ["button", "link"] } }, id: "sq-2" },
+			{
+				type: "registryCall",
+				action: "page_snapshot_query",
+				params: { filter: { role: ["button", "link"] } },
+				id: "sq-2",
+			},
 			{ id: globalThis.chrome.runtime.id },
 			sendResponse,
 		);
 		await new Promise((resolve) => setTimeout(resolve, 10));
-		const response = sendResponse.mock.calls[0][0] as { ok: boolean; value: { nodes: Array<{ role: string }> } };
+		const response = sendResponse.mock.calls[0][0] as {
+			ok: boolean;
+			value: { nodes: Array<{ role: string }> };
+		};
 		expect(response.ok).toBe(true);
 		expect(response.value.nodes).toHaveLength(2);
 	});
@@ -374,28 +394,45 @@ describe("snapshot_query handler", () => {
 		const sendResponse = vi.fn();
 		const listener = mockAddListener.mock.calls[0][0];
 		listener(
-			{ type: "registryCall", action: "page_snapshot_query", params: { filter: { tag: "a" } }, id: "sq-3" },
+			{
+				type: "registryCall",
+				action: "page_snapshot_query",
+				params: { filter: { tag: "a" } },
+				id: "sq-3",
+			},
 			{ id: globalThis.chrome.runtime.id },
 			sendResponse,
 		);
 		await new Promise((resolve) => setTimeout(resolve, 10));
-		const response = sendResponse.mock.calls[0][0] as { ok: boolean; value: { nodes: Array<{ tag: string }> } };
+		const response = sendResponse.mock.calls[0][0] as {
+			ok: boolean;
+			value: { nodes: Array<{ tag: string }> };
+		};
 		expect(response.ok).toBe(true);
 		expect(response.value.nodes).toHaveLength(1);
 		expect(response.value.nodes[0].tag).toBe("a");
 	});
 
 	it("filter by interactiveOnly excludes non-interactive", async () => {
-		document.body.innerHTML = "<button>A</button><div>B</div><h1>C</h1><a href='#'>D</a>";
+		document.body.innerHTML =
+			"<button>A</button><div>B</div><h1>C</h1><a href='#'>D</a>";
 		const sendResponse = vi.fn();
 		const listener = mockAddListener.mock.calls[0][0];
 		listener(
-			{ type: "registryCall", action: "page_snapshot_query", params: { filter: { interactiveOnly: true } }, id: "sq-4" },
+			{
+				type: "registryCall",
+				action: "page_snapshot_query",
+				params: { filter: { interactiveOnly: true } },
+				id: "sq-4",
+			},
 			{ id: globalThis.chrome.runtime.id },
 			sendResponse,
 		);
 		await new Promise((resolve) => setTimeout(resolve, 10));
-		const response = sendResponse.mock.calls[0][0] as { ok: boolean; value: { nodes: Array<{ role: string }> } };
+		const response = sendResponse.mock.calls[0][0] as {
+			ok: boolean;
+			value: { nodes: Array<{ role: string }> };
+		};
 		expect(response.ok).toBe(true);
 		const roles = response.value.nodes.map((n: { role: string }) => n.role);
 		expect(roles).not.toContain("heading");
@@ -409,28 +446,45 @@ describe("snapshot_query handler", () => {
 		const sendResponse = vi.fn();
 		const listener = mockAddListener.mock.calls[0][0];
 		listener(
-			{ type: "registryCall", action: "page_snapshot_query", params: { filter: { text: "sign" } }, id: "sq-5" },
+			{
+				type: "registryCall",
+				action: "page_snapshot_query",
+				params: { filter: { text: "sign" } },
+				id: "sq-5",
+			},
 			{ id: globalThis.chrome.runtime.id },
 			sendResponse,
 		);
 		await new Promise((resolve) => setTimeout(resolve, 10));
-		const response = sendResponse.mock.calls[0][0] as { ok: boolean; value: { nodes: Array<{ text: string }> } };
+		const response = sendResponse.mock.calls[0][0] as {
+			ok: boolean;
+			value: { nodes: Array<{ text: string }> };
+		};
 		expect(response.ok).toBe(true);
 		expect(response.value.nodes).toHaveLength(1);
 		expect(response.value.nodes[0].text).toContain("Sign in");
 	});
 
 	it("filter by name substring", async () => {
-		document.body.innerHTML = "<input aria-label='Email'><input aria-label='Password'>";
+		document.body.innerHTML =
+			"<input aria-label='Email'><input aria-label='Password'>";
 		const sendResponse = vi.fn();
 		const listener = mockAddListener.mock.calls[0][0];
 		listener(
-			{ type: "registryCall", action: "page_snapshot_query", params: { filter: { name: "email" } }, id: "sq-6" },
+			{
+				type: "registryCall",
+				action: "page_snapshot_query",
+				params: { filter: { name: "email" } },
+				id: "sq-6",
+			},
 			{ id: globalThis.chrome.runtime.id },
 			sendResponse,
 		);
 		await new Promise((resolve) => setTimeout(resolve, 10));
-		const response = sendResponse.mock.calls[0][0] as { ok: boolean; value: { nodes: unknown[] } };
+		const response = sendResponse.mock.calls[0][0] as {
+			ok: boolean;
+			value: { nodes: unknown[] };
+		};
 		expect(response.ok).toBe(true);
 		expect(response.value.nodes).toHaveLength(1);
 	});
@@ -440,27 +494,44 @@ describe("snapshot_query handler", () => {
 		const sendResponse = vi.fn();
 		const listener = mockAddListener.mock.calls[0][0];
 		listener(
-			{ type: "registryCall", action: "page_snapshot_query", params: { filter: { href: "/docs" } }, id: "sq-7" },
+			{
+				type: "registryCall",
+				action: "page_snapshot_query",
+				params: { filter: { href: "/docs" } },
+				id: "sq-7",
+			},
 			{ id: globalThis.chrome.runtime.id },
 			sendResponse,
 		);
 		await new Promise((resolve) => setTimeout(resolve, 10));
-		const response = sendResponse.mock.calls[0][0] as { ok: boolean; value: { nodes: Array<{ href: string }> } };
+		const response = sendResponse.mock.calls[0][0] as {
+			ok: boolean;
+			value: { nodes: Array<{ href: string }> };
+		};
 		expect(response.ok).toBe(true);
 		expect(response.value.nodes).toHaveLength(1);
 	});
 
 	it("combined filter with AND logic", async () => {
-		document.body.innerHTML = "<button>OK</button><a href='/go'>Go</a><button>Cancel</button>";
+		document.body.innerHTML =
+			"<button>OK</button><a href='/go'>Go</a><button>Cancel</button>";
 		const sendResponse = vi.fn();
 		const listener = mockAddListener.mock.calls[0][0];
 		listener(
-			{ type: "registryCall", action: "page_snapshot_query", params: { filter: { role: "button", text: "ok" } }, id: "sq-8" },
+			{
+				type: "registryCall",
+				action: "page_snapshot_query",
+				params: { filter: { role: "button", text: "ok" } },
+				id: "sq-8",
+			},
 			{ id: globalThis.chrome.runtime.id },
 			sendResponse,
 		);
 		await new Promise((resolve) => setTimeout(resolve, 10));
-		const response = sendResponse.mock.calls[0][0] as { ok: boolean; value: { nodes: Array<{ role: string; text: string }> } };
+		const response = sendResponse.mock.calls[0][0] as {
+			ok: boolean;
+			value: { nodes: Array<{ role: string; text: string }> };
+		};
 		expect(response.ok).toBe(true);
 		expect(response.value.nodes).toHaveLength(1);
 		expect(response.value.nodes[0].text).toContain("OK");
@@ -468,11 +539,16 @@ describe("snapshot_query handler", () => {
 
 	it("empty filter returns all nodes", async () => {
 		document.body.innerHTML = "<button>A</button><a href='#'>B</a><h1>C</h1>";
-		const sendResponse = vi.fn();
+		const _sendResponse = vi.fn();
 		const listener = mockAddListener.mock.calls[0][0];
 		// Get unfiltered count via snapshot_data
 		listener(
-			{ type: "registryCall", action: "page_snapshot_data", params: {}, id: "sq-base" },
+			{
+				type: "registryCall",
+				action: "page_snapshot_data",
+				params: {},
+				id: "sq-base",
+			},
 			{ id: globalThis.chrome.runtime.id },
 			vi.fn(),
 		);
@@ -480,12 +556,20 @@ describe("snapshot_query handler", () => {
 
 		const sendResponse2 = vi.fn();
 		listener(
-			{ type: "registryCall", action: "page_snapshot_query", params: {}, id: "sq-9" },
+			{
+				type: "registryCall",
+				action: "page_snapshot_query",
+				params: {},
+				id: "sq-9",
+			},
 			{ id: globalThis.chrome.runtime.id },
 			sendResponse2,
 		);
 		await new Promise((resolve) => setTimeout(resolve, 10));
-		const response = sendResponse2.mock.calls[0][0] as { ok: boolean; value: { nodes: unknown[] } };
+		const response = sendResponse2.mock.calls[0][0] as {
+			ok: boolean;
+			value: { nodes: unknown[] };
+		};
 		expect(response.ok).toBe(true);
 		expect(response.value.nodes.length).toBeGreaterThan(0);
 	});
@@ -495,12 +579,20 @@ describe("snapshot_query handler", () => {
 		const sendResponse = vi.fn();
 		const listener = mockAddListener.mock.calls[0][0];
 		listener(
-			{ type: "registryCall", action: "page_snapshot_query", params: { filter: { role: "button" } }, id: "sq-10" },
+			{
+				type: "registryCall",
+				action: "page_snapshot_query",
+				params: { filter: { role: "button" } },
+				id: "sq-10",
+			},
 			{ id: globalThis.chrome.runtime.id },
 			sendResponse,
 		);
 		await new Promise((resolve) => setTimeout(resolve, 10));
-		const response = sendResponse.mock.calls[0][0] as { ok: boolean; value: { nodes: unknown[] } };
+		const response = sendResponse.mock.calls[0][0] as {
+			ok: boolean;
+			value: { nodes: unknown[] };
+		};
 		expect(response.ok).toBe(true);
 		expect(response.value.nodes).toHaveLength(0);
 	});
@@ -510,14 +602,24 @@ describe("snapshot_query handler", () => {
 		const sendResponse = vi.fn();
 		const listener = mockAddListener.mock.calls[0][0];
 		listener(
-			{ type: "registryCall", action: "page_snapshot_query", params: { filter: { interactiveOnly: true } }, id: "sq-11" },
+			{
+				type: "registryCall",
+				action: "page_snapshot_query",
+				params: { filter: { interactiveOnly: true } },
+				id: "sq-11",
+			},
 			{ id: globalThis.chrome.runtime.id },
 			sendResponse,
 		);
 		await new Promise((resolve) => setTimeout(resolve, 10));
 		const response = sendResponse.mock.calls[0][0] as {
 			ok: boolean;
-			value: { nodes: unknown[]; url: string; title: string; viewport: { width: number; height: number } };
+			value: {
+				nodes: unknown[];
+				url: string;
+				title: string;
+				viewport: { width: number; height: number };
+			};
 		};
 		expect(response.ok).toBe(true);
 		expect(typeof response.value.url).toBe("string");
@@ -534,12 +636,20 @@ describe("snapshot_query handler", () => {
 		const sendResponse = vi.fn();
 		const listener = mockAddListener.mock.calls[0][0];
 		listener(
-			{ type: "registryCall", action: "page_snapshot_query", params: { filter: { role: "button" } }, id: "sq-12" },
+			{
+				type: "registryCall",
+				action: "page_snapshot_query",
+				params: { filter: { role: "button" } },
+				id: "sq-12",
+			},
 			{ id: globalThis.chrome.runtime.id },
 			sendResponse,
 		);
 		await new Promise((resolve) => setTimeout(resolve, 10));
-		const response = sendResponse.mock.calls[0][0] as { ok: boolean; error?: { code: string } };
+		const response = sendResponse.mock.calls[0][0] as {
+			ok: boolean;
+			error?: { code: string };
+		};
 		expect(response.ok).toBe(false);
 		expect(response.error?.code).toBe("E_SNAPSHOT");
 		// Restore body
@@ -547,16 +657,27 @@ describe("snapshot_query handler", () => {
 	});
 
 	it("limit caps results", async () => {
-		document.body.innerHTML = Array.from({ length: 10 }, (_, i) => `<button>Btn${i}</button>`).join("");
+		document.body.innerHTML = Array.from(
+			{ length: 10 },
+			(_, i) => `<button>Btn${i}</button>`,
+		).join("");
 		const sendResponse = vi.fn();
 		const listener = mockAddListener.mock.calls[0][0];
 		listener(
-			{ type: "registryCall", action: "page_snapshot_query", params: { filter: { role: "button", limit: 3 } }, id: "sq-13" },
+			{
+				type: "registryCall",
+				action: "page_snapshot_query",
+				params: { filter: { role: "button", limit: 3 } },
+				id: "sq-13",
+			},
 			{ id: globalThis.chrome.runtime.id },
 			sendResponse,
 		);
 		await new Promise((resolve) => setTimeout(resolve, 10));
-		const response = sendResponse.mock.calls[0][0] as { ok: boolean; value: { nodes: unknown[] } };
+		const response = sendResponse.mock.calls[0][0] as {
+			ok: boolean;
+			value: { nodes: unknown[] };
+		};
 		expect(response.ok).toBe(true);
 		expect(response.value.nodes).toHaveLength(3);
 	});
@@ -610,9 +731,9 @@ describe("snapshot refId contract", () => {
 
 		const result = inlineSnapshot(500);
 		expect(result.text).toContain("filled:Alice");
-		expect(result.nodes.some((n) => n.tag === "p" && n.name === "filled:Alice")).toBe(
-			true,
-		);
+		expect(
+			result.nodes.some((n) => n.tag === "p" && n.name === "filled:Alice"),
+		).toBe(true);
 	});
 
 	it("inlineSnapshot includes input value on form controls", () => {
@@ -989,17 +1110,22 @@ describe("set_files handler", () => {
 			handlers.set_files,
 			{
 				refId: "e1",
-				files: [{
-					kind: "bytes",
-					name: "hello.txt",
-					data: "aGVsbG8=",
-					mimeType: "text/plain",
-				}],
+				files: [
+					{
+						kind: "bytes",
+						name: "hello.txt",
+						data: "aGVsbG8=",
+						mimeType: "text/plain",
+					},
+				],
 			},
 		);
 		expect(result.ok).toBe(true);
 		if (result.ok) {
-			const value = result.value as { fileCount?: number; fileNames?: string[] };
+			const value = result.value as {
+				fileCount?: number;
+				fileNames?: string[];
+			};
 			expect(value.fileCount).toBe(1);
 			expect(value.fileNames).toEqual(["hello.txt"]);
 		}
@@ -1014,14 +1140,12 @@ describe("set_files handler", () => {
 		input.type = "file";
 		input.setAttribute("data-ref-id", "e2");
 		document.body.appendChild(input);
-		const fetchMock = vi
-			.spyOn(globalThis, "fetch")
-			.mockResolvedValue(
-				new Response(new Uint8Array([97]), {
-					status: 200,
-					headers: { "content-type": "text/plain" },
-				}),
-			);
+		const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+			new Response(new Uint8Array([97]), {
+				status: 200,
+				headers: { "content-type": "text/plain" },
+			}),
+		);
 
 		const result = await dispatchContentScriptCall(
 			"page_set_files",
@@ -1029,11 +1153,13 @@ describe("set_files handler", () => {
 			handlers.set_files,
 			{
 				refId: "e2",
-				files: [{
-					kind: "url",
-					url: "https://example.com/a.txt",
-					name: "a.txt",
-				}],
+				files: [
+					{
+						kind: "url",
+						url: "https://example.com/a.txt",
+						name: "a.txt",
+					},
+				],
 			},
 		);
 		fetchMock.mockRestore();
@@ -1055,12 +1181,14 @@ describe("set_files handler", () => {
 			handlers.set_files,
 			{
 				refId: "e3",
-				files: [{
-					kind: "bytes",
-					name: "x.txt",
-					data: "YQ==",
-					mimeType: "text/plain",
-				}],
+				files: [
+					{
+						kind: "bytes",
+						name: "x.txt",
+						data: "YQ==",
+						mimeType: "text/plain",
+					},
+				],
 			},
 		);
 		expect(result.ok).toBe(false);
@@ -1081,12 +1209,14 @@ describe("set_files handler", () => {
 			handlers.set_files,
 			{
 				refId: "e4",
-				files: [{
-					kind: "bytes",
-					name: "bad.bin",
-					data: "!!!",
-					mimeType: "application/octet-stream",
-				}],
+				files: [
+					{
+						kind: "bytes",
+						name: "bad.bin",
+						data: "!!!",
+						mimeType: "application/octet-stream",
+					},
+				],
 			},
 		);
 		expect(result.ok).toBe(false);
@@ -1101,12 +1231,14 @@ describe("set_files handler", () => {
 			"set_files",
 			handlers.set_files,
 			{
-				files: [{
-					kind: "bytes",
-					name: "x.txt",
-					data: "YQ==",
-					mimeType: "text/plain",
-				}],
+				files: [
+					{
+						kind: "bytes",
+						name: "x.txt",
+						data: "YQ==",
+						mimeType: "text/plain",
+					},
+				],
 			},
 		);
 		expect(result.ok).toBe(false);

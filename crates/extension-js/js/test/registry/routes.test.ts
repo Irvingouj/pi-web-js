@@ -1,13 +1,16 @@
 // @vitest-environment node
 
-import { describe, expect, it, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+import {
+	addContentScriptAction,
+	clearContentScriptActions,
+} from "../../src/shared/registry/content-script-actions.js";
 import {
 	clearRoutes,
 	inferTabPolicy,
 	populateRoutesFromManifest,
 	routeFromOwner,
 } from "../../src/shared/registry/routes.js";
-import { clearContentScriptActions, addContentScriptAction } from "../../src/shared/registry/content-script-actions.js";
 
 describe("registry routes", () => {
 	beforeEach(() => {

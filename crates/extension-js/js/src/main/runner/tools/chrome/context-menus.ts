@@ -1,5 +1,3 @@
-/// <reference types="chrome" />
-import { z } from "zod";
 import * as schemas from "../../../../shared/schemas.js";
 import { registerChromePassthrough } from "../../chrome/internals.js";
 import { zChromeVoid } from "./register-helpers.js";
@@ -13,7 +11,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.contextMenus.create({ id: \"menuItemId\", title: \"My Menu\", contexts: [\"page\"] })"
+	'chrome.contextMenus.create({ id: "menuItemId", title: "My Menu", contexts: ["page"] })',
 );
 registerChromePassthrough(
 	"chrome_contextMenus_remove",
@@ -31,7 +29,7 @@ registerChromePassthrough(
 			description: "Menu item ID to remove (literal)",
 		},
 	],
-	"chrome.contextMenus.remove(\"menuItemId\")"
+	'chrome.contextMenus.remove("menuItemId")',
 );
 registerChromePassthrough(
 	"chrome_contextMenus_removeAll",
@@ -42,7 +40,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.contextMenus.removeAll()"
+	"chrome.contextMenus.removeAll()",
 );
 registerChromePassthrough(
 	"chrome_contextMenus_update",
@@ -53,5 +51,5 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.contextMenus.update(\"menuItemId\", { title: \"Updated\" })"
+	'chrome.contextMenus.update("menuItemId", { title: "Updated" })',
 );

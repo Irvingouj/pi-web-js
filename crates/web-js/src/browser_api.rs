@@ -247,7 +247,7 @@ pub async fn execute_fetch(params: FetchParams) -> WasmAsyncResponse {
                     if is_timeout {
                         "ETIMEDOUT"
                     } else {
-                        "ENETWORK".into()
+                        "ENETWORK"
                     },
                 )),
             };

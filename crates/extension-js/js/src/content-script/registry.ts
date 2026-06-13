@@ -1,6 +1,6 @@
 import type { z } from "zod";
-import { coerceWasmParams } from "../shared/registry/manifest.js";
 import { dispatchValidated } from "../shared/registry/dispatch.js";
+import { coerceWasmParams } from "../shared/registry/manifest.js";
 
 export type ContentScriptHandler = (
 	params: unknown,
@@ -17,7 +17,9 @@ export type ContentScriptHandlerSpec = {
 const handlerSpecs = new Map<string, ContentScriptHandlerSpec>();
 const inFlightCalls = new Map<string, AbortController>();
 
-export function registerContentScriptSpec(spec: ContentScriptHandlerSpec): void {
+export function registerContentScriptSpec(
+	spec: ContentScriptHandlerSpec,
+): void {
 	handlerSpecs.set(spec.registryAction, spec);
 }
 
@@ -58,7 +60,10 @@ export async function dispatchContentScriptCall(
 	handler: ContentScriptHandler,
 	params: unknown,
 	callId?: string,
-): Promise<{ ok: true; value: unknown } | { ok: false; error: { message: string; code: string } }> {
+): Promise<
+	| { ok: true; value: unknown }
+	| { ok: false; error: { message: string; code: string } }
+> {
 	const spec = getContentScriptSpec(registryAction);
 	if (!spec) {
 		return {

@@ -2,17 +2,16 @@
 
 import { allocateRefId } from "./ref-id.js";
 
-export { allocateRefId, getNextRefId, syncRefIdCounterFromDom } from "./ref-id.js";
+export {
+	allocateRefId,
+	getNextRefId,
+	syncRefIdCounterFromDom,
+} from "./ref-id.js";
 
 export const INTERACTIVE_SELECTOR =
 	'input, textarea, select, button, a, [role="button"], [role="link"]';
 
-const EXCLUDED_TAGS = new Set([
-	"script",
-	"style",
-	"noscript",
-	"template",
-]);
+const EXCLUDED_TAGS = new Set(["script", "style", "noscript", "template"]);
 
 const MARKDOWN_TEXT_TAGS = new Set([
 	"p",

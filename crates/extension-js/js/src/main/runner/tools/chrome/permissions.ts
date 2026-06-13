@@ -35,8 +35,22 @@ async function invokePermissionsChrome(
 	return result;
 }
 
-regChrome("chrome_permissions_contains", ["permissions"], "Check permission", zChromeAny, "chrome.permissions.contains({ permissions: [\"tabs\"] })", "boolean");
-regChrome("chrome_permissions_getAll", ["permissions"], "Get all permissions", zChromeAny, "chrome.permissions.getAll()", "{ permissions: string[], origins: string[] }");
+regChrome(
+	"chrome_permissions_contains",
+	["permissions"],
+	"Check permission",
+	zChromeAny,
+	'chrome.permissions.contains({ permissions: ["tabs"] })',
+	"boolean",
+);
+regChrome(
+	"chrome_permissions_getAll",
+	["permissions"],
+	"Get all permissions",
+	zChromeAny,
+	"chrome.permissions.getAll()",
+	"{ permissions: string[], origins: string[] }",
+);
 
 registerJsCall({
 	action: "chrome_permissions_remove",
@@ -48,7 +62,12 @@ registerJsCall({
 	owner: "main-thread",
 	returnType: "boolean",
 	handler: async (params: unknown) =>
-		invokePermissionsChrome("chrome_permissions_remove", ["permissions"], "remove", params),
+		invokePermissionsChrome(
+			"chrome_permissions_remove",
+			["permissions"],
+			"remove",
+			params,
+		),
 	paramTypes: [],
 	returnDoc: "boolean",
 	errorCode: "ECHROME",
@@ -65,7 +84,12 @@ registerJsCall({
 	owner: "main-thread",
 	returnType: "boolean",
 	handler: async (params: unknown) =>
-		invokePermissionsChrome("chrome_permissions_request", ["permissions"], "request", params),
+		invokePermissionsChrome(
+			"chrome_permissions_request",
+			["permissions"],
+			"request",
+			params,
+		),
 	paramTypes: [],
 	returnDoc: "boolean",
 	errorCode: "ECHROME",

@@ -87,8 +87,7 @@ describe("manifest documentation export", () => {
 	it("manifestEntryToWasm maps docs into the WASM registration shape", () => {
 		const manifest = getSerializableJsManifest();
 		const sample =
-			manifest.find((entry) => entry.action === "page_goto") ??
-			manifest[0];
+			manifest.find((entry) => entry.action === "page_goto") ?? manifest[0];
 
 		expect(manifestEntryToWasm(sample)).toEqual({
 			action: sample.action,
@@ -150,7 +149,9 @@ describe("manifest documentation export", () => {
 
 		expect(pageGoto?.owner).toBe("main-thread");
 		expect(pageGoto?.fields).toEqual(["url"]);
-		expect(pageGoto?.example).toBe('page.goto("https://example.com", { waitUntil: "networkidle" })');
+		expect(pageGoto?.example).toBe(
+			'page.goto("https://example.com", { waitUntil: "networkidle" })',
+		);
 		expect(pageClick?.owner).toBe("content-script");
 		expect(pageClick?.paramsDoc[0]?.description).toContain("(refId)");
 		expect(pageFind?.description).toContain("CSS selector");
@@ -162,10 +163,16 @@ describe("manifest documentation export", () => {
 		expect(tabCreate?.aliases).toEqual([
 			{ namespace: "tab", name: "create", fields: ["url"] },
 		]);
-		const pageNewTab = manifest.find((entry) => entry.action === "page_new_tab");
+		const pageNewTab = manifest.find(
+			(entry) => entry.action === "page_new_tab",
+		);
 		expect(pageNewTab?.fields).toEqual(["url"]);
 
-		expect(pageFind?.aliases?.some((a) => a.namespace === "page" && a.name === "query")).toBe(true);
+		expect(
+			pageFind?.aliases?.some(
+				(a) => a.namespace === "page" && a.name === "query",
+			),
+		).toBe(true);
 	});
 
 	it("registers page tab aliases", () => {
@@ -245,7 +252,9 @@ describe("manifest documentation export", () => {
 	it("seeds agentMeta on page.* mutation APIs", () => {
 		const manifest = getSerializableJsManifest();
 		const pageFill = manifest.find((e) => e.action === "page_fill");
-		expect(pageFill?.prerequisites).toEqual(["Ensure the target tab is active and the content script is ready before mutating"]);
+		expect(pageFill?.prerequisites).toEqual([
+			"Ensure the target tab is active and the content script is ready before mutating",
+		]);
 		expect(pageFill?.tags).toEqual(["mutation", "write"]);
 		expect(pageFill?.relatedApis).toEqual(["web.tab.fill"]);
 
@@ -258,7 +267,9 @@ describe("manifest documentation export", () => {
 		]);
 
 		const pageClick = manifest.find((e) => e.action === "page_click");
-		expect(pageClick?.prerequisites).toEqual(["Ensure the target tab is active and the content script is ready before mutating"]);
+		expect(pageClick?.prerequisites).toEqual([
+			"Ensure the target tab is active and the content script is ready before mutating",
+		]);
 		expect(pageClick?.tags).toEqual(["mutation", "write"]);
 		expect(pageClick?.relatedApis).toEqual(["web.tab.click"]);
 
@@ -297,7 +308,9 @@ describe("manifest documentation export", () => {
 			"web.tab.snapshot",
 		]);
 
-		const pageSnapshotData = manifest.find((e) => e.action === "page_snapshot_data");
+		const pageSnapshotData = manifest.find(
+			(e) => e.action === "page_snapshot_data",
+		);
 		expect(pageSnapshotData?.notes?.join(" ")).toMatch(/content-script/i);
 		expect(pageSnapshotData?.tags).toEqual(["snapshot", "read"]);
 		expect(pageSnapshotData?.relatedApis).toEqual([
@@ -309,9 +322,13 @@ describe("manifest documentation export", () => {
 	it("seeds agentMeta on web.tab.* mutation APIs", () => {
 		const manifest = getSerializableJsManifest();
 		const tabFill = manifest.find((e) => e.action === "tab_fill");
-		expect(tabFill?.prerequisites).toEqual(["Ensure the target tab exists and the content script is ready before mutating"]);
+		expect(tabFill?.prerequisites).toEqual([
+			"Ensure the target tab exists and the content script is ready before mutating",
+		]);
 		expect(tabFill?.tags).toEqual(["mutation", "write"]);
-		expect(tabFill?.notes).toContain("Explicit tabId required; same handlers as page.*");
+		expect(tabFill?.notes).toContain(
+			"Explicit tabId required; same handlers as page.*",
+		);
 		expect(tabFill?.relatedApis).toEqual(["page.fill"]);
 
 		const tabSetFiles = manifest.find((e) => e.action === "tab_set_files");
@@ -319,7 +336,9 @@ describe("manifest documentation export", () => {
 		expect(tabSetFiles?.relatedApis).toEqual(["page.setFiles"]);
 
 		const tabClick = manifest.find((e) => e.action === "tab_click");
-		expect(tabClick?.prerequisites).toEqual(["Ensure the target tab exists and the content script is ready before mutating"]);
+		expect(tabClick?.prerequisites).toEqual([
+			"Ensure the target tab exists and the content script is ready before mutating",
+		]);
 		expect(tabClick?.tags).toEqual(["mutation", "write"]);
 		expect(tabClick?.relatedApis).toEqual(["page.click"]);
 
@@ -364,7 +383,9 @@ describe("manifest documentation export", () => {
 
 	it("page_set_files paramsDoc contains files from hand-written paramTypes", () => {
 		const manifest = getSerializableJsManifest();
-		const pageSetFiles = manifest.find((entry) => entry.action === "page_set_files");
+		const pageSetFiles = manifest.find(
+			(entry) => entry.action === "page_set_files",
+		);
 		expect(pageSetFiles).toBeDefined();
 		expect(pageSetFiles!.paramsDoc.some((p) => p.name === "files")).toBe(true);
 		expect(pageSetFiles!.publicName).toBe("page.setFiles");
@@ -404,7 +425,15 @@ describe("manifest documentation export", () => {
 
 	it("no manifest entry has banned types in returnsDoc.type or paramsDoc[].type", () => {
 		const manifest = getSerializableJsManifest();
-		const banned = new Set(["unknown", "undefined", "any", "object", "lazy", "void", "record"]);
+		const banned = new Set([
+			"unknown",
+			"undefined",
+			"any",
+			"object",
+			"lazy",
+			"void",
+			"record",
+		]);
 		for (const entry of manifest) {
 			expect(banned.has(entry.returnsDoc.type)).toBe(false);
 			for (const param of entry.paramsDoc) {
@@ -430,16 +459,28 @@ describe("manifest documentation export", () => {
 			"tab_snapshot_data",
 			"tab_fetch",
 		]);
-		const banned = new Set(["unknown", "undefined", "any", "object", "lazy", "void", "record"]);
+		const banned = new Set([
+			"unknown",
+			"undefined",
+			"any",
+			"object",
+			"lazy",
+			"void",
+			"record",
+		]);
 		const violations: string[] = [];
 		for (const entry of manifest) {
 			if (!AC_USED.has(entry.action)) continue;
 			if (banned.has(entry.returnsDoc.type)) {
-				violations.push(`${entry.action} returnsDoc.type="${entry.returnsDoc.type}"`);
+				violations.push(
+					`${entry.action} returnsDoc.type="${entry.returnsDoc.type}"`,
+				);
 			}
 			for (const param of entry.paramsDoc) {
 				if (banned.has(param.type)) {
-					violations.push(`${entry.action} paramsDoc[${param.name}].type="${param.type}"`);
+					violations.push(
+						`${entry.action} paramsDoc[${param.name}].type="${param.type}"`,
+					);
 				}
 			}
 		}
@@ -484,23 +525,24 @@ describe("manifest documentation export", () => {
 	});
 
 	it("manifestEntryToWasm handles empty agentMeta arrays correctly", () => {
-		const entry: import("../src/shared/registry/manifest.js").SerializableJsCallManifestEntry = {
-			action: "empty_meta_test",
-			namespace: "test",
-			name: "empty",
-			publicName: "test.empty",
-			description: "Test empty arrays",
-			fields: null,
-			aliases: null,
-			owner: "main-thread",
-			paramsDoc: [],
-			returnsDoc: { type: "null", description: "null" },
-			errorCode: "ETEST",
-			prerequisites: [],
-			notes: [],
-			tags: [],
-			relatedApis: [],
-		};
+		const entry: import("../src/shared/registry/manifest.js").SerializableJsCallManifestEntry =
+			{
+				action: "empty_meta_test",
+				namespace: "test",
+				name: "empty",
+				publicName: "test.empty",
+				description: "Test empty arrays",
+				fields: null,
+				aliases: null,
+				owner: "main-thread",
+				paramsDoc: [],
+				returnsDoc: { type: "null", description: "null" },
+				errorCode: "ETEST",
+				prerequisites: [],
+				notes: [],
+				tags: [],
+				relatedApis: [],
+			};
 
 		const wasm = manifestEntryToWasm(entry);
 		expect(wasm.prerequisites).toEqual([]);
@@ -510,20 +552,21 @@ describe("manifest documentation export", () => {
 	});
 
 	it("manifestEntryToWasm handles partial agentMeta correctly", () => {
-		const entry: import("../src/shared/registry/manifest.js").SerializableJsCallManifestEntry = {
-			action: "partial_meta_test",
-			namespace: "test",
-			name: "partial",
-			publicName: "test.partial",
-			description: "Test partial metadata",
-			fields: null,
-			aliases: null,
-			owner: "main-thread",
-			paramsDoc: [],
-			returnsDoc: { type: "null", description: "null" },
-			errorCode: "ETEST",
-			tags: ["read"],
-		};
+		const entry: import("../src/shared/registry/manifest.js").SerializableJsCallManifestEntry =
+			{
+				action: "partial_meta_test",
+				namespace: "test",
+				name: "partial",
+				publicName: "test.partial",
+				description: "Test partial metadata",
+				fields: null,
+				aliases: null,
+				owner: "main-thread",
+				paramsDoc: [],
+				returnsDoc: { type: "null", description: "null" },
+				errorCode: "ETEST",
+				tags: ["read"],
+			};
 
 		const wasm = manifestEntryToWasm(entry);
 		expect(wasm.prerequisites).toBeNull();
@@ -572,7 +615,9 @@ describe("manifest integrity", () => {
 		});
 		expect(() => freezeJsRegistry()).not.toThrow();
 		const manifest = getSerializableJsManifest();
-		const mainThreadEntry = manifest.find((e) => e.action === "phantom_main_action");
+		const mainThreadEntry = manifest.find(
+			(e) => e.action === "phantom_main_action",
+		);
 		expect(mainThreadEntry?.owner).toBe("main-thread");
 	});
 
@@ -621,6 +666,8 @@ describe("manifest integrity", () => {
 		expect(entry!.paramsDoc.some((p) => p.name === "url")).toBe(true);
 		expect(entry!.paramsDoc.some((p) => p.name === "timeout")).toBe(true);
 		expect(entry!.paramsDoc.find((p) => p.name === "url")?.required).toBe(true);
-		expect(entry!.paramsDoc.find((p) => p.name === "timeout")?.required).toBe(false);
+		expect(entry!.paramsDoc.find((p) => p.name === "timeout")?.required).toBe(
+			false,
+		);
 	});
 });

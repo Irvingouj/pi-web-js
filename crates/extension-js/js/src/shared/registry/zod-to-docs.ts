@@ -91,7 +91,11 @@ export function describeSchema(
 
 	if (schema instanceof z.ZodRecord) {
 		// ZodRecord does not expose a public valueType accessor; use _def.
-		const valueType = describeSchema((schema._def as { valueType: z.ZodTypeAny }).valueType, depth + 1, maxDepth);
+		const valueType = describeSchema(
+			(schema._def as { valueType: z.ZodTypeAny }).valueType,
+			depth + 1,
+			maxDepth,
+		);
 		if (valueType === "unknown" || valueType === "any") {
 			return "{ [key: string]: unknown }";
 		}
@@ -173,14 +177,41 @@ export function zodToParamDocs(schema: z.ZodTypeAny): ToolDocParam[] {
 		let inner = field;
 
 		while (true) {
-			if (inner instanceof z.ZodOptional) { isOptional = true; inner = inner.unwrap(); continue; }
-			if (inner instanceof z.ZodDefault) { isOptional = true; inner = inner.removeDefault(); continue; }
-			if (inner instanceof z.ZodEffects) { inner = inner.innerType(); continue; }
-			if (inner instanceof z.ZodNullable) { isNullable = true; inner = inner.unwrap(); continue; }
-			if (inner instanceof z.ZodBranded) { inner = inner.unwrap(); continue; }
-			if (inner instanceof z.ZodReadonly) { inner = inner.unwrap(); continue; }
-			if (inner instanceof z.ZodCatch) { inner = inner.removeCatch(); continue; }
-			if (inner instanceof z.ZodPipeline) { inner = inner._def.in; continue; }
+			if (inner instanceof z.ZodOptional) {
+				isOptional = true;
+				inner = inner.unwrap();
+				continue;
+			}
+			if (inner instanceof z.ZodDefault) {
+				isOptional = true;
+				inner = inner.removeDefault();
+				continue;
+			}
+			if (inner instanceof z.ZodEffects) {
+				inner = inner.innerType();
+				continue;
+			}
+			if (inner instanceof z.ZodNullable) {
+				isNullable = true;
+				inner = inner.unwrap();
+				continue;
+			}
+			if (inner instanceof z.ZodBranded) {
+				inner = inner.unwrap();
+				continue;
+			}
+			if (inner instanceof z.ZodReadonly) {
+				inner = inner.unwrap();
+				continue;
+			}
+			if (inner instanceof z.ZodCatch) {
+				inner = inner.removeCatch();
+				continue;
+			}
+			if (inner instanceof z.ZodPipeline) {
+				inner = inner._def.in;
+				continue;
+			}
 			break;
 		}
 

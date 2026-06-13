@@ -224,7 +224,12 @@ describe("describeSchema", () => {
 
 	it("describes intersection types with &", () => {
 		expect(
-			describeSchema(z.intersection(z.object({ a: z.string() }), z.object({ b: z.number() }))),
+			describeSchema(
+				z.intersection(
+					z.object({ a: z.string() }),
+					z.object({ b: z.number() }),
+				),
+			),
 		).toBe("{ a: string } & { b: number }");
 	});
 

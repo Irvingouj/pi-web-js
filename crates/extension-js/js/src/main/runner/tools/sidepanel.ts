@@ -1,38 +1,22 @@
 /// <reference types="chrome" />
 import { z } from "zod";
+import {
+	findElementByLabel,
+	throwElementNotFound,
+} from "../../../content-script/dom-utils.js";
 import { logger } from "../../../shared/logger.js";
 import * as schemas from "../../../shared/schemas.js";
+import { registerJsCall } from "../../../shared/tool-registry.js";
+import type { DomSnapshotParams } from "../runtime.js";
 import {
-	dispatchTool,
-	registerJsCall,
-	type CallContext,
-	type ToolDocParam,
-} from "../../../shared/tool-registry.js";
-import type { DomFormatParams, DomSnapshotParams, FetchParams } from "../runtime.js";
-import {
-	makeError,
 	asRecord,
-	extractTabId,
-	unwrapResult,
-	getActiveTabId,
-	resolveActiveTabId,
-	waitForTabLoad,
-	handleFetch,
-	handleHostCallAction,
-	registerChromePassthrough,
-	getElementByRefId,
-	extractRefId,
-	handleDomSnapshot,
-	handleDomFormat,
-	ensureDomSnapshot,
-	buildSnapshotInTab,
-	throwIfAborted,
-	DEFAULT_TIMEOUT_MS,
-	DEFAULT_MAX_NODES,
 	DEFAULT_SCROLL_AMOUNT,
-	DEFAULT_POLL_INTERVAL_MS,
+	extractRefId,
+	getElementByRefId,
+	handleDomSnapshot,
+	makeError,
+	unwrapResult,
 } from "../runtime.js";
-import { findElementByLabel, throwElementNotFound } from "../../../content-script/dom-utils.js";
 
 // ─── Sidepanel ───────────────────────────────────────────────────
 
@@ -263,7 +247,8 @@ registerJsCall({
 	params: schemas.SidepanelClickParamsSchema,
 	returns: z.null(),
 	owner: "main-thread",
-	handler: async (params, _ctx) => dispatchSidepanelEvent("sidepanel_click", params),
+	handler: async (params, _ctx) =>
+		dispatchSidepanelEvent("sidepanel_click", params),
 	paramTypes: [
 		{
 			name: "refId",
@@ -281,7 +266,7 @@ registerJsCall({
 	returnDoc: "null",
 	errorCode: "E_UNKNOWN",
 
-	example: "sidepanel.click({ refId: \"e2\" })",
+	example: 'sidepanel.click({ refId: "e2" })',
 });
 
 registerJsCall({
@@ -311,7 +296,7 @@ registerJsCall({
 	returnDoc: "null",
 	errorCode: "E_UNKNOWN",
 
-	example: "sidepanel.dblclick({ refId: \"e2\" })",
+	example: 'sidepanel.dblclick({ refId: "e2" })',
 });
 
 registerJsCall({
@@ -322,7 +307,8 @@ registerJsCall({
 	params: schemas.SidepanelFillParamsSchema,
 	returns: z.null(),
 	owner: "main-thread",
-	handler: async (params, _ctx) => dispatchSidepanelEvent("sidepanel_fill", params),
+	handler: async (params, _ctx) =>
+		dispatchSidepanelEvent("sidepanel_fill", params),
 	paramTypes: [
 		{
 			name: "refId",
@@ -346,7 +332,7 @@ registerJsCall({
 	returnDoc: "null",
 	errorCode: "E_UNKNOWN",
 
-	example: "sidepanel.fill({ refId: \"e2\" })",
+	example: 'sidepanel.fill({ refId: "e2" })',
 });
 
 registerJsCall({
@@ -357,7 +343,8 @@ registerJsCall({
 	params: schemas.SidepanelTypeParamsSchema,
 	returns: z.null(),
 	owner: "main-thread",
-	handler: async (params, _ctx) => dispatchSidepanelEvent("sidepanel_type", params),
+	handler: async (params, _ctx) =>
+		dispatchSidepanelEvent("sidepanel_type", params),
 	paramTypes: [
 		{
 			name: "refId",
@@ -381,7 +368,7 @@ registerJsCall({
 	returnDoc: "null",
 	errorCode: "E_UNKNOWN",
 
-	example: "sidepanel.type({ refId: \"e2\" })",
+	example: 'sidepanel.type({ refId: "e2" })',
 });
 
 registerJsCall({
@@ -393,7 +380,8 @@ registerJsCall({
 	returns: z.null(),
 	fields: ["key"],
 	owner: "main-thread",
-	handler: async (params, _ctx) => dispatchSidepanelEvent("sidepanel_press", params),
+	handler: async (params, _ctx) =>
+		dispatchSidepanelEvent("sidepanel_press", params),
 	paramTypes: [
 		{
 			name: "key",
@@ -405,7 +393,7 @@ registerJsCall({
 	returnDoc: "null",
 	errorCode: "E_UNKNOWN",
 
-	example: "sidepanel.press(\"Enter\")",
+	example: 'sidepanel.press("Enter")',
 });
 
 registerJsCall({
@@ -416,7 +404,8 @@ registerJsCall({
 	params: schemas.SidepanelSelectParamsSchema,
 	returns: z.null(),
 	owner: "main-thread",
-	handler: async (params, _ctx) => dispatchSidepanelEvent("sidepanel_select", params),
+	handler: async (params, _ctx) =>
+		dispatchSidepanelEvent("sidepanel_select", params),
 	paramTypes: [
 		{
 			name: "refId",
@@ -440,7 +429,7 @@ registerJsCall({
 	returnDoc: "null",
 	errorCode: "E_UNKNOWN",
 
-	example: "sidepanel.select({ refId: \"e2\" })",
+	example: 'sidepanel.select({ refId: "e2" })',
 });
 
 registerJsCall({
@@ -451,7 +440,8 @@ registerJsCall({
 	params: schemas.SidepanelCheckParamsSchema,
 	returns: z.null(),
 	owner: "main-thread",
-	handler: async (params, _ctx) => dispatchSidepanelEvent("sidepanel_check", params),
+	handler: async (params, _ctx) =>
+		dispatchSidepanelEvent("sidepanel_check", params),
 	paramTypes: [
 		{
 			name: "refId",
@@ -475,7 +465,7 @@ registerJsCall({
 	returnDoc: "null",
 	errorCode: "E_UNKNOWN",
 
-	example: "sidepanel.check({ refId: \"e2\" })",
+	example: 'sidepanel.check({ refId: "e2" })',
 });
 
 registerJsCall({
@@ -486,7 +476,8 @@ registerJsCall({
 	params: schemas.SidepanelHoverParamsSchema,
 	returns: z.null(),
 	owner: "main-thread",
-	handler: async (params, _ctx) => dispatchSidepanelEvent("sidepanel_hover", params),
+	handler: async (params, _ctx) =>
+		dispatchSidepanelEvent("sidepanel_hover", params),
 	paramTypes: [
 		{
 			name: "refId",
@@ -504,7 +495,7 @@ registerJsCall({
 	returnDoc: "null",
 	errorCode: "E_UNKNOWN",
 
-	example: "sidepanel.hover({ refId: \"e2\" })",
+	example: 'sidepanel.hover({ refId: "e2" })',
 });
 
 registerJsCall({
@@ -532,7 +523,8 @@ registerJsCall({
 	params: schemas.SidepanelScrollParamsSchema,
 	returns: z.null(),
 	owner: "main-thread",
-	handler: async (params, _ctx) => dispatchSidepanelEvent("sidepanel_scroll", params),
+	handler: async (params, _ctx) =>
+		dispatchSidepanelEvent("sidepanel_scroll", params),
 	paramTypes: [
 		{
 			name: "direction",
@@ -550,7 +542,7 @@ registerJsCall({
 	returnDoc: "null",
 	errorCode: "E_UNKNOWN",
 
-	example: "sidepanel.scroll({ direction: \"down\", amount: 500 })",
+	example: 'sidepanel.scroll({ direction: "down", amount: 500 })',
 });
 
 registerJsCall({
@@ -580,7 +572,7 @@ registerJsCall({
 	returnDoc: "null",
 	errorCode: "E_UNKNOWN",
 
-	example: "sidepanel.scroll_to({ refId: \"e2\" })",
+	example: 'sidepanel.scroll_to({ refId: "e2" })',
 });
 
 registerJsCall({
@@ -591,7 +583,8 @@ registerJsCall({
 	params: schemas.SidepanelAppendParamsSchema,
 	returns: z.null(),
 	owner: "main-thread",
-	handler: async (params, _ctx) => dispatchSidepanelEvent("sidepanel_append", params),
+	handler: async (params, _ctx) =>
+		dispatchSidepanelEvent("sidepanel_append", params),
 	paramTypes: [
 		{
 			name: "refId",
@@ -615,7 +608,7 @@ registerJsCall({
 	returnDoc: "null",
 	errorCode: "E_UNKNOWN",
 
-	example: "sidepanel.append({ refId: \"e2\" })",
+	example: 'sidepanel.append({ refId: "e2" })',
 });
 
 registerJsCall({

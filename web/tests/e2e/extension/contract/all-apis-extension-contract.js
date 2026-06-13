@@ -267,10 +267,17 @@ api("tab.create", "sidepanel", async () => tab.create(TEST_URL), {
 api("tab.list", "sidepanel", async () => tab.list(), { expected: "success" });
 
 // page tab aliases.
-api("page.tabs", "sidepanel", async () => page.tabs({}), { expected: "success" });
-api("page.switch", "sidepanel", async ({ active }) => page.switch(active.tabId), {
+api("page.tabs", "sidepanel", async () => page.tabs({}), {
 	expected: "success",
 });
+api(
+	"page.switch",
+	"sidepanel",
+	async ({ active }) => page.switch(active.tabId),
+	{
+		expected: "success",
+	},
+);
 api(
 	"page.new_tab",
 	"sidepanel",
@@ -1062,7 +1069,7 @@ api(
 api(
 	"chrome.permissions.getAll",
 	"sidepanel",
-		async () => chrome.permissions.getAll(),
+	async () => chrome.permissions.getAll(),
 	{ expected: "success" },
 );
 api(
@@ -1697,22 +1704,19 @@ function verifyContractCoverage() {
 async function buildFixture(runDestructive = false) {
 	print("[buildFixture] start");
 	const fixtureTabQuery = await allowUnavailable(() =>
-		chrome.tabs.query({ url: TEST_URL + "*" }),
+		chrome.tabs.query({ url: `${TEST_URL}*` }),
 	);
 	const fixtureTabs = Array.isArray(fixtureTabQuery) ? fixtureTabQuery : [];
 	const normalizedTestUrl = TEST_URL.replace(/\/$/, "");
 	const fixtureTab =
 		fixtureTabs.find(
 			(t) => t.url === TEST_URL || t.url === normalizedTestUrl,
-		) ??
-		(fixtureTabs[0]?.id != null ? fixtureTabs[0] : null);
+		) ?? (fixtureTabs[0]?.id != null ? fixtureTabs[0] : null);
 	let current;
 	if (fixtureTab?.id != null) {
 		current = { tabId: fixtureTab.id, id: fixtureTab.id, url: fixtureTab.url };
 	} else {
-		current = await expectValueOrTypedError("tab.current", () =>
-			tab.current(),
-		);
+		current = await expectValueOrTypedError("tab.current", () => tab.current());
 	}
 	print("[buildFixture] tab.current done");
 	// If tab.current() is unavailable, current is a typed error. We still need

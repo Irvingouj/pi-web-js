@@ -72,7 +72,8 @@ describe("dispatchContentScriptCall", () => {
 		expect(result).toEqual({
 			ok: false,
 			error: {
-				message: "No schema registered for content-script action: missing_schema_action",
+				message:
+					"No schema registered for content-script action: missing_schema_action",
 				code: "E_INTERNAL",
 			},
 		});

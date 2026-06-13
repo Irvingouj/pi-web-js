@@ -19,8 +19,11 @@ export const EXTENSION_MANIFEST_PATH = path.resolve(
 export const FIXTURE_ORIGIN = "https://extension-js.test";
 export const FIXTURE_URL = `${FIXTURE_ORIGIN}/fixture`;
 
-export const TESTCASE_SERVER_PORT = Number(process.env.TESTCASE_SERVER_PORT ?? "9292");
-export const TESTCASE_SERVER_HOST = process.env.TESTCASE_SERVER_HOST ?? "127.0.0.1";
+export const TESTCASE_SERVER_PORT = Number(
+	process.env.TESTCASE_SERVER_PORT ?? "9292",
+);
+export const TESTCASE_SERVER_HOST =
+	process.env.TESTCASE_SERVER_HOST ?? "127.0.0.1";
 export const SIMPLE_FORM_1_URL = `http://${TESTCASE_SERVER_HOST}:${TESTCASE_SERVER_PORT}/testcases/simple-form-1/`;
 export const DYNAMIC_FEED_URL = `http://${TESTCASE_SERVER_HOST}:${TESTCASE_SERVER_PORT}/testcases/dynamic-feed/`;
 export const LARGE_DOM_URL = `http://${TESTCASE_SERVER_HOST}:${TESTCASE_SERVER_PORT}/testcases/large-dom/`;
@@ -61,7 +64,9 @@ export const EXT_E2E_LOG_LEVEL: (typeof E2E_LOG_LEVELS)[number] =
 export const EXTENSION_MANIFEST = JSON.parse(
 	readFileSync(EXTENSION_MANIFEST_PATH, "utf8"),
 ) as { permissions?: string[] };
-export const GRANTED_PERMISSIONS = new Set(EXTENSION_MANIFEST.permissions ?? []);
+export const GRANTED_PERMISSIONS = new Set(
+	EXTENSION_MANIFEST.permissions ?? [],
+);
 
 export const CHROME_NAMESPACE_PERMISSION: Record<string, string | null> = {
 	"chrome.action": null,

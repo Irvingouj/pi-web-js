@@ -1,6 +1,6 @@
 import { z } from "zod";
-import * as schemas from "../shared/schemas.js";
 import { CONTENT_SCRIPT_TOOL_SPECS } from "../shared/registry/content-script-tools.js";
+import * as schemas from "../shared/schemas.js";
 import type { ContentScriptHandlerSpec } from "./registry.js";
 
 /** Infra-only schemas for non-registryCall messages (ping connectivity probe). */

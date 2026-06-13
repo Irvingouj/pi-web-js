@@ -1,25 +1,20 @@
-import { z } from "zod";
+import type { z } from "zod";
 import { logger } from "./logger.js";
+import {
+	clearContentScriptActions,
+	isContentScriptAction,
+} from "./registry/content-script-actions.js";
 import { dispatchValidated } from "./registry/dispatch.js";
-import { getRoute, inferOwner } from "./registry/routes.js";
-import { clearContentScriptActions, isContentScriptAction } from "./registry/content-script-actions.js";
-import {
-	zodToParamDocs,
-	zodToReturnType,
-} from "./registry/zod-to-docs.js";
-import {
-	type AsyncError,
-	type AsyncResponse,
-	type CallContext,
-	type Command,
-	type JsCallSpec,
-	type SerializableJsCallManifestEntry,
-	type ToolDefinition,
-	type ToolDoc,
-	type ToolDocParam,
-	coerceWasmParams,
-	manifestEntryToWasm,
+import type {
+	AsyncResponse,
+	CallContext,
+	JsCallSpec,
+	SerializableJsCallManifestEntry,
+	ToolDefinition,
+	ToolDoc,
 } from "./registry/manifest.js";
+import { inferOwner } from "./registry/routes.js";
+import { zodToParamDocs, zodToReturnType } from "./registry/zod-to-docs.js";
 
 export type {
 	AsyncError,
@@ -62,7 +57,9 @@ export function throwIfAborted(): void {
 	}
 }
 
-function isCodedError(err: unknown): err is { code?: string; category?: string } {
+function _isCodedError(
+	err: unknown,
+): err is { code?: string; category?: string } {
 	return typeof err === "object" && err !== null;
 }
 
@@ -83,9 +80,7 @@ export function registerContentScriptJsCall<P, R>(
 
 export function registerJsCall<P, R>(spec: JsCallSpec<P, R>): void {
 	if (jsRegistryFrozen) {
-		throw new Error(
-			`JS registry is frozen; cannot register "${spec.action}"`,
-		);
+		throw new Error(`JS registry is frozen; cannot register "${spec.action}"`);
 	}
 	if (jsRegistry.has(spec.action)) {
 		throw new Error(`Tool "${spec.action}" is already registered`);

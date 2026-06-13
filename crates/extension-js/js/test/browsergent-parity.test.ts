@@ -6,12 +6,12 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { handlers } from "../src/content-script/handlers.js";
-import { inlineSnapshot } from "../src/content-script/snapshot.js";
 import {
 	dispatchContentScriptCall,
 	registerContentScriptSpec,
 } from "../src/content-script/registry.js";
 import { buildContentScriptSpecs } from "../src/content-script/schemas.js";
+import { inlineSnapshot } from "../src/content-script/snapshot.js";
 
 if (typeof globalThis.CSS === "undefined" || !globalThis.CSS.escape) {
 	(globalThis as unknown as Record<string, unknown>).CSS = {

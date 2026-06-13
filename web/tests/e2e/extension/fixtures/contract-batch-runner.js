@@ -7,7 +7,7 @@ function ensureContractLoaded(contractSource) {
 }
 
 function typedFromThrown(err) {
-	const msg = err && err.message ? err.message : String(err);
+	const msg = err?.message ? err.message : String(err);
 	const codeMatch = msg.match(/^([A-Z][A-Z_0-9]+)/);
 	return {
 		ok: false,
@@ -29,7 +29,7 @@ async function runContractApi(item, fx) {
 					ok: false,
 					error: {
 						code: "E_EXPECTED_REJECTION",
-						message: item.action + " should have rejected",
+						message: `${item.action} should have rejected`,
 					},
 				};
 			} catch (err) {
@@ -43,8 +43,7 @@ async function runContractApi(item, fx) {
 						ok: false,
 						error: {
 							code: "E_WRONG_ERROR_CODE",
-							message:
-								"expected " + expectedCode + " got " + typed.error.code,
+							message: `expected ${expectedCode} got ${typed.error.code}`,
 						},
 					};
 				}
@@ -64,8 +63,7 @@ async function runContractApi(item, fx) {
 						ok: false,
 						error: {
 							code: "E_WRONG_ERROR_CODE",
-							message:
-								"expected " + expectedCode + " got " + value.error.code,
+							message: `expected ${expectedCode} got ${value.error.code}`,
 						},
 					};
 				}
@@ -79,7 +77,7 @@ async function runContractApi(item, fx) {
 				ok: false,
 				error: {
 					code: "E_EXPECTED_TYPED_ERROR",
-					message: item.action + " should have returned typed error",
+					message: `${item.action} should have returned typed error`,
 				},
 			};
 		}
@@ -97,7 +95,7 @@ async function runContractApi(item, fx) {
 					ok: false,
 					error: {
 						code: "E_WRONG_ERROR_CODE",
-						message: "expected " + expectedCode + " got " + typed.error.code,
+						message: `expected ${expectedCode} got ${typed.error.code}`,
 					},
 				};
 			}
@@ -108,7 +106,7 @@ async function runContractApi(item, fx) {
 }
 
 function clearDestructiveFixtureIds(item, fx, result) {
-	if (!result || !result.ok) return;
+	if (!result?.ok) return;
 	if (item.action === "chrome.tabs.remove") {
 		fx.createdTabId = null;
 	}
@@ -131,7 +129,7 @@ function fixtureSummary(fx) {
 		createdTabId: fx.createdTabId ? fx.createdTabId : null,
 		createdWindowId: fx.createdWindowId ? fx.createdWindowId : null,
 		sessionId: fx.sessionId ? fx.sessionId : "",
-		activeTabId: fx.active && fx.active.tabId ? fx.active.tabId : null,
+		activeTabId: fx.active?.tabId ? fx.active.tabId : null,
 	};
 }
 
@@ -179,7 +177,7 @@ async function runChromeApiSingle(
 					ok: false,
 					error: {
 						code: "E_MISSING_CASE",
-						message: "missing contract item " + apiName,
+						message: `missing contract item ${apiName}`,
 					},
 					api: apiName,
 				}),
@@ -193,7 +191,7 @@ async function runChromeApiSingle(
 					ok: false,
 					error: {
 						code: "E_SKIPPED",
-						message: item.action + " skipped without destructive run",
+						message: `${item.action} skipped without destructive run`,
 					},
 					api: apiName,
 				}),
@@ -207,7 +205,7 @@ async function runChromeApiSingle(
 					ok: false,
 					error: {
 						code: "E_DESTRUCTIVE_SKIPPED",
-						message: item.action + " requires destructive run",
+						message: `${item.action} requires destructive run`,
 					},
 					api: apiName,
 				}),
@@ -238,7 +236,7 @@ async function runContractBatch(
 	ensureContractLoaded(contractSource);
 
 	async function emit(result) {
-		print(resultPrefix + JSON.stringify(result) + "\n");
+		print(`${resultPrefix + JSON.stringify(result)}\n`);
 	}
 
 	const fx = await buildFixture(runDestructive);
@@ -250,7 +248,7 @@ async function runContractBatch(
 					ok: false,
 					error: {
 						code: "E_MISSING_CASE",
-						message: "missing contract item " + name,
+						message: `missing contract item ${name}`,
 					},
 					api: name,
 				});
@@ -261,7 +259,7 @@ async function runContractBatch(
 					ok: false,
 					error: {
 						code: "E_SKIPPED",
-						message: item.action + " skipped without destructive run",
+						message: `${item.action} skipped without destructive run`,
 					},
 					api: name,
 				});
@@ -272,7 +270,7 @@ async function runContractBatch(
 					ok: false,
 					error: {
 						code: "E_DESTRUCTIVE_SKIPPED",
-						message: item.action + " requires destructive run",
+						message: `${item.action} requires destructive run`,
 					},
 					api: name,
 				});

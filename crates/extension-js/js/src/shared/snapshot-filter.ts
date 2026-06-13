@@ -108,7 +108,12 @@ function toMatcher(pattern: string | RegExp): StringMatcher {
 }
 
 function toSet<T extends string>(value: T | T[]): Set<string> {
-	if (Array.isArray(value)) return new Set(value.filter((s) => typeof s === "string").map((s) => (s as string).toLowerCase()));
+	if (Array.isArray(value))
+		return new Set(
+			value
+				.filter((s) => typeof s === "string")
+				.map((s) => (s as string).toLowerCase()),
+		);
 	if (typeof value !== "string") return new Set();
 	return new Set([value.toLowerCase()]);
 }
@@ -151,7 +156,9 @@ export function filterNodes(
 
 	if (filter.interactiveOnly) {
 		result = result.filter(
-			(n) => INTERACTIVE_ROLES.has(n.role.toLowerCase()) || INTERACTIVE_TAGS.has(n.tag.toLowerCase()),
+			(n) =>
+				INTERACTIVE_ROLES.has(n.role.toLowerCase()) ||
+				INTERACTIVE_TAGS.has(n.tag.toLowerCase()),
 		);
 	}
 

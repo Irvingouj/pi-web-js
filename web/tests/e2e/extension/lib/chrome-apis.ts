@@ -41,7 +41,9 @@ export function chromeApis(namespace: ChromeNamespace): ApiCase[] {
 	return CHROME_API_CASES.filter((c) => c.api.startsWith(`${namespace}.`));
 }
 
-export function chromeNamespaceDestructive(namespace: ChromeNamespace): boolean {
+export function chromeNamespaceDestructive(
+	namespace: ChromeNamespace,
+): boolean {
 	return chromeApis(namespace).some((c) => c.destructive);
 }
 

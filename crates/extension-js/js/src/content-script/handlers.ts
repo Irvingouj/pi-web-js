@@ -1,4 +1,19 @@
-import { logger } from "./logger.js";
+import { base64ToUint8Array } from "../shared/array-buffer.js";
+import { encodeFetchResponse } from "../shared/fetch-response.js";
+import { allocateRefId, syncRefIdCounterFromDom } from "../shared/ref-id.js";
+import {
+	notInteractableError,
+	throwStructuredAgentError,
+} from "../shared/registry/agent-errors.js";
+import {
+	getAccessibleName,
+	getAccessibleRole,
+	readFormFields,
+	resolveAbsoluteUrl,
+	resolveContainerRefId,
+} from "../shared/snapshot-dom.js";
+import { filterNodes } from "../shared/snapshot-filter.js";
+import { assertFillEffect, makeActionResult } from "./action-result.js";
 import {
 	asRecord,
 	assertInteractable,
@@ -8,26 +23,8 @@ import {
 	getStringParam,
 	throwElementNotFound,
 } from "./dom-utils.js";
+import { logger } from "./logger.js";
 import { inlineSnapshot } from "./snapshot.js";
-import {
-	getAccessibleName,
-	getAccessibleRole,
-	readFormFields,
-	resolveAbsoluteUrl,
-	resolveContainerRefId,
-} from "../shared/snapshot-dom.js";
-import { filterNodes } from "../shared/snapshot-filter.js";
-import { allocateRefId, syncRefIdCounterFromDom } from "../shared/ref-id.js";
-import { base64ToUint8Array } from "../shared/array-buffer.js";
-import { encodeFetchResponse } from "../shared/fetch-response.js";
-import {
-	assertFillEffect,
-	makeActionResult,
-} from "./action-result.js";
-import {
-	notInteractableError,
-	throwStructuredAgentError,
-} from "../shared/registry/agent-errors.js";
 
 export const DEFAULT_FETCH_TIMEOUT_MS = 30_000;
 const DEFAULT_WAIT_FOR_TIMEOUT_MS = 30_000;
@@ -56,9 +53,7 @@ function normalizeFetchParams(params: unknown): {
 	const obj = asRecord(params);
 	const options = asRecord(obj.options ?? {});
 	const url = String(obj.url ?? "");
-	const method = String(
-		options.method ?? obj.method ?? "GET",
-	).toUpperCase();
+	const method = String(options.method ?? obj.method ?? "GET").toUpperCase();
 	const headersRaw = options.headers ?? obj.headers ?? {};
 	const headers =
 		typeof headersRaw === "object" && headersRaw !== null
@@ -472,17 +467,9 @@ export const handlers: Record<string, Handler> = {
 		const direction = (obj.direction as string) ?? "down";
 		const amount = typeof obj.amount === "number" ? obj.amount : 300;
 		const top =
-			direction === "down"
-				? amount
-				: direction === "up"
-					? -amount
-					: 0;
+			direction === "down" ? amount : direction === "up" ? -amount : 0;
 		const left =
-			direction === "right"
-				? amount
-				: direction === "left"
-					? -amount
-					: 0;
+			direction === "right" ? amount : direction === "left" ? -amount : 0;
 		window.scrollBy({ top, left, behavior: "smooth" });
 		return makeActionResult("scroll", null, { direction, amount });
 	},
@@ -703,7 +690,8 @@ export const handlers: Record<string, Handler> = {
 	},
 
 	fetch: async (params, signal) => {
-		const { url, method, headers, body, timeout } = normalizeFetchParams(params);
+		const { url, method, headers, body, timeout } =
+			normalizeFetchParams(params);
 		if (!url) {
 			throw new Error("fetch requires a url");
 		}

@@ -4,7 +4,7 @@ import { NETWORK_IDLE_QUIET_MS } from "./constants.js";
 
 const log = logger.child("runner");
 
-const TRACKED_RESOURCE_TYPES: chrome.webRequest.ResourceType[] = [
+const TRACKED_RESOURCE_TYPES: `${chrome.webRequest.ResourceType}`[] = [
 	"main_frame",
 	"sub_frame",
 	"stylesheet",
@@ -21,9 +21,17 @@ const TRACKED_RESOURCE_TYPES: chrome.webRequest.ResourceType[] = [
  */
 export class NetworkTracker {
 	private inFlight = new Map<string, number>();
-	private onBeforeRequest: ((details: chrome.webRequest.WebRequestBodyDetails) => void) | null = null;
-	private onCompleted: ((details: chrome.webRequest.WebResponseCacheDetails) => void) | null = null;
-	private onErrorOccurred: ((details: chrome.webRequest.WebResponseErrorDetails) => void) | null = null;
+	private onBeforeRequest:
+		| ((
+				details: chrome.webRequest.OnBeforeRequestDetails,
+		  ) => chrome.webRequest.BlockingResponse | undefined)
+		| null = null;
+	private onCompleted:
+		| ((details: chrome.webRequest.OnCompletedDetails) => void)
+		| null = null;
+	private onErrorOccurred:
+		| ((details: chrome.webRequest.OnErrorOccurredDetails) => void)
+		| null = null;
 
 	constructor(private readonly tabId: number) {}
 
@@ -70,7 +78,9 @@ export class NetworkTracker {
 		const deadline = Date.now() + timeoutMs;
 		while (Date.now() < deadline) {
 			if (this.inFlight.size === 0) {
-				await new Promise((resolve) => setTimeout(resolve, NETWORK_IDLE_QUIET_MS));
+				await new Promise((resolve) =>
+					setTimeout(resolve, NETWORK_IDLE_QUIET_MS),
+				);
 				if (this.inFlight.size === 0) {
 					log.debug("networkTracker_idle", { tabId: this.tabId });
 					return;
@@ -87,9 +97,11 @@ export class NetworkTracker {
 	dispose(): void {
 		const api = globalThis.chrome?.webRequest;
 		if (!api) return;
-		if (this.onBeforeRequest) api.onBeforeRequest.removeListener(this.onBeforeRequest);
+		if (this.onBeforeRequest)
+			api.onBeforeRequest.removeListener(this.onBeforeRequest);
 		if (this.onCompleted) api.onCompleted.removeListener(this.onCompleted);
-		if (this.onErrorOccurred) api.onErrorOccurred.removeListener(this.onErrorOccurred);
+		if (this.onErrorOccurred)
+			api.onErrorOccurred.removeListener(this.onErrorOccurred);
 		this.onBeforeRequest = null;
 		this.onCompleted = null;
 		this.onErrorOccurred = null;

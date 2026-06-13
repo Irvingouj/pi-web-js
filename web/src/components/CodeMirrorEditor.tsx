@@ -374,79 +374,70 @@ function getLightTheme() {
 
 const CodeMirrorEditor = forwardRef<CellEditorHandle, Props>(
 	(
-		{
-			id,
-			value,
-			placeholder,
-			kind,
-			onChange,
-			onRun,
-			onDoneEditing,
-			autoFocus,
-		},
+		{ id, value, placeholder, kind, onChange, onRun, onDoneEditing, autoFocus },
 		ref,
 	) => {
-	const containerRef = useRef<HTMLDivElement>(null);
-	const viewRef = useRef<EditorView | null>(null);
-	const { theme } = useTheme();
+		const containerRef = useRef<HTMLDivElement>(null);
+		const viewRef = useRef<EditorView | null>(null);
+		const { theme } = useTheme();
 
-	useImperativeHandle(ref, () => ({
-		getText: () => viewRef.current?.state.doc.toString() ?? "",
-	}));
+		useImperativeHandle(ref, () => ({
+			getText: () => viewRef.current?.state.doc.toString() ?? "",
+		}));
 
-	useEffect(() => {
-		if (!containerRef.current) return;
+		useEffect(() => {
+			if (!containerRef.current) return;
 
-		const isCode = kind === "code";
-		const runHandler = isCode ? onRun : onDoneEditing;
+			const isCode = kind === "code";
+			const runHandler = isCode ? onRun : onDoneEditing;
 
-		const state = EditorState.create({
-			doc: value,
-			extensions: [
-				...getBaseExtensions(onChange, runHandler, onDoneEditing),
-				...(isCode ? [javascript()] : []),
-				themeCompartment.of(theme === "dark" ? oneDark : getLightTheme()),
-				EditorState.tabSize.of(2),
-				placeholder ? EditorView.lineWrapping : [],
-			],
-		});
+			const state = EditorState.create({
+				doc: value,
+				extensions: [
+					...getBaseExtensions(onChange, runHandler, onDoneEditing),
+					...(isCode ? [javascript()] : []),
+					themeCompartment.of(theme === "dark" ? oneDark : getLightTheme()),
+					EditorState.tabSize.of(2),
+					placeholder ? EditorView.lineWrapping : [],
+				],
+			});
 
-		const view = new EditorView({
-			state,
-			parent: containerRef.current,
-		});
+			const view = new EditorView({
+				state,
+				parent: containerRef.current,
+			});
 
-		viewRef.current = view;
-		(containerRef.current as any).__codemirror = view;
+			viewRef.current = view;
+			(containerRef.current as any).__codemirror = view;
 
-		if (autoFocus) {
-			view.focus();
-		}
+			if (autoFocus) {
+				view.focus();
+			}
 
-		return () => {
-			view.destroy();
-			viewRef.current = null;
-		};
-	}, []);
+			return () => {
+				view.destroy();
+				viewRef.current = null;
+			};
+		}, []);
 
-	useEffect(() => {
-		const view = viewRef.current;
-		if (!view) return;
-		view.dispatch({
-			effects: themeCompartment.reconfigure(
-				theme === "dark" ? oneDark : getLightTheme(),
-			),
-		});
-	}, [theme]);
+		useEffect(() => {
+			const view = viewRef.current;
+			if (!view) return;
+			view.dispatch({
+				effects: themeCompartment.reconfigure(
+					theme === "dark" ? oneDark : getLightTheme(),
+				),
+			});
+		}, [theme]);
 
-	return (
-		<div
-			ref={containerRef}
-			data-testid="cell-editor"
-			id={`editor-${id}`}
-			class="cm-editor-wrapper"
-		/>
-	);
+		return (
+			<div
+				ref={containerRef}
+				data-testid="cell-editor"
+				id={`editor-${id}`}
+				class="cm-editor-wrapper"
+			/>
+		);
 	},
 );
 

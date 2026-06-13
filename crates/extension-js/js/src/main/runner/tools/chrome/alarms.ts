@@ -25,9 +25,8 @@ registerChromePassthrough(
 			required: false,
 			description: "Alarm info (literal)",
 		},
-	]
-,
-	"chrome.alarms.create(\"myAlarm\", { delayInMinutes: 5 })"
+	],
+	'chrome.alarms.create("myAlarm", { delayInMinutes: 5 })',
 );
 registerChromePassthrough(
 	"chrome_alarms_clear",
@@ -44,9 +43,8 @@ registerChromePassthrough(
 			required: false,
 			description: "Alarm name to clear (literal)",
 		},
-	]
-,
-	"chrome.alarms.clear(\"myAlarm\")"
+	],
+	'chrome.alarms.clear("myAlarm")',
 );
 registerChromePassthrough(
 	"chrome_alarms_clearAll",
@@ -57,16 +55,24 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.alarms.clearAll()"
+	"chrome.alarms.clearAll()",
 );
 registerChromePassthrough(
 	"chrome_alarms_getAll",
 	"chrome",
 	"Get all alarms",
 	["alarms"],
-	z.array(z.object({ name: z.string().optional(), periodInMinutes: z.number().optional(), scheduledTime: z.number().optional() }).passthrough()),
+	z.array(
+		z
+			.object({
+				name: z.string().optional(),
+				periodInMinutes: z.number().optional(),
+				scheduledTime: z.number().optional(),
+			})
+			.passthrough(),
+	),
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.alarms.getAll()"
+	"chrome.alarms.getAll()",
 );

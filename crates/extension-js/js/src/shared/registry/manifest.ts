@@ -44,7 +44,9 @@ export interface ToolDoc {
 export type ToolAgentMeta = {
 	prerequisites?: string[];
 	notes?: string[];
-	tags?: Array<"read" | "write" | "mutation" | "snapshot" | "navigation" | "chrome">;
+	tags?: Array<
+		"read" | "write" | "mutation" | "snapshot" | "navigation" | "chrome"
+	>;
 	relatedApis?: string[];
 };
 
@@ -136,7 +138,10 @@ export function coerceWasmParams(params: unknown): unknown {
 	}
 	if (params instanceof Map) {
 		return Object.fromEntries(
-			[...params.entries()].map(([key, value]) => [key, coerceWasmParams(value)]),
+			[...params.entries()].map(([key, value]) => [
+				key,
+				coerceWasmParams(value),
+			]),
 		);
 	}
 	if (Array.isArray(params)) {

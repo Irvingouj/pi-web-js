@@ -36,7 +36,9 @@ export function parseAllSentinels(
 	while (searchFrom < stdout.length) {
 		const idx = stdout.indexOf(RESULT_PREFIX, searchFrom);
 		if (idx < 0) break;
-		const lineParsed = parseSentinelLine(stdout.slice(idx).split("\n")[0] ?? "");
+		const lineParsed = parseSentinelLine(
+			stdout.slice(idx).split("\n")[0] ?? "",
+		);
 		if (lineParsed) results.push(lineParsed);
 		searchFrom = idx + RESULT_PREFIX.length + 1;
 	}

@@ -1,10 +1,10 @@
 import { expect, type TestInfo } from "@playwright/test";
-import { CHROME_PROPERTY_ONLY } from "./chrome-handler-audit.ts";
 import { chromeRunnerAction } from "./chrome-apis.ts";
 import { parseChromeApiSentinel } from "./chrome-fixture.ts";
+import { CHROME_PROPERTY_ONLY } from "./chrome-handler-audit.ts";
+import { EXT_E2E_ATTACH_ALWAYS } from "./constants.ts";
 import { executeCell } from "./harness.ts";
 import { buildStrictRunnerSource } from "./runner-source.ts";
-import { EXT_E2E_ATTACH_ALWAYS } from "./constants.ts";
 import { parseAllSentinels } from "./sentinels.ts";
 import type {
 	ApiCase,
@@ -52,7 +52,11 @@ async function attachChromeDiagnostics(
 		`extensionId: ${harness.extensionId}`,
 		`sidepanelUrl: ${harness.sidepanel.url()}`,
 		`kernelStatus: ${kernelStatus ?? ""}`,
-		extra ? Object.entries(extra).map(([k, v]) => `${k}: ${v}`).join("\n") : "",
+		extra
+			? Object.entries(extra)
+					.map(([k, v]) => `${k}: ${v}`)
+					.join("\n")
+			: "",
 		"",
 		"--- sentinel ---",
 		sentinel ? JSON.stringify(sentinel, null, 2) : "(missing)",
@@ -73,10 +77,13 @@ async function attachChromeDiagnostics(
 		harness.browserConsoleErrors.join("\n") || "(none)",
 	].join("\n");
 
-	await testInfo.attach(`chrome-e2e-failure-${apiCase.api.replace(/\./g, "_")}`, {
-		body,
-		contentType: "text/plain",
-	});
+	await testInfo.attach(
+		`chrome-e2e-failure-${apiCase.api.replace(/\./g, "_")}`,
+		{
+			body,
+			contentType: "text/plain",
+		},
+	);
 }
 
 function assertChromeContractResult(
@@ -85,7 +92,10 @@ function assertChromeContractResult(
 ): void {
 	const sentinels = parseAllSentinels(execution.stdout);
 	const entry = sentinels.find((s) => s.api === apiCase.api);
-	expect(entry, `${apiCase.api} sentinel missing\nstdout:\n${execution.stdout}`).toBeTruthy();
+	expect(
+		entry,
+		`${apiCase.api} sentinel missing\nstdout:\n${execution.stdout}`,
+	).toBeTruthy();
 
 	if (apiCase.contractExpected === "success") {
 		expect(
@@ -185,7 +195,10 @@ export async function runChromeApiTest(
 
 	try {
 		expect(execution.status, `${apiCase.api} cell status`).toBe("success");
-		expect(entry, `${apiCase.api} sentinel missing\nstdout:\n${execution.stdout}`).toBeTruthy();
+		expect(
+			entry,
+			`${apiCase.api} sentinel missing\nstdout:\n${execution.stdout}`,
+		).toBeTruthy();
 
 		assertChromeContractResult(apiCase, execution);
 		assertTransportLogs(apiCase, execution.stderr, runtimeSlice);

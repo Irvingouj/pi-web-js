@@ -5,34 +5,9 @@ import * as schemas from "../../../shared/schemas.js";
 import {
 	dispatchTool,
 	registerJsCall,
-	type CallContext,
 	type ToolDocParam,
 } from "../../../shared/tool-registry.js";
-import type { DomFormatParams, DomSnapshotParams, FetchParams } from "../runtime.js";
-import {
-	makeError,
-	asRecord,
-	extractTabId,
-	unwrapResult,
-	getActiveTabId,
-	resolveActiveTabId,
-	waitForTabLoad,
-	handleFetch,
-	handleHostCallAction,
-	registerChromePassthrough,
-	requireArgumentArray,
-	getElementByRefId,
-	extractRefId,
-	handleDomSnapshot,
-	handleDomFormat,
-	ensureDomSnapshot,
-	buildSnapshotInTab,
-	throwIfAborted,
-	DEFAULT_TIMEOUT_MS,
-	DEFAULT_MAX_NODES,
-	DEFAULT_SCROLL_AMOUNT,
-	DEFAULT_POLL_INTERVAL_MS,
-} from "../runtime.js";
+import { requireArgumentArray, unwrapResult } from "../runtime.js";
 import {
 	checkPermission,
 	permissionFromChromeAction,
@@ -40,7 +15,10 @@ import {
 
 // ─── Alias actions ───────────────────────────────────────────────
 
-function normalizeAliasArgs(action: string, args: readonly unknown[]): unknown[] {
+function normalizeAliasArgs(
+	action: string,
+	args: readonly unknown[],
+): unknown[] {
 	if (args.length === 1 && typeof args[0] === "string") {
 		switch (action) {
 			case "history_delete":
@@ -115,7 +93,12 @@ registerAlias(
 	"Get a cookie",
 	schemas.ChromeCookieSchema,
 	[
-		{ name: "url", type: "string", required: false, description: "Cookie URL (url)" },
+		{
+			name: "url",
+			type: "string",
+			required: false,
+			description: "Cookie URL (url)",
+		},
 		{
 			name: "name",
 			type: "string",
@@ -123,7 +106,7 @@ registerAlias(
 			description: "Cookie name (literal)",
 		},
 	],
-	"web.cookies.get({ url: \"https://example.com\", name: \"session\" })",
+	'web.cookies.get({ url: "https://example.com", name: "session" })',
 );
 registerAlias(
 	"cookies_set",
@@ -131,7 +114,12 @@ registerAlias(
 	"Set a cookie",
 	schemas.ChromeCookieSchema,
 	[
-		{ name: "url", type: "string", required: false, description: "Cookie URL (url)" },
+		{
+			name: "url",
+			type: "string",
+			required: false,
+			description: "Cookie URL (url)",
+		},
 		{
 			name: "name",
 			type: "string",
@@ -145,7 +133,7 @@ registerAlias(
 			description: "Cookie value (literal)",
 		},
 	],
-	"web.cookies.set({ url: \"https://example.com\", name: \"session\", value: \"abc\" })",
+	'web.cookies.set({ url: "https://example.com", name: "session", value: "abc" })',
 );
 registerAlias(
 	"cookies_delete",
@@ -153,7 +141,12 @@ registerAlias(
 	"Remove a cookie",
 	z.record(z.unknown()),
 	[
-		{ name: "url", type: "string", required: false, description: "Cookie URL (url)" },
+		{
+			name: "url",
+			type: "string",
+			required: false,
+			description: "Cookie URL (url)",
+		},
 		{
 			name: "name",
 			type: "string",
@@ -161,15 +154,22 @@ registerAlias(
 			description: "Cookie name (literal)",
 		},
 	],
-	"web.cookies.delete({ url: \"https://example.com\", name: \"session\" })",
+	'web.cookies.delete({ url: "https://example.com", name: "session" })',
 );
 registerAlias(
 	"cookies_list",
 	"chrome_cookies_getAll",
 	"Get all cookies",
 	schemas.ChromeCookieArraySchema,
-	[{ name: "url", type: "string", required: false, description: "Cookie URL (url)" }],
-	"web.cookies.list({ url: \"https://example.com\" })",
+	[
+		{
+			name: "url",
+			type: "string",
+			required: false,
+			description: "Cookie URL (url)",
+		},
+	],
+	'web.cookies.list({ url: "https://example.com" })',
 );
 registerAlias(
 	"history_search",
@@ -190,7 +190,7 @@ registerAlias(
 			description: "Maximum results (literal)",
 		},
 	],
-	"web.history.search({ text: \"example\", maxResults: 10 })",
+	'web.history.search({ text: "example", maxResults: 10 })',
 );
 registerAlias(
 	"history_delete",
@@ -205,7 +205,7 @@ registerAlias(
 			description: "URL to delete from history (url)",
 		},
 	],
-	"web.history.delete(\"https://example.com\")",
+	'web.history.delete("https://example.com")',
 );
 registerAlias(
 	"bookmarks_search",
@@ -220,7 +220,7 @@ registerAlias(
 			description: "Search query (literal)",
 		},
 	],
-	"web.bookmarks.search(\"example\")",
+	'web.bookmarks.search("example")',
 );
 registerAlias(
 	"bookmarks_create",
@@ -247,7 +247,7 @@ registerAlias(
 			description: "Bookmark URL (url)",
 		},
 	],
-	"web.bookmarks.create({ title: \"Example\", url: \"https://example.com\" })",
+	'web.bookmarks.create({ title: "Example", url: "https://example.com" })',
 );
 registerAlias(
 	"bookmarks_delete",
@@ -262,7 +262,7 @@ registerAlias(
 			description: "Bookmark ID to remove (literal)",
 		},
 	],
-	"web.bookmarks.delete(\"bookmarkId\")",
+	'web.bookmarks.delete("bookmarkId")',
 );
 registerAlias(
 	"notifications_create",
@@ -283,7 +283,7 @@ registerAlias(
 			description: "Notification options (literal)",
 		},
 	],
-	"web.notifications.create({ id: \"test\", options: { type: \"basic\", title: \"Hello\", message: \"World\" } })",
+	'web.notifications.create({ id: "test", options: { type: "basic", title: "Hello", message: "World" } })',
 );
 registerAlias(
 	"notifications_clear",
@@ -298,5 +298,5 @@ registerAlias(
 			description: "Notification ID to clear (literal)",
 		},
 	],
-	"web.notifications.clear(\"test\")",
+	'web.notifications.clear("test")',
 );

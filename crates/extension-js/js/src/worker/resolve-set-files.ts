@@ -1,5 +1,8 @@
 import { arrayBufferToBase64 } from "../shared/array-buffer.js";
-import type { PageSetFilesParams, TabSetFilesParams } from "../shared/generated.js";
+import type {
+	PageSetFilesParams,
+	TabSetFilesParams,
+} from "../shared/generated.js";
 import {
 	PageSetFilesParamsSchema,
 	TabSetFilesParamsSchema,
@@ -42,14 +45,19 @@ export async function resolveSetFilesParams(
 	params: unknown,
 	runId: string | undefined,
 	readBase64: (path: string) => Promise<string>,
-): Promise<{ ok: true; value: Record<string, unknown> } | { ok: false; error: { message: string; code: string; category?: string } }> {
+): Promise<
+	| { ok: true; value: Record<string, unknown> }
+	| { ok: false; error: { message: string; code: string; category?: string } }
+> {
 	const schema =
 		action === "tab_set_files"
 			? TabSetFilesParamsSchema
 			: PageSetFilesParamsSchema;
 	const parsed = schema.safeParse(params);
 	if (!parsed.success) {
-		return invalidParams(parsed.error.issues[0]?.message ?? "Invalid setFiles params");
+		return invalidParams(
+			parsed.error.issues[0]?.message ?? "Invalid setFiles params",
+		);
 	}
 
 	const data = parsed.data as PageSetFilesParams | TabSetFilesParams;

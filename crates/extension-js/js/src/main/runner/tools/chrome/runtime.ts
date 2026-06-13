@@ -1,6 +1,5 @@
 /// <reference types="chrome" />
 import { z } from "zod";
-import * as schemas from "../../../../shared/schemas.js";
 import { registerChromePassthrough } from "../../chrome/internals.js";
 
 registerChromePassthrough(
@@ -12,7 +11,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.runtime.sendMessage({ greeting: \"hello\" })",
+	'chrome.runtime.sendMessage({ greeting: "hello" })',
 	"message response",
 );
 registerChromePassthrough(
@@ -24,7 +23,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.runtime.connect({ name: \"myPort\" })",
+	'chrome.runtime.connect({ name: "myPort" })',
 	"Port",
 );
 registerChromePassthrough(
@@ -36,7 +35,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.runtime.getURL(\"page.html\")"
+	'chrome.runtime.getURL("page.html")',
 );
 registerChromePassthrough(
 	"chrome_runtime_getManifest",

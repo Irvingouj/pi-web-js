@@ -1,5 +1,3 @@
-/// <reference types="chrome" />
-import { z } from "zod";
 import * as schemas from "../../../../shared/schemas.js";
 import { registerChromePassthrough } from "../../chrome/internals.js";
 import { zChromeVoid } from "./register-helpers.js";
@@ -20,7 +18,7 @@ registerChromePassthrough(
 			description: "Whether to populate tab info (literal)",
 		},
 	],
-	"chrome.windows.getCurrent({ populate: true })"
+	"chrome.windows.getCurrent({ populate: true })",
 );
 
 registerChromePassthrough(
@@ -32,7 +30,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.windows.getAll({ populate: false })"
+	"chrome.windows.getAll({ populate: false })",
 );
 registerChromePassthrough(
 	"chrome_windows_create",
@@ -43,7 +41,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.windows.create({ url: \"https://example.com\" })"
+	'chrome.windows.create({ url: "https://example.com" })',
 );
 registerChromePassthrough(
 	"chrome_windows_update",
@@ -54,7 +52,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.windows.update(1, { focused: true })"
+	"chrome.windows.update(1, { focused: true })",
 );
 registerChromePassthrough(
 	"chrome_windows_remove",
@@ -72,5 +70,5 @@ registerChromePassthrough(
 			description: "Window ID to remove",
 		},
 	],
-	"chrome.windows.remove(1)"
+	"chrome.windows.remove(1)",
 );

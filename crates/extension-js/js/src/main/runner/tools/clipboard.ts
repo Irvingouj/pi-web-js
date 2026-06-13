@@ -1,37 +1,8 @@
 /// <reference types="chrome" />
 import { z } from "zod";
-import { logger } from "../../../shared/logger.js";
 import * as schemas from "../../../shared/schemas.js";
-import {
-	dispatchTool,
-	registerJsCall,
-	type CallContext,
-	type ToolDocParam,
-} from "../../../shared/tool-registry.js";
-import type { DomFormatParams, DomSnapshotParams, FetchParams } from "../runtime.js";
-import {
-	makeError,
-	asRecord,
-	extractTabId,
-	unwrapResult,
-	getActiveTabId,
-	resolveActiveTabId,
-	waitForTabLoad,
-	handleFetch,
-	handleHostCallAction,
-	registerChromePassthrough,
-	getElementByRefId,
-	extractRefId,
-	handleDomSnapshot,
-	handleDomFormat,
-	ensureDomSnapshot,
-	buildSnapshotInTab,
-	throwIfAborted,
-	DEFAULT_TIMEOUT_MS,
-	DEFAULT_MAX_NODES,
-	DEFAULT_SCROLL_AMOUNT,
-	DEFAULT_POLL_INTERVAL_MS,
-} from "../runtime.js";
+import { registerJsCall } from "../../../shared/tool-registry.js";
+import { asRecord } from "../runtime.js";
 
 // ─── Clipboard ───────────────────────────────────────────────────
 
@@ -52,7 +23,7 @@ registerJsCall({
 	errorCode: "ECLIPBOARD",
 	errorCategory: "permission",
 
-	example: "clipboard.read({ text: \"hello\" })",
+	example: 'clipboard.read({ text: "hello" })',
 });
 
 registerJsCall({
@@ -98,5 +69,5 @@ registerJsCall({
 	errorCode: "ECLIPBOARD",
 	errorCategory: "permission",
 
-	example: "clipboard.write(\"text\")",
+	example: 'clipboard.write("text")',
 });

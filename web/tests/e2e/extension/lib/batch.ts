@@ -1,8 +1,14 @@
 import { expect } from "@playwright/test";
-import type { ApiCase, CellExecution, ContractResult, ExtensionFixture, ExtensionHarness } from "./types.ts";
 import { executeCell } from "./harness.ts";
 import { buildStrictRunnerSource } from "./runner-source.ts";
 import { parseAllSentinels } from "./sentinels.ts";
+import type {
+	ApiCase,
+	CellExecution,
+	ContractResult,
+	ExtensionFixture,
+	ExtensionHarness,
+} from "./types.ts";
 
 export { buildStrictRunnerSource, parseAllSentinels };
 
@@ -20,7 +26,9 @@ export async function runApiBatch(
 	fixture: ExtensionFixture,
 	runDestructive: boolean,
 ): Promise<void> {
-	const selected = cases.filter((c) => (runDestructive ? true : !c.destructive));
+	const selected = cases.filter((c) =>
+		runDestructive ? true : !c.destructive,
+	);
 	const runnable = selected.filter((c) => !c.skip || runDestructive);
 	if (runnable.length === 0) return;
 

@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CONTRACT_MANIFEST } from "./contract-metadata.ts";
@@ -49,7 +49,9 @@ export function auditChromeHandlerCoverage(): {
 	chromeApiCount: number;
 } {
 	const registered = collectRegisteredChromeActions();
-	const chromeApis = CONTRACT_MANIFEST.filter((api) => api.startsWith("chrome."));
+	const chromeApis = CONTRACT_MANIFEST.filter((api) =>
+		api.startsWith("chrome."),
+	);
 	const missing = chromeApis.filter((api) => {
 		if (CHROME_PROPERTY_ONLY.has(api)) return false;
 		return !registered.has(api.replace(/\./g, "_"));

@@ -13,7 +13,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.bookmarks.search({ query: \"example\" })"
+	'chrome.bookmarks.search({ query: "example" })',
 );
 registerChromePassthrough(
 	"chrome_bookmarks_create",
@@ -24,7 +24,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.bookmarks.create({ title: \"Example\", url: \"https://example.com\" })"
+	'chrome.bookmarks.create({ title: "Example", url: "https://example.com" })',
 );
 registerChromePassthrough(
 	"chrome_bookmarks_remove",
@@ -41,9 +41,8 @@ registerChromePassthrough(
 			required: false,
 			description: "Bookmark ID to remove (literal)",
 		},
-	]
-,
-	"chrome.bookmarks.remove(\"bookmarkId\")"
+	],
+	'chrome.bookmarks.remove("bookmarkId")',
 );
 registerChromePassthrough(
 	"chrome_bookmarks_get",
@@ -54,7 +53,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.bookmarks.get(\"bookmarkId\")"
+	'chrome.bookmarks.get("bookmarkId")',
 );
 registerChromePassthrough(
 	"chrome_bookmarks_getChildren",
@@ -65,7 +64,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.bookmarks.getChildren(\"folderId\")"
+	'chrome.bookmarks.getChildren("folderId")',
 );
 registerChromePassthrough(
 	"chrome_bookmarks_getTree",
@@ -76,7 +75,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.bookmarks.getTree()"
+	"chrome.bookmarks.getTree()",
 );
 registerChromePassthrough(
 	"chrome_bookmarks_move",
@@ -87,7 +86,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.bookmarks.move(\"bookmarkId\", { parentId: \"newFolderId\" })"
+	'chrome.bookmarks.move("bookmarkId", { parentId: "newFolderId" })',
 );
 registerChromePassthrough(
 	"chrome_bookmarks_removeTree",
@@ -98,7 +97,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.bookmarks.removeTree(\"folderId\")"
+	'chrome.bookmarks.removeTree("folderId")',
 );
 registerChromePassthrough(
 	"chrome_bookmarks_update",
@@ -109,5 +108,5 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.bookmarks.update(\"bookmarkId\", { title: \"New Title\" })"
+	'chrome.bookmarks.update("bookmarkId", { title: "New Title" })',
 );

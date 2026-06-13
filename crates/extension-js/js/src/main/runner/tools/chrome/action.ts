@@ -12,7 +12,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.action.setBadgeText({ text: \"1\" })"
+	'chrome.action.setBadgeText({ text: "1" })',
 );
 registerChromePassthrough(
 	"chrome_action_setBadgeBackgroundColor",
@@ -23,7 +23,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.action.setBadgeBackgroundColor({ color: \"#FF0000\" })"
+	'chrome.action.setBadgeBackgroundColor({ color: "#FF0000" })',
 );
 registerChromePassthrough(
 	"chrome_action_setTitle",
@@ -34,7 +34,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.action.setTitle({ title: \"My Extension\" })"
+	'chrome.action.setTitle({ title: "My Extension" })',
 );
 registerChromePassthrough(
 	"chrome_action_setIcon",
@@ -45,7 +45,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.action.setIcon({ path: \"icon.png\" })"
+	'chrome.action.setIcon({ path: "icon.png" })',
 );
 registerChromePassthrough(
 	"chrome_action_getBadgeText",
@@ -56,7 +56,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.action.getBadgeText({})"
+	"chrome.action.getBadgeText({})",
 );
 registerChromePassthrough(
 	"chrome_action_openPopup",
@@ -67,7 +67,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.action.openPopup()"
+	"chrome.action.openPopup()",
 );
 registerChromePassthrough(
 	"chrome_action_setPopup",
@@ -78,5 +78,5 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.action.setPopup({ popup: \"popup.html\" })"
+	'chrome.action.setPopup({ popup: "popup.html" })',
 );

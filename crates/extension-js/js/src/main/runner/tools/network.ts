@@ -1,37 +1,9 @@
 /// <reference types="chrome" />
 import { z } from "zod";
-import { logger } from "../../../shared/logger.js";
 import * as schemas from "../../../shared/schemas.js";
-import {
-	dispatchTool,
-	registerJsCall,
-	type CallContext,
-	type ToolDocParam,
-} from "../../../shared/tool-registry.js";
-import type { DomFormatParams, DomSnapshotParams, FetchParams } from "../runtime.js";
-import {
-	makeError,
-	asRecord,
-	extractTabId,
-	unwrapResult,
-	getActiveTabId,
-	resolveActiveTabId,
-	waitForTabLoad,
-	handleFetch,
-	handleHostCallAction,
-	registerChromePassthrough,
-	getElementByRefId,
-	extractRefId,
-	handleDomSnapshot,
-	handleDomFormat,
-	ensureDomSnapshot,
-	buildSnapshotInTab,
-	throwIfAborted,
-	DEFAULT_TIMEOUT_MS,
-	DEFAULT_MAX_NODES,
-	DEFAULT_SCROLL_AMOUNT,
-	DEFAULT_POLL_INTERVAL_MS,
-} from "../runtime.js";
+import { registerJsCall } from "../../../shared/tool-registry.js";
+import type { FetchParams } from "../runtime.js";
+import { handleFetch, unwrapResult } from "../runtime.js";
 
 // ─── Network / Sleep ─────────────────────────────────────────────
 
@@ -81,11 +53,12 @@ registerJsCall({
 			description: "Timeout in milliseconds (literal)",
 		},
 	],
-	returnDoc: "DTO with `{ body, headers, ok, status }` — not a native Response object",
+	returnDoc:
+		"DTO with `{ body, headers, ok, status }` — not a native Response object",
 	errorCode: "E_UNKNOWN",
 	errorCategory: "network",
 
-	example: "network.fetch(\"https://example.com\")",
+	example: 'network.fetch("https://example.com")',
 });
 
 registerJsCall({
@@ -152,5 +125,5 @@ registerJsCall({
 	returnDoc: "Label string",
 	errorCode: "E_UNKNOWN",
 
-	example: "util.mock_async({ tabId: 123, script: \"document.title\" })",
+	example: 'util.mock_async({ tabId: 123, script: "document.title" })',
 });

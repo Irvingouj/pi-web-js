@@ -1,7 +1,7 @@
 import { expect, type Page } from "@playwright/test";
-import { executeCell } from "./harness.ts";
 import { RESULT_PREFIX } from "./constants.ts";
-import type { CellExecution, ContractResult } from "./types.ts";
+import { executeCell } from "./harness.ts";
+import type { CellExecution } from "./types.ts";
 
 /**
  * Activate a testcase tab by navigating the fixture tab to the given URL

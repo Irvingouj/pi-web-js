@@ -32,7 +32,9 @@ import type {
 	ExtensionHarness,
 } from "./types.ts";
 
-export async function installFixtureRoutes(context: BrowserContext): Promise<void> {
+export async function installFixtureRoutes(
+	context: BrowserContext,
+): Promise<void> {
 	await context.route(`${FIXTURE_ORIGIN}/**`, async (route) => {
 		const url = new URL(route.request().url());
 		if (url.pathname === "/fixture" || url.pathname === "/fixture/") {
@@ -226,15 +228,16 @@ export async function launchExtension(
 			browserConsoleErrors,
 			serviceWorkerErrors,
 			"sidepanel",
-			(handler) => sidepanel!.on("console", handler),
+			(handler) => sidepanel?.on("console", handler),
 		);
 		const logSuffix =
-			EXT_E2E_LOG_LEVEL !== "error"
-				? `?e2e_log=${EXT_E2E_LOG_LEVEL}`
-				: "";
-		await sidepanel.goto(`chrome-extension://${extensionId}/index.html${logSuffix}`, {
-			waitUntil: "domcontentloaded",
-		});
+			EXT_E2E_LOG_LEVEL !== "error" ? `?e2e_log=${EXT_E2E_LOG_LEVEL}` : "";
+		await sidepanel.goto(
+			`chrome-extension://${extensionId}/index.html${logSuffix}`,
+			{
+				waitUntil: "domcontentloaded",
+			},
+		);
 
 		expect(sidepanel.url().startsWith("chrome-extension://")).toBe(true);
 
@@ -274,7 +277,9 @@ export async function launchExtension(
 	}
 }
 
-export async function teardownExtension(harness: ExtensionHarness): Promise<void> {
+export async function teardownExtension(
+	harness: ExtensionHarness,
+): Promise<void> {
 	const userDataDir = harness.userDataDir;
 	try {
 		await cleanupFixture(harness);
@@ -307,7 +312,9 @@ export async function waitForKernelReady(
 
 async function setEditorSource(page: Page, source: string): Promise<void> {
 	await page.bringToFront();
-	const editor = page.locator('[data-testid="cell-editor"] .cm-content').first();
+	const editor = page
+		.locator('[data-testid="cell-editor"] .cm-content')
+		.first();
 	await editor.click();
 	const selectAll = process.platform === "darwin" ? "Meta+a" : "Control+a";
 	await page.keyboard.press(selectAll);
@@ -350,8 +357,10 @@ export async function executeCell<T>(
 	);
 
 	const statusText =
-		(await sidepanel.locator('[data-testid="cell-status"]').first().textContent()) ??
-		"";
+		(await sidepanel
+			.locator('[data-testid="cell-status"]')
+			.first()
+			.textContent()) ?? "";
 	const status: CellExecution<T>["status"] = statusText
 		.toLowerCase()
 		.includes("error")
@@ -359,8 +368,10 @@ export async function executeCell<T>(
 		: "success";
 
 	const stdout = decodeRenderedOutput(
-		(await sidepanel.locator('[data-testid="cell-output"]').first().textContent()) ??
-			"",
+		(await sidepanel
+			.locator('[data-testid="cell-output"]')
+			.first()
+			.textContent()) ?? "",
 	);
 	const stderr = (
 		await sidepanel.locator('[data-testid="cell-error"]').allTextContents()
@@ -436,13 +447,19 @@ print(RESULT_PREFIX + JSON.stringify({ ok: true, value: apis.sort() }));
 }
 
 export function assertNoHarnessErrors(
-	harness: Pick<ExtensionHarness, "serviceWorkerErrors" | "browserConsoleErrors">,
+	harness: Pick<
+		ExtensionHarness,
+		"serviceWorkerErrors" | "browserConsoleErrors"
+	>,
 	testInfo?: TestInfo,
 ): void {
 	if (harness.serviceWorkerErrors.length > 0) {
 		const msg = harness.serviceWorkerErrors.join("\n");
 		if (testInfo) {
-			testInfo.attach("service-worker-errors", { body: msg, contentType: "text/plain" });
+			testInfo.attach("service-worker-errors", {
+				body: msg,
+				contentType: "text/plain",
+			});
 		}
 		throw new Error(`Service worker errors:\n${msg}`);
 	}
@@ -454,7 +471,10 @@ export function assertNoHarnessErrors(
 	if (fatalConsole.length > 0) {
 		const msg = fatalConsole.join("\n");
 		if (testInfo) {
-			testInfo.attach("browser-console-errors", { body: msg, contentType: "text/plain" });
+			testInfo.attach("browser-console-errors", {
+				body: msg,
+				contentType: "text/plain",
+			});
 		}
 		throw new Error(`Browser console errors:\n${msg}`);
 	}

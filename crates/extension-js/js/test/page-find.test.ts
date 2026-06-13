@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { handlers } from "../src/content-script/handlers.js";
 import {
 	dispatchContentScriptCall,
 	registerContentScriptSpec,
 } from "../src/content-script/registry.js";
 import { buildContentScriptSpecs } from "../src/content-script/schemas.js";
-import { handlers } from "../src/content-script/handlers.js";
 
 const mockAddListener = vi.fn();
 

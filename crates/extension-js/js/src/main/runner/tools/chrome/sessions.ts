@@ -1,5 +1,3 @@
-/// <reference types="chrome" />
-import { z } from "zod";
 import * as schemas from "../../../../shared/schemas.js";
 import { registerChromePassthrough } from "../../chrome/internals.js";
 
@@ -12,7 +10,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.sessions.getRecentlyClosed()"
+	"chrome.sessions.getRecentlyClosed()",
 );
 registerChromePassthrough(
 	"chrome_sessions_restore",
@@ -30,7 +28,7 @@ registerChromePassthrough(
 			description: "Session ID (literal)",
 		},
 	],
-	"chrome.sessions.restore(\"sessionId\")"
+	'chrome.sessions.restore("sessionId")',
 );
 registerChromePassthrough(
 	"chrome_sessions_getDevices",
@@ -41,5 +39,5 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.sessions.getDevices()"
+	"chrome.sessions.getDevices()",
 );

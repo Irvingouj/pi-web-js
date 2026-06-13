@@ -1,4 +1,4 @@
-import { test, expect } from "./fixtures.ts";
+import { expect, test } from "./fixtures.ts";
 import { FIXTURE_URL } from "./lib/constants.ts";
 import { executeCell, restartKernel } from "./lib/harness.ts";
 
@@ -20,11 +20,14 @@ if (tabs.length > 0) {
 }
 `;
 
-test.describe.serial("tab query user snippet", () => {
-	test("diagnostic: web.tab vs tab namespace", async ({ harness }, testInfo) => {
-		const exec = await executeCell(
-			harness.sidepanel,
-			`
+test.describe
+	.serial("tab query user snippet", () => {
+		test("diagnostic: web.tab vs tab namespace", async ({
+			harness,
+		}, testInfo) => {
+			const exec = await executeCell(
+				harness.sidepanel,
+				`
 print("typeof web=" + typeof web);
 print("typeof web.tab=" + (typeof web !== "undefined" ? typeof web.tab : "no web"));
 print("typeof tab=" + typeof tab);
@@ -35,36 +38,38 @@ if (typeof tab !== "undefined") {
   print("typeof tab.query=" + typeof tab.query);
 }
 `,
-			15_000,
-		);
-		await testInfo.attach("namespace-probe.txt", {
-			body: `${exec.status}\n${exec.stdout}\n${exec.stderr}`,
-			contentType: "text/plain",
+				15_000,
+			);
+			await testInfo.attach("namespace-probe.txt", {
+				body: `${exec.status}\n${exec.stdout}\n${exec.stderr}`,
+				contentType: "text/plain",
+			});
+			console.log(exec.stdout, exec.stderr);
+			expect(exec.status).toBe("success");
+			expect(exec.stdout).toContain("typeof web.tab.query=function");
 		});
-		console.log(exec.stdout, exec.stderr);
-		expect(exec.status).toBe("success");
-		expect(exec.stdout).toContain("typeof web.tab.query=function");
-	});
 
-	test("runs exact web.tab.query + snapshot snippet from sidepanel", async ({
-		harness,
-	}, testInfo) => {
-		// The user's snippet uses tabs[0]; after a long suite many stray tabs exist.
-		// Keep only the fixture page and sidepanel so tabs[0] is deterministic.
-		for (const page of harness.context.pages()) {
-			if (page !== harness.fixtureTab && page !== harness.sidepanel) {
-				await page.close().catch(() => {});
+		test("runs exact web.tab.query + snapshot snippet from sidepanel", async ({
+			harness,
+		}, testInfo) => {
+			// The user's snippet uses tabs[0]; after a long suite many stray tabs exist.
+			// Keep only the fixture page and sidepanel so tabs[0] is deterministic.
+			for (const page of harness.context.pages()) {
+				if (page !== harness.fixtureTab && page !== harness.sidepanel) {
+					await page.close().catch(() => {});
+				}
 			}
-		}
-		await harness.fixtureTab.goto(FIXTURE_URL, { waitUntil: "domcontentloaded" });
-		await harness.fixtureTab.bringToFront();
-		await restartKernel(harness.sidepanel);
+			await harness.fixtureTab.goto(FIXTURE_URL, {
+				waitUntil: "domcontentloaded",
+			});
+			await harness.fixtureTab.bringToFront();
+			await restartKernel(harness.sidepanel);
 
-		const logStart = harness.runtimeLogs.length;
+			const logStart = harness.runtimeLogs.length;
 
-		const exec = await executeCell(
-			harness.sidepanel,
-			`
+			const exec = await executeCell(
+				harness.sidepanel,
+				`
 const keep = ${JSON.stringify(FIXTURE_URL)};
 let fixtureTabs = await chrome.tabs.query({ url: keep + "*" });
 if (fixtureTabs.length === 0) {
@@ -81,44 +86,44 @@ if (fixtureTabs[0]?.id != null) {
 }
 ${USER_TAB_SNIPPET}
 `,
-			30_000,
-		);
+				30_000,
+			);
 
-		const runtimeTail = harness.runtimeLogs.slice(logStart).join("\n");
-		const diagnostic = [
-			"=== cell status ===",
-			exec.status,
-			"=== stdout ===",
-			exec.stdout || "(empty)",
-			"=== stderr (UI) ===",
-			exec.stderr || "(empty)",
-			"=== runtime logs (tail) ===",
-			runtimeTail || "(none — set EXT_E2E_VERBOSE=1 for full capture)",
-			"=== browser console errors ===",
-			harness.browserConsoleErrors.slice(-20).join("\n") || "(none)",
-		].join("\n");
+			const runtimeTail = harness.runtimeLogs.slice(logStart).join("\n");
+			const diagnostic = [
+				"=== cell status ===",
+				exec.status,
+				"=== stdout ===",
+				exec.stdout || "(empty)",
+				"=== stderr (UI) ===",
+				exec.stderr || "(empty)",
+				"=== runtime logs (tail) ===",
+				runtimeTail || "(none — set EXT_E2E_VERBOSE=1 for full capture)",
+				"=== browser console errors ===",
+				harness.browserConsoleErrors.slice(-20).join("\n") || "(none)",
+			].join("\n");
 
-		await testInfo.attach("tab-snippet-diagnostic.txt", {
-			body: diagnostic,
-			contentType: "text/plain",
+			await testInfo.attach("tab-snippet-diagnostic.txt", {
+				body: diagnostic,
+				contentType: "text/plain",
+			});
+
+			console.log(diagnostic);
+
+			expect(
+				exec.status,
+				`snippet failed — see attached tab-snippet-diagnostic.txt\n${diagnostic}`,
+			).toBe("success");
+			expect(exec.stderr, "cell should not show runtime error").toBe("");
+			expect(exec.stdout, "should log tab count").toMatch(/Tab count:/);
+			expect(exec.stdout, "first tab should be the https fixture").toMatch(
+				/First tab: extension-js contract fixture/,
+			);
+			expect(exec.stdout, "snapshot should succeed on fixture tab").toMatch(
+				/Snapshot length:/,
+			);
+			expect(exec.stdout, "snapshot_data should return fixture url").toMatch(
+				/Snapshot data URL: https:\/\/extension-js\.test\/fixture/,
+			);
 		});
-
-		console.log(diagnostic);
-
-		expect(
-			exec.status,
-			`snippet failed — see attached tab-snippet-diagnostic.txt\n${diagnostic}`,
-		).toBe("success");
-		expect(exec.stderr, "cell should not show runtime error").toBe("");
-		expect(exec.stdout, "should log tab count").toMatch(/Tab count:/);
-		expect(exec.stdout, "first tab should be the https fixture").toMatch(
-			/First tab: extension-js contract fixture/,
-		);
-		expect(exec.stdout, "snapshot should succeed on fixture tab").toMatch(
-			/Snapshot length:/,
-		);
-		expect(exec.stdout, "snapshot_data should return fixture url").toMatch(
-			/Snapshot data URL: https:\/\/extension-js\.test\/fixture/,
-		);
 	});
-});

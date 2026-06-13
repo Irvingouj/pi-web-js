@@ -1,33 +1,28 @@
 /// <reference types="chrome" />
 import { z } from "zod";
-import { logger } from "../../../shared/logger.js";
-import * as schemas from "../../../shared/schemas.js";
-import {
-	dispatchTool,
-	registerJsCall,
-	type CallContext,
-	type ToolDocParam,
-} from "../../../shared/tool-registry.js";
 import { CONTENT_SCRIPT_TOOL_SPECS } from "../../../shared/registry/content-script-tools.js";
 import { defineContentScriptTool } from "../../../shared/registry/define-content-script-tool.js";
-import type { DomFormatParams, DomSnapshotParams, FetchParams } from "../runtime.js";
 import {
-	makeError,
-	throwAgentError,
-	asRecord,
-	extractTabId,
-	unwrapResult,
-	resolveActiveTabId,
-	waitForTabLoad,
-	pingTabContentScript,
-	preflightDomTab,
+	contentScriptMissingError,
+	noTabError,
+} from "../../../shared/registry/normalize-agent-error.js";
+import * as schemas from "../../../shared/schemas.js";
+import { dispatchTool, registerJsCall } from "../../../shared/tool-registry.js";
+import { NetworkTracker } from "../lib/network-tracker.js";
+import {
 	CONTENT_SCRIPT_GRACE_MS,
 	CS_FAST_PING_MS,
 	DEFAULT_TIMEOUT_MS,
+	extractTabId,
+	makeError,
 	NETWORK_IDLE_QUIET_MS,
+	pingTabContentScript,
+	preflightDomTab,
+	resolveActiveTabId,
+	throwAgentError,
+	unwrapResult,
+	waitForTabLoad,
 } from "../runtime.js";
-import { NetworkTracker } from "../lib/network-tracker.js";
-import { noTabError, contentScriptMissingError } from "../../../shared/registry/normalize-agent-error.js";
 
 async function requireActiveTab(action: string): Promise<number> {
 	const tabId = await resolveActiveTabId();
@@ -81,10 +76,11 @@ registerJsCall({
 	example: "page.title()",
 });
 
-for (const spec of CONTENT_SCRIPT_TOOL_SPECS.filter((s) => s.namespace === "page")) {
+for (const spec of CONTENT_SCRIPT_TOOL_SPECS.filter(
+	(s) => s.namespace === "page",
+)) {
 	defineContentScriptTool(spec);
 }
-
 
 registerJsCall({
 	action: "page_goto",
@@ -111,10 +107,7 @@ registerJsCall({
 				: undefined;
 		const chromeApi = window.chrome;
 		let navSawLoading = false;
-		const navListener = (
-			tabId: number,
-			changeInfo: { status?: string },
-		) => {
+		const navListener = (tabId: number, changeInfo: { status?: string }) => {
 			if (tabId !== activeTab) return;
 			if (changeInfo.status === "loading") {
 				navSawLoading = true;
@@ -172,10 +165,7 @@ registerJsCall({
 			const tracker = new NetworkTracker(activeTab);
 			try {
 				tracker.start();
-				const networkTimeout = Math.max(
-					NETWORK_IDLE_QUIET_MS * 2,
-					timeoutMs,
-				);
+				const networkTimeout = Math.max(NETWORK_IDLE_QUIET_MS * 2, timeoutMs);
 				await tracker.waitForIdle(networkTimeout);
 			} catch (idleErr) {
 				throw makeError(
@@ -208,7 +198,8 @@ registerJsCall({
 			name: "waitUntil",
 			type: '"load" | "networkidle"',
 			required: false,
-			description: "When to consider navigation complete. 'load' waits for tab status complete (default). 'networkidle' waits until no in-flight requests for 500ms.",
+			description:
+				"When to consider navigation complete. 'load' waits for tab status complete (default). 'networkidle' waits until no in-flight requests for 500ms.",
 		},
 	],
 	returnDoc: "Tab update result",
@@ -216,7 +207,6 @@ registerJsCall({
 	errorCategory: "navigation",
 	example: 'page.goto("https://example.com", { waitUntil: "networkidle" })',
 });
-
 
 registerJsCall({
 	action: "page_health",
@@ -234,12 +224,10 @@ registerJsCall({
 		const url = tab.url ?? "";
 		const title = tab.title ?? "";
 		const urlPreflight = await preflightDomTab(tabId);
-		const domApis =
-			urlPreflight && !urlPreflight.ok ? "blocked" : "ok";
+		const domApis = urlPreflight && !urlPreflight.ok ? "blocked" : "ok";
 		const pingResult = await pingTabContentScript(tabId, CS_FAST_PING_MS);
 		const contentScript = pingResult.ok ? "connected" : "missing";
-		const mutationsReady =
-			domApis === "ok" && contentScript === "connected";
+		const mutationsReady = domApis === "ok" && contentScript === "connected";
 		const health: z.infer<typeof schemas.PageHealthResultSchema> = {
 			tabId,
 			url,
@@ -264,7 +252,8 @@ registerJsCall({
 		return health;
 	},
 	paramTypes: [],
-	returnDoc: "Tab health: contentScript connection and http(s) domApis readiness",
+	returnDoc:
+		"Tab health: contentScript connection and http(s) domApis readiness",
 	errorCode: "E_NO_TAB",
 	example: "page.health()",
 });
@@ -279,9 +268,7 @@ registerJsCall({
 	owner: "main-thread",
 	handler: async (_params, _ctx) => {
 		const activeTab = await requireActiveTab("page.reload()");
-		return unwrapResult(
-			await dispatchTool("chrome_tabs_reload", [activeTab]),
-		);
+		return unwrapResult(await dispatchTool("chrome_tabs_reload", [activeTab]));
 	},
 	paramTypes: [],
 	returnDoc: "null",
@@ -316,18 +303,6 @@ registerJsCall({
 	errorCode: "E_UNKNOWN",
 	example: "page.wait(1000)",
 });
-
-
-
-
-
-
-
-
-
-
-
-
 
 registerJsCall({
 	action: "page_close",
@@ -373,7 +348,8 @@ registerJsCall({
 			name: "params",
 			type: "{ active?: boolean, currentWindow?: boolean, url?: string }",
 			required: false,
-			description: "Tab query filter (e.g. { active: true, currentWindow: true }) (literal)",
+			description:
+				"Tab query filter (e.g. { active: true, currentWindow: true }) (literal)",
 		},
 	],
 	returnDoc: "Tab array",
@@ -391,10 +367,7 @@ registerJsCall({
 	returns: schemas.ChromeTabSchema,
 	owner: "main-thread",
 	handler: async (params, _ctx) => {
-		const tabId =
-			typeof params === "number"
-				? params
-				: extractTabId(params);
+		const tabId = typeof params === "number" ? params : extractTabId(params);
 		if (tabId === null) {
 			throw makeError("page_switch requires a tabId", "E_MISSING_PARAM");
 		}
@@ -407,7 +380,8 @@ registerJsCall({
 			name: "tabId",
 			type: "number",
 			required: true,
-			description: "Tab ID to activate (can also be passed as a plain number or as { tabId: number }) (literal)",
+			description:
+				"Tab ID to activate (can also be passed as a plain number or as { tabId: number }) (literal)",
 		},
 	],
 	returnDoc: "Updated tab",
@@ -444,7 +418,7 @@ registerJsCall({
 	returnDoc: "Created tab",
 	errorCode: "ECHROME",
 	errorCategory: "extension",
-	example: "page.new_tab(\"https://example.com\")",
+	example: 'page.new_tab("https://example.com")',
 });
 
 registerJsCall({
@@ -460,11 +434,10 @@ registerJsCall({
 		const tab = unwrapResult(
 			await dispatchTool("chrome_tabs_get", [tabId]),
 		) as Record<string, unknown>;
-		return { ...tab, tabId: (typeof tab.id === "number" ? tab.id : tabId) };
+		return { ...tab, tabId: typeof tab.id === "number" ? tab.id : tabId };
 	},
 	paramTypes: [],
 	returnDoc: "Active tab object with tabId",
 	errorCode: "E_NO_TAB",
 	example: "page.active_tab()",
 });
-

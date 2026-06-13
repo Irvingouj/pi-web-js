@@ -9,7 +9,9 @@ import {
 describe("normalizeAgentError", () => {
 	it("maps Receiving end does not exist to E_CONTENT_SCRIPT with recovery", () => {
 		const err = normalizeAgentError(
-			new Error("Could not establish connection. Receiving end does not exist."),
+			new Error(
+				"Could not establish connection. Receiving end does not exist.",
+			),
 			{ tabId: 941354017, url: "https://www.google.com/" },
 		);
 		expect(err.code).toBe("E_CONTENT_SCRIPT");
@@ -22,9 +24,7 @@ describe("normalizeAgentError", () => {
 	});
 
 	it("maps connection errors without tabId to generic E_CONTENT_SCRIPT", () => {
-		const err = normalizeAgentError(
-			new Error("Receiving end does not exist."),
-		);
+		const err = normalizeAgentError(new Error("Receiving end does not exist."));
 		expect(err.code).toBe("E_CONTENT_SCRIPT");
 		expect(err.details).toBeUndefined();
 		expect(err.hint).toContain("Content script is not connected");
@@ -82,7 +82,8 @@ describe("normalizeAgentError", () => {
 
 	it("QuickJS ReferenceError includes message + line (T-016)", () => {
 		const refError = new ReferenceError("foo is not defined");
-		refError.stack = "ReferenceError: foo is not defined\n    at eval (cell.js:7:5)";
+		refError.stack =
+			"ReferenceError: foo is not defined\n    at eval (cell.js:7:5)";
 		const err = normalizeAgentError(refError);
 		expect(err.details?.name).toBe("ReferenceError");
 		expect(err.details?.line).toBe(7);

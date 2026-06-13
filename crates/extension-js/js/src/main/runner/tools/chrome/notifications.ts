@@ -24,9 +24,8 @@ registerChromePassthrough(
 			required: false,
 			description: "Notification options (literal)",
 		},
-	]
-,
-	"chrome.notifications.create(\"notificationId\", { type: \"basic\", title: \"Hello\", message: \"World\" })"
+	],
+	'chrome.notifications.create("notificationId", { type: "basic", title: "Hello", message: "World" })',
 );
 registerChromePassthrough(
 	"chrome_notifications_clear",
@@ -43,9 +42,8 @@ registerChromePassthrough(
 			required: false,
 			description: "Notification ID to clear (literal)",
 		},
-	]
-,
-	"chrome.notifications.clear(\"notificationId\")"
+	],
+	'chrome.notifications.clear("notificationId")',
 );
 registerChromePassthrough(
 	"chrome_notifications_getAll",
@@ -68,5 +66,5 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.notifications.update(\"notificationId\", { title: \"Updated\" })"
+	'chrome.notifications.update("notificationId", { title: "Updated" })',
 );

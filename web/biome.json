@@ -1,0 +1,56 @@
+{
+	"$schema": "https://biomejs.dev/schemas/2.4.16/schema.json",
+	"files": {
+		"includes": [
+			"**/*.ts",
+			"**/*.tsx",
+			"**/*.js",
+			"**/*.jsx",
+			"**/*.json",
+			"**/*.jsonc",
+			"!**/dist",
+			"!**/package",
+			"!**/playwright-report",
+			"!**/test-results",
+			"!**/node_modules",
+			"!dev-bridge",
+			"!public",
+			"!**/*.config.ts"
+		]
+	},
+	"linter": {
+		"rules": {
+			"suspicious": {
+				"noExplicitAny": "off",
+				"noTemplateCurlyInString": "off"
+			},
+			"style": {
+				"noNonNullAssertion": "off"
+			},
+			"correctness": {
+				"noUnusedFunctionParameters": "off"
+			}
+		}
+	},
+	"overrides": [
+		{
+			"includes": ["**/tests/**", "**/*.spec.ts", "**/*.spec.tsx", "**/e2e/**"],
+			"linter": {
+				"rules": {
+					"correctness": {
+						"noEmptyPattern": "off"
+					},
+					"suspicious": {
+						"noAssignInExpressions": "off"
+					},
+					"security": {
+						"noGlobalEval": "off"
+					},
+					"complexity": {
+						"noBannedTypes": "off"
+					}
+				}
+			}
+		}
+	]
+}

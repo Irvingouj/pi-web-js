@@ -1,9 +1,9 @@
-import { describe, expect, it } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { describe, expect, it } from "vitest";
 import {
-	getSerializableJsManifest,
 	freezeJsRegistry,
+	getSerializableJsManifest,
 	manifestEntryToWasm,
 } from "../src/shared/tool-registry.js";
 import "../src/main/runner/index.js";
@@ -22,11 +22,8 @@ describe("apiDocs real WASM pipeline", () => {
 		const manifest = getSerializableJsManifest();
 		freezeJsRegistry();
 
-		const {
-			ExtensionSession,
-			registerJsCallBatch,
-			freezeManifest,
-		} = await import("./_real_wasm.js");
+		const { ExtensionSession, registerJsCallBatch, freezeManifest } =
+			await import("./_real_wasm.js");
 
 		const batch = manifest.map((entry) => ({
 			entry: manifestEntryToWasm(entry),
@@ -43,7 +40,9 @@ describe("apiDocs real WASM pipeline", () => {
 		expect(markdown).toContain("refId");
 		expect(markdown).toContain("value");
 		expect(markdown).toContain("Prerequisites");
-		expect(markdown).toContain("Ensure the target tab is active and the content script is ready before mutating");
+		expect(markdown).toContain(
+			"Ensure the target tab is active and the content script is ready before mutating",
+		);
 		expect(markdown).toContain("Notes");
 		expect(markdown).toContain("Tags");
 		expect(markdown).toContain("mutation");

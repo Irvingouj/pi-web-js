@@ -1,0 +1,42 @@
+{
+	"$schema": "https://biomejs.dev/schemas/2.4.15/schema.json",
+	"files": {
+		"includes": [
+			"**/*.ts",
+			"**/*.tsx",
+			"**/*.js",
+			"**/*.jsx",
+			"**/*.json",
+			"**/*.jsonc",
+			"!**/dist",
+			"!**/pkg",
+			"!**/node_modules",
+			"!extension_js.js",
+			"!extension_js.d.ts",
+			"!src/worker/extension_js.js",
+			"!**/*.config.ts"
+		]
+	},
+	"linter": {
+		"rules": {
+			"style": {
+				"noNonNullAssertion": "off"
+			},
+			"suspicious": {
+				"noExplicitAny": "off"
+			}
+		}
+	},
+	"overrides": [
+		{
+			"includes": ["**/test/**", "**/*.test.ts", "**/*.spec.ts"],
+			"linter": {
+				"rules": {
+					"complexity": {
+						"useArrowFunction": "off"
+					}
+				}
+			}
+		}
+	]
+}

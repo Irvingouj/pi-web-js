@@ -80,19 +80,13 @@ export const UNDOCUMENTED_CONTRACT_PREFIXES = [
 	"host.",
 ] as const;
 
-export const UNDOCUMENTED_CONTRACT_APIS = new Set([
-	"chrome.runtime.id",
-]);
+export const UNDOCUMENTED_CONTRACT_APIS = new Set(["chrome.runtime.id"]);
 
-export function filterDocumentedContractApis(
-	publicNames: string[],
-): string[] {
+export function filterDocumentedContractApis(publicNames: string[]): string[] {
 	return publicNames.filter(
 		(name) =>
 			!UNDOCUMENTED_CONTRACT_APIS.has(name) &&
-			!UNDOCUMENTED_CONTRACT_PREFIXES.some((prefix) =>
-				name.startsWith(prefix),
-			),
+			!UNDOCUMENTED_CONTRACT_PREFIXES.some((prefix) => name.startsWith(prefix)),
 	);
 }
 

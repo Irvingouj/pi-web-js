@@ -1,11 +1,12 @@
 /// <reference types="chrome" />
+
+import { logger as logModule } from "../../shared/logger.js";
 import type { AsyncResponse, Command } from "../../shared/tool-registry.js";
 import { dispatchTool, getRunnerSignal } from "../../shared/tool-registry.js";
-import { logger as logModule } from "../../shared/logger.js";
-import { isValidMainThreadAction } from "./lib/host-registry.js";
 import { isNativeParityAction, normalizeParityArgs } from "./chrome/native.js";
-import { normalizeParams } from "./lib/params.js";
 import { handleHostCallAction } from "./host.js";
+import { isValidMainThreadAction } from "./lib/host-registry.js";
+import { normalizeParams } from "./lib/params.js";
 
 function parityParamsForDispatch(action: string, params: unknown): unknown {
 	if (!isNativeParityAction(action)) return params;
@@ -20,15 +21,56 @@ function unknownActionResponse(action: string): AsyncResponse {
 	};
 }
 
-export async function executeMainThreadCommand(command: Command, relaySignal?: AbortSignal): Promise<AsyncResponse> {
+function resolveSignal(relaySignal?: AbortSignal): AbortSignal {
 	const signal = relaySignal ?? getRunnerSignal();
-	if (signal?.aborted) throw new Error("Runner aborted: ExtensionSession stopped");
-	const logger = logModule.child("runner");
-	const finish = logger.timer("command_dispatch", { action: command.action, commandId: command.call_id, runId: command.runId });
-	if (!isValidMainThreadAction(command.action)) { finish({ ok: false }); return unknownActionResponse(command.action); }
-	if (command.action.startsWith("host_")) { const r = await handleHostCallAction(command.action.slice(5), command.params); finish({ ok: r.ok, handler: "host" }); return r; }
-	const params = isNativeParityAction(command.action) ? parityParamsForDispatch(command.action, command.params) : normalizeParams(command.action, command.params);
-	const r = await dispatchTool(command.action, params, command.call_id, command.runId, signal);
-	finish({ ok: r.ok });
-	return r;
+	if (signal?.aborted)
+		throw new Error("Runner aborted: ExtensionSession stopped");
+	return signal ?? new AbortController().signal;
+}
+
+async function dispatchCommand(
+	command: Command,
+	signal: AbortSignal,
+): Promise<{ response: AsyncResponse; handler?: string }> {
+	if (!isValidMainThreadAction(command.action))
+		return { response: unknownActionResponse(command.action) };
+	if (command.action.startsWith("host_")) {
+		const r = await handleHostCallAction(
+			command.action.slice(5),
+			command.params,
+		);
+		return { response: r, handler: "host" };
+	}
+	const params = isNativeParityAction(command.action)
+		? parityParamsForDispatch(command.action, command.params)
+		: normalizeParams(command.action, command.params);
+	const r = await dispatchTool(
+		command.action,
+		params,
+		command.call_id,
+		command.runId,
+		signal,
+	);
+	return { response: r };
+}
+
+function startCommandTimer(command: Command) {
+	return logModule.child("runner").timer("command_dispatch", {
+		action: command.action,
+		commandId: command.call_id,
+		runId: command.runId,
+	});
+}
+
+export async function executeMainThreadCommand(
+	command: Command,
+	relaySignal?: AbortSignal,
+): Promise<AsyncResponse> {
+	const finish = startCommandTimer(command);
+	const { response, handler } = await dispatchCommand(
+		command,
+		resolveSignal(relaySignal),
+	);
+	finish({ ok: response.ok, ...(handler ? { handler } : {}) });
+	return response;
 }

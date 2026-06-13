@@ -8,10 +8,7 @@ const onActivatedListener = ({ tabId }: { tabId: number }) => {
 	activeTabId = tabId;
 };
 
-const onUpdatedListener = (
-	tabId: number,
-	changeInfo: { status?: string },
-) => {
+const onUpdatedListener = (tabId: number, changeInfo: { status?: string }) => {
 	const chromeApi = window.chrome;
 	if (!chromeApi?.runtime?.id) return;
 	if (changeInfo.status === "complete") {

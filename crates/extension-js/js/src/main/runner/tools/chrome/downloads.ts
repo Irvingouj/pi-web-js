@@ -1,5 +1,3 @@
-/// <reference types="chrome" />
-import { z } from "zod";
 import * as schemas from "../../../../shared/schemas.js";
 import { registerChromePassthrough } from "../../chrome/internals.js";
 import { zChromeVoid } from "./register-helpers.js";
@@ -13,7 +11,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.downloads.download({ url: \"https://example.com/file.zip\" })"
+	'chrome.downloads.download({ url: "https://example.com/file.zip" })',
 );
 registerChromePassthrough(
 	"chrome_downloads_search",
@@ -24,7 +22,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.downloads.search({})"
+	"chrome.downloads.search({})",
 );
 registerChromePassthrough(
 	"chrome_downloads_erase",
@@ -35,7 +33,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.downloads.erase({ ids: [1] })"
+	"chrome.downloads.erase({ ids: [1] })",
 );
 registerChromePassthrough(
 	"chrome_downloads_pause",
@@ -46,7 +44,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.downloads.pause(1)"
+	"chrome.downloads.pause(1)",
 );
 registerChromePassthrough(
 	"chrome_downloads_resume",
@@ -57,7 +55,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.downloads.resume(1)"
+	"chrome.downloads.resume(1)",
 );
 registerChromePassthrough(
 	"chrome_downloads_cancel",
@@ -68,7 +66,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.downloads.cancel(1)"
+	"chrome.downloads.cancel(1)",
 );
 registerChromePassthrough(
 	"chrome_downloads_open",
@@ -79,7 +77,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.downloads.open(1)"
+	"chrome.downloads.open(1)",
 );
 registerChromePassthrough(
 	"chrome_downloads_show",
@@ -90,7 +88,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.downloads.show(1)"
+	"chrome.downloads.show(1)",
 );
 registerChromePassthrough(
 	"chrome_downloads_removeFile",
@@ -101,5 +99,5 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.downloads.removeFile(1)"
+	"chrome.downloads.removeFile(1)",
 );

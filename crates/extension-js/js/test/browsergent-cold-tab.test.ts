@@ -5,20 +5,20 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ExtensionSession } from "../src/main/index.js";
-import { setActiveTabId } from "../src/main/tab-context.js";
 import { setRunnerAbortController } from "../src/main/runner/index.js";
 import { executeMainThreadCommand } from "../src/main/runner/runtime.js";
 import {
 	initCapabilities,
 	resetCapabilities,
 } from "../src/main/runner/tools/chrome/capability.js";
+import { setActiveTabId } from "../src/main/tab-context.js";
 import "../src/main/runner/index.js";
+import { handlers } from "../src/content-script/handlers.js";
 import {
 	dispatchContentScriptCall,
 	registerContentScriptSpec,
 } from "../src/content-script/registry.js";
 import { buildContentScriptSpecs } from "../src/content-script/schemas.js";
-import { handlers } from "../src/content-script/handlers.js";
 import { inlineSnapshot } from "../src/content-script/snapshot.js";
 
 interface MockWorker {
@@ -76,13 +76,17 @@ function buildChromeMock(
 			query: vi.fn(() => Promise.resolve([{ id: 1, url: GOOGLE_URL }])),
 			onActivated: { addListener: vi.fn(), removeListener: vi.fn() },
 			onUpdated: {
-				addListener: vi.fn((fn: (tabId: number, changeInfo: { status?: string }) => void) => {
-					onUpdatedListeners.push(fn);
-				}),
-				removeListener: vi.fn((fn: (tabId: number, changeInfo: { status?: string }) => void) => {
-					const idx = onUpdatedListeners.indexOf(fn);
-					if (idx !== -1) onUpdatedListeners.splice(idx, 1);
-				}),
+				addListener: vi.fn(
+					(fn: (tabId: number, changeInfo: { status?: string }) => void) => {
+						onUpdatedListeners.push(fn);
+					},
+				),
+				removeListener: vi.fn(
+					(fn: (tabId: number, changeInfo: { status?: string }) => void) => {
+						const idx = onUpdatedListeners.indexOf(fn);
+						if (idx !== -1) onUpdatedListeners.splice(idx, 1);
+					},
+				),
 			},
 		},
 		scripting: {
@@ -131,26 +135,20 @@ describe("browsergent cold tab acceptance", () => {
 		setActiveTabId(1);
 		resetCapabilities();
 
-		vi.stubGlobal(
-			"Worker",
-			function () {
-				const instance: MockWorker = {
-					postMessage: vi.fn((msg: unknown) => {
-						postMessages.push(msg);
-					}),
-					terminate: vi.fn(),
-					onmessage: null,
-				};
-				workerInstances.push(instance);
-				return instance;
-			} as unknown as typeof Worker,
-		);
-		vi.stubGlobal(
-			"URL",
-			function () {
-				return { toString: () => "mock-worker-url" };
-			} as unknown as typeof URL,
-		);
+		vi.stubGlobal("Worker", function () {
+			const instance: MockWorker = {
+				postMessage: vi.fn((msg: unknown) => {
+					postMessages.push(msg);
+				}),
+				terminate: vi.fn(),
+				onmessage: null,
+			};
+			workerInstances.push(instance);
+			return instance;
+		} as unknown as typeof Worker);
+		vi.stubGlobal("URL", function () {
+			return { toString: () => "mock-worker-url" };
+		} as unknown as typeof URL);
 
 		for (const spec of buildContentScriptSpecs()) {
 			registerContentScriptSpec(spec);
@@ -200,54 +198,56 @@ describe("browsergent cold tab acceptance", () => {
 	it("pre-opened tab: snapshot and fill fail without CS, then succeed after CS connects", async () => {
 		let csConnected = false;
 		let snapshotInputValue: string | undefined;
-		const sendMessage = vi.fn(async (_tabId: number, msg: Record<string, unknown>) => {
-			if (msg.action === "ping") {
-				if (!csConnected) {
-					throw new Error("Receiving end does not exist.");
+		const sendMessage = vi.fn(
+			async (_tabId: number, msg: Record<string, unknown>) => {
+				if (msg.action === "ping") {
+					if (!csConnected) {
+						throw new Error("Receiving end does not exist.");
+					}
+					return { ok: true };
 				}
-				return { ok: true };
-			}
-			if (
-				msg.type === "registryCall" &&
-				msg.action === "page_snapshot_data"
-			) {
-				if (!csConnected) {
-					throw new Error("Receiving end does not exist.");
-				}
-				const fillValue = snapshotInputValue;
-				const node: Record<string, unknown> = {
-					refId: "e6",
-					role: "textbox",
-					tag: "input",
-					name: "Search",
-				};
-				if (fillValue !== undefined) {
-					node.value = fillValue;
-				}
-				return {
-					ok: true,
-					value: {
-						text: "URL: https://www.google.com/\nTitle: Google\n\n- textbox [e6]",
-						nodes: [node],
-						url: GOOGLE_URL,
-						title: "Google",
-						viewport: { width: 800, height: 600 },
-					},
-				};
-			}
-			if (msg.type === "registryCall" && msg.action === "page_fill") {
-				return {
-					ok: true,
-					value: {
-						ok: true,
-						action: "fill",
+				if (
+					msg.type === "registryCall" &&
+					msg.action === "page_snapshot_data"
+				) {
+					if (!csConnected) {
+						throw new Error("Receiving end does not exist.");
+					}
+					const fillValue = snapshotInputValue;
+					const node: Record<string, unknown> = {
 						refId: "e6",
-						value: "test search",
-					},
-				};
-			}
-			throw new Error("Receiving end does not exist.");
-		});
+						role: "textbox",
+						tag: "input",
+						name: "Search",
+					};
+					if (fillValue !== undefined) {
+						node.value = fillValue;
+					}
+					return {
+						ok: true,
+						value: {
+							text: "URL: https://www.google.com/\nTitle: Google\n\n- textbox [e6]",
+							nodes: [node],
+							url: GOOGLE_URL,
+							title: "Google",
+							viewport: { width: 800, height: 600 },
+						},
+					};
+				}
+				if (msg.type === "registryCall" && msg.action === "page_fill") {
+					return {
+						ok: true,
+						value: {
+							ok: true,
+							action: "fill",
+							refId: "e6",
+							value: "test search",
+						},
+					};
+				}
+				throw new Error("Receiving end does not exist.");
+			},
+		);
 
 		vi.stubGlobal(
 			"chrome",
@@ -317,7 +317,8 @@ describe("browsergent cold tab acceptance", () => {
 				]),
 			}),
 		});
-		const coldErr = (coldFill?.result as { error?: { message?: string } }).error;
+		const coldErr = (coldFill?.result as { error?: { message?: string } })
+			.error;
 		expect(coldErr?.message).not.toContain("Receiving end does not exist");
 
 		csConnected = true;
@@ -355,8 +356,9 @@ describe("browsergent cold tab acceptance", () => {
 				(m as PostMessage).id === "warm-snap",
 		);
 		expect(snapAfterFill?.result).toMatchObject({ ok: true });
-		const snapValue = (snapAfterFill?.result as { value?: { nodes?: Array<{ value?: string }> } })
-			?.value;
+		const snapValue = (
+			snapAfterFill?.result as { value?: { nodes?: Array<{ value?: string }> } }
+		)?.value;
 		const inputNode = snapValue?.nodes?.find((n) => n.value === "test search");
 		expect(inputNode?.value).toBe("test search");
 
@@ -383,26 +385,28 @@ describe("browsergent cold tab acceptance", () => {
 
 	it("page.goto(currentUrl) reconnects content script so fill succeeds", async () => {
 		let csConnected = false;
-		const sendMessage = vi.fn(async (_tabId: number, msg: Record<string, unknown>) => {
-			if (msg.action === "ping") {
-				if (!csConnected) {
-					throw new Error("Receiving end does not exist.");
+		const sendMessage = vi.fn(
+			async (_tabId: number, msg: Record<string, unknown>) => {
+				if (msg.action === "ping") {
+					if (!csConnected) {
+						throw new Error("Receiving end does not exist.");
+					}
+					return { ok: true };
 				}
-				return { ok: true };
-			}
-			if (msg.type === "registryCall" && msg.action === "page_fill") {
-				return {
-					ok: true,
-					value: {
+				if (msg.type === "registryCall" && msg.action === "page_fill") {
+					return {
 						ok: true,
-						action: "fill",
-						refId: "e6",
-						value: "test search",
-					},
-				};
-			}
-			throw new Error("Receiving end does not exist.");
-		});
+						value: {
+							ok: true,
+							action: "fill",
+							refId: "e6",
+							value: "test search",
+						},
+					};
+				}
+				throw new Error("Receiving end does not exist.");
+			},
+		);
 
 		vi.stubGlobal(
 			"chrome",
@@ -468,26 +472,28 @@ describe("browsergent cold tab acceptance", () => {
 
 	it("page.health() returns accurate state on cold tab and after recovery", async () => {
 		let csConnected = false;
-		const sendMessage = vi.fn(async (_tabId: number, msg: Record<string, unknown>) => {
-			if (msg.action === "ping") {
-				if (!csConnected) {
-					throw new Error("Receiving end does not exist.");
+		const sendMessage = vi.fn(
+			async (_tabId: number, msg: Record<string, unknown>) => {
+				if (msg.action === "ping") {
+					if (!csConnected) {
+						throw new Error("Receiving end does not exist.");
+					}
+					return { ok: true };
 				}
-				return { ok: true };
-			}
-			if (msg.type === "registryCall" && msg.action === "page_fill") {
-				return {
-					ok: true,
-					value: {
+				if (msg.type === "registryCall" && msg.action === "page_fill") {
+					return {
 						ok: true,
-						action: "fill",
-						refId: "e6",
-						value: "test search",
-					},
-				};
-			}
-			throw new Error("Receiving end does not exist.");
-		});
+						value: {
+							ok: true,
+							action: "fill",
+							refId: "e6",
+							value: "test search",
+						},
+					};
+				}
+				throw new Error("Receiving end does not exist.");
+			},
+		);
 
 		vi.stubGlobal(
 			"chrome",
@@ -548,7 +554,8 @@ describe("browsergent cold tab acceptance", () => {
 				]),
 			}),
 		});
-		const coldErr = (coldFill?.result as { error?: { message?: string } }).error;
+		const coldErr = (coldFill?.result as { error?: { message?: string } })
+			.error;
 		expect(coldErr?.message).not.toContain("Receiving end does not exist");
 
 		// Recovery via page.goto(currentUrl)

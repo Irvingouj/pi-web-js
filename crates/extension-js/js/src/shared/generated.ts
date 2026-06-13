@@ -6,7 +6,12 @@ export type TreeSnapshot = {
 	version: string;
 	url: string | null;
 	title: string | null;
-	viewport: { width: number; height: number; scrollX: number; scrollY: number } | null;
+	viewport: {
+		width: number;
+		height: number;
+		scrollX: number;
+		scrollY: number;
+	} | null;
 	nodes: SemanticNode[];
 	outline?: OutlineNode[];
 };
@@ -99,7 +104,12 @@ export type AsyncCommand = {
 };
 
 export type CellError =
-	| { kind: "compile"; name: string | null; message: string; line: number | null }
+	| {
+			kind: "compile";
+			name: string | null;
+			message: string;
+			line: number | null;
+	  }
 	| {
 			kind: "runtime";
 			name: string | null;
@@ -181,7 +191,11 @@ export type PageSetFilesParams = {
 
 export type PageFindParams = { selector: string };
 
-export type PageGotoParams = { url: string; timeout?: bigint; waitUntil?: "load" | "networkidle" };
+export type PageGotoParams = {
+	url: string;
+	timeout?: bigint;
+	waitUntil?: "load" | "networkidle";
+};
 
 export type SnapshotFilter = {
 	role?: string | string[];

@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { clearRoutes } from "../src/shared/registry/routes.js";
+import { FsWriteParamsSchema } from "../src/shared/schemas.js";
 import {
 	extensionDispatch,
 	registerWorkerHandler,
 } from "../src/worker/worker.js";
-import { clearRoutes } from "../src/shared/registry/routes.js";
-import { FsWriteParamsSchema } from "../src/shared/schemas.js";
 
 describe("fs.writeBase64 (T-011)", () => {
 	beforeEach(() => {
@@ -50,24 +50,34 @@ describe("fs.writeBase64 (T-011)", () => {
 		const parseResult = FsWriteParamsSchema.safeParse({ data: "base64data" });
 		expect(parseResult.success).toBe(false);
 		if (!parseResult.success) {
-			expect(parseResult.error.issues.some((i) => i.path.includes("path"))).toBe(true);
+			expect(
+				parseResult.error.issues.some((i) => i.path.includes("path")),
+			).toBe(true);
 		}
 	});
 
 	it("rejects missing data with E_INVALID_PARAMS", async () => {
-		const parseResult = FsWriteParamsSchema.safeParse({ path: "/tmp/photo.jpg" });
+		const parseResult = FsWriteParamsSchema.safeParse({
+			path: "/tmp/photo.jpg",
+		});
 		expect(parseResult.success).toBe(false);
 		if (!parseResult.success) {
-			expect(parseResult.error.issues.some((i) => i.path.includes("data"))).toBe(true);
+			expect(
+				parseResult.error.issues.some((i) => i.path.includes("data")),
+			).toBe(true);
 		}
 	});
 
 	it("returns E_INVALID_ENCODING for invalid base64 data", async () => {
 		registerWorkerHandler("fs_write_base64", (p) => {
 			const params = p as { path: string; data: string };
-			const isValid = /^[A-Za-z0-9+/]*={0,2}$/.test(params.data) && params.data.length % 4 === 0;
+			const isValid =
+				/^[A-Za-z0-9+/]*={0,2}$/.test(params.data) &&
+				params.data.length % 4 === 0;
 			if (!isValid) {
-				const err = new Error("Invalid base64 encoding") as Error & { code: string };
+				const err = new Error("Invalid base64 encoding") as Error & {
+					code: string;
+				};
 				err.code = "E_INVALID_ENCODING";
 				throw err;
 			}

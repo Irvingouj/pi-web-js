@@ -1,6 +1,9 @@
 export type TabPolicy = "active" | "required" | "optional";
 
-export type RouteEndpoint = "main-thread" | "content-script" | `worker:${string}`;
+export type RouteEndpoint =
+	| "main-thread"
+	| "content-script"
+	| `worker:${string}`;
 
 export type Route = {
 	endpoint: RouteEndpoint;

@@ -1,37 +1,6 @@
-/// <reference types="chrome" />
-import { z } from "zod";
-import { logger } from "../../../shared/logger.js";
 import * as schemas from "../../../shared/schemas.js";
-import {
-	dispatchTool,
-	registerJsCall,
-	type CallContext,
-	type ToolDocParam,
-} from "../../../shared/tool-registry.js";
-import type { DomFormatParams, DomSnapshotParams, FetchParams } from "../runtime.js";
-import {
-	makeError,
-	asRecord,
-	extractTabId,
-	unwrapResult,
-	getActiveTabId,
-	resolveActiveTabId,
-	waitForTabLoad,
-	handleFetch,
-	handleHostCallAction,
-	registerChromePassthrough,
-	getElementByRefId,
-	extractRefId,
-	handleDomSnapshot,
-	handleDomFormat,
-	ensureDomSnapshot,
-	buildSnapshotInTab,
-	throwIfAborted,
-	DEFAULT_TIMEOUT_MS,
-	DEFAULT_MAX_NODES,
-	DEFAULT_SCROLL_AMOUNT,
-	DEFAULT_POLL_INTERVAL_MS,
-} from "../runtime.js";
+import { registerJsCall } from "../../../shared/tool-registry.js";
+import { asRecord, handleHostCallAction, unwrapResult } from "../runtime.js";
 
 // ─── Host call ───────────────────────────────────────────────────
 
@@ -68,5 +37,5 @@ registerJsCall({
 	errorCode: "ENOHANDLER",
 	errorCategory: "host",
 
-	example: "host.call([\"title\", \"url\"])",
+	example: 'host.call(["title", "url"])',
 });

@@ -1,5 +1,3 @@
-/// <reference types="chrome" />
-import { z } from "zod";
 import * as schemas from "../../../../shared/schemas.js";
 import { registerChromePassthrough } from "../../chrome/internals.js";
 
@@ -12,7 +10,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.system.cpu.getInfo()"
+	"chrome.system.cpu.getInfo()",
 );
 registerChromePassthrough(
 	"chrome_system_memory_getInfo",
@@ -23,7 +21,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.system.memory.getInfo()"
+	"chrome.system.memory.getInfo()",
 );
 registerChromePassthrough(
 	"chrome_system_storage_getInfo",
@@ -34,5 +32,5 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.system.storage.getInfo()"
+	"chrome.system.storage.getInfo()",
 );

@@ -1,6 +1,6 @@
 import { z } from "zod";
-import type { JsCallSpec } from "./manifest.js";
 import * as schemas from "../schemas.js";
+import type { JsCallSpec } from "./manifest.js";
 
 const AWAIT_PROMISE_NOTE =
 	"Returns a Promise; await before reading the result. For a cell's last line, use `page.snapshot()` without a leading await so the cell returns the settled value.";
@@ -58,7 +58,9 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		errorCode: "E_MISSING_PARAM",
 		example: 'page.click({ refId: "e2" })',
 		agentMeta: {
-			prerequisites: ["Ensure the target tab is active and the content script is ready before mutating"],
+			prerequisites: [
+				"Ensure the target tab is active and the content script is ready before mutating",
+			],
 			notes: [
 				AWAIT_PROMISE_NOTE,
 				"Same content-script path as web.tab.*",
@@ -100,7 +102,9 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		errorCode: "E_MISSING_PARAM",
 		example: 'page.fill({ refId: "e2", value: "hello" })',
 		agentMeta: {
-			prerequisites: ["Ensure the target tab is active and the content script is ready before mutating"],
+			prerequisites: [
+				"Ensure the target tab is active and the content script is ready before mutating",
+			],
 			notes: [
 				AWAIT_PROMISE_NOTE,
 				"Same content-script path as web.tab.*",
@@ -135,15 +139,19 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 				name: "files",
 				type: "{ name?: string, url?: string, path?: string, handle?: string, mimeType?: string }[]",
 				required: true,
-				description: "Each entry uses exactly one of url, path (vfs), or handle (from page.fetch store:true)",
+				description:
+					"Each entry uses exactly one of url, path (vfs), or handle (from page.fetch store:true)",
 			},
 		],
-		returnDoc: "{ ok: true, action: 'setFiles', refId?, fileCount?, fileNames? }",
+		returnDoc:
+			"{ ok: true, action: 'setFiles', refId?, fileCount?, fileNames? }",
 		errorCode: "E_MISSING_PARAM",
 		example:
 			'page.setFiles({ refId: "e3", files: [{ url: "https://example.com/photo.jpg", name: "photo.jpg" }] })',
 		agentMeta: {
-			prerequisites: ["Ensure the target tab is active and the content script is ready before mutating"],
+			prerequisites: [
+				"Ensure the target tab is active and the content script is ready before mutating",
+			],
 			notes: [
 				AWAIT_PROMISE_NOTE,
 				"Target must be input[type=file]; prefer url, vfs path, or fetch handle — bytes are not passed through QuickJS",
@@ -187,7 +195,9 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		errorCode: "E_MISSING_PARAM",
 		example: 'page.type({ refId: "e2", text: "hello" })',
 		agentMeta: {
-			prerequisites: ["Ensure the target tab is active and the content script is ready before mutating"],
+			prerequisites: [
+				"Ensure the target tab is active and the content script is ready before mutating",
+			],
 			notes: [
 				AWAIT_PROMISE_NOTE,
 				"Same content-script path as web.tab.*",
@@ -229,7 +239,9 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		errorCode: "E_MISSING_PARAM",
 		example: 'page.append({ refId: "e2", text: " world" })',
 		agentMeta: {
-			prerequisites: ["Ensure the target tab is active and the content script is ready before mutating"],
+			prerequisites: [
+				"Ensure the target tab is active and the content script is ready before mutating",
+			],
 			notes: [
 				"Same content-script path as web.tab.*",
 				"Always operates on the active tab; use web.tab.* if you need to target a specific tabId",
@@ -258,7 +270,9 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		errorCode: "E_NO_TAB",
 		example: 'page.press("Enter")',
 		agentMeta: {
-			prerequisites: ["Ensure the target tab is active and the content script is ready before mutating"],
+			prerequisites: [
+				"Ensure the target tab is active and the content script is ready before mutating",
+			],
 			notes: [
 				"Same content-script path as web.tab.*",
 				"Always operates on the active tab; use web.tab.* if you need to target a specific tabId",
@@ -299,7 +313,9 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		errorCode: "E_MISSING_PARAM",
 		example: 'page.select({ refId: "e2", value: "option1" })',
 		agentMeta: {
-			prerequisites: ["Ensure the target tab is active and the content script is ready before mutating"],
+			prerequisites: [
+				"Ensure the target tab is active and the content script is ready before mutating",
+			],
 			notes: [
 				"Same content-script path as web.tab.*",
 				"Always operates on the active tab; use web.tab.* if you need to target a specific tabId",
@@ -340,7 +356,9 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		errorCode: "E_MISSING_PARAM",
 		example: 'page.check({ refId: "e2", checked: true })',
 		agentMeta: {
-			prerequisites: ["Ensure the target tab is active and the content script is ready before mutating"],
+			prerequisites: [
+				"Ensure the target tab is active and the content script is ready before mutating",
+			],
 			notes: [
 				"Same content-script path as web.tab.*",
 				"Always operates on the active tab; use web.tab.* if you need to target a specific tabId",
@@ -375,7 +393,9 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		errorCode: "E_MISSING_PARAM",
 		example: 'page.hover({ refId: "e2" })',
 		agentMeta: {
-			prerequisites: ["Ensure the target tab is active and the content script is ready before mutating"],
+			prerequisites: [
+				"Ensure the target tab is active and the content script is ready before mutating",
+			],
 			notes: [
 				"Same content-script path as web.tab.*",
 				"Always operates on the active tab; use web.tab.* if you need to target a specific tabId",
@@ -397,7 +417,9 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		errorCode: "E_NO_TAB",
 		example: "page.unhover()",
 		agentMeta: {
-			prerequisites: ["Ensure the target tab is active and the content script is ready before mutating"],
+			prerequisites: [
+				"Ensure the target tab is active and the content script is ready before mutating",
+			],
 			notes: [
 				"Same content-script path as web.tab.*",
 				"Always operates on the active tab; use web.tab.* if you need to target a specific tabId",
@@ -485,7 +507,9 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		errorCode: "E_MISSING_PARAM",
 		example: 'page.dblclick({ refId: "e2" })',
 		agentMeta: {
-			prerequisites: ["Ensure the target tab is active and the content script is ready before mutating"],
+			prerequisites: [
+				"Ensure the target tab is active and the content script is ready before mutating",
+			],
 			notes: [
 				"Same content-script path as web.tab.*",
 				"Always operates on the active tab; use web.tab.* if you need to target a specific tabId",
@@ -503,7 +527,12 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		params: schemas.TabClickParamsSchema,
 		returns: schemas.PageActionResultSchema,
 		paramTypes: [
-			{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
+			{
+				name: "tabId",
+				type: "number",
+				required: true,
+				description: "Tab ID (literal)",
+			},
 			{
 				name: "refId",
 				type: "string",
@@ -521,7 +550,9 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		errorCode: "E_NO_TAB",
 		example: 'web.tab.click({ tabId: 123, refId: "e2" })',
 		agentMeta: {
-			prerequisites: ["Ensure the target tab exists and the content script is ready before mutating"],
+			prerequisites: [
+				"Ensure the target tab exists and the content script is ready before mutating",
+			],
 			notes: ["Explicit tabId required; same handlers as page.*"],
 			tags: ["mutation", "write"],
 			relatedApis: ["page.click"],
@@ -536,7 +567,12 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		params: schemas.TabFillParamsSchema,
 		returns: schemas.PageActionResultSchema,
 		paramTypes: [
-			{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
+			{
+				name: "tabId",
+				type: "number",
+				required: true,
+				description: "Tab ID (literal)",
+			},
 			{
 				name: "refId",
 				type: "string",
@@ -560,7 +596,9 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		errorCode: "E_NO_TAB",
 		example: 'web.tab.fill({ tabId: 123, refId: "e2", value: "hello" })',
 		agentMeta: {
-			prerequisites: ["Ensure the target tab exists and the content script is ready before mutating"],
+			prerequisites: [
+				"Ensure the target tab exists and the content script is ready before mutating",
+			],
 			notes: ["Explicit tabId required; same handlers as page.*"],
 			tags: ["mutation", "write"],
 			relatedApis: ["page.fill"],
@@ -575,7 +613,12 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		params: schemas.TabSetFilesParamsSchema,
 		returns: schemas.PageActionResultSchema,
 		paramTypes: [
-			{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
+			{
+				name: "tabId",
+				type: "number",
+				required: true,
+				description: "Tab ID (literal)",
+			},
 			{
 				name: "refId",
 				type: "string",
@@ -592,15 +635,19 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 				name: "files",
 				type: "{ name?: string, url?: string, path?: string, handle?: string, mimeType?: string }[]",
 				required: true,
-				description: "Each entry uses exactly one of url, path (vfs), or handle",
+				description:
+					"Each entry uses exactly one of url, path (vfs), or handle",
 			},
 		],
-		returnDoc: "{ ok: true, action: 'setFiles', refId?, fileCount?, fileNames? }",
+		returnDoc:
+			"{ ok: true, action: 'setFiles', refId?, fileCount?, fileNames? }",
 		errorCode: "E_NO_TAB",
 		example:
 			'web.tab.setFiles({ tabId: 123, refId: "e3", files: [{ url: "https://example.com/photo.jpg" }] })',
 		agentMeta: {
-			prerequisites: ["Ensure the target tab exists and the content script is ready before mutating"],
+			prerequisites: [
+				"Ensure the target tab exists and the content script is ready before mutating",
+			],
 			notes: ["Explicit tabId required; same handlers as page.*"],
 			tags: ["mutation", "write"],
 			relatedApis: ["page.setFiles"],
@@ -615,9 +662,24 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		params: schemas.TabScrollToParamsSchema,
 		returns: schemas.PageActionResultSchema,
 		paramTypes: [
-			{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
-			{ name: "x", type: "number", required: false, description: "X coordinate (literal)" },
-			{ name: "y", type: "number", required: false, description: "Y coordinate (literal)" },
+			{
+				name: "tabId",
+				type: "number",
+				required: true,
+				description: "Tab ID (literal)",
+			},
+			{
+				name: "x",
+				type: "number",
+				required: false,
+				description: "X coordinate (literal)",
+			},
+			{
+				name: "y",
+				type: "number",
+				required: false,
+				description: "Y coordinate (literal)",
+			},
 			{
 				name: "refId",
 				type: "string",
@@ -644,7 +706,12 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		params: schemas.TabTypeParamsSchema,
 		returns: schemas.PageActionResultSchema,
 		paramTypes: [
-			{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
+			{
+				name: "tabId",
+				type: "number",
+				required: true,
+				description: "Tab ID (literal)",
+			},
 			{
 				name: "refId",
 				type: "string",
@@ -668,7 +735,9 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		errorCode: "E_NO_TAB",
 		example: 'web.tab.type({ tabId: 123, refId: "e2", text: "hello" })',
 		agentMeta: {
-			prerequisites: ["Ensure the target tab exists and the content script is ready before mutating"],
+			prerequisites: [
+				"Ensure the target tab exists and the content script is ready before mutating",
+			],
 			notes: ["Explicit tabId required; same handlers as page.*"],
 			tags: ["mutation", "write"],
 			relatedApis: ["page.type"],
@@ -683,7 +752,12 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		params: schemas.TabPressParamsSchema,
 		returns: schemas.PageActionResultSchema,
 		paramTypes: [
-			{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
+			{
+				name: "tabId",
+				type: "number",
+				required: true,
+				description: "Tab ID (literal)",
+			},
 			{
 				name: "key",
 				type: "string",
@@ -695,7 +769,9 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		errorCode: "E_NO_TAB",
 		example: 'web.tab.press({ tabId: 123, key: "Enter" })',
 		agentMeta: {
-			prerequisites: ["Ensure the target tab exists and the content script is ready before mutating"],
+			prerequisites: [
+				"Ensure the target tab exists and the content script is ready before mutating",
+			],
 			notes: ["Explicit tabId required; same handlers as page.*"],
 			tags: ["mutation", "write"],
 			relatedApis: ["page.press"],
@@ -710,7 +786,12 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		params: schemas.TabSelectParamsSchema,
 		returns: schemas.PageActionResultSchema,
 		paramTypes: [
-			{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
+			{
+				name: "tabId",
+				type: "number",
+				required: true,
+				description: "Tab ID (literal)",
+			},
 			{
 				name: "refId",
 				type: "string",
@@ -734,7 +815,9 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		errorCode: "E_NO_TAB",
 		example: 'web.tab.select({ tabId: 123, refId: "e2", value: "option1" })',
 		agentMeta: {
-			prerequisites: ["Ensure the target tab exists and the content script is ready before mutating"],
+			prerequisites: [
+				"Ensure the target tab exists and the content script is ready before mutating",
+			],
 			notes: ["Explicit tabId required; same handlers as page.*"],
 			tags: ["mutation", "write"],
 			relatedApis: ["page.select"],
@@ -749,7 +832,12 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		params: schemas.TabCheckParamsSchema,
 		returns: schemas.PageActionResultSchema,
 		paramTypes: [
-			{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
+			{
+				name: "tabId",
+				type: "number",
+				required: true,
+				description: "Tab ID (literal)",
+			},
 			{
 				name: "refId",
 				type: "string",
@@ -773,7 +861,9 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		errorCode: "E_NO_TAB",
 		example: 'web.tab.check({ tabId: 123, refId: "e2", checked: true })',
 		agentMeta: {
-			prerequisites: ["Ensure the target tab exists and the content script is ready before mutating"],
+			prerequisites: [
+				"Ensure the target tab exists and the content script is ready before mutating",
+			],
 			notes: ["Explicit tabId required; same handlers as page.*"],
 			tags: ["mutation", "write"],
 			relatedApis: ["page.check"],
@@ -788,7 +878,12 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		params: schemas.TabHoverParamsSchema,
 		returns: schemas.PageActionResultSchema,
 		paramTypes: [
-			{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
+			{
+				name: "tabId",
+				type: "number",
+				required: true,
+				description: "Tab ID (literal)",
+			},
 			{
 				name: "refId",
 				type: "string",
@@ -806,7 +901,9 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		errorCode: "E_NO_TAB",
 		example: 'web.tab.hover({ tabId: 123, refId: "e2" })',
 		agentMeta: {
-			prerequisites: ["Ensure the target tab exists and the content script is ready before mutating"],
+			prerequisites: [
+				"Ensure the target tab exists and the content script is ready before mutating",
+			],
 			notes: ["Explicit tabId required; same handlers as page.*"],
 			tags: ["mutation", "write"],
 			relatedApis: ["page.hover"],
@@ -821,13 +918,20 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		params: schemas.TabUnhoverParamsSchema,
 		returns: schemas.PageActionResultSchema,
 		paramTypes: [
-			{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
+			{
+				name: "tabId",
+				type: "number",
+				required: true,
+				description: "Tab ID (literal)",
+			},
 		],
 		returnDoc: "{ ok: true, action: 'unhover' }",
 		errorCode: "E_NO_TAB",
-		example: 'web.tab.unhover({ tabId: 123 })',
+		example: "web.tab.unhover({ tabId: 123 })",
 		agentMeta: {
-			prerequisites: ["Ensure the target tab exists and the content script is ready before mutating"],
+			prerequisites: [
+				"Ensure the target tab exists and the content script is ready before mutating",
+			],
 			notes: ["Explicit tabId required; same handlers as page.*"],
 			tags: ["mutation", "write"],
 			relatedApis: ["page.unhover"],
@@ -842,7 +946,12 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		params: schemas.TabScrollParamsSchema,
 		returns: schemas.PageActionResultSchema,
 		paramTypes: [
-			{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
+			{
+				name: "tabId",
+				type: "number",
+				required: true,
+				description: "Tab ID (literal)",
+			},
 			{
 				name: "direction",
 				type: "string",
@@ -869,7 +978,12 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		params: schemas.TabDblClickParamsSchema,
 		returns: schemas.PageActionResultSchema,
 		paramTypes: [
-			{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
+			{
+				name: "tabId",
+				type: "number",
+				required: true,
+				description: "Tab ID (literal)",
+			},
 			{
 				name: "refId",
 				type: "string",
@@ -887,7 +1001,9 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		errorCode: "E_NO_TAB",
 		example: 'web.tab.dblclick({ tabId: 123, refId: "e2" })',
 		agentMeta: {
-			prerequisites: ["Ensure the target tab exists and the content script is ready before mutating"],
+			prerequisites: [
+				"Ensure the target tab exists and the content script is ready before mutating",
+			],
 			notes: ["Explicit tabId required; same handlers as page.*"],
 			tags: ["mutation", "write"],
 			relatedApis: ["page.dblclick"],
@@ -902,11 +1018,16 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		params: schemas.TabBackParamsSchema,
 		returns: schemas.PageActionResultSchema,
 		paramTypes: [
-			{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
+			{
+				name: "tabId",
+				type: "number",
+				required: true,
+				description: "Tab ID (literal)",
+			},
 		],
 		returnDoc: "Back result",
 		errorCode: "E_NO_TAB",
-		example: 'web.tab.back({ tabId: 123 })',
+		example: "web.tab.back({ tabId: 123 })",
 		handlerKey: "back",
 	},
 	{
@@ -1009,7 +1130,8 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		action: "page_snapshot_query",
 		namespace: "page",
 		name: "snapshot_query",
-		description: "Query page snapshot with semantic filtering by role, tag, text, name, etc.",
+		description:
+			"Query page snapshot with semantic filtering by role, tag, text, name, etc.",
 		params: schemas.PageSnapshotQueryParamsSchema,
 		returns: schemas.SnapshotResultSchema,
 		paramTypes: [
@@ -1074,7 +1196,8 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 				description: "CSS selector to find elements (selector)",
 			},
 		],
-		returnDoc: "Array of elements with refId, role, name, href/src, alt, and parentRefId",
+		returnDoc:
+			"Array of elements with refId, role, name, href/src, alt, and parentRefId",
 		errorCode: "E_NO_TAB",
 		example: 'page.find("h1")',
 		agentMeta: {
@@ -1131,9 +1254,7 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 					.array(z.object({ tag: z.string(), text: z.string() }))
 					.optional(),
 				links: z
-					.array(
-						z.object({ href: z.string().nullable(), text: z.string() }),
-					)
+					.array(z.object({ href: z.string().nullable(), text: z.string() }))
 					.optional(),
 				text: z.string().optional(),
 			})
@@ -1200,11 +1321,16 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		params: schemas.TabForwardParamsSchema,
 		returns: schemas.PageActionResultSchema,
 		paramTypes: [
-			{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
+			{
+				name: "tabId",
+				type: "number",
+				required: true,
+				description: "Tab ID (literal)",
+			},
 		],
 		returnDoc: "Forward result",
 		errorCode: "E_NO_TAB",
-		example: 'web.tab.forward({ tabId: 123 })',
+		example: "web.tab.forward({ tabId: 123 })",
 		handlerKey: "forward",
 	},
 	{
@@ -1216,7 +1342,12 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		returns: z.string(),
 		fields: ["tabId"],
 		paramTypes: [
-			{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
+			{
+				name: "tabId",
+				type: "number",
+				required: true,
+				description: "Tab ID (literal)",
+			},
 			{
 				name: "max_nodes",
 				type: "number",
@@ -1238,7 +1369,12 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		returns: z.string(),
 		fields: ["tabId"],
 		paramTypes: [
-			{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
+			{
+				name: "tabId",
+				type: "number",
+				required: true,
+				description: "Tab ID (literal)",
+			},
 		],
 		returnDoc: "Snapshot text",
 		errorCode: "E_SNAPSHOT",
@@ -1254,7 +1390,12 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		returns: schemas.SnapshotResultSchema,
 		fields: ["tabId"],
 		paramTypes: [
-			{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
+			{
+				name: "tabId",
+				type: "number",
+				required: true,
+				description: "Tab ID (literal)",
+			},
 		],
 		returnDoc: "Snapshot data",
 		errorCode: "E_SNAPSHOT",
@@ -1265,12 +1406,18 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		action: "tab_snapshot_query",
 		namespace: "web.tab",
 		name: "snapshot_query",
-		description: "Query tab snapshot with semantic filtering by role, tag, text, name, etc.",
+		description:
+			"Query tab snapshot with semantic filtering by role, tag, text, name, etc.",
 		params: schemas.TabSnapshotQueryParamsSchema,
 		returns: schemas.SnapshotResultSchema,
 		fields: ["tabId"],
 		paramTypes: [
-			{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
+			{
+				name: "tabId",
+				type: "number",
+				required: true,
+				description: "Tab ID (literal)",
+			},
 			{
 				name: "filter",
 				type: "{ role?: string | string[], tag?: string | string[], text?: string, name?: string, interactiveOnly?: boolean, href?: string, src?: string, limit?: number }",
@@ -1286,7 +1433,8 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		],
 		returnDoc: "{ text, nodes (filtered), url, title, viewport }",
 		errorCode: "E_SNAPSHOT",
-		example: 'web.tab.snapshot_query({ tabId: 123, filter: { role: \"button\" } })',
+		example:
+			'web.tab.snapshot_query({ tabId: 123, filter: { role: "button" } })',
 		agentMeta: {
 			notes: [
 				"Explicit tabId required; same handler as page.snapshot_query",
@@ -1306,12 +1454,23 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		returns: schemas.FetchValueSchema,
 		fields: ["tabId", "url", "options"],
 		paramTypes: [
-			{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
-			{ name: "url", type: "string", required: false, description: "URL to fetch" },
+			{
+				name: "tabId",
+				type: "number",
+				required: true,
+				description: "Tab ID (literal)",
+			},
+			{
+				name: "url",
+				type: "string",
+				required: false,
+				description: "URL to fetch",
+			},
 		],
 		returnDoc: "Fetch result DTO",
 		errorCode: "E_NO_TAB",
-		example: 'web.tab.fetch({ tabId: 123, url: "https://api.example.com/data" })',
+		example:
+			'web.tab.fetch({ tabId: 123, url: "https://api.example.com/data" })',
 		handlerKey: "fetch",
 	},
 	{
@@ -1323,7 +1482,12 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		returns: schemas.TabEvaluateResultSchema,
 		fields: ["tabId", "script"],
 		paramTypes: [
-			{ name: "tabId", type: "number", required: true, description: "Tab ID (literal)" },
+			{
+				name: "tabId",
+				type: "number",
+				required: true,
+				description: "Tab ID (literal)",
+			},
 			{
 				name: "script",
 				type: "string",

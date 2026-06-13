@@ -1,12 +1,12 @@
 // @vitest-environment node
 
 import { describe, expect, it } from "vitest";
-import { CONTENT_SCRIPT_TOOL_SPECS } from "../../src/shared/registry/content-script-tools.js";
 import { handlers } from "../../src/content-script/handlers.js";
 import {
 	buildContentScriptSpecs,
 	buildInfraContentScriptSpecs,
 } from "../../src/content-script/schemas.js";
+import { CONTENT_SCRIPT_TOOL_SPECS } from "../../src/shared/registry/content-script-tools.js";
 
 describe("buildContentScriptSpecs", () => {
 	it("produces one spec per CONTENT_SCRIPT_TOOL_SPECS entry", () => {
@@ -33,7 +33,9 @@ describe("buildContentScriptSpecs", () => {
 	});
 
 	it("page_snapshot_query spec has correct handlerKey and schema", () => {
-		const spec = CONTENT_SCRIPT_TOOL_SPECS.find((s) => s.action === "page_snapshot_query");
+		const spec = CONTENT_SCRIPT_TOOL_SPECS.find(
+			(s) => s.action === "page_snapshot_query",
+		);
 		expect(spec).toBeDefined();
 		expect(spec!.handlerKey).toBe("snapshot_query");
 		expect(spec!.namespace).toBe("page");
@@ -41,13 +43,19 @@ describe("buildContentScriptSpecs", () => {
 	});
 
 	it("page_snapshot_query params schema validates filter", () => {
-		const spec = CONTENT_SCRIPT_TOOL_SPECS.find((s) => s.action === "page_snapshot_query");
-		const result = spec!.params.safeParse({ filter: { role: "button", interactiveOnly: true } });
+		const spec = CONTENT_SCRIPT_TOOL_SPECS.find(
+			(s) => s.action === "page_snapshot_query",
+		);
+		const result = spec!.params.safeParse({
+			filter: { role: "button", interactiveOnly: true },
+		});
 		expect(result.success).toBe(true);
 	});
 
 	it("tab_snapshot_query spec has correct handlerKey and schema", () => {
-		const spec = CONTENT_SCRIPT_TOOL_SPECS.find((s) => s.action === "tab_snapshot_query");
+		const spec = CONTENT_SCRIPT_TOOL_SPECS.find(
+			(s) => s.action === "tab_snapshot_query",
+		);
 		expect(spec).toBeDefined();
 		expect(spec!.handlerKey).toBe("snapshot_query");
 		expect(spec!.namespace).toBe("web.tab");

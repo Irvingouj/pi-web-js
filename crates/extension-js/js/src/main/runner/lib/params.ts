@@ -1,14 +1,10 @@
 /// <reference types="chrome" />
 import {
-	coerceWasmParams,
 	type AsyncResponse,
+	coerceWasmParams,
 } from "../../../shared/tool-registry.js";
-import {
-	DEFAULT_SCROLL_AMOUNT,
-	DEFAULT_TIMEOUT_MS,
-} from "./constants.js";
+import { DEFAULT_SCROLL_AMOUNT, DEFAULT_TIMEOUT_MS } from "./constants.js";
 import { makeError } from "./types.js";
-import { asRecord } from "./params-helpers.js";
 
 export { asRecord, extractTabId } from "./params-helpers.js";
 
@@ -50,7 +46,10 @@ const arrayNormalizers = new Map<string, (arr: unknown[]) => unknown>([
 	["tab_snapshot", (p) => ({ tabId: p[0], options: p[1] ?? {} })],
 	["tab_snapshot_text", (p) => ({ tabId: p[0], options: p[1] ?? {} })],
 	["tab_snapshot_data", (p) => ({ tabId: p[0], options: p[1] ?? {} })],
-	["page_wait_for", (p) => ({ selector: p[0], timeout: p[1] ?? BigInt(DEFAULT_TIMEOUT_MS) })],
+	[
+		"page_wait_for",
+		(p) => ({ selector: p[0], timeout: p[1] ?? BigInt(DEFAULT_TIMEOUT_MS) }),
+	],
 	["page_extract", (p) => ({ fields: p })],
 	["storage_get_many", (p) => ({ keys: p })],
 	["storage_delete_many", (p) => ({ keys: p })],

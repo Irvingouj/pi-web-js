@@ -172,5 +172,4 @@ for (const r of results.filter(r => !r.ok)) {
 		console.log(`Smoke test: ${pass}/${total} passed`);
 		console.log(output?.slice(0, 3000));
 	});
-
 });

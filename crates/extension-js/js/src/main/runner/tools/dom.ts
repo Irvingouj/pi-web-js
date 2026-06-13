@@ -1,36 +1,13 @@
 /// <reference types="chrome" />
 import { z } from "zod";
-import { logger } from "../../../shared/logger.js";
 import * as schemas from "../../../shared/schemas.js";
+import { registerJsCall } from "../../../shared/tool-registry.js";
+import type { DomFormatParams, DomSnapshotParams } from "../runtime.js";
 import {
-	dispatchTool,
-	registerJsCall,
-	type CallContext,
-	type ToolDocParam,
-} from "../../../shared/tool-registry.js";
-import type { DomFormatParams, DomSnapshotParams, FetchParams } from "../runtime.js";
-import {
-	makeError,
-	asRecord,
-	extractTabId,
-	unwrapResult,
-	getActiveTabId,
-	resolveActiveTabId,
-	waitForTabLoad,
-	handleFetch,
-	handleHostCallAction,
-	registerChromePassthrough,
-	getElementByRefId,
-	extractRefId,
-	handleDomSnapshot,
 	handleDomFormat,
-	ensureDomSnapshot,
-	buildSnapshotInTab,
-	throwIfAborted,
-	DEFAULT_TIMEOUT_MS,
-	DEFAULT_MAX_NODES,
-	DEFAULT_SCROLL_AMOUNT,
-	DEFAULT_POLL_INTERVAL_MS,
+	handleDomSnapshot,
+	makeError,
+	unwrapResult,
 } from "../runtime.js";
 
 // ─── DOM ─────────────────────────────────────────────────────────
@@ -71,7 +48,7 @@ registerJsCall({
 	returnDoc: "Snapshot data",
 	errorCode: "E_SNAPSHOT",
 
-	example: "dom.snapshot({ tabId: 123, script: \"document.title\" })",
+	example: 'dom.snapshot({ tabId: 123, script: "document.title" })',
 });
 
 registerJsCall({
@@ -102,5 +79,5 @@ registerJsCall({
 	returnDoc: "Formatted snapshot",
 	errorCode: "E_FORMAT",
 
-	example: "dom.format({ text: \"hello\" })",
+	example: 'dom.format({ text: "hello" })',
 });

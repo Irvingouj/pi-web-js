@@ -1,6 +1,3 @@
-/// <reference types="chrome" />
-import { z } from "zod";
-import * as schemas from "../../../../shared/schemas.js";
 import { registerChromePassthrough } from "../../chrome/internals.js";
 import { zChromeVoid } from "./register-helpers.js";
 
@@ -13,7 +10,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.sidePanel.setOptions({ path: \"sidepanel.html\" })"
+	'chrome.sidePanel.setOptions({ path: "sidepanel.html" })',
 );
 registerChromePassthrough(
 	"chrome_sidePanel_setPanelBehavior",
@@ -24,5 +21,5 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })"
+	"chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })",
 );

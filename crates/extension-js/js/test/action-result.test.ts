@@ -16,7 +16,7 @@ if (typeof globalThis.CSS === "undefined" || !globalThis.CSS.escape) {
 
 // Polyfill scrollIntoView for jsdom
 if (typeof Element.prototype.scrollIntoView === "undefined") {
-	Element.prototype.scrollIntoView = function () {};
+	Element.prototype.scrollIntoView = () => {};
 }
 
 describe("action-result", () => {
@@ -86,7 +86,12 @@ describe("T-015: mutation handlers return PageActionResult", () => {
 		input.setAttribute("data-ref-id", "e1");
 		document.body.appendChild(input);
 		const result = handlers.fill({ refId: "e1", value: "hello" });
-		expect(result).toMatchObject({ ok: true, action: "fill", refId: "e1", value: "hello" });
+		expect(result).toMatchObject({
+			ok: true,
+			action: "fill",
+			refId: "e1",
+			value: "hello",
+		});
 	});
 
 	it("type returns PageActionResult with ok, action, refId, text", () => {
@@ -94,7 +99,12 @@ describe("T-015: mutation handlers return PageActionResult", () => {
 		input.setAttribute("data-ref-id", "e1");
 		document.body.appendChild(input);
 		const result = handlers.type({ refId: "e1", text: "hello" });
-		expect(result).toMatchObject({ ok: true, action: "type", refId: "e1", text: "hello" });
+		expect(result).toMatchObject({
+			ok: true,
+			action: "type",
+			refId: "e1",
+			text: "hello",
+		});
 	});
 
 	it("append returns PageActionResult with ok, action, refId, text", () => {
@@ -103,7 +113,12 @@ describe("T-015: mutation handlers return PageActionResult", () => {
 		input.value = "hello";
 		document.body.appendChild(input);
 		const result = handlers.append({ refId: "e1", text: " world" });
-		expect(result).toMatchObject({ ok: true, action: "append", refId: "e1", text: "hello world" });
+		expect(result).toMatchObject({
+			ok: true,
+			action: "append",
+			refId: "e1",
+			text: "hello world",
+		});
 	});
 
 	it("press returns PageActionResult with ok, action, key", () => {
@@ -119,7 +134,12 @@ describe("T-015: mutation handlers return PageActionResult", () => {
 		select.appendChild(opt);
 		document.body.appendChild(select);
 		const result = handlers.select({ refId: "e1", value: "b" });
-		expect(result).toMatchObject({ ok: true, action: "select", refId: "e1", value: "b" });
+		expect(result).toMatchObject({
+			ok: true,
+			action: "select",
+			refId: "e1",
+			value: "b",
+		});
 	});
 
 	it("check returns PageActionResult with ok, action, refId, checked", () => {
@@ -128,7 +148,12 @@ describe("T-015: mutation handlers return PageActionResult", () => {
 		checkbox.setAttribute("data-ref-id", "e1");
 		document.body.appendChild(checkbox);
 		const result = handlers.check({ refId: "e1", checked: true });
-		expect(result).toMatchObject({ ok: true, action: "check", refId: "e1", checked: true });
+		expect(result).toMatchObject({
+			ok: true,
+			action: "check",
+			refId: "e1",
+			checked: true,
+		});
 	});
 
 	it("hover returns PageActionResult with ok, action, refId", () => {
@@ -146,7 +171,12 @@ describe("T-015: mutation handlers return PageActionResult", () => {
 
 	it("scroll returns PageActionResult with ok, action, direction, amount", () => {
 		const result = handlers.scroll({ direction: "down", amount: 300 });
-		expect(result).toMatchObject({ ok: true, action: "scroll", direction: "down", amount: 300 });
+		expect(result).toMatchObject({
+			ok: true,
+			action: "scroll",
+			direction: "down",
+			amount: 300,
+		});
 	});
 
 	it("scroll_to returns PageActionResult with ok, action, refId", () => {
@@ -154,7 +184,11 @@ describe("T-015: mutation handlers return PageActionResult", () => {
 		btn.setAttribute("data-ref-id", "e1");
 		document.body.appendChild(btn);
 		const result = handlers.scroll_to({ refId: "e1" });
-		expect(result).toMatchObject({ ok: true, action: "scroll_to", refId: "e1" });
+		expect(result).toMatchObject({
+			ok: true,
+			action: "scroll_to",
+			refId: "e1",
+		});
 	});
 
 	it("dblclick returns PageActionResult with ok, action, refId", () => {

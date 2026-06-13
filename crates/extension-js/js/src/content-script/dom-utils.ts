@@ -5,19 +5,14 @@ import {
 	throwStructuredAgentError,
 } from "../shared/registry/normalize-agent-error.js";
 import {
-	INTERACTIVE_SELECTOR,
 	enrichFormNode,
 	getAccessibleName,
 	getAccessibleRole,
+	INTERACTIVE_SELECTOR,
 	shouldInclude,
 } from "../shared/snapshot-dom.js";
 
-export {
-	enrichFormNode,
-	getAccessibleName,
-	getAccessibleRole,
-	shouldInclude,
-};
+export { enrichFormNode, getAccessibleName, getAccessibleRole, shouldInclude };
 
 /**
  * Find an element by its opaque reference ID.
@@ -99,7 +94,9 @@ export function findSemanticCandidates(query: string): SemanticCandidate[] {
 		const ariaLabel = el.getAttribute("aria-label");
 		const placeholder = (el as HTMLInputElement).placeholder;
 		const text = el.textContent?.trim() || "";
-		const haystacks = [ariaLabel, placeholder, text].filter(Boolean) as string[];
+		const haystacks = [ariaLabel, placeholder, text].filter(
+			Boolean,
+		) as string[];
 		if (!haystacks.some((h) => h.toLowerCase().includes(lowerQuery))) {
 			continue;
 		}

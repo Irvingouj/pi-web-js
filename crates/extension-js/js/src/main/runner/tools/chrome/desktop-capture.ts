@@ -6,7 +6,7 @@ regChrome(
 	["desktopCapture"],
 	"Choose desktop media",
 	zChromeAny,
-	"chrome.desktopCapture.chooseDesktopMedia([\"screen\"], (id) => id)",
+	'chrome.desktopCapture.chooseDesktopMedia(["screen"], (id) => id)',
 	"string",
 );
 regChrome(

@@ -1,6 +1,6 @@
+import type { z } from "zod";
 import { base64ToUint8Array } from "../shared/array-buffer.js";
 import type { FetchValueSchema } from "../shared/schemas.js";
-import type { z } from "zod";
 import { storeBlob } from "./binary-blob-store.js";
 
 type FetchValue = z.infer<typeof FetchValueSchema>;
@@ -24,7 +24,11 @@ export function maybeStoreFetchResult(
 	if (!wantsStore(params)) {
 		return result;
 	}
-	if (typeof result !== "object" || result === null || !("bodyEncoding" in result)) {
+	if (
+		typeof result !== "object" ||
+		result === null ||
+		!("bodyEncoding" in result)
+	) {
 		return result;
 	}
 	const fetchValue = result as FetchValue;

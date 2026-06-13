@@ -20,7 +20,7 @@ export function syncRefIdCounterFromDom(): void {
 export function allocateRefId(el: Element): string {
 	const existing = el.getAttribute("data-ref-id");
 	if (existing && REF_ID_PATTERN.test(existing)) return existing;
-	const refId = "e" + ++counter;
+	const refId = `e${++counter}`;
 	el.setAttribute("data-ref-id", refId);
 	return refId;
 }
@@ -28,5 +28,5 @@ export function allocateRefId(el: Element): string {
 /** @deprecated Use allocateRefId after syncRefIdCounterFromDom */
 export function getNextRefId(): string {
 	syncRefIdCounterFromDom();
-	return "e" + ++counter;
+	return `e${++counter}`;
 }

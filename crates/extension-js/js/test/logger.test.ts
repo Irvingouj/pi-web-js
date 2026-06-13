@@ -236,12 +236,12 @@ describe("Logger", () => {
 
 describe("Logger default state", () => {
 	let consoleLogSpy: ReturnType<typeof vi.spyOn>;
-	let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+	let _consoleErrorSpy: ReturnType<typeof vi.spyOn>;
 
 	beforeEach(() => {
 		setLogLevel("trace");
 		consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-		consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+		_consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 	});
 
 	afterEach(() => {

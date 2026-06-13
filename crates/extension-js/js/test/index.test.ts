@@ -2,8 +2,8 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ExtensionSession } from "../src/main/index.js";
-import { setActiveTabId } from "../src/main/tab-context.js";
 import { setRunnerAbortController } from "../src/main/runner/index.js";
+import { setActiveTabId } from "../src/main/tab-context.js";
 
 interface MockWorker {
 	postMessage: ReturnType<typeof vi.fn>;
@@ -22,9 +22,7 @@ interface PostMessage {
 const MOCK_PAGE_CLICK_RESULT = { ok: true, action: "click", refId: "e1" };
 
 function mockContentScriptSendMessage(
-	response:
-		| { ok: true; value: unknown }
-		| { ok: false; error: unknown } = {
+	response: { ok: true; value: unknown } | { ok: false; error: unknown } = {
 		ok: true,
 		value: MOCK_PAGE_CLICK_RESULT,
 	},
@@ -42,8 +40,14 @@ declare global {
 		runtime: { id: string };
 		tabs: {
 			sendMessage: ReturnType<typeof vi.fn>;
-			onActivated: { addListener: ReturnType<typeof vi.fn>; removeListener: ReturnType<typeof vi.fn> };
-			onUpdated: { addListener: ReturnType<typeof vi.fn>; removeListener: ReturnType<typeof vi.fn> };
+			onActivated: {
+				addListener: ReturnType<typeof vi.fn>;
+				removeListener: ReturnType<typeof vi.fn>;
+			};
+			onUpdated: {
+				addListener: ReturnType<typeof vi.fn>;
+				removeListener: ReturnType<typeof vi.fn>;
+			};
 			query: ReturnType<typeof vi.fn>;
 		};
 		scripting: { executeScript: ReturnType<typeof vi.fn> };
@@ -61,28 +65,22 @@ describe("ExtensionSession fs namespace e2e", () => {
 		sessions = [];
 		setRunnerAbortController(null);
 
-		vi.stubGlobal(
-			"Worker",
-			function () {
-				const instance = {
-					postMessage: vi.fn((msg: unknown) => {
-						postMessages.push(msg);
-					}),
-					terminate: vi.fn(),
-					onmessage: null as ((e: MessageEvent) => void) | null,
-					onerror: null as ((e: ErrorEvent) => void) | null,
-					onmessageerror: null as ((e: MessageEvent) => void) | null,
-				};
-				workerInstances.push(instance);
-				return instance;
-			} as unknown as typeof Worker,
-		);
-		vi.stubGlobal(
-			"URL",
-			function () {
-				return { toString: () => "mock-worker-url" };
-			} as unknown as typeof URL,
-		);
+		vi.stubGlobal("Worker", function () {
+			const instance = {
+				postMessage: vi.fn((msg: unknown) => {
+					postMessages.push(msg);
+				}),
+				terminate: vi.fn(),
+				onmessage: null as ((e: MessageEvent) => void) | null,
+				onerror: null as ((e: ErrorEvent) => void) | null,
+				onmessageerror: null as ((e: MessageEvent) => void) | null,
+			};
+			workerInstances.push(instance);
+			return instance;
+		} as unknown as typeof Worker);
+		vi.stubGlobal("URL", function () {
+			return { toString: () => "mock-worker-url" };
+		} as unknown as typeof URL);
 	});
 
 	afterEach(async () => {
@@ -296,11 +294,17 @@ describe("ExtensionSession fs namespace e2e", () => {
 	}) => {
 		const [session, , worker] = await initSession();
 
-		const fsMethod = (session.fs as Record<string, (params: unknown) => Promise<unknown>>)[action];
+		const fsMethod = (
+			session.fs as Record<string, (params: unknown) => Promise<unknown>>
+		)[action];
 		const promise = fsMethod(params);
 
 		const fsCallMsg = postMessages.find(
-			(m): m is PostMessage => typeof m === "object" && m !== null && (m as PostMessage).type === "fsCall" && (m as PostMessage).action === action,
+			(m): m is PostMessage =>
+				typeof m === "object" &&
+				m !== null &&
+				(m as PostMessage).type === "fsCall" &&
+				(m as PostMessage).action === action,
 		);
 		expect(fsCallMsg).toBeDefined();
 		expect(fsCallMsg).toMatchObject({
@@ -320,7 +324,11 @@ describe("ExtensionSession fs namespace e2e", () => {
 		const existsPromise = session.fs.exists({ path: "/test" });
 
 		const fsCallMsg = postMessages.find(
-			(m): m is PostMessage => typeof m === "object" && m !== null && (m as PostMessage).type === "fsCall" && (m as PostMessage).action === "exists",
+			(m): m is PostMessage =>
+				typeof m === "object" &&
+				m !== null &&
+				(m as PostMessage).type === "fsCall" &&
+				(m as PostMessage).action === "exists",
 		);
 		expect(fsCallMsg).toBeDefined();
 
@@ -335,7 +343,10 @@ describe("ExtensionSession fs namespace e2e", () => {
 		const promise = session.apiDocs("json");
 
 		const apiDocsMsg = postMessages.find(
-			(m): m is PostMessage => typeof m === "object" && m !== null && (m as PostMessage).type === "apiDocs",
+			(m): m is PostMessage =>
+				typeof m === "object" &&
+				m !== null &&
+				(m as PostMessage).type === "apiDocs",
 		);
 		expect(apiDocsMsg).toBeDefined();
 		expect(apiDocsMsg).toMatchObject({
@@ -343,15 +354,33 @@ describe("ExtensionSession fs namespace e2e", () => {
 			format: "json",
 		});
 
-		sendWorkerResult(worker, apiDocsMsg?.id ?? "", JSON.stringify([
-			{ public_name: "fs.exists", namespace: "fs", name: "exists", action: "fs_exists" },
-			{ public_name: "page.goto", namespace: "page", name: "goto", action: "page_goto" },
-		]));
+		sendWorkerResult(
+			worker,
+			apiDocsMsg?.id ?? "",
+			JSON.stringify([
+				{
+					public_name: "fs.exists",
+					namespace: "fs",
+					name: "exists",
+					action: "fs_exists",
+				},
+				{
+					public_name: "page.goto",
+					namespace: "page",
+					name: "goto",
+					action: "page_goto",
+				},
+			]),
+		);
 		const result = await promise;
 		expect(Array.isArray(result)).toBe(true);
 		expect(result).toHaveLength(2);
-		expect((result as unknown[])[0]).toMatchObject({ public_name: "fs.exists" });
-		expect((result as unknown[])[1]).toMatchObject({ public_name: "page.goto" });
+		expect((result as unknown[])[0]).toMatchObject({
+			public_name: "fs.exists",
+		});
+		expect((result as unknown[])[1]).toMatchObject({
+			public_name: "page.goto",
+		});
 	});
 
 	it("apiDocs('markdown') sends apiDocs message and returns markdown string", async () => {
@@ -360,7 +389,10 @@ describe("ExtensionSession fs namespace e2e", () => {
 		const promise = session.apiDocs("markdown");
 
 		const apiDocsMsg = postMessages.find(
-			(m): m is PostMessage => typeof m === "object" && m !== null && (m as PostMessage).type === "apiDocs",
+			(m): m is PostMessage =>
+				typeof m === "object" &&
+				m !== null &&
+				(m as PostMessage).type === "apiDocs",
 		);
 		expect(apiDocsMsg).toBeDefined();
 		expect(apiDocsMsg).toMatchObject({
@@ -368,7 +400,11 @@ describe("ExtensionSession fs namespace e2e", () => {
 			format: "markdown",
 		});
 
-		sendWorkerResult(worker, apiDocsMsg?.id ?? "", "## `page` module\n\npage.goto\n");
+		sendWorkerResult(
+			worker,
+			apiDocsMsg?.id ?? "",
+			"## `page` module\n\npage.goto\n",
+		);
 		const result = await promise;
 		expect(typeof result).toBe("string");
 		expect(result).toContain("## `page` module");
@@ -380,7 +416,10 @@ describe("ExtensionSession fs namespace e2e", () => {
 		const promise = session.apiDocs();
 
 		const apiDocsMsg = postMessages.find(
-			(m): m is PostMessage => typeof m === "object" && m !== null && (m as PostMessage).type === "apiDocs",
+			(m): m is PostMessage =>
+				typeof m === "object" &&
+				m !== null &&
+				(m as PostMessage).type === "apiDocs",
 		);
 		expect(apiDocsMsg).toBeDefined();
 		expect(apiDocsMsg).toMatchObject({
@@ -405,9 +444,7 @@ describe("ExtensionSession fs namespace e2e", () => {
 				Array.isArray((m as { manifest?: unknown[] }).manifest),
 		);
 		const manifest = initMsg?.manifest ?? [];
-		const pageFill = manifest.find(
-			(e: any) => e.action === "page_fill",
-		);
+		const pageFill = manifest.find((e: any) => e.action === "page_fill");
 		expect(pageFill).toBeDefined();
 		expect(pageFill?.namespace).toBe("page");
 		expect(pageFill?.publicName).toBe("page.fill");
@@ -419,7 +456,9 @@ describe("ExtensionSession fs namespace e2e", () => {
 			]),
 		);
 		expect(pageFill?.prerequisites).toEqual(
-			expect.arrayContaining(["Ensure the target tab is active and the content script is ready before mutating"]),
+			expect.arrayContaining([
+				"Ensure the target tab is active and the content script is ready before mutating",
+			]),
 		);
 		expect(pageFill?.notes).toEqual(
 			expect.arrayContaining([expect.any(String)]),
@@ -434,7 +473,10 @@ describe("ExtensionSession fs namespace e2e", () => {
 		const promise = session.apiDocs("markdown");
 
 		const apiDocsMsg = postMessages.find(
-			(m): m is PostMessage => typeof m === "object" && m !== null && (m as PostMessage).type === "apiDocs",
+			(m): m is PostMessage =>
+				typeof m === "object" &&
+				m !== null &&
+				(m as PostMessage).type === "apiDocs",
 		);
 		expect(apiDocsMsg).toBeDefined();
 		expect(apiDocsMsg).toMatchObject({
@@ -444,7 +486,11 @@ describe("ExtensionSession fs namespace e2e", () => {
 
 		// Minimal stub — the real generate_markdown() pipeline is covered in
 		// api-docs-integration.test.ts with the actual WASM module.
-		sendWorkerResult(worker, apiDocsMsg?.id ?? "", "## `page` module\n\npage.fill\n");
+		sendWorkerResult(
+			worker,
+			apiDocsMsg?.id ?? "",
+			"## `page` module\n\npage.fill\n",
+		);
 		const result = await promise;
 		expect(typeof result).toBe("string");
 	});
@@ -509,7 +555,12 @@ describe("ExtensionSession fs namespace e2e", () => {
 		const [, , worker] = await initSession();
 		setActiveTabId(1);
 
-		sendWorkerAsyncRelay(worker, "relay-legacy", "page_click", "content-script");
+		sendWorkerAsyncRelay(
+			worker,
+			"relay-legacy",
+			"page_click",
+			"content-script",
+		);
 		await new Promise((resolve) => setTimeout(resolve, 0));
 
 		const relayResult = postMessages.find(
@@ -544,7 +595,7 @@ describe("ExtensionSession fs namespace e2e", () => {
 
 		sendWorkerAsyncRelay(worker, "relay-tab", "tab_click", "content-script", {
 			tabPolicy: "required",
-				params: { tabId: 1n, refId: "e1" },
+			params: { tabId: 1n, refId: "e1" },
 		});
 		await new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -553,7 +604,7 @@ describe("ExtensionSession fs namespace e2e", () => {
 			expect.objectContaining({
 				type: "registryCall",
 				action: "tab_click",
-			params: { tabId: 1n, refId: "e1" },
+				params: { tabId: 1n, refId: "e1" },
 			}),
 		);
 	});
@@ -585,7 +636,11 @@ describe("ExtensionSession fs namespace e2e", () => {
 		);
 
 		const relayResult = postMessages.find(
-			(m): m is PostMessage => typeof m === "object" && m !== null && (m as PostMessage).type === "asyncRelayResult" && (m as PostMessage).id === "relay-1",
+			(m): m is PostMessage =>
+				typeof m === "object" &&
+				m !== null &&
+				(m as PostMessage).type === "asyncRelayResult" &&
+				(m as PostMessage).id === "relay-1",
 		);
 		expect(relayResult).toMatchObject({
 			type: "asyncRelayResult",
@@ -631,7 +686,10 @@ describe("ExtensionSession fs namespace e2e", () => {
 				action: "page_fill",
 			}),
 		);
-		expect(sendMessage).not.toHaveBeenCalledWith(99, expect.objectContaining({ action: "page_click" }));
+		expect(sendMessage).not.toHaveBeenCalledWith(
+			99,
+			expect.objectContaining({ action: "page_click" }),
+		);
 		expect(sendMessage).not.toHaveBeenCalledWith(1, expect.anything());
 	});
 
@@ -639,12 +697,14 @@ describe("ExtensionSession fs namespace e2e", () => {
 		globalThis.chrome = {
 			runtime: { id: "extension-test" },
 			tabs: {
-				sendMessage: vi.fn(async (_tabId: number, msg: Record<string, unknown>) => {
-					if (msg.action === "ping") {
-						return { ok: true };
-					}
-					return new Promise(() => {});
-				}),
+				sendMessage: vi.fn(
+					async (_tabId: number, msg: Record<string, unknown>) => {
+						if (msg.action === "ping") {
+							return { ok: true };
+						}
+						return new Promise(() => {});
+					},
+				),
 				onActivated: { addListener: vi.fn(), removeListener: vi.fn() },
 				onUpdated: { addListener: vi.fn(), removeListener: vi.fn() },
 				query: vi.fn(() => Promise.resolve([{ id: 1 }])),
@@ -655,7 +715,12 @@ describe("ExtensionSession fs namespace e2e", () => {
 		setActiveTabId(1);
 		await new Promise((resolve) => setTimeout(resolve, 0));
 
-		sendWorkerAsyncRelay(worker, "relay-cancel-1", "page_click", "content-script");
+		sendWorkerAsyncRelay(
+			worker,
+			"relay-cancel-1",
+			"page_click",
+			"content-script",
+		);
 		await new Promise((resolve) => setTimeout(resolve, 0));
 
 		if (worker.onmessage) {
@@ -667,7 +732,10 @@ describe("ExtensionSession fs namespace e2e", () => {
 
 		expect(globalThis.chrome.tabs.sendMessage).toHaveBeenCalledWith(
 			1,
-			expect.objectContaining({ type: "registryCallCancel", id: "relay-cancel-1" }),
+			expect.objectContaining({
+				type: "registryCallCancel",
+				id: "relay-cancel-1",
+			}),
 		);
 	});
 
@@ -687,15 +755,17 @@ describe("ExtensionSession fs namespace e2e", () => {
 						status: "complete",
 					}),
 				),
-				sendMessage: vi.fn(async (_tabId: number, msg: Record<string, unknown>) => {
-					if (msg.action === "ping") {
-						return { ok: true };
-					}
-					if (msg.type === "registryCall") {
-						return registryPromise;
-					}
-					return { ok: false, error: "unexpected message" };
-				}),
+				sendMessage: vi.fn(
+					async (_tabId: number, msg: Record<string, unknown>) => {
+						if (msg.action === "ping") {
+							return { ok: true };
+						}
+						if (msg.type === "registryCall") {
+							return registryPromise;
+						}
+						return { ok: false, error: "unexpected message" };
+					},
+				),
 				onActivated: { addListener: vi.fn(), removeListener: vi.fn() },
 				onUpdated: { addListener: vi.fn(), removeListener: vi.fn() },
 				query: vi.fn(() => Promise.resolve([{ id: 1 }])),
@@ -706,7 +776,12 @@ describe("ExtensionSession fs namespace e2e", () => {
 		setActiveTabId(1);
 		await new Promise((resolve) => setTimeout(resolve, 0));
 
-		sendWorkerAsyncRelay(worker, "relay-abort-success", "page_click", "content-script");
+		sendWorkerAsyncRelay(
+			worker,
+			"relay-abort-success",
+			"page_click",
+			"content-script",
+		);
 		await new Promise((resolve) => setTimeout(resolve, 0));
 
 		resolveRegistry({
@@ -791,11 +866,12 @@ describe("ExtensionSession fs namespace e2e", () => {
 			relayResult.result !== null &&
 			"value" in relayResult.result
 		) {
-			expect(typeof (relayResult.result as { value: unknown }).value).toBe("string");
+			expect(typeof (relayResult.result as { value: unknown }).value).toBe(
+				"string",
+			);
 		}
 	});
 });
-
 
 describe("session.snapshot.query()", () => {
 	let sessions: ExtensionSession[] = [];
@@ -808,28 +884,22 @@ describe("session.snapshot.query()", () => {
 		sessions = [];
 		setRunnerAbortController(null);
 
-		vi.stubGlobal(
-			"Worker",
-			function () {
-				const instance: MockWorker = {
-					postMessage: vi.fn((msg: unknown) => {
-						postMessages.push(msg);
-					}),
-					terminate: vi.fn(),
-					onmessage: null,
-					onerror: null,
-					onmessageerror: null,
-				};
-				workerInstances.push(instance);
-				return instance;
-			} as unknown as typeof Worker,
-		);
-		vi.stubGlobal(
-			"URL",
-			function () {
-				return { toString: () => "mock-worker-url" };
-			} as unknown as typeof URL,
-		);
+		vi.stubGlobal("Worker", function () {
+			const instance: MockWorker = {
+				postMessage: vi.fn((msg: unknown) => {
+					postMessages.push(msg);
+				}),
+				terminate: vi.fn(),
+				onmessage: null,
+				onerror: null,
+				onmessageerror: null,
+			};
+			workerInstances.push(instance);
+			return instance;
+		} as unknown as typeof Worker);
+		vi.stubGlobal("URL", function () {
+			return { toString: () => "mock-worker-url" };
+		} as unknown as typeof URL);
 		vi.stubGlobal("chrome", {
 			runtime: { id: "extension-test" },
 			tabs: {
@@ -837,7 +907,15 @@ describe("session.snapshot.query()", () => {
 					ok: true,
 					value: {
 						text: "",
-						nodes: [{ refId: "e1", role: "button", tag: "button", name: "Go", text: "Go" }],
+						nodes: [
+							{
+								refId: "e1",
+								role: "button",
+								tag: "button",
+								name: "Go",
+								text: "Go",
+							},
+						],
 						url: "https://example.com/",
 						title: "Example",
 						viewport: { width: 800, height: 600 },
@@ -874,7 +952,9 @@ describe("session.snapshot.query()", () => {
 		sessions = [];
 	});
 
-	async function initSnapshotSession(): Promise<[ExtensionSession, MockWorker]> {
+	async function initSnapshotSession(): Promise<
+		[ExtensionSession, MockWorker]
+	> {
 		const initPromise = ExtensionSession.init();
 		setTimeout(() => {
 			const latestWorker = workerInstances[workerInstances.length - 1];
@@ -926,7 +1006,15 @@ describe("session.snapshot.query()", () => {
 			ok: true,
 			value: {
 				text: "",
-				nodes: [{ refId: "e1", role: "button", tag: "button", name: "Go", text: "Go" }],
+				nodes: [
+					{
+						refId: "e1",
+						role: "button",
+						tag: "button",
+						name: "Go",
+						text: "Go",
+					},
+				],
 				url: "https://example.com/",
 				title: "Example",
 				viewport: { width: 800, height: 600 },

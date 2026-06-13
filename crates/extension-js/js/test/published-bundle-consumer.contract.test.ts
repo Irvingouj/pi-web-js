@@ -16,7 +16,9 @@ const PKG_DIR = path.resolve(__dirname, "../pkg");
 
 function readPublishedFile(name: string): string {
 	const filePath = path.join(PKG_DIR, name);
-	expect(fs.existsSync(filePath), `missing published artifact: ${name}`).toBe(true);
+	expect(fs.existsSync(filePath), `missing published artifact: ${name}`).toBe(
+		true,
+	);
 	return fs.readFileSync(filePath, "utf8");
 }
 
@@ -121,7 +123,10 @@ function createBrowsergentDistLayout(): {
 	wasmImportUrl: string;
 } {
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), "browsergent-dist-"));
-	fs.copyFileSync(path.join(PKG_DIR, "worker.js"), path.join(root, "worker.js"));
+	fs.copyFileSync(
+		path.join(PKG_DIR, "worker.js"),
+		path.join(root, "worker.js"),
+	);
 	fs.copyFileSync(
 		path.join(PKG_DIR, "extension_js.js"),
 		path.join(root, "extension_js.js"),
@@ -135,8 +140,9 @@ function createBrowsergentDistLayout(): {
 	};
 }
 
-const browsergentDistLayouts: Array<ReturnType<typeof createBrowsergentDistLayout>> =
-	[];
+const browsergentDistLayouts: Array<
+	ReturnType<typeof createBrowsergentDistLayout>
+> = [];
 
 afterEach(() => {
 	while (browsergentDistLayouts.length > 0) {
@@ -167,9 +173,7 @@ describe("published bundle: consumer dist layout simulation", () => {
 describe("published bundle: page.fill API surface", () => {
 	it("page.fill docs require object params, not positional refId/text", () => {
 		const indexSource = readPublishedFile("index.js");
-		expect(indexSource).toContain(
-			'page.fill({ refId: "e2", value: "hello" })',
-		);
+		expect(indexSource).toContain('page.fill({ refId: "e2", value: "hello" })');
 		expect(indexSource).not.toContain('page.fill("e2", "hello")');
 	});
 });

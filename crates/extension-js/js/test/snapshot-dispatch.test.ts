@@ -2,12 +2,12 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ExtensionSession } from "../src/main/index.js";
-import { setActiveTabId } from "../src/main/tab-context.js";
 import { setRunnerAbortController } from "../src/main/runner/index.js";
 import {
 	initCapabilities,
 	resetCapabilities,
 } from "../src/main/runner/tools/chrome/capability.js";
+import { setActiveTabId } from "../src/main/tab-context.js";
 import "../src/main/runner/index.js";
 import { registerContentScriptSpec } from "../src/content-script/registry.js";
 import { buildContentScriptSpecs } from "../src/content-script/schemas.js";
@@ -28,7 +28,7 @@ describe("snapshot dispatch", () => {
 	let executeScriptCalls = 0;
 	let registrySnapshotCalls = 0;
 	let registrySnapshotTextCalls = 0;
-	let registrySnapshotQueryCalls = 0;
+	let _registrySnapshotQueryCalls = 0;
 	let workerInstances: MockWorker[] = [];
 	let postMessages: unknown[] = [];
 
@@ -36,7 +36,7 @@ describe("snapshot dispatch", () => {
 		executeScriptCalls = 0;
 		registrySnapshotCalls = 0;
 		registrySnapshotTextCalls = 0;
-		registrySnapshotQueryCalls = 0;
+		_registrySnapshotQueryCalls = 0;
 		workerInstances = [];
 		postMessages = [];
 		setRunnerAbortController(null);
@@ -47,27 +47,21 @@ describe("snapshot dispatch", () => {
 			registerContentScriptSpec(spec);
 		}
 
-		vi.stubGlobal(
-			"Worker",
-			function () {
-				const instance: MockWorker = {
-					postMessage: vi.fn((msg: unknown) => {
-						postMessages.push(msg);
-					}),
-					terminate: vi.fn(),
-					onmessage: null,
-				};
-				workerInstances.push(instance);
-				return instance;
-			} as unknown as typeof Worker,
-		);
+		vi.stubGlobal("Worker", function () {
+			const instance: MockWorker = {
+				postMessage: vi.fn((msg: unknown) => {
+					postMessages.push(msg);
+				}),
+				terminate: vi.fn(),
+				onmessage: null,
+			};
+			workerInstances.push(instance);
+			return instance;
+		} as unknown as typeof Worker);
 
-		vi.stubGlobal(
-			"URL",
-			function () {
-				return { toString: () => "mock-worker-url" };
-			} as unknown as typeof URL,
-		);
+		vi.stubGlobal("URL", function () {
+			return { toString: () => "mock-worker-url" };
+		} as unknown as typeof URL);
 
 		vi.stubGlobal("chrome", {
 			runtime: { id: "extension-test" },
@@ -80,54 +74,62 @@ describe("snapshot dispatch", () => {
 						status: "complete",
 					}),
 				),
-				sendMessage: vi.fn(async (_tabId: number, msg: Record<string, unknown>) => {
-					if (msg.action === "ping") {
-						return { ok: true };
-					}
-					if (
-						msg.type === "registryCall" &&
-						msg.action === "page_snapshot_data"
-					) {
-						registrySnapshotCalls += 1;
-						return {
-							ok: true,
-							value: {
-								text: "snapshot",
-								nodes: [],
-								url: "https://example.com/",
-								title: "Example",
-								viewport: { width: 800, height: 600 },
-							},
-						};
-					}
-					if (
-						msg.type === "registryCall" &&
-						msg.action === "page_snapshot"
-					) {
-						registrySnapshotTextCalls += 1;
-						return {
-							ok: true,
-							value: "URL: https://example.com/\nTitle: Example\n\n- button [e1]",
-						};
-					}
-					if (
-						msg.type === "registryCall" &&
-						msg.action === "page_snapshot_query"
-					) {
-						registrySnapshotQueryCalls += 1;
-						return {
-							ok: true,
-							value: {
-								text: "",
-								nodes: [{ refId: "e1", role: "button", tag: "button", name: "Go", text: "Go" }],
-								url: "https://example.com/",
-								title: "Example",
-								viewport: { width: 800, height: 600 },
-							},
-						};
-					}
-					return { ok: false, error: "unexpected message" };
-				}),
+				sendMessage: vi.fn(
+					async (_tabId: number, msg: Record<string, unknown>) => {
+						if (msg.action === "ping") {
+							return { ok: true };
+						}
+						if (
+							msg.type === "registryCall" &&
+							msg.action === "page_snapshot_data"
+						) {
+							registrySnapshotCalls += 1;
+							return {
+								ok: true,
+								value: {
+									text: "snapshot",
+									nodes: [],
+									url: "https://example.com/",
+									title: "Example",
+									viewport: { width: 800, height: 600 },
+								},
+							};
+						}
+						if (msg.type === "registryCall" && msg.action === "page_snapshot") {
+							registrySnapshotTextCalls += 1;
+							return {
+								ok: true,
+								value:
+									"URL: https://example.com/\nTitle: Example\n\n- button [e1]",
+							};
+						}
+						if (
+							msg.type === "registryCall" &&
+							msg.action === "page_snapshot_query"
+						) {
+							_registrySnapshotQueryCalls += 1;
+							return {
+								ok: true,
+								value: {
+									text: "",
+									nodes: [
+										{
+											refId: "e1",
+											role: "button",
+											tag: "button",
+											name: "Go",
+											text: "Go",
+										},
+									],
+									url: "https://example.com/",
+									title: "Example",
+									viewport: { width: 800, height: 600 },
+								},
+							};
+						}
+						return { ok: false, error: "unexpected message" };
+					},
+				),
 				query: vi.fn(() => Promise.resolve([{ id: 1 }])),
 				onActivated: { addListener: vi.fn(), removeListener: vi.fn() },
 				onUpdated: { addListener: vi.fn(), removeListener: vi.fn() },
@@ -295,7 +297,10 @@ describe("snapshot dispatch", () => {
 				id: "sq-1",
 				owner: "content-script",
 				tabPolicy: "active",
-				command: { action: "page_snapshot_query", params: { filter: { role: "button" } } },
+				command: {
+					action: "page_snapshot_query",
+					params: { filter: { role: "button" } },
+				},
 			},
 		} as MessageEvent);
 
@@ -315,7 +320,9 @@ describe("snapshot dispatch", () => {
 	});
 
 	it("page_snapshot_query passes filter params through relay", async () => {
-		const chromeApi = globalThis.chrome as { tabs: { sendMessage: ReturnType<typeof vi.fn> } };
+		const chromeApi = globalThis.chrome as {
+			tabs: { sendMessage: ReturnType<typeof vi.fn> };
+		};
 		const initPromise = ExtensionSession.init();
 		setTimeout(() => {
 			const worker = workerInstances[workerInstances.length - 1];
@@ -330,14 +337,18 @@ describe("snapshot dispatch", () => {
 				id: "sq-2",
 				owner: "content-script",
 				tabPolicy: "active",
-				command: { action: "page_snapshot_query", params: { filter: { interactiveOnly: true, limit: 10 } } },
+				command: {
+					action: "page_snapshot_query",
+					params: { filter: { interactiveOnly: true, limit: 10 } },
+				},
 			},
 		} as MessageEvent);
 
 		await new Promise((resolve) => setTimeout(resolve, 100));
 
 		const sentMessage = chromeApi.tabs.sendMessage.mock.calls.find(
-			(call: [number, Record<string, unknown>]) => call[1]?.action === "page_snapshot_query",
+			(call: [number, Record<string, unknown>]) =>
+				call[1]?.action === "page_snapshot_query",
 		);
 		expect(sentMessage).toBeDefined();
 		expect((sentMessage![1] as Record<string, unknown>).params).toMatchObject({

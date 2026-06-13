@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { maybeStoreFetchResult } from "../src/worker/fetch-store.js";
 import { takeBlob } from "../src/worker/binary-blob-store.js";
+import { maybeStoreFetchResult } from "../src/worker/fetch-store.js";
 
 describe("maybeStoreFetchResult", () => {
 	it("stores binary fetch results when store is true", () => {
@@ -40,6 +40,8 @@ describe("maybeStoreFetchResult", () => {
 			contentType: "text/plain",
 			finalUrl: "https://example.com/x",
 		};
-		expect(maybeStoreFetchResult({ store: true }, value, "run-1")).toEqual(value);
+		expect(maybeStoreFetchResult({ store: true }, value, "run-1")).toEqual(
+			value,
+		);
 	});
 });

@@ -1,5 +1,5 @@
-import { ExtensionSession } from "@pi-oxide/extension-js";
 import type { LogLevel } from "@pi-oxide/extension-js";
+import { ExtensionSession } from "@pi-oxide/extension-js";
 import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 import type { WorkerRunResult } from "../types";
 
@@ -37,8 +37,7 @@ async function ensureSession(): Promise<ExtensionSession> {
 				w.__extensionSession = session;
 				session.setLogLevel("trace");
 				const params = new URLSearchParams(window.location.search);
-				const logLevel =
-					params.get("e2e_log") ?? params.get("log");
+				const logLevel = params.get("e2e_log") ?? params.get("log");
 				if (
 					logLevel === "trace" ||
 					logLevel === "debug" ||

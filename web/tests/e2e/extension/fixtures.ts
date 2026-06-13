@@ -12,7 +12,7 @@ type WorkerFixtures = {
 	fixture: ExtensionFixture;
 };
 
-export const test = base.extend<{}, WorkerFixtures>({
+export const test = base.extend<object, WorkerFixtures>({
 	harness: [
 		async ({}, use) => {
 			const harness = await launchExtension();

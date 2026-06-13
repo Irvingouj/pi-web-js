@@ -1,11 +1,8 @@
-import { describe, expect, it } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { describe, expect, it } from "vitest";
 
-const TOOLS_DIR = path.resolve(
-	import.meta.dirname,
-	"../src/main/runner/tools",
-);
+const TOOLS_DIR = path.resolve(import.meta.dirname, "../src/main/runner/tools");
 
 describe("first-party tools must not call executeInTab", () => {
 	it("runner tool modules do not reference executeInTab or executeSnapshotInTab", () => {
@@ -20,7 +17,10 @@ describe("first-party tools must not call executeInTab", () => {
 				if (!entry.name.endsWith(".ts")) continue;
 				if (full.includes(`${path.sep}chrome${path.sep}`)) continue;
 				const text = fs.readFileSync(full, "utf8");
-				if (text.includes("executeInTab") || text.includes("executeSnapshotInTab")) {
+				if (
+					text.includes("executeInTab") ||
+					text.includes("executeSnapshotInTab")
+				) {
 					violations.push(path.relative(TOOLS_DIR, full));
 				}
 			}

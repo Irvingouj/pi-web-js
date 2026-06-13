@@ -1,5 +1,10 @@
 export type WasmCellError =
-	| { kind: "compile"; name: string | null; message: string; line: number | null }
+	| {
+			kind: "compile";
+			name: string | null;
+			message: string;
+			line: number | null;
+	  }
 	| {
 			kind: "runtime";
 			name: string | null;
@@ -176,7 +181,10 @@ export class ExtensionSession {
 				action: "fs_exists",
 				description: "Check if a path exists.",
 				params: [],
-				returns: { js_type: "boolean", description: "Whether the path exists." },
+				returns: {
+					js_type: "boolean",
+					description: "Whether the path exists.",
+				},
 				source: "rust_core",
 			},
 			{
@@ -185,7 +193,14 @@ export class ExtensionSession {
 				name: "goto",
 				action: "page_goto",
 				description: "Navigate to a URL.",
-				params: [{ name: "url", js_type: "string", required: true, description: "The URL to navigate to." }],
+				params: [
+					{
+						name: "url",
+						js_type: "string",
+						required: true,
+						description: "The URL to navigate to.",
+					},
+				],
 				returns: { js_type: "object", description: "Navigation result." },
 				source: "extension",
 			},

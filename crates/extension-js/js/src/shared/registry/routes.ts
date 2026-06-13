@@ -1,5 +1,5 @@
-import type { ExecutionContextId } from "./manifest.js";
 import { isContentScriptAction } from "./content-script-actions.js";
+import type { ExecutionContextId } from "./manifest.js";
 import type { Route, TabPolicy } from "./types.js";
 
 const routes = new Map<string, Route>();
@@ -33,7 +33,9 @@ export function inferEndpoint(owner: ExecutionContextId): Route["endpoint"] {
 	if (owner === "worker") {
 		return "worker:default";
 	}
-	return owner.startsWith("worker:") ? (owner as Route["endpoint"]) : "main-thread";
+	return owner.startsWith("worker:")
+		? (owner as Route["endpoint"])
+		: "main-thread";
 }
 
 export function inferOwner(

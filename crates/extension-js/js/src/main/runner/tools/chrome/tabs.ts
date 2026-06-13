@@ -13,7 +13,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.tabs.query({})"
+	"chrome.tabs.query({})",
 );
 registerChromePassthrough(
 	"chrome_tabs_create",
@@ -24,7 +24,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.tabs.create({ url: \"https://example.com\" })"
+	'chrome.tabs.create({ url: "https://example.com" })',
 );
 registerChromePassthrough(
 	"chrome_tabs_update",
@@ -35,7 +35,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.tabs.update(1, { active: true })"
+	"chrome.tabs.update(1, { active: true })",
 );
 registerChromePassthrough(
 	"chrome_tabs_remove",
@@ -53,7 +53,7 @@ registerChromePassthrough(
 			description: "Tab ID to remove (literal)",
 		},
 	],
-	"chrome.tabs.remove(1)"
+	"chrome.tabs.remove(1)",
 );
 registerChromePassthrough(
 	"chrome_tabs_get",
@@ -71,7 +71,7 @@ registerChromePassthrough(
 			description: "Tab ID to get (literal)",
 		},
 	],
-	"chrome.tabs.get(1)"
+	"chrome.tabs.get(1)",
 );
 registerChromePassthrough(
 	"chrome_tabs_reload",
@@ -89,7 +89,7 @@ registerChromePassthrough(
 			description: "Tab ID to reload (literal)",
 		},
 	],
-	"chrome.tabs.reload(1)"
+	"chrome.tabs.reload(1)",
 );
 registerChromePassthrough(
 	"chrome_tabs_sendMessage",
@@ -100,7 +100,12 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[
-		{ name: "tabId", type: "number", required: false, description: "Tab ID (literal)" },
+		{
+			name: "tabId",
+			type: "number",
+			required: false,
+			description: "Tab ID (literal)",
+		},
 		{
 			name: "message",
 			type: "message payload",
@@ -108,7 +113,7 @@ registerChromePassthrough(
 			description: "Message to send (literal)",
 		},
 	],
-	"chrome.tabs.sendMessage(123, { greeting: \"hello\" })",
+	'chrome.tabs.sendMessage(123, { greeting: "hello" })',
 	"message response",
 );
 registerChromePassthrough(
@@ -120,7 +125,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.tabs.connect(123, { name: \"myPort\" })",
+	'chrome.tabs.connect(123, { name: "myPort" })',
 	"Port",
 );
 registerChromePassthrough(
@@ -132,7 +137,7 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.tabs.group({ tabIds: [1, 2, 3] })"
+	"chrome.tabs.group({ tabIds: [1, 2, 3] })",
 );
 registerChromePassthrough(
 	"chrome_tabs_ungroup",
@@ -143,5 +148,5 @@ registerChromePassthrough(
 	"ECHROME",
 	"extension",
 	[],
-	"chrome.tabs.ungroup([1, 2, 3])"
+	"chrome.tabs.ungroup([1, 2, 3])",
 );
