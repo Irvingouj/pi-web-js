@@ -1,7 +1,7 @@
 {
 	"name": "@pi-oxide/extension-js",
 	"type": "module",
-	"version": "0.8.0",
+	"version": "0.8.1",
 	"license": "LicenseRef-PiccoloNotebook-Fair-BYOK-1.0",
 	"main": "index.js",
 	"types": "index.d.ts",
@@ -18,7 +18,5 @@
 		"zod": "^3.23.8",
 		"@pi-oxide/dom-semantic-tree": "^0.1.1"
 	},
-	"sideEffects": [
-		"./snippets/*"
-	]
+	"sideEffects": ["./snippets/*"]
 }
