@@ -505,6 +505,36 @@ export const PageSnapshotDataParamsSchema = z.object({
 	options: z.object({}).passthrough().optional().describe("Snapshot options"),
 }).passthrough();
 
+export const SnapshotQueryFilterSchema = z.object({
+	role: z.union([z.string(), z.array(z.string())]).optional()
+		.describe("Filter by ARIA role"),
+	tag: z.union([z.string(), z.array(z.string())]).optional()
+		.describe("Filter by HTML tag"),
+	text: z.string().optional()
+		.describe("Filter by text content (case-insensitive substring)"),
+	name: z.string().optional()
+		.describe("Filter by accessible name (case-insensitive substring)"),
+	interactiveOnly: z.boolean().optional()
+		.describe("Only include interactive elements"),
+	href: z.string().optional()
+		.describe("Filter by href pattern (case-insensitive substring)"),
+	src: z.string().optional()
+		.describe("Filter by src pattern (case-insensitive substring)"),
+	limit: z.number().positive().optional()
+		.describe("Maximum filtered nodes to return"),
+}).passthrough();
+
+export const PageSnapshotQueryParamsSchema = z.object({
+	filter: SnapshotQueryFilterSchema.optional()
+		.describe("Semantic filter criteria"),
+	max_nodes: z.number().optional()
+		.describe("Maximum nodes to collect before filtering"),
+}).passthrough();
+
+export const TabSnapshotQueryParamsSchema = PageSnapshotQueryParamsSchema.extend({
+	tabId: z.number().describe("Tab ID"),
+});
+
 // ─── Filesystem schemas ────────────────────────────────────────
 
 export const FsPathParamsSchema = z.object({

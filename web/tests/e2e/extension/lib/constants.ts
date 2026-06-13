@@ -28,6 +28,7 @@ export const MEDIA_DOWNLOAD_URL = `http://${TESTCASE_SERVER_HOST}:${TESTCASE_SER
 export const STALE_REF_URL = `http://${TESTCASE_SERVER_HOST}:${TESTCASE_SERVER_PORT}/testcases/stale-ref/`;
 export const FILE_UPLOAD_FORM_URL = `http://${TESTCASE_SERVER_HOST}:${TESTCASE_SERVER_PORT}/testcases/file-upload-form/`;
 export const SLOW_NETWORK_URL = `http://${TESTCASE_SERVER_HOST}:${TESTCASE_SERVER_PORT}/testcases/slow-network/`;
+export const SNAPSHOT_QUERY_URL = `http://${TESTCASE_SERVER_HOST}:${TESTCASE_SERVER_PORT}/testcases/snapshot-query/`;
 export const RESULT_PREFIX = "__EXTENSION_CONTRACT_RESULT__";
 
 export const EXT_CONTRACT_APIS = process.env.EXT_CONTRACT_APIS === "1";

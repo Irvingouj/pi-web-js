@@ -333,6 +333,235 @@ describe("content-script onMessage handler", () => {
 	});
 });
 
+describe("snapshot_query handler", () => {
+	beforeEach(() => {
+		document.body.innerHTML = "";
+	});
+
+	it("filter by role returns only matching nodes", async () => {
+		document.body.innerHTML = "<button>A</button><a href='#'>B</a><h1>C</h1>";
+		const sendResponse = vi.fn();
+		const listener = mockAddListener.mock.calls[0][0];
+		listener(
+			{ type: "registryCall", action: "page_snapshot_query", params: { filter: { role: "button" } }, id: "sq-1" },
+			{ id: globalThis.chrome.runtime.id },
+			sendResponse,
+		);
+		await new Promise((resolve) => setTimeout(resolve, 10));
+		const response = sendResponse.mock.calls[0][0] as { ok: boolean; value: { nodes: Array<{ role: string }> } };
+		expect(response.ok).toBe(true);
+		expect(response.value.nodes).toHaveLength(1);
+		expect(response.value.nodes[0].role).toBe("button");
+	});
+
+	it("filter by multiple roles", async () => {
+		document.body.innerHTML = "<button>A</button><a href='#'>B</a><input type='text'>";
+		const sendResponse = vi.fn();
+		const listener = mockAddListener.mock.calls[0][0];
+		listener(
+			{ type: "registryCall", action: "page_snapshot_query", params: { filter: { role: ["button", "link"] } }, id: "sq-2" },
+			{ id: globalThis.chrome.runtime.id },
+			sendResponse,
+		);
+		await new Promise((resolve) => setTimeout(resolve, 10));
+		const response = sendResponse.mock.calls[0][0] as { ok: boolean; value: { nodes: Array<{ role: string }> } };
+		expect(response.ok).toBe(true);
+		expect(response.value.nodes).toHaveLength(2);
+	});
+
+	it("filter by tag", async () => {
+		document.body.innerHTML = "<button>A</button><a href='#'>B</a>";
+		const sendResponse = vi.fn();
+		const listener = mockAddListener.mock.calls[0][0];
+		listener(
+			{ type: "registryCall", action: "page_snapshot_query", params: { filter: { tag: "a" } }, id: "sq-3" },
+			{ id: globalThis.chrome.runtime.id },
+			sendResponse,
+		);
+		await new Promise((resolve) => setTimeout(resolve, 10));
+		const response = sendResponse.mock.calls[0][0] as { ok: boolean; value: { nodes: Array<{ tag: string }> } };
+		expect(response.ok).toBe(true);
+		expect(response.value.nodes).toHaveLength(1);
+		expect(response.value.nodes[0].tag).toBe("a");
+	});
+
+	it("filter by interactiveOnly excludes non-interactive", async () => {
+		document.body.innerHTML = "<button>A</button><div>B</div><h1>C</h1><a href='#'>D</a>";
+		const sendResponse = vi.fn();
+		const listener = mockAddListener.mock.calls[0][0];
+		listener(
+			{ type: "registryCall", action: "page_snapshot_query", params: { filter: { interactiveOnly: true } }, id: "sq-4" },
+			{ id: globalThis.chrome.runtime.id },
+			sendResponse,
+		);
+		await new Promise((resolve) => setTimeout(resolve, 10));
+		const response = sendResponse.mock.calls[0][0] as { ok: boolean; value: { nodes: Array<{ role: string }> } };
+		expect(response.ok).toBe(true);
+		const roles = response.value.nodes.map((n: { role: string }) => n.role);
+		expect(roles).not.toContain("heading");
+		expect(roles).not.toContain("generic");
+		expect(roles).toContain("button");
+		expect(roles).toContain("link");
+	});
+
+	it("filter by text substring (case-insensitive)", async () => {
+		document.body.innerHTML = "<button>Sign in</button><button>Cancel</button>";
+		const sendResponse = vi.fn();
+		const listener = mockAddListener.mock.calls[0][0];
+		listener(
+			{ type: "registryCall", action: "page_snapshot_query", params: { filter: { text: "sign" } }, id: "sq-5" },
+			{ id: globalThis.chrome.runtime.id },
+			sendResponse,
+		);
+		await new Promise((resolve) => setTimeout(resolve, 10));
+		const response = sendResponse.mock.calls[0][0] as { ok: boolean; value: { nodes: Array<{ text: string }> } };
+		expect(response.ok).toBe(true);
+		expect(response.value.nodes).toHaveLength(1);
+		expect(response.value.nodes[0].text).toContain("Sign in");
+	});
+
+	it("filter by name substring", async () => {
+		document.body.innerHTML = "<input aria-label='Email'><input aria-label='Password'>";
+		const sendResponse = vi.fn();
+		const listener = mockAddListener.mock.calls[0][0];
+		listener(
+			{ type: "registryCall", action: "page_snapshot_query", params: { filter: { name: "email" } }, id: "sq-6" },
+			{ id: globalThis.chrome.runtime.id },
+			sendResponse,
+		);
+		await new Promise((resolve) => setTimeout(resolve, 10));
+		const response = sendResponse.mock.calls[0][0] as { ok: boolean; value: { nodes: unknown[] } };
+		expect(response.ok).toBe(true);
+		expect(response.value.nodes).toHaveLength(1);
+	});
+
+	it("filter by href substring", async () => {
+		document.body.innerHTML = "<a href='/docs'>Docs</a><a href='/api'>API</a>";
+		const sendResponse = vi.fn();
+		const listener = mockAddListener.mock.calls[0][0];
+		listener(
+			{ type: "registryCall", action: "page_snapshot_query", params: { filter: { href: "/docs" } }, id: "sq-7" },
+			{ id: globalThis.chrome.runtime.id },
+			sendResponse,
+		);
+		await new Promise((resolve) => setTimeout(resolve, 10));
+		const response = sendResponse.mock.calls[0][0] as { ok: boolean; value: { nodes: Array<{ href: string }> } };
+		expect(response.ok).toBe(true);
+		expect(response.value.nodes).toHaveLength(1);
+	});
+
+	it("combined filter with AND logic", async () => {
+		document.body.innerHTML = "<button>OK</button><a href='/go'>Go</a><button>Cancel</button>";
+		const sendResponse = vi.fn();
+		const listener = mockAddListener.mock.calls[0][0];
+		listener(
+			{ type: "registryCall", action: "page_snapshot_query", params: { filter: { role: "button", text: "ok" } }, id: "sq-8" },
+			{ id: globalThis.chrome.runtime.id },
+			sendResponse,
+		);
+		await new Promise((resolve) => setTimeout(resolve, 10));
+		const response = sendResponse.mock.calls[0][0] as { ok: boolean; value: { nodes: Array<{ role: string; text: string }> } };
+		expect(response.ok).toBe(true);
+		expect(response.value.nodes).toHaveLength(1);
+		expect(response.value.nodes[0].text).toContain("OK");
+	});
+
+	it("empty filter returns all nodes", async () => {
+		document.body.innerHTML = "<button>A</button><a href='#'>B</a><h1>C</h1>";
+		const sendResponse = vi.fn();
+		const listener = mockAddListener.mock.calls[0][0];
+		// Get unfiltered count via snapshot_data
+		listener(
+			{ type: "registryCall", action: "page_snapshot_data", params: {}, id: "sq-base" },
+			{ id: globalThis.chrome.runtime.id },
+			vi.fn(),
+		);
+		await new Promise((resolve) => setTimeout(resolve, 10));
+
+		const sendResponse2 = vi.fn();
+		listener(
+			{ type: "registryCall", action: "page_snapshot_query", params: {}, id: "sq-9" },
+			{ id: globalThis.chrome.runtime.id },
+			sendResponse2,
+		);
+		await new Promise((resolve) => setTimeout(resolve, 10));
+		const response = sendResponse2.mock.calls[0][0] as { ok: boolean; value: { nodes: unknown[] } };
+		expect(response.ok).toBe(true);
+		expect(response.value.nodes.length).toBeGreaterThan(0);
+	});
+
+	it("empty result returns empty nodes", async () => {
+		document.body.innerHTML = "<div>text</div>";
+		const sendResponse = vi.fn();
+		const listener = mockAddListener.mock.calls[0][0];
+		listener(
+			{ type: "registryCall", action: "page_snapshot_query", params: { filter: { role: "button" } }, id: "sq-10" },
+			{ id: globalThis.chrome.runtime.id },
+			sendResponse,
+		);
+		await new Promise((resolve) => setTimeout(resolve, 10));
+		const response = sendResponse.mock.calls[0][0] as { ok: boolean; value: { nodes: unknown[] } };
+		expect(response.ok).toBe(true);
+		expect(response.value.nodes).toHaveLength(0);
+	});
+
+	it("returns url, title, viewport metadata", async () => {
+		document.body.innerHTML = "<button>A</button>";
+		const sendResponse = vi.fn();
+		const listener = mockAddListener.mock.calls[0][0];
+		listener(
+			{ type: "registryCall", action: "page_snapshot_query", params: { filter: { interactiveOnly: true } }, id: "sq-11" },
+			{ id: globalThis.chrome.runtime.id },
+			sendResponse,
+		);
+		await new Promise((resolve) => setTimeout(resolve, 10));
+		const response = sendResponse.mock.calls[0][0] as {
+			ok: boolean;
+			value: { nodes: unknown[]; url: string; title: string; viewport: { width: number; height: number } };
+		};
+		expect(response.ok).toBe(true);
+		expect(typeof response.value.url).toBe("string");
+		expect(typeof response.value.title).toBe("string");
+		expect(response.value.viewport).toBeDefined();
+		expect(typeof response.value.viewport.width).toBe("number");
+	});
+
+	it("returns E_SNAPSHOT when document.body is null", async () => {
+		const originalBody = document.body;
+		// Remove body by replacing it
+		const parent = originalBody?.parentNode;
+		if (parent) parent.removeChild(originalBody!);
+		const sendResponse = vi.fn();
+		const listener = mockAddListener.mock.calls[0][0];
+		listener(
+			{ type: "registryCall", action: "page_snapshot_query", params: { filter: { role: "button" } }, id: "sq-12" },
+			{ id: globalThis.chrome.runtime.id },
+			sendResponse,
+		);
+		await new Promise((resolve) => setTimeout(resolve, 10));
+		const response = sendResponse.mock.calls[0][0] as { ok: boolean; error?: { code: string } };
+		expect(response.ok).toBe(false);
+		expect(response.error?.code).toBe("E_SNAPSHOT");
+		// Restore body
+		if (parent && originalBody) parent.appendChild(originalBody);
+	});
+
+	it("limit caps results", async () => {
+		document.body.innerHTML = Array.from({ length: 10 }, (_, i) => `<button>Btn${i}</button>`).join("");
+		const sendResponse = vi.fn();
+		const listener = mockAddListener.mock.calls[0][0];
+		listener(
+			{ type: "registryCall", action: "page_snapshot_query", params: { filter: { role: "button", limit: 3 } }, id: "sq-13" },
+			{ id: globalThis.chrome.runtime.id },
+			sendResponse,
+		);
+		await new Promise((resolve) => setTimeout(resolve, 10));
+		const response = sendResponse.mock.calls[0][0] as { ok: boolean; value: { nodes: unknown[] } };
+		expect(response.ok).toBe(true);
+		expect(response.value.nodes).toHaveLength(3);
+	});
+});
+
 describe("snapshot refId contract", () => {
 	beforeEach(() => {
 		document.body.innerHTML = "";

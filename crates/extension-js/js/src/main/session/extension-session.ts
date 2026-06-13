@@ -11,6 +11,8 @@ import type {
   WasmGlobalsSnapshot,
 } from "../../../pkg/extension_js.js";
 import type { FsAction, FsActionMap } from "../../shared/fs-types.js";
+import type { SnapshotFilter } from "../../shared/snapshot-filter.js";
+import type { InlineSnapshotResult } from "../../shared/collect-inline-snapshot.js";
 import type { LogLevel } from "../../shared/logger.js";
 import { logger, setLogLevel as setMainLogLevel, LOG_LEVEL_NUMERIC } from "../../shared/logger.js";
 import type { Command } from "../../shared/registry/manifest.js";
@@ -581,6 +583,25 @@ export class ExtensionSession {
       update: (params: FsReadRangeDataParams) =>
         this.safePost("update", params),
       hash: (params: FsHashParams) => this.safePost("hash", params),
+    };
+  }
+
+  get snapshot() {
+    return {
+      query: async (
+        filter?: SnapshotFilter,
+        options?: { maxNodes?: number; tabId?: number },
+      ): Promise<InlineSnapshotResult> => {
+        const result = await this.executeContentScriptCommand(
+          { action: "page_snapshot_query", params: { filter: filter ?? {}, max_nodes: options?.maxNodes } },
+          options?.tabId ? "required" : "active",
+        );
+        if (typeof result === "object" && result !== null && "ok" in result && !(result as { ok: boolean }).ok) {
+          const err = (result as { error?: { message?: string; code?: string } }).error;
+          throw new Error(err?.message ?? "snapshot_query failed");
+        }
+        return result as InlineSnapshotResult;
+      },
     };
   }
 

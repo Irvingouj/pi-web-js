@@ -16,6 +16,7 @@ import {
 	resolveAbsoluteUrl,
 	resolveContainerRefId,
 } from "../shared/snapshot-dom.js";
+import { filterNodes } from "../shared/snapshot-filter.js";
 import { allocateRefId, syncRefIdCounterFromDom } from "../shared/ref-id.js";
 import { base64ToUint8Array } from "../shared/array-buffer.js";
 import { encodeFetchResponse } from "../shared/fetch-response.js";
@@ -574,6 +575,30 @@ export const handlers: Record<string, Handler> = {
 		const maxNodes = resolveMaxNodes(params);
 		const r = inlineSnapshot(maxNodes);
 		return r.text;
+	},
+
+	snapshot_query: async (params) => {
+		if (!document.body) {
+			throwStructuredAgentError({
+				message: "Document body not available for snapshot",
+				code: "E_SNAPSHOT",
+				category: "resource",
+				details: { cause: "document.body is null" },
+				recovery: ["Wait for the page to load fully before taking a snapshot."],
+			});
+		}
+		const maxNodes = resolveMaxNodes(params);
+		const r = inlineSnapshot(maxNodes);
+		const obj = asRecord(params);
+		const filter = obj.filter ? asRecord(obj.filter) : {};
+		const filtered = filterNodes(r.nodes, filter);
+		return {
+			text: "",
+			nodes: filtered,
+			url: r.url,
+			title: r.title,
+			viewport: r.viewport,
+		};
 	},
 
 	find: (params) => {

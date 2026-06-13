@@ -183,6 +183,28 @@ export type PageFindParams = { selector: string };
 
 export type PageGotoParams = { url: string; timeout?: bigint; waitUntil?: "load" | "networkidle" };
 
+export type SnapshotFilter = {
+	role?: string | string[];
+	tag?: string | string[];
+	text?: string;
+	name?: string;
+	interactiveOnly?: boolean;
+	href?: string;
+	src?: string;
+	limit?: number;
+};
+
+export type PageSnapshotQueryParams = {
+	filter?: SnapshotFilter;
+	max_nodes?: number;
+};
+
+export type TabSnapshotQueryParams = {
+	filter?: SnapshotFilter;
+	max_nodes?: number;
+	tabId: number;
+};
+
 export type PageHoverParams = { refId?: string; label?: string };
 
 export type PagePressParams = { key: string };

@@ -8,6 +8,9 @@ import {
 	PageFillParamsSchema,
 	PageSetFilesParamsSchema,
 	FsWriteParamsSchema,
+	PageSnapshotQueryParamsSchema,
+	SnapshotQueryFilterSchema,
+	TabSnapshotQueryParamsSchema,
 } from "../src/shared/schemas.js";
 import {
 	dispatchContentScriptCall,
@@ -372,5 +375,59 @@ describe("invalid parameter shapes produce E_INVALID_PARAMS through real dispatc
 				code: "E_INVALID_PARAMS",
 			},
 		});
+	});
+});
+
+describe("PageSnapshotQueryParamsSchema", () => {
+	it("parses valid params with role filter", () => {
+		const result = PageSnapshotQueryParamsSchema.parse({ filter: { role: "button" } });
+		expect(result.filter).toEqual({ role: "button" });
+	});
+
+	it("parses valid params with multiple roles", () => {
+		const result = PageSnapshotQueryParamsSchema.parse({ filter: { role: ["button", "link"] } });
+		expect(result.filter).toEqual({ role: ["button", "link"] });
+	});
+
+	it("parses valid params with interactiveOnly", () => {
+		const result = PageSnapshotQueryParamsSchema.parse({ filter: { interactiveOnly: true } });
+		expect(result.filter).toEqual({ interactiveOnly: true });
+	});
+
+	it("parses valid params with max_nodes and filter", () => {
+		const result = PageSnapshotQueryParamsSchema.parse({ max_nodes: 100, filter: { tag: "a" } });
+		expect(result.max_nodes).toBe(100);
+		expect(result.filter).toEqual({ tag: "a" });
+	});
+
+	it("parses empty params", () => {
+		const result = PageSnapshotQueryParamsSchema.parse({});
+		expect(result).toEqual({});
+	});
+
+	it("rejects invalid interactiveOnly type", () => {
+		const result = PageSnapshotQueryParamsSchema.safeParse({ filter: { interactiveOnly: "yes" } });
+		expect(result.success).toBe(false);
+	});
+});
+
+describe("TabSnapshotQueryParamsSchema", () => {
+	it("parses valid params with tabId and filter", () => {
+		const result = TabSnapshotQueryParamsSchema.safeParse({ tabId: 1, filter: { role: "button" } });
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.data.tabId).toBe(1);
+			expect(result.data.filter).toEqual({ role: "button" });
+		}
+	});
+
+	it("rejects missing tabId", () => {
+		const result = TabSnapshotQueryParamsSchema.safeParse({ filter: { role: "button" } });
+		expect(result.success).toBe(false);
+	});
+
+	it("rejects non-number tabId", () => {
+		const result = TabSnapshotQueryParamsSchema.safeParse({ tabId: "bad", filter: { role: "button" } });
+		expect(result.success).toBe(false);
 	});
 });

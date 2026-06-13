@@ -795,3 +795,198 @@ describe("ExtensionSession fs namespace e2e", () => {
 		}
 	});
 });
+
+
+describe("session.snapshot.query()", () => {
+	let sessions: ExtensionSession[] = [];
+	let postMessages: unknown[] = [];
+	let workerInstances: MockWorker[] = [];
+
+	beforeEach(() => {
+		postMessages = [];
+		workerInstances = [];
+		sessions = [];
+		setRunnerAbortController(null);
+
+		vi.stubGlobal(
+			"Worker",
+			function () {
+				const instance: MockWorker = {
+					postMessage: vi.fn((msg: unknown) => {
+						postMessages.push(msg);
+					}),
+					terminate: vi.fn(),
+					onmessage: null,
+					onerror: null,
+					onmessageerror: null,
+				};
+				workerInstances.push(instance);
+				return instance;
+			} as unknown as typeof Worker,
+		);
+		vi.stubGlobal(
+			"URL",
+			function () {
+				return { toString: () => "mock-worker-url" };
+			} as unknown as typeof URL,
+		);
+		vi.stubGlobal("chrome", {
+			runtime: { id: "extension-test" },
+			tabs: {
+				sendMessage: mockContentScriptSendMessage({
+					ok: true,
+					value: {
+						text: "",
+						nodes: [{ refId: "e1", role: "button", tag: "button", name: "Go", text: "Go" }],
+						url: "https://example.com/",
+						title: "Example",
+						viewport: { width: 800, height: 600 },
+					},
+				}),
+				onActivated: { addListener: vi.fn(), removeListener: vi.fn() },
+				onUpdated: { addListener: vi.fn(), removeListener: vi.fn() },
+				query: vi.fn(() => Promise.resolve([{ id: 1 }])),
+				get: vi.fn(() =>
+					Promise.resolve({
+						id: 1,
+						url: "https://example.com/",
+						title: "Example",
+						status: "complete",
+					}),
+				),
+			},
+			scripting: { executeScript: vi.fn() },
+		});
+	});
+
+	afterEach(async () => {
+		for (const session of sessions) {
+			try {
+				await session.stopWith(Promise.resolve());
+			} catch {
+				// ignore
+			}
+		}
+		vi.restoreAllMocks();
+		vi.unstubAllGlobals();
+		postMessages = [];
+		workerInstances = [];
+		sessions = [];
+	});
+
+	async function initSnapshotSession(): Promise<[ExtensionSession, MockWorker]> {
+		const initPromise = ExtensionSession.init();
+		setTimeout(() => {
+			const latestWorker = workerInstances[workerInstances.length - 1];
+			if (latestWorker?.onmessage) {
+				latestWorker.onmessage({
+					data: { type: "ready" },
+				} as MessageEvent);
+			}
+		}, 0);
+		const [session] = await initPromise;
+		sessions.push(session);
+		const worker = workerInstances[workerInstances.length - 1];
+		return [session, worker];
+	}
+
+	it("calls executeContentScriptCommand with correct action and default params", async () => {
+		const [session] = await initSnapshotSession();
+		const spy = vi.spyOn(session as any, "executeContentScriptCommand");
+		spy.mockResolvedValueOnce({
+			ok: true,
+			value: {
+				text: "",
+				nodes: [],
+				url: "https://example.com/",
+				title: "Example",
+				viewport: { width: 800, height: 600 },
+			},
+		});
+
+		const result = await session.snapshot.query();
+
+		expect(spy).toHaveBeenCalledTimes(1);
+		expect(spy).toHaveBeenCalledWith(
+			expect.objectContaining({
+				action: "page_snapshot_query",
+				params: { filter: {}, max_nodes: undefined },
+			}),
+			"active",
+		);
+		expect(result).toMatchObject({ ok: true });
+
+		spy.mockRestore();
+	});
+
+	it("passes filter through to executeContentScriptCommand", async () => {
+		const [session] = await initSnapshotSession();
+		const spy = vi.spyOn(session as any, "executeContentScriptCommand");
+		spy.mockResolvedValueOnce({
+			ok: true,
+			value: {
+				text: "",
+				nodes: [{ refId: "e1", role: "button", tag: "button", name: "Go", text: "Go" }],
+				url: "https://example.com/",
+				title: "Example",
+				viewport: { width: 800, height: 600 },
+			},
+		});
+
+		const result = await session.snapshot.query({ role: "button" });
+
+		expect(spy).toHaveBeenCalledTimes(1);
+		expect(spy).toHaveBeenCalledWith(
+			expect.objectContaining({
+				action: "page_snapshot_query",
+				params: { filter: { role: "button" }, max_nodes: undefined },
+			}),
+			"active",
+		);
+		expect(result).toMatchObject({ ok: true });
+
+		spy.mockRestore();
+	});
+
+	it("uses 'required' tabPolicy when tabId is provided in options", async () => {
+		const [session] = await initSnapshotSession();
+		const spy = vi.spyOn(session as any, "executeContentScriptCommand");
+		spy.mockResolvedValueOnce({
+			ok: true,
+			value: {
+				text: "",
+				nodes: [],
+				url: "https://example.com/",
+				title: "Example",
+				viewport: { width: 800, height: 600 },
+			},
+		});
+
+		const result = await session.snapshot.query({}, { tabId: 42 });
+
+		expect(spy).toHaveBeenCalledTimes(1);
+		expect(spy).toHaveBeenCalledWith(
+			expect.objectContaining({
+				action: "page_snapshot_query",
+				params: { filter: {}, max_nodes: undefined },
+			}),
+			"required",
+		);
+		expect(result).toMatchObject({ ok: true });
+
+		spy.mockRestore();
+	});
+
+	it("throws when executeContentScriptCommand returns ok: false", async () => {
+		const [session] = await initSnapshotSession();
+		const spy = vi.spyOn(session as any, "executeContentScriptCommand");
+		spy.mockResolvedValueOnce({
+			ok: false,
+			error: { message: "snap failed", code: "E_SNAPSHOT" },
+		});
+
+		await expect(session.snapshot.query()).rejects.toThrow("snap failed");
+
+		spy.mockRestore();
+	});
+});

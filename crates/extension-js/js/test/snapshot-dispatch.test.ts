@@ -28,6 +28,7 @@ describe("snapshot dispatch", () => {
 	let executeScriptCalls = 0;
 	let registrySnapshotCalls = 0;
 	let registrySnapshotTextCalls = 0;
+	let registrySnapshotQueryCalls = 0;
 	let workerInstances: MockWorker[] = [];
 	let postMessages: unknown[] = [];
 
@@ -35,6 +36,7 @@ describe("snapshot dispatch", () => {
 		executeScriptCalls = 0;
 		registrySnapshotCalls = 0;
 		registrySnapshotTextCalls = 0;
+		registrySnapshotQueryCalls = 0;
 		workerInstances = [];
 		postMessages = [];
 		setRunnerAbortController(null);
@@ -106,6 +108,22 @@ describe("snapshot dispatch", () => {
 						return {
 							ok: true,
 							value: "URL: https://example.com/\nTitle: Example\n\n- button [e1]",
+						};
+					}
+					if (
+						msg.type === "registryCall" &&
+						msg.action === "page_snapshot_query"
+					) {
+						registrySnapshotQueryCalls += 1;
+						return {
+							ok: true,
+							value: {
+								text: "",
+								nodes: [{ refId: "e1", role: "button", tag: "button", name: "Go", text: "Go" }],
+								url: "https://example.com/",
+								title: "Example",
+								viewport: { width: 800, height: 600 },
+							},
 						};
 					}
 					return { ok: false, error: "unexpected message" };
@@ -258,6 +276,73 @@ describe("snapshot dispatch", () => {
 			}),
 		});
 		expect(sendMessageCalls).toBe(0);
+
+		await session.stopWith(Promise.resolve());
+	});
+
+	it("page_snapshot_query relays to content-script with correct action", async () => {
+		const initPromise = ExtensionSession.init();
+		setTimeout(() => {
+			const worker = workerInstances[workerInstances.length - 1];
+			worker?.onmessage?.({ data: { type: "ready" } } as MessageEvent);
+		}, 0);
+		const [session] = await initPromise;
+		const worker = workerInstances[workerInstances.length - 1];
+
+		worker.onmessage?.({
+			data: {
+				type: "asyncRelay",
+				id: "sq-1",
+				owner: "content-script",
+				tabPolicy: "active",
+				command: { action: "page_snapshot_query", params: { filter: { role: "button" } } },
+			},
+		} as MessageEvent);
+
+		await new Promise((resolve) => setTimeout(resolve, 100));
+
+		const result = postMessages.find(
+			(m): m is PostMessage =>
+				typeof m === "object" &&
+				m !== null &&
+				(m as PostMessage).type === "asyncRelayResult" &&
+				(m as PostMessage).id === "sq-1",
+		);
+		expect(result?.result).toMatchObject({ ok: true });
+		expect(executeScriptCalls).toBe(0);
+
+		await session.stopWith(Promise.resolve());
+	});
+
+	it("page_snapshot_query passes filter params through relay", async () => {
+		const chromeApi = globalThis.chrome as { tabs: { sendMessage: ReturnType<typeof vi.fn> } };
+		const initPromise = ExtensionSession.init();
+		setTimeout(() => {
+			const worker = workerInstances[workerInstances.length - 1];
+			worker?.onmessage?.({ data: { type: "ready" } } as MessageEvent);
+		}, 0);
+		const [session] = await initPromise;
+		const worker = workerInstances[workerInstances.length - 1];
+
+		worker.onmessage?.({
+			data: {
+				type: "asyncRelay",
+				id: "sq-2",
+				owner: "content-script",
+				tabPolicy: "active",
+				command: { action: "page_snapshot_query", params: { filter: { interactiveOnly: true, limit: 10 } } },
+			},
+		} as MessageEvent);
+
+		await new Promise((resolve) => setTimeout(resolve, 100));
+
+		const sentMessage = chromeApi.tabs.sendMessage.mock.calls.find(
+			(call: [number, Record<string, unknown>]) => call[1]?.action === "page_snapshot_query",
+		);
+		expect(sentMessage).toBeDefined();
+		expect((sentMessage![1] as Record<string, unknown>).params).toMatchObject({
+			filter: { interactiveOnly: true, limit: 10 },
+		});
 
 		await session.stopWith(Promise.resolve());
 	});
