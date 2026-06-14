@@ -341,7 +341,11 @@ registerJsCall({
 	returns: schemas.ChromeTabArraySchema,
 	owner: "main-thread",
 	handler: async (params, _ctx) => {
-		return unwrapResult(await dispatchTool("chrome_tabs_query", [params]));
+		const tabs = unwrapResult(await dispatchTool("chrome_tabs_query", [params]));
+		return (Array.isArray(tabs) ? tabs : []).map((t) => ({
+			...t,
+			tabId: t?.id,
+		}));
 	},
 	paramTypes: [
 		{

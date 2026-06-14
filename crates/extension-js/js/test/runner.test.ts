@@ -996,6 +996,29 @@ describe("chrome passthrough", () => {
 		expect(mockChrome.tabs.query).toHaveBeenCalledWith({ active: true });
 	});
 
+	it("page_tabs adds tabId from chrome tab id", async () => {
+		mockChrome.tabs.query.mockResolvedValue([
+			{ id: 11, url: "https://example.com/", title: "Example" },
+			{ id: 22, url: "https://other.test/", title: "Other" },
+		]);
+		const result = await executeMainThreadCommand({
+			action: "page_tabs",
+			params: {},
+			call_id: 1,
+		});
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			const tabs = result.value as Array<{ id?: number; tabId?: number }>;
+			expect(Array.isArray(tabs)).toBe(true);
+			expect(tabs).toHaveLength(2);
+			expect(tabs[0].id).toBe(11);
+			expect(tabs[0].tabId).toBe(11);
+			expect(tabs[1].id).toBe(22);
+			expect(tabs[1].tabId).toBe(22);
+		}
+		expect(mockChrome.tabs.query).toHaveBeenCalledWith({});
+	});
+
 	it("chrome_tabs_update preserves argument order and falsey values", async () => {
 		await dispatchTool("chrome_tabs_update", [0, { active: false }]);
 		expect(mockChrome.tabs.update).toHaveBeenCalledWith(0, { active: false });

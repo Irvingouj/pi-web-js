@@ -58,6 +58,7 @@ pub fn format_cell_error_text(err: &CellError) -> String {
             line,
             action,
             code,
+            stack,
         } => {
             if action.is_some() || code.is_some() {
                 let action = action.as_deref().unwrap_or("unknown");
@@ -66,13 +67,28 @@ pub fn format_cell_error_text(err: &CellError) -> String {
                 if let Some(line) = line {
                     out.push_str(&format!(" (line {})", line));
                 }
+                append_stack(&mut out, stack);
                 out
             } else {
-                format_named_error(name.as_deref(), message, *line)
+                let mut out = format_named_error(name.as_deref(), message, *line);
+                if message.is_empty() {
+                    append_stack(&mut out, stack);
+                }
+                out
             }
         }
         CellError::FuelExhausted => "Execution stopped: time limit reached".to_string(),
         CellError::Internal { message } => format!("Internal error: {}", message),
+    }
+}
+
+fn append_stack(out: &mut String, stack: &Option<String>) {
+    if let Some(stack) = stack {
+        let trimmed = stack.trim();
+        if !trimmed.is_empty() {
+            out.push_str("\nStack:\n");
+            out.push_str(trimmed);
+        }
     }
 }
 
@@ -107,6 +123,7 @@ mod tests {
                 "await page.goto(url)".into(),
                 "refresh the tab".into(),
             ]),
+            stack: None,
         };
         let text = format_js_exception(&exc);
         assert!(text.contains("Hint: snapshot works"));
@@ -132,6 +149,7 @@ mod tests {
             line: None,
             action: None,
             code: None,
+            stack: None,
         });
         assert_eq!(text, "TypeError: x is not defined");
     }
@@ -144,6 +162,7 @@ mod tests {
             line: None,
             action: Some("tab_snapshot".into()),
             code: Some("E_SCRIPTING".into()),
+            stack: None,
         });
         assert_eq!(text, "[tab_snapshot] (E_SCRIPTING): Cannot execute script");
     }
@@ -156,11 +175,27 @@ mod tests {
             line: Some(12),
             action: Some("tab_snapshot".into()),
             code: Some("E_SCRIPTING".into()),
+            stack: None,
         });
         assert_eq!(
             text,
             "[tab_snapshot] (E_SCRIPTING): Cannot execute script (line 12)"
         );
+    }
+
+    #[test]
+    fn format_runtime_error_empty_message_uses_stack() {
+        let text = format_cell_error_text(&CellError::Runtime {
+            name: Some("TypeError".into()),
+            message: String::new(),
+            line: None,
+            action: None,
+            code: None,
+            stack: Some("    at foo (eval:1:5)\n    at bar (eval:2:10)".into()),
+        });
+        assert!(text.contains("TypeError"));
+        assert!(text.contains("Stack:"));
+        assert!(text.contains("at foo (eval:1:5)"));
     }
 
     #[test]

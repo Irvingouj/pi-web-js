@@ -68,6 +68,7 @@ pub enum WasmCellError {
         line: Option<u32>,
         action: Option<String>,
         code: Option<String>,
+        stack: Option<String>,
     },
     FuelExhausted,
     Internal {
@@ -192,12 +193,14 @@ impl From<web_js_core::CellError> for WasmCellError {
                 line,
                 action,
                 code,
+                stack,
             } => WasmCellError::Runtime {
                 name,
                 message,
                 line,
                 action,
                 code,
+                stack,
             },
             web_js_core::CellError::FuelExhausted => WasmCellError::FuelExhausted,
             web_js_core::CellError::Internal { message } => WasmCellError::Internal { message },

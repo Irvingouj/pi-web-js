@@ -1418,6 +1418,24 @@ console.log(result)"#;
     }
 
     #[test]
+    fn test_thrown_error_carries_stack() {
+        let mut session = JsSession::new();
+        let result = session.run_cell("throw new Error(\"boom\")", "");
+        assert!(result.error.is_some(), "{:?}", result.error);
+        match result.error.as_ref().unwrap() {
+            crate::types::CellError::Runtime { name, message, stack, .. } => {
+                assert_eq!(name.as_deref(), Some("Error"));
+                assert_eq!(message, "boom");
+                assert!(
+                    stack.as_ref().is_some_and(|s| !s.trim().is_empty()),
+                    "stack should be captured: {stack:?}"
+                );
+            }
+            other => panic!("thrown Error should be runtime, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn test_syntax_error_classification_parity_eval_and_throw() {
         let mut session = JsSession::new();
 
@@ -1677,6 +1695,7 @@ console.log(result)"#;
                         line: None,
                         action: None,
                         code: None,
+                        stack: None,
                     },
                 );
                 assert_eq!(display, "TypeError: x is not a function");

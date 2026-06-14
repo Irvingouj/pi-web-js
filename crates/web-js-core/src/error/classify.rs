@@ -94,6 +94,7 @@ pub(crate) fn cell_error_from_js_exception(exc: JsException) -> CellError {
             line,
             action: exc.action,
             code: exc.code,
+            stack: exc.stack,
         }
     }
 }
@@ -119,6 +120,7 @@ pub(crate) fn cell_error_from_text(msg: &str) -> CellError {
         code: None,
         hint: None,
         recovery: None,
+        stack: None,
     })
 }
 
@@ -150,6 +152,7 @@ mod tests {
             code: None,
             hint: None,
             recovery: None,
+            stack: None,
         }
     }
 
@@ -200,6 +203,7 @@ mod tests {
             code: Some("E_SCRIPTING".into()),
             hint: None,
             recovery: None,
+            stack: None,
         };
         let err = cell_error_from_js_exception(exc);
         match err {
@@ -241,6 +245,7 @@ mod tests {
             code: None,
             hint: None,
             recovery: None,
+            stack: None,
         };
         let err = cell_error_from_js_exception(exc);
         match err {
@@ -251,6 +256,31 @@ mod tests {
                 let display = format_cell_error_text(&err);
                 assert_eq!(display, "TypeError");
                 assert!(!display.contains("TypeError: TypeError"));
+            }
+            other => panic!("expected Runtime, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn js_exc_forwards_stack_to_cell_error() {
+        let exc = JsException {
+            name: Some("TypeError".into()),
+            message: String::new(),
+            line: None,
+            action: None,
+            code: None,
+            hint: None,
+            recovery: None,
+            stack: Some("    at foo (eval:1:5)\n    at bar (eval:2:10)".into()),
+        };
+        match cell_error_from_js_exception(exc) {
+            CellError::Runtime { stack, .. } => {
+                assert!(
+                    stack
+                        .as_ref()
+                        .is_some_and(|s| s.contains("at foo (eval:1:5)")),
+                    "stack should be forwarded: {stack:?}"
+                );
             }
             other => panic!("expected Runtime, got {other:?}"),
         }

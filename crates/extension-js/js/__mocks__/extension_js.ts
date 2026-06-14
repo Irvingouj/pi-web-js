@@ -12,6 +12,7 @@ export type WasmCellError =
 			line: number | null;
 			action: string | null;
 			code: string | null;
+			stack: string | null;
 	  }
 	| { kind: "fuel_exhausted" }
 	| { kind: "internal"; message: string };

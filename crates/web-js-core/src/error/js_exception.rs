@@ -11,6 +11,7 @@ pub(crate) struct JsException {
     pub code: Option<String>,
     pub hint: Option<String>,
     pub recovery: Option<Vec<String>>,
+    pub stack: Option<String>,
 }
 
 /// Extract a line number from an error message or stack trace.
@@ -154,6 +155,7 @@ pub(crate) fn parse_js_exception<'js>(value: &Value<'js>) -> JsException {
             code: None,
             hint: None,
             recovery: None,
+            stack: None,
         };
     };
 
@@ -221,6 +223,7 @@ pub(crate) fn parse_js_exception<'js>(value: &Value<'js>) -> JsException {
         code,
         hint,
         recovery,
+        stack,
     }
 }
 

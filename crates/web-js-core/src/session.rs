@@ -483,6 +483,7 @@ impl JsSession {
                         line: None,
                         action: None,
                         code: None,
+                        stack: None,
                     },
                     false,
                     exec_count,

@@ -21,6 +21,7 @@ pub enum CellError {
         line: Option<u32>,
         action: Option<String>,
         code: Option<String>,
+        stack: Option<String>,
     },
     /// Execution exceeded the time limit (likely an infinite loop).
     FuelExhausted,
