@@ -6,6 +6,7 @@ use web_sys::{
     FileSystemRemoveOptions, FileSystemWritableFileStream, StorageManager,
 };
 
+use crate::path_util::path_parts;
 use crate::{DirEntry, EntryKind, FsError, Metadata, Result};
 
 fn js_err_to_fs_err(err: &JsValue) -> FsError {
@@ -51,30 +52,6 @@ async fn get_root() -> Result<FileSystemDirectoryHandle> {
         .map_err(|_| FsError::Io("invalid directory handle".into()))
 }
 
-fn path_parts(path: &std::path::Path) -> Result<Vec<String>> {
-    if !path.has_root() {
-        return Err(FsError::InvalidPath);
-    }
-    let mut parts = Vec::new();
-    for comp in path.components() {
-        match comp {
-            std::path::Component::RootDir => {}
-            std::path::Component::Normal(s) => {
-                let s = s.to_str().ok_or(FsError::InvalidPath)?;
-                if s == ".." {
-                    return Err(FsError::InvalidPath);
-                }
-                if s == "." || s.is_empty() {
-                    continue;
-                }
-                parts.push(s.to_string());
-            }
-            _ => return Err(FsError::InvalidPath),
-        }
-    }
-    Ok(parts)
-}
-
 async fn resolve_dir(path: &std::path::Path) -> Result<FileSystemDirectoryHandle> {
     let parts = path_parts(path)?;
     let mut current = get_root().await?;
@@ -112,7 +89,10 @@ async fn resolve_parent_and_name(
 ) -> Result<(FileSystemDirectoryHandle, String)> {
     let parts = path_parts(path)?;
     if parts.is_empty() {
-        return Err(FsError::InvalidPath);
+        return Err(FsError::InvalidPath(format!(
+            "path resolves to root: {}",
+            path.display()
+        )));
     }
     let name = parts.last().unwrap().clone();
     let parent_parts = &parts[..parts.len() - 1];
@@ -144,7 +124,10 @@ async fn resolve_file(path: &std::path::Path) -> Result<FileSystemFileHandle> {
 async fn resolve_file_create(path: &std::path::Path) -> Result<FileSystemFileHandle> {
     let parts = path_parts(path)?;
     if parts.is_empty() {
-        return Err(FsError::InvalidPath);
+        return Err(FsError::InvalidPath(format!(
+            "path resolves to root: {}",
+            path.display()
+        )));
     }
     let name = parts.last().unwrap().clone();
     let parent_parts = &parts[..parts.len() - 1];

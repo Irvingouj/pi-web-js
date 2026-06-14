@@ -1,5 +1,6 @@
 pub mod error;
 pub mod metadata;
+pub mod path_util;
 
 #[cfg(target_family = "wasm")]
 mod opfs;

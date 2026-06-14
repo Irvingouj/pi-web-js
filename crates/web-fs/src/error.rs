@@ -16,8 +16,8 @@ pub enum FsError {
     NotDirectory,
     #[error("E_DIRECTORY_NOT_EMPTY")]
     DirectoryNotEmpty,
-    #[error("E_INVALID_PATH")]
-    InvalidPath,
+    #[error("E_INVALID_PATH: {0}")]
+    InvalidPath(String),
     #[error("E_INVALID_ENCODING")]
     InvalidEncoding,
     #[error("E_PERMISSION_DENIED")]
@@ -37,7 +37,7 @@ impl FsError {
             FsError::NotFile => "E_NOT_FILE",
             FsError::NotDirectory => "E_NOT_DIRECTORY",
             FsError::DirectoryNotEmpty => "E_DIRECTORY_NOT_EMPTY",
-            FsError::InvalidPath => "E_INVALID_PATH",
+            FsError::InvalidPath(_) => "E_INVALID_PATH",
             FsError::InvalidEncoding => "E_INVALID_ENCODING",
             FsError::PermissionDenied => "E_PERMISSION_DENIED",
             FsError::OutOfQuota => "E_OUT_OF_QUOTA",
@@ -49,6 +49,7 @@ impl FsError {
     pub fn wire_message(&self) -> String {
         match self {
             FsError::Io(msg) => msg.clone(),
+            FsError::InvalidPath(ctx) => format!("E_INVALID_PATH: {}", ctx),
             _ => self.wire_code().to_string(),
         }
     }
