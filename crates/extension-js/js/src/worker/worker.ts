@@ -686,32 +686,45 @@ export function createExecutableCallback(
 			if (!prepared.ok) {
 				return prepared;
 			}
-			const result = await remoteCall(prepared.params, {
-				...context,
-				signal:
-					context?.signal ??
-					(context?.runId
-						? runAbortControllers.get(context.runId)?.signal
-						: undefined),
-			});
-			if (
-				typeof result === "object" &&
-				result !== null &&
-				"ok" in result &&
-				(result as { ok: boolean }).ok &&
-				FETCH_STORE_ACTIONS.has(entry.action)
-			) {
-				const okResult = result as { ok: true; value: unknown };
-				return {
-					ok: true,
-					value: maybeStoreFetchResult(
-						originalParams,
-						okResult.value,
-						context?.runId,
-					),
-				};
+			try {
+				const result = await remoteCall(prepared.params, {
+					...context,
+					signal:
+						context?.signal ??
+						(context?.runId
+							? runAbortControllers.get(context.runId)?.signal
+							: undefined),
+				});
+				if (
+					typeof result === "object" &&
+					result !== null &&
+					"ok" in result &&
+					(result as { ok: boolean }).ok &&
+					FETCH_STORE_ACTIONS.has(entry.action)
+				) {
+					const okResult = result as { ok: true; value: unknown };
+					return {
+						ok: true,
+						value: maybeStoreFetchResult(
+							originalParams,
+							okResult.value,
+							context?.runId,
+						),
+					};
+				}
+				return result;
+			} catch (error: unknown) {
+				const message =
+					error instanceof Error ? error.message : String(error);
+				const code =
+					typeof error === "object" &&
+					error !== null &&
+					"code" in error &&
+					typeof (error as { code?: unknown }).code === "string"
+						? (error as { code: string }).code
+						: entry.errorCode || "E_RELAY";
+				return { ok: false, error: { message, code } };
 			}
-			return result;
 		};
 	}
 }

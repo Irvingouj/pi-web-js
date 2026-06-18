@@ -1749,4 +1749,75 @@ console.log(result)"#;
             other => panic!("expected runtime error, got {other:?}"),
         }
     }
+
+    /// setTimeout must exist in the sandbox so cells can wait between actions.
+    /// Regression: agent cells like `await new Promise(r => setTimeout(r, 500))`
+    /// threw an opaque empty-message TypeError because setTimeout was undefined.
+    #[test]
+    fn test_set_timeout_produces_async_sleep_command() {
+        let mut session = JsSession::new();
+
+        let result = session.run_cell(
+            r#"
+            await new Promise((resolve) => setTimeout(resolve, 500));
+            print("done");
+        "#,
+            "",
+        );
+
+        assert!(
+            result.error.is_none(),
+            "setTimeout must not throw; got error: {:?}",
+            result.error
+        );
+        assert_eq!(
+            result.status,
+            CellStatus::AsyncPending,
+            "setTimeout should yield an async sleep command, got status {:?}",
+            result.status
+        );
+        assert_eq!(result.pending_commands.len(), 1);
+        assert_eq!(result.pending_commands[0].action, "sleep");
+    }
+
+    /// After the host resumes the sleep command, the setTimeout callback must fire.
+    /// Regression: reject was stored as undefined, causing resume_async_pending to
+    /// fail before the resolve path was reached — callbacks never fired.
+    #[test]
+    fn test_set_timeout_callback_fires_on_resume() {
+        let mut session = JsSession::new();
+
+        let result = session.run_cell(
+            r#"
+            await new Promise((resolve) => setTimeout(resolve, 500));
+            print("callback fired");
+        "#,
+            "",
+        );
+
+        assert!(result.error.is_none(), "cell should not error: {:?}", result.error);
+        assert_eq!(result.status, CellStatus::AsyncPending);
+        assert_eq!(result.pending_commands.len(), 1);
+        assert_eq!(result.pending_commands[0].action, "sleep");
+
+        let call_id = result.pending_commands[0].call_id;
+        let response = crate::types::AsyncResponse {
+            ok: true,
+            value: Some(serde_json::json!(null)),
+            error: None,
+        };
+        let json = serde_json::to_string(&response).unwrap();
+        let resume = session.resume_cell(call_id, &json);
+        assert!(
+            resume.error.is_none(),
+            "resume should not error: {:?}",
+            resume.error
+        );
+        assert_eq!(resume.status, CellStatus::Done);
+        assert!(
+            resume.stdout.iter().any(|s| s.contains("callback fired")),
+            "callback should have fired, stdout: {:?}",
+            resume.stdout
+        );
+    }
 }

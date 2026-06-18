@@ -404,7 +404,10 @@ export class ExtensionSession {
 					},
 				});
 			}
-			return executeMainThreadCommand(cmd, signal);
+			return this.withMainThreadTimeout(
+				executeMainThreadCommand(cmd, signal),
+				cmd.action,
+			);
 		}
 		if (owner === "content-script") {
 			return this.executeContentScriptCommand(cmd, tabPolicy, relayId, signal);
@@ -415,6 +418,39 @@ export class ExtensionSession {
 				message: `Unknown execution context: ${owner}`,
 				code: "E_UNKNOWN_CONTEXT",
 			},
+		});
+	}
+	/**
+	 * Race a main-thread command against a hard timeout. If the handler hangs
+	 * (e.g. waitForTabLoad on a page that never reaches `complete`, or a content
+	 * script that never reconnects), this converts the hang into a structured
+	 * E_TIMEOUT error that the relay posts back to the worker — instead of
+	 * leaving the cell's join_all awaiting forever.
+	 */
+	private withMainThreadTimeout<T>(
+		promise: Promise<T>,
+		action: string,
+		timeoutMs = 120_000,
+	): Promise<T | { ok: false; error: { message: string; code: string } }> {
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		const timeout = new Promise<{
+			ok: false;
+			error: { message: string; code: string };
+		}>((resolve) => {
+			timer = setTimeout(
+				() =>
+					resolve({
+						ok: false,
+						error: {
+							message: `Main-thread action "${action}" timed out after ${timeoutMs}ms`,
+							code: "E_TIMEOUT",
+						},
+					}),
+				timeoutMs,
+			);
+		});
+		return Promise.race([promise, timeout]).finally(() => {
+			if (timer) clearTimeout(timer);
 		});
 	}
 

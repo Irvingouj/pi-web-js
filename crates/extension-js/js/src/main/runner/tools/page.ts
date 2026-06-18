@@ -105,6 +105,21 @@ registerJsCall({
 			preNavResult.ok && preNavResult.value
 				? (preNavResult.value as { url?: string }).url
 				: undefined;
+		// Never navigate the Browsergent side panel or other chrome-extension:// pages.
+		// page.goto targets the runner's active tab, which in side-panel contexts is
+		// the extension page itself — navigating it destroys the UI and breaks the
+		// worker relay permanently.
+		if (
+			preNavigationUrl &&
+			(preNavigationUrl.startsWith("chrome-extension://") ||
+				preNavigationUrl.startsWith("chrome://"))
+		) {
+			throw makeError(
+				`Refusing to navigate the active tab (${preNavigationUrl}) — it is a chrome-extension:// or chrome:// page. Use web.tab.list() to find an http(s) tab, then web.tab.activate(tabId) before calling page.goto().`,
+				"E_PERMISSION",
+				"navigation",
+			);
+		}
 		const chromeApi = window.chrome;
 		let navSawLoading = false;
 		const navListener = (tabId: number, changeInfo: { status?: string }) => {
