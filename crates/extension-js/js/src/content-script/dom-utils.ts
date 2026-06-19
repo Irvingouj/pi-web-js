@@ -9,6 +9,7 @@ import {
 	getAccessibleName,
 	getAccessibleRole,
 	INTERACTIVE_SELECTOR,
+	isSelfOrAncestorHidden,
 	shouldInclude,
 } from "../shared/snapshot-dom.js";
 
@@ -30,6 +31,12 @@ export function assertInteractable(el: Element, action: string): void {
 		const refId = el.getAttribute("data-ref-id") || undefined;
 		throwStructuredAgentError(
 			notInteractableError(action, refId ?? "", { reason: "disabled" }),
+		);
+	}
+	if (isSelfOrAncestorHidden(el)) {
+		const refId = el.getAttribute("data-ref-id") || undefined;
+		throwStructuredAgentError(
+			notInteractableError(action, refId ?? "", { reason: "hidden" }),
 		);
 	}
 }

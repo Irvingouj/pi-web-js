@@ -6,6 +6,19 @@ import {
 	makeActionResult,
 } from "../src/content-script/action-result.js";
 import { handlers } from "../src/content-script/handlers.js";
+import {
+	grantObservation,
+	resetLease,
+} from "../src/content-script/observation-lease.js";
+
+beforeEach(() => {
+	resetLease();
+});
+
+function grantFromDom() {
+	const els = Array.from(document.querySelectorAll("[data-ref-id]"));
+	grantObservation(els.map((el) => ({ refId: el.getAttribute("data-ref-id")!, element: el })));
+}
 
 // Polyfill CSS.escape for jsdom test environments where it is unavailable
 if (typeof globalThis.CSS === "undefined" || !globalThis.CSS.escape) {
@@ -77,6 +90,7 @@ describe("T-015: mutation handlers return PageActionResult", () => {
 		const btn = document.createElement("button");
 		btn.setAttribute("data-ref-id", "e1");
 		document.body.appendChild(btn);
+		grantFromDom();
 		const result = handlers.click({ refId: "e1" });
 		expect(result).toMatchObject({ ok: true, action: "click", refId: "e1" });
 	});
@@ -85,6 +99,7 @@ describe("T-015: mutation handlers return PageActionResult", () => {
 		const input = document.createElement("input");
 		input.setAttribute("data-ref-id", "e1");
 		document.body.appendChild(input);
+		grantFromDom();
 		const result = handlers.fill({ refId: "e1", value: "hello" });
 		expect(result).toMatchObject({
 			ok: true,
@@ -120,8 +135,8 @@ describe("T-015: mutation handlers return PageActionResult", () => {
 			text: "hello world",
 		});
 	});
-
 	it("press returns PageActionResult with ok, action, key", () => {
+		grantObservation([]);
 		const result = handlers.press({ key: "Enter" });
 		expect(result).toMatchObject({ ok: true, action: "press", key: "Enter" });
 	});
@@ -208,6 +223,7 @@ describe("T-015: mutation handlers return PageActionResult", () => {
 			configurable: true,
 		});
 		document.body.appendChild(input);
+		grantFromDom();
 		expect(() => handlers.fill({ refId: "e1", value: "new" })).toThrow();
 	});
 });

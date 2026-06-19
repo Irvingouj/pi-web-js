@@ -991,6 +991,24 @@ export const PageActionResultSchema = z.object({
 		.array(z.string())
 		.optional()
 		.describe("Names of attached files (for setFiles actions)"),
+	observationId: z
+		.string()
+		.optional()
+		.describe(
+			"Opaque ID of the observation lease authorizing this action (snapshot-scoped)",
+		),
+	dispatched: z
+		.literal(true)
+		.optional()
+		.describe(
+			"True if the action was dispatched to the DOM. Does NOT prove the application accepted it.",
+		),
+	verification: z
+		.literal("required")
+		.optional()
+		.describe(
+			"Always 'required': a fresh observation is required to verify the effect.",
+		),
 });
 
 export type PageActionResult = z.infer<typeof PageActionResultSchema>;
@@ -1080,6 +1098,12 @@ export const SnapshotResultSchema = z.object({
 			height: z.number().describe("Viewport height in pixels"),
 		})
 		.describe("Viewport dimensions"),
+	observationId: z
+		.string()
+		.optional()
+		.describe(
+			"Opaque ID of the observation lease granted by this snapshot. Pass to subsequent actions to prove they act on fresh observations.",
+		),
 });
 
 export const ChromeTabSchema = z

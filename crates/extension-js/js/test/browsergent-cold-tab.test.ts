@@ -20,6 +20,20 @@ import {
 } from "../src/content-script/registry.js";
 import { buildContentScriptSpecs } from "../src/content-script/schemas.js";
 import { inlineSnapshot } from "../src/content-script/snapshot.js";
+import {
+	grantObservation,
+	resetLease,
+} from "../src/content-script/observation-lease.js";
+
+function grantFromDom() {
+	const els = Array.from(document.querySelectorAll("[data-ref-id]"));
+	grantObservation(
+		els.map((el) => ({
+			refId: el.getAttribute("data-ref-id")!,
+			element: el,
+		})),
+	);
+}
 
 interface MockWorker {
 	postMessage: ReturnType<typeof vi.fn>;
@@ -153,6 +167,7 @@ describe("browsergent cold tab acceptance", () => {
 		for (const spec of buildContentScriptSpecs()) {
 			registerContentScriptSpec(spec);
 		}
+		resetLease();
 	});
 
 	afterEach(async () => {
@@ -367,6 +382,7 @@ describe("browsergent cold tab acceptance", () => {
 		input.type = "text";
 		document.body.appendChild(input);
 		const snap = inlineSnapshot(500);
+		grantFromDom();
 		const refId = snap.nodes.find((n) => n.tag === "input")!.refId;
 		const fillResult = await dispatchContentScriptCall(
 			"page_fill",

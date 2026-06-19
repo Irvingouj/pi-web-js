@@ -12,6 +12,19 @@ import {
 } from "../src/content-script/registry.js";
 import { buildContentScriptSpecs } from "../src/content-script/schemas.js";
 import { inlineSnapshot } from "../src/content-script/snapshot.js";
+import {
+	grantObservation,
+	resetLease,
+} from "../src/content-script/observation-lease.js";
+
+beforeEach(() => {
+	resetLease();
+});
+
+function grantFromDom() {
+	const els = Array.from(document.querySelectorAll("[data-ref-id]"));
+	grantObservation(els.map((el) => ({ refId: el.getAttribute("data-ref-id")!, element: el })));
+}
 
 if (typeof globalThis.CSS === "undefined" || !globalThis.CSS.escape) {
 	(globalThis as unknown as Record<string, unknown>).CSS = {
@@ -49,6 +62,7 @@ describe("Browsergent parity: snapshot_data contract", () => {
 		document.body.appendChild(input);
 
 		const data = inlineSnapshot(500);
+		grantFromDom();
 		const node = data.nodes.find((n) => n.tag === "input");
 		expect(node).toBeDefined();
 

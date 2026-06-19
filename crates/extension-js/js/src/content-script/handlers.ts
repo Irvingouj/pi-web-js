@@ -3,6 +3,7 @@ import { encodeFetchResponse } from "../shared/fetch-response.js";
 import { allocateRefId, syncRefIdCounterFromDom } from "../shared/ref-id.js";
 import {
 	notInteractableError,
+	observationRequiredError,
 	throwStructuredAgentError,
 } from "../shared/registry/agent-errors.js";
 import {
@@ -13,6 +14,14 @@ import {
 	resolveContainerRefId,
 } from "../shared/snapshot-dom.js";
 import { filterNodes } from "../shared/snapshot-filter.js";
+import {
+	currentObservationId,
+	grantObservation,
+	hasActiveObservation,
+	invalidateLease,
+	requireTarget,
+	requireTargetByLabel,
+} from "./observation-lease.js";
 import { assertFillEffect, makeActionResult } from "./action-result.js";
 import {
 	asRecord,
@@ -262,27 +271,33 @@ export const handlers: Record<string, Handler> = {
 	click: (params) => {
 		const refId = getStringParam(params, "refId");
 		const label = getStringParam(params, "label");
-		let el = refId ? getElementByRefId(refId) : null;
-		if (!el && label) {
-			el = findElementByLabel(label);
-		}
-		if (!el) {
+		let el: Element | null;
+		if (refId) {
+			el = requireTarget(refId, "click");
+		} else if (label) {
+			el = requireTargetByLabel(label, "click");
+		} else {
 			throwElementNotFound(refId, label, true);
 		}
 		assertInteractable(el, "click");
 		(el as HTMLElement).click();
-		return makeActionResult("click", el);
+		return makeActionResult("click", el, {
+			observationId: currentObservationId(),
+			dispatched: true,
+			verification: "required",
+		});
 	},
-
 	fill: (params) => {
 		const refId = getStringParam(params, "refId");
 		const label = getStringParam(params, "label");
 		const value = getStringParam(params, "value");
-		let el = refId ? getElementByRefId(refId) : null;
-		if (!el && label) {
+		let el: Element | null;
+		if (refId) {
+			el = requireTarget(refId, "fill");
+		} else if (label) {
 			el = findElementByLabel(label);
-		}
-		if (!el) {
+			if (!el) throwElementNotFound(refId, label, true);
+		} else {
 			throwElementNotFound(refId, label, true);
 		}
 		assertInteractable(el, "fill");
@@ -292,7 +307,12 @@ export const handlers: Record<string, Handler> = {
 			el.dispatchEvent(ev);
 			const resolvedRefId = refId || el.getAttribute("data-ref-id") || "";
 			assertFillEffect("fill", el, resolvedRefId, value);
-			return makeActionResult("fill", el, { value: el.value });
+			return makeActionResult("fill", el, {
+				value: el.value,
+				observationId: currentObservationId(),
+				dispatched: true,
+				verification: "required",
+			});
 		}
 		throw new Error("Element is not an input");
 	},
@@ -386,12 +406,20 @@ export const handlers: Record<string, Handler> = {
 	},
 
 	press: (params) => {
+		if (!hasActiveObservation()) {
+			throwStructuredAgentError(observationRequiredError("press"));
+		}
 		const key = getStringParam(params, "key");
 		const evDown = new KeyboardEvent("keydown", { key, bubbles: true });
 		document.dispatchEvent(evDown);
 		const evUp = new KeyboardEvent("keyup", { key, bubbles: true });
 		document.dispatchEvent(evUp);
-		return makeActionResult("press", null, { key });
+		return makeActionResult("press", null, {
+			key,
+			observationId: currentObservationId(),
+			dispatched: true,
+			verification: "required",
+		});
 	},
 
 	select: (params) => {
@@ -463,6 +491,7 @@ export const handlers: Record<string, Handler> = {
 	},
 
 	scroll: (params) => {
+		invalidateLease();
 		const obj = asRecord(params);
 		const direction = (obj.direction as string) ?? "down";
 		const amount = typeof obj.amount === "number" ? obj.amount : 300;
@@ -494,6 +523,7 @@ export const handlers: Record<string, Handler> = {
 	},
 
 	forward: () => {
+		invalidateLease();
 		window.history.forward();
 		return makeActionResult("forward", null);
 	},
@@ -522,8 +552,8 @@ export const handlers: Record<string, Handler> = {
 		const code = resolveEvaluateCode(params);
 		return new Function(code)();
 	},
-
 	back: () => {
+		invalidateLease();
 		window.history.back();
 		return makeActionResult("back", null);
 	},
@@ -545,8 +575,14 @@ export const handlers: Record<string, Handler> = {
 		const maxNodes = resolveMaxNodes(params);
 		logger.debug("snapshot", { maxNodes, hasBody: !!document.body });
 		const r = inlineSnapshot(maxNodes);
-		logger.debug("snapshot_result", { nodeCount: r.nodes.length });
-		return r;
+		const observed = r.nodes
+			.map((n) => {
+				const el = getElementByRefId(n.refId);
+				return el ? { refId: n.refId, element: el } : null;
+			})
+			.filter((x): x is { refId: string; element: Element } => x !== null);
+		const observationId = grantObservation(observed);
+		return { ...r, observationId };
 	},
 
 	snapshot_text: async (params) => {

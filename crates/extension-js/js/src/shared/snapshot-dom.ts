@@ -199,12 +199,21 @@ export function getOwnVisibleText(el: Element, maxLen = 60): string {
 	return full ? full.slice(0, maxLen) : "";
 }
 
+export function isSelfOrAncestorHidden(el: Element): boolean {
+	let node: Element | null = el;
+	while (node) {
+		if ((node as HTMLElement).hidden) return true;
+		if (node.getAttribute("aria-hidden") === "true") return true;
+		if ((node as HTMLElement).inert) return true;
+		const style = window.getComputedStyle(node);
+		if (style.display === "none" || style.visibility === "hidden") return true;
+		node = node.parentElement;
+	}
+	return false;
+}
+
 function isHiddenElement(el: Element): boolean {
-	if ((el as HTMLElement).hidden) return true;
-	if (el.getAttribute("aria-hidden") === "true") return true;
-	if ((el as HTMLElement).inert) return true;
-	const style = window.getComputedStyle(el);
-	return style.display === "none" || style.visibility === "hidden";
+	return isSelfOrAncestorHidden(el);
 }
 
 /** Include if the element would remain visible in a Markdown rendering. */

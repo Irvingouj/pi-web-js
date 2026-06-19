@@ -106,6 +106,34 @@ export function notInteractableError(
 	};
 }
 
+export function observationRequiredError(action: string): AsyncError {
+	return {
+		message: `${action} requires a fresh observation before acting.`,
+		code: "E_OBSERVATION_REQUIRED",
+		category: "observation",
+		hint: "Element refIds are only valid after a snapshot. Take a fresh observation and select a refId from its returned nodes.",
+		recovery: [
+			"const d = await page.snapshot_data(); find the target in d.nodes",
+			"Use a refId from that snapshot only",
+		],
+		details: { action },
+	};
+}
+
+export function ambiguousTargetError(label: string): AsyncError {
+	return {
+		message: `Multiple elements match label "${label}". The target is ambiguous.`,
+		code: "E_AMBIGUOUS_TARGET",
+		category: "observation",
+		hint: "Use a refId from the latest snapshot_data instead of a label, or narrow the label.",
+		recovery: [
+			"const d = await page.snapshot_data(); find the target in d.nodes",
+			"Use the refId from that snapshot",
+		],
+		details: { label },
+	};
+}
+
 export function isContentScriptConnectionError(msg: string): boolean {
 	return (
 		msg.includes("Could not establish connection") ||
