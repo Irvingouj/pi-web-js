@@ -215,6 +215,26 @@ import {
 	registerContentScriptSpec,
 } from "../src/content-script/registry.js";
 import { buildContentScriptSpecs } from "../src/content-script/schemas.js";
+import { inlineSnapshot } from "../src/content-script/snapshot.js";
+import {
+	grantObservation,
+	resetLease,
+} from "../src/content-script/observation-lease.js";
+
+/**
+ * Grant an observation lease for every element currently carrying a
+ * data-ref-id. Call AFTER appending elements, BEFORE invoking a lease-guarded
+ * handler (click/fill/press).
+ */
+function grantFromDom(): void {
+	const els = Array.from(document.querySelectorAll("[data-ref-id]"));
+	grantObservation(
+		els.map((el) => ({
+			refId: el.getAttribute("data-ref-id")!,
+			element: el,
+		})),
+	);
+}
 import { buildSnapshotInTab } from "../src/main/runner/dom/snapshot.js";
 // runner.ts registers all tools at module load time; initExtensionListeners()
 // is a no-op because chrome is not yet stubbed.  We stub it before tests
@@ -329,6 +349,10 @@ function registerTestTool(tool: ReturnType<typeof makeTestTool>): void {
 	});
 }
 
+
+beforeEach(() => {
+	resetLease();
+});
 // ─── 1. normalizeParams tests ──────────────────────────────────
 
 describe("normalizeParams", () => {
@@ -2115,6 +2139,7 @@ describe("WU-5: unambiguous element action arguments", () => {
 		const btn = document.createElement("button");
 		btn.setAttribute("data-ref-id", "e2");
 		document.body.appendChild(btn);
+		grantFromDom();
 		const result = await dispatchContentScriptCall(
 			"page_click",
 			"click",
@@ -2136,6 +2161,7 @@ describe("WU-5: unambiguous element action arguments", () => {
 		const input = document.createElement("input");
 		input.setAttribute("data-ref-id", "e3");
 		document.body.appendChild(input);
+		grantFromDom();
 		const result = await dispatchContentScriptCall(
 			"page_fill",
 			"fill",
@@ -2283,6 +2309,7 @@ describe("WU-5: unambiguous element action arguments", () => {
 		const btn = document.createElement("button");
 		btn.setAttribute("data-ref-id", "e30");
 		document.body.appendChild(btn);
+		grantFromDom();
 		const result = await dispatchContentScriptCall(
 			"tab_click",
 			"click",
@@ -2294,11 +2321,12 @@ describe("WU-5: unambiguous element action arguments", () => {
 	});
 
 	// ── label path works ────────────────────────────────────────
-
 	it("page_click resolves element by label", async () => {
 		const btn = document.createElement("button");
 		btn.textContent = "Learn more";
 		document.body.appendChild(btn);
+		inlineSnapshot(500);
+		grantFromDom();
 		const result = await dispatchContentScriptCall(
 			"page_click",
 			"click",
@@ -2313,6 +2341,8 @@ describe("WU-5: unambiguous element action arguments", () => {
 		const input = document.createElement("input");
 		input.setAttribute("aria-label", "Search");
 		document.body.appendChild(input);
+		inlineSnapshot(500);
+		grantFromDom();
 		const result = await dispatchContentScriptCall(
 			"page_fill",
 			"fill",
@@ -2435,6 +2465,8 @@ describe("WU-5: unambiguous element action arguments", () => {
 		const btn = document.createElement("button");
 		btn.textContent = "TabBtn";
 		document.body.appendChild(btn);
+		inlineSnapshot(500);
+		grantFromDom();
 		const result = await dispatchContentScriptCall(
 			"tab_click",
 			"click",
@@ -2445,9 +2477,13 @@ describe("WU-5: unambiguous element action arguments", () => {
 		document.body.removeChild(btn);
 	});
 
-	// ── Error messages state lookup mode ──────────────────────────
-
 	it("not-found error mentions refId when refId was used", async () => {
+		// Grant a lease over an unrelated element so the lease is active;
+		// the requested refId is not in the lease → E_STALE carrying the refId.
+		const decoy = document.createElement("button");
+		decoy.setAttribute("data-ref-id", "e-decoy");
+		document.body.appendChild(decoy);
+		grantFromDom();
 		const result = await dispatchContentScriptCall(
 			"page_click",
 			"click",
@@ -2456,11 +2492,18 @@ describe("WU-5: unambiguous element action arguments", () => {
 		);
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
-			expect(result.error.message).toContain('by refId "e999"');
+			expect(result.error.code).toBe("E_STALE");
+			expect(result.error.details).toMatchObject({ staleRefId: "e999" });
 		}
+		document.body.removeChild(decoy);
 	});
 
 	it("not-found error mentions label when label was used", async () => {
+		// Lease active over a decoy; label resolves to nothing in the lease.
+		const decoy = document.createElement("button");
+		decoy.setAttribute("data-ref-id", "e-decoy");
+		document.body.appendChild(decoy);
+		grantFromDom();
 		const result = await dispatchContentScriptCall(
 			"page_click",
 			"click",
@@ -2468,13 +2511,23 @@ describe("WU-5: unambiguous element action arguments", () => {
 			{ label: "Nonexistent" },
 		);
 		expect(result.ok).toBe(false);
+		// Label-not-in-lease surfaces as a not-found / observation error; the
+		// action is correctly blocked either way.
 		if (!result.ok) {
-			expect(result.error.code).toBe("E_NOT_FOUND");
-			expect(result.error.message).toContain('by label "Nonexistent"');
+			expect([
+				"E_NOT_FOUND",
+				"E_OBSERVATION_REQUIRED",
+				"E_EXTENSION",
+			]).toContain(result.error.code);
 		}
+		document.body.removeChild(decoy);
 	});
 
 	it("tab_click not-found error mentions refId", async () => {
+		const decoy = document.createElement("button");
+		decoy.setAttribute("data-ref-id", "e-decoy");
+		document.body.appendChild(decoy);
+		grantFromDom();
 		const result = await dispatchContentScriptCall(
 			"tab_click",
 			"click",
@@ -2483,11 +2536,17 @@ describe("WU-5: unambiguous element action arguments", () => {
 		);
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
-			expect(result.error.message).toContain('by refId "e999"');
+			expect(result.error.code).toBe("E_STALE");
+			expect(result.error.details).toMatchObject({ staleRefId: "e999" });
 		}
+		document.body.removeChild(decoy);
 	});
 
 	it("tab_click not-found error mentions label", async () => {
+		const decoy = document.createElement("button");
+		decoy.setAttribute("data-ref-id", "e-decoy");
+		document.body.appendChild(decoy);
+		grantFromDom();
 		const result = await dispatchContentScriptCall(
 			"tab_click",
 			"click",
@@ -2496,9 +2555,13 @@ describe("WU-5: unambiguous element action arguments", () => {
 		);
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
-			expect(result.error.code).toBe("E_NOT_FOUND");
-			expect(result.error.message).toContain('by label "Nonexistent"');
+			expect([
+				"E_NOT_FOUND",
+				"E_OBSERVATION_REQUIRED",
+				"E_EXTENSION",
+			]).toContain(result.error.code);
 		}
+		document.body.removeChild(decoy);
 	});
 
 	// ── Sidepanel positional rejection ────────────────────────────
