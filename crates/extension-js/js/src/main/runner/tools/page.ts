@@ -7,6 +7,7 @@ import {
 	noTabError,
 } from "../../../shared/registry/normalize-agent-error.js";
 import * as schemas from "../../../shared/schemas.js";
+import { logger } from "../../../shared/logger.js";
 import { dispatchTool, registerJsCall } from "../../../shared/tool-registry.js";
 import { NetworkTracker } from "../lib/network-tracker.js";
 import {
@@ -91,8 +92,15 @@ registerJsCall({
 	returns: schemas.ChromeTabSchema,
 	fields: ["url"],
 	owner: "main-thread",
-	handler: async (params, _ctx) => {
+	handler: async (params, ctx) => {
 		const activeTab = await requireActiveTab("page.goto()");
+		const traceId = ctx.runId ?? "?";
+		logger.debug("page_goto_start", {
+			traceId,
+			url: params.url,
+			waitUntil: params.waitUntil ?? "load",
+			timeoutMs: Number(params.timeout) || 30_000,
+		});
 		if (!params.url.startsWith("http:") && !params.url.startsWith("https:")) {
 			throw makeError(
 				`Navigation blocked: URL scheme not supported (${params.url})`,
@@ -141,10 +149,12 @@ registerJsCall({
 			const loadResult = await waitForTabLoad(activeTab, timeoutMs, {
 				preNavigationUrl,
 				getNavSawLoading: () => navSawLoading,
+				runId: traceId,
 			});
 			if (!loadResult.ok) {
 				return unwrapResult(loadResult);
 			}
+			logger.debug("page_goto_tab_load_complete", { traceId });
 		} finally {
 			chromeApi?.tabs?.onUpdated?.removeListener(navListener);
 		}
@@ -179,10 +189,15 @@ registerJsCall({
 		if (params.waitUntil === "networkidle") {
 			const tracker = new NetworkTracker(activeTab);
 			try {
+				logger.debug("page_goto_network_idle_start", { traceId });
 				tracker.start();
 				const networkTimeout = Math.max(NETWORK_IDLE_QUIET_MS * 2, timeoutMs);
-				await tracker.waitForIdle(networkTimeout);
+				await tracker.waitForIdle(networkTimeout, traceId);
 			} catch (idleErr) {
+				logger.debug("page_goto_network_idle_timeout", {
+					traceId,
+					error: idleErr instanceof Error ? idleErr.message : String(idleErr),
+				});
 				throw makeError(
 					idleErr instanceof Error ? idleErr.message : String(idleErr),
 					"E_NAVIGATION",
@@ -190,6 +205,7 @@ registerJsCall({
 				);
 			} finally {
 				tracker.dispose();
+				logger.debug("page_goto_network_idle_done", { traceId });
 			}
 		}
 		const pingResult = await pingTabContentScript(activeTab, timeoutMs);

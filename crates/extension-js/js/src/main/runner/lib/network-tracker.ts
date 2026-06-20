@@ -48,11 +48,12 @@ export class NetworkTracker {
 			types: TRACKED_RESOURCE_TYPES,
 		};
 
-		this.onBeforeRequest = (details) => {
-			if (details.tabId === this.tabId) {
-				this.inFlight.set(details.requestId, Date.now());
-			}
-		};
+	this.onBeforeRequest = (details): chrome.webRequest.BlockingResponse | undefined => {
+		if (details.tabId === this.tabId) {
+			this.inFlight.set(details.requestId, Date.now());
+		}
+		return undefined;
+	};
 		this.onCompleted = (details) => {
 			if (details.tabId === this.tabId) {
 				this.inFlight.delete(details.requestId);
@@ -74,23 +75,34 @@ export class NetworkTracker {
 		return this.inFlight.size;
 	}
 
-	async waitForIdle(timeoutMs: number): Promise<void> {
+	async waitForIdle(timeoutMs: number, traceId?: string): Promise<void> {
 		const deadline = Date.now() + timeoutMs;
+		let lastLogTime = 0;
 		while (Date.now() < deadline) {
 			if (this.inFlight.size === 0) {
 				await new Promise((resolve) =>
 					setTimeout(resolve, NETWORK_IDLE_QUIET_MS),
 				);
 				if (this.inFlight.size === 0) {
-					log.debug("networkTracker_idle", { tabId: this.tabId });
+					log.debug("networkTracker_idle", { tabId: this.tabId, traceId });
 					return;
 				}
 				continue;
 			}
+			// Log ~every 1 second while waiting
+			const now = Date.now();
+			if (now - lastLogTime >= 1000) {
+				lastLogTime = now;
+				log.debug("networkTracker_idle_wait", {
+					tabId: this.tabId,
+					traceId,
+					inFlight: this.inFlight.size,
+				});
+			}
 			await new Promise((resolve) => setTimeout(resolve, 50));
 		}
 		throw new Error(
-			`Network idle timeout for tab ${this.tabId} (${this.inFlight.size} requests still in flight)`,
+			`Network idle timeout for tab ${this.tabId} (traceId=${traceId ?? "?"}, ${this.inFlight.size} requests still in flight)`,
 		);
 	}
 

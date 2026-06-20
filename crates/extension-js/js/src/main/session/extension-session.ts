@@ -592,9 +592,9 @@ export class ExtensionSession {
 		});
 	}
 
-	async runCellAsync(code: string, stdin?: string): Promise<CellResult> {
+	async runCellAsync(code: string, stdin?: string, traceId?: string): Promise<CellResult> {
 		const id = this.generateId();
-		const runId = this.generateId();
+		const runId = traceId || this.generateId();
 		const run = this.runQueue.then(async () => {
 			logger.trace("runCell_start", {
 				runId,
