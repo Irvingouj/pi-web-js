@@ -1141,6 +1141,158 @@ console.log(result)"#;
     }
 
     #[test]
+    fn test_single_field_binding_merges_options_object() {
+        // The documented calling convention for single-field tools is
+        // `(primaryArg, optionsObject)` — e.g.
+        //   page.goto("https://example.com", { waitUntil: "networkidle" })
+        // The options object must merge into params (positional primary wins),
+        // not be silently dropped by the fields normalizer.
+        use crate::api_docs::{
+            clear_docs, clear_handlers, generate_js_bindings_code, register, register_handler,
+            ApiHandler, JsApiDoc, ReturnDoc, ToolSource, ToolTransport,
+        };
+        use std::future::Future;
+        use std::pin::Pin;
+        use std::rc::Rc;
+
+        clear_docs();
+        clear_handlers();
+
+        register(JsApiDoc {
+            namespace: "page".into(),
+            name: "goto".into(),
+            action: Some("page_goto".into()),
+            description: "Navigate the active tab to a URL.".into(),
+            params: vec![],
+            returns: ReturnDoc {
+                js_type: "object".into(),
+                description: "Tab.".into(),
+            },
+            public_name: "page.goto".into(),
+            local_name: None,
+            transport: ToolTransport::Async,
+            tool_source: ToolSource::Extension,
+            fields: Some(vec!["url".into()]),
+            aliases: vec![],
+            permission: None,
+            example: None,
+            prerequisites: None,
+            notes: None,
+            tags: None,
+            related_apis: None,
+        });
+        let _ = register_handler(
+            "page_goto",
+            ApiHandler::Rust(Rc::new(|_cmd| {
+                Box::pin(async move {
+                    Ok(crate::types::AsyncResponse {
+                        ok: true,
+                        value: None,
+                        error: None,
+                    })
+                })
+                    as Pin<Box<dyn Future<Output = Result<crate::types::AsyncResponse, String>>>>
+            })),
+        );
+
+        let mut session = JsSession::new();
+        let setup = session.run_cell_unwrapped(&generate_js_bindings_code(), "");
+        assert!(setup.error.is_none(), "{:?}", setup.error);
+
+        // (url, optionsObject) — the documented form.
+        let result = session.run_cell(
+            r#"await page.goto("https://example.com", { waitUntil: "networkidle" })"#,
+            "",
+        );
+        assert_eq!(result.status, CellStatus::AsyncPending, "{:?}", result);
+        assert_eq!(result.pending_commands.len(), 1);
+        assert_eq!(result.pending_commands[0].action, "page_goto");
+        assert_eq!(
+            result.pending_commands[0].params,
+            serde_json::json!({ "url": "https://example.com", "waitUntil": "networkidle" }),
+            "page.goto(url, options) must merge options into params"
+        );
+
+        clear_handlers();
+        clear_docs();
+    }
+
+    #[test]
+    fn test_single_field_binding_positional_wins_over_options() {
+        // When the options object duplicates the positional field name,
+        // the positional arg takes precedence — page.goto("a", { url: "b" })
+        // must yield url: "a".
+        use crate::api_docs::{
+            clear_docs, clear_handlers, generate_js_bindings_code, register, register_handler,
+            ApiHandler, JsApiDoc, ReturnDoc, ToolSource, ToolTransport,
+        };
+        use std::future::Future;
+        use std::pin::Pin;
+        use std::rc::Rc;
+
+        clear_docs();
+        clear_handlers();
+
+        register(JsApiDoc {
+            namespace: "page".into(),
+            name: "goto".into(),
+            action: Some("page_goto".into()),
+            description: "Navigate.".into(),
+            params: vec![],
+            returns: ReturnDoc {
+                js_type: "object".into(),
+                description: "Tab.".into(),
+            },
+            public_name: "page.goto".into(),
+            local_name: None,
+            transport: ToolTransport::Async,
+            tool_source: ToolSource::Extension,
+            fields: Some(vec!["url".into()]),
+            aliases: vec![],
+            permission: None,
+            example: None,
+            prerequisites: None,
+            notes: None,
+            tags: None,
+            related_apis: None,
+        });
+        let _ = register_handler(
+            "page_goto",
+            ApiHandler::Rust(Rc::new(|_cmd| {
+                Box::pin(async move {
+                    Ok(crate::types::AsyncResponse {
+                        ok: true,
+                        value: None,
+                        error: None,
+                    })
+                })
+                    as Pin<Box<dyn Future<Output = Result<crate::types::AsyncResponse, String>>>>
+            })),
+        );
+
+        let mut session = JsSession::new();
+        let setup = session.run_cell_unwrapped(&generate_js_bindings_code(), "");
+        assert!(setup.error.is_none(), "{:?}", setup.error);
+
+        let result = session.run_cell(
+            r#"await page.goto("https://primary.com", { url: "https://options.com", waitUntil: "networkidle" })"#,
+            "",
+        );
+        assert_eq!(result.status, CellStatus::AsyncPending, "{:?}", result);
+        assert_eq!(
+            result.pending_commands[0].params,
+            serde_json::json!({
+                "url": "https://primary.com",
+                "waitUntil": "networkidle"
+            }),
+            "positional url must win over the options.url key"
+        );
+
+        clear_handlers();
+        clear_docs();
+    }
+
+    #[test]
     fn test_parity_async_params_preserve_cookie_details() {
         let mut session = JsSession::new();
         let setup = session.run_cell_unwrapped(

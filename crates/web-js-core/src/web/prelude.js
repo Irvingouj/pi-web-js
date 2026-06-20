@@ -188,7 +188,19 @@ function makeAsync(action, fields, parity) {
       } else if (fields) {
         if (args.length === 0) params = {};
         else if (args.length === 1) params = args[0];
-        else params = args;
+        else if (
+          fields.length === 1 &&
+          args.length === 2 &&
+          args[1] !== null &&
+          typeof args[1] === 'object' &&
+          !Array.isArray(args[1])
+        ) {
+          // (primaryArg, optionsObject) convention — e.g.
+          // page.goto(url, { waitUntil: "networkidle" }). Merge the options
+          // object into params; the positional primary arg takes precedence.
+          params = Object.assign({}, args[1]);
+          params[fields[0]] = args[0];
+        } else params = args;
         if (Array.isArray(params)) {
           if (fields.length === 1 && fields[0] === 'fields') {
             if (params.every(function(item) { return typeof item === 'string'; })) {
