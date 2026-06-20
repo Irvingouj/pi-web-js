@@ -123,6 +123,16 @@ export type WaitForTabLoadOptions = {
 	preNavigationUrl?: string;
 	/** When set, returns whether a loading event was observed before waitForTabLoad (e.g. listener registered pre-update). */
 	getNavSawLoading?: () => boolean;
+	/** trace-id for logging correlation with the originating run_js cell. */
+	runId?: string;
+	/**
+	 * Grace window (ms) for heavy SPAs whose `load` event never fires. Once the
+	 * tab has provably navigated (URL moved away from preNavigationUrl) but
+	 * `complete` hasn't arrived, settle as loaded after this delay instead of
+	 * waiting out the full timeout. Default 5000. Ignored when preNavigationUrl
+	 * is unknown (can't prove navigation).
+	 */
+	loadGraceMs?: number;
 };
 
 export async function waitForTabLoad(
@@ -139,6 +149,7 @@ export async function waitForTabLoad(
 		tabId: targetTab,
 		timeout: timeoutMs,
 		preNavigationUrl,
+		runId: options?.runId,
 	});
 	const chrome = window.chrome;
 	if (!chrome?.runtime?.id) {
@@ -174,14 +185,25 @@ export async function waitForTabLoad(
 		return sawLoading || urlChanged;
 	};
 
+	const hasNavigatedAway = (tabUrl: string | undefined): boolean =>
+		preNavigationUrl !== undefined &&
+		typeof tabUrl === "string" &&
+		tabUrl.length > 0 &&
+		tabUrl !== preNavigationUrl;
+
+	const graceMs =
+		options?.loadGraceMs ?? 5_000;
+
 	try {
 		await new Promise<void>((resolve, reject) => {
 			let settled = false;
 			let sawLoading = getNavSawLoading?.() ?? false;
+			let graceTimer: ReturnType<typeof setTimeout> | null = null;
 			const cleanup = () => {
 				try {
 					chrome.tabs.onUpdated.removeListener(listener);
 				} catch {}
+				if (graceTimer) clearTimeout(graceTimer);
 			};
 			const settle = (fn: () => void) => {
 				if (!settled) {
@@ -197,6 +219,20 @@ export async function waitForTabLoad(
 				}
 			};
 
+			const armGraceIfNavigated = (tabUrl: string | undefined) => {
+				if (graceTimer || settled) return;
+				if (!hasNavigatedAway(tabUrl)) return;
+				graceTimer = setTimeout(() => {
+					log.debug("waitForTabLoad_grace_settle", {
+						tabId: targetTab,
+						url: tabUrl,
+						graceMs,
+						runId: options?.runId,
+					});
+					settle(resolve);
+				}, graceMs);
+			};
+
 			const trySettle = () => {
 				mergeNavLoading();
 				chrome.tabs
@@ -204,6 +240,8 @@ export async function waitForTabLoad(
 					.then((tab) => {
 						if (shouldSettleOnComplete(tab, sawLoading)) {
 							settle(resolve);
+						} else {
+							armGraceIfNavigated(tab.url);
 						}
 					})
 					.catch(() => {});
@@ -211,11 +249,24 @@ export async function waitForTabLoad(
 
 			const listener = (
 				updatedTabId: number,
-				changeInfo: { status?: string },
+				changeInfo: { status?: string; url?: string },
 			) => {
 				if (updatedTabId !== targetTab) return;
 				if (changeInfo.status === "loading") {
 					sawLoading = true;
+					log.debug("waitForTabLoad_status", {
+						tabId: targetTab,
+						status: "loading",
+						runId: options?.runId,
+					});
+				}
+				if (changeInfo.url) {
+					log.debug("waitForTabLoad_status", {
+						tabId: targetTab,
+						url: changeInfo.url,
+						runId: options?.runId,
+					});
+					armGraceIfNavigated(changeInfo.url);
 				}
 				if (changeInfo.status === "complete") {
 					trySettle();
@@ -231,8 +282,16 @@ export async function waitForTabLoad(
 					if (tab.status === "loading") {
 						sawLoading = true;
 					}
+					log.debug("waitForTabLoad_initial_status", {
+						tabId: targetTab,
+						status: tab.status,
+						url: tab.url,
+						runId: options?.runId,
+					});
 					if (shouldSettleOnComplete(tab, sawLoading)) {
 						settle(resolve);
+					} else {
+						armGraceIfNavigated(tab.url);
 					}
 				})
 				.catch((err) => {
@@ -246,6 +305,7 @@ export async function waitForTabLoad(
 		log.debug("waitForTabLoad_loaded", {
 			tabId: targetTab,
 			status: "complete",
+			runId: options?.runId,
 		});
 		return { ok: true, value: true };
 	} catch (err: unknown) {
@@ -263,6 +323,7 @@ export async function waitForTabLoad(
 				tabId: targetTab,
 				timeout: timeoutMs,
 				url: displayUrl,
+				runId: options?.runId,
 			});
 			return {
 				ok: false,

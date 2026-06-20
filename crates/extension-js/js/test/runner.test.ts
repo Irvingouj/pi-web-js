@@ -1850,6 +1850,48 @@ describe("page actions", () => {
 		expect(result.ok).toBe(true);
 	});
 
+	it("waitForTabLoad settles via grace when navigated but complete never arrives", async () => {
+		// Heavy SPAs (e.g. LinkedIn company pages) can keep tab.status at
+		// "loading" indefinitely — the load event never fires. Once the tab has
+		// clearly navigated (URL moved away from preNavigationUrl), waiting
+		// forever for "complete" is wrong: settle as loaded after a grace window.
+		mockChrome.tabs.get.mockResolvedValue({
+			id: 1,
+			status: "loading",
+			url: "https://new.com",
+		});
+		mockChrome.tabs.onUpdated.addListener.mockImplementation(() => {});
+		mockChrome.tabs.onUpdated.removeListener.mockImplementation(() => {});
+
+		const result = await waitForTabLoad(1, 300, {
+			preNavigationUrl: "https://old.com",
+			loadGraceMs: 50,
+		});
+		expect(result.ok).toBe(true);
+	});
+
+	it("waitForTabLoad does NOT grace-settle when navigation is unproven (url unchanged)", async () => {
+		// Grace only applies once navigation is proven (URL moved away from
+		// preNavigationUrl). A tab that stays on the pre-nav URL forever must
+		// still hit the hard timeout, not settle via grace.
+		mockChrome.tabs.get.mockResolvedValue({
+			id: 1,
+			status: "loading",
+			url: "https://same.com",
+		});
+		mockChrome.tabs.onUpdated.addListener.mockImplementation(() => {});
+		mockChrome.tabs.onUpdated.removeListener.mockImplementation(() => {});
+
+		const result = await waitForTabLoad(1, 200, {
+			preNavigationUrl: "https://same.com",
+			loadGraceMs: 50,
+		});
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_NAVIGATION");
+		}
+	});
+
 	it("pingTabContentScript retries transient receiving-end errors", async () => {
 		mockChrome.tabs.sendMessage
 			.mockRejectedValueOnce(new Error("Receiving end does not exist."))
