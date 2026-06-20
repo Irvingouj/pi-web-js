@@ -38,3 +38,13 @@ hmac = "0.12"
 thiserror = "1"
 tracing = "0.1"
 tracing-wasm = "0.2"
+
+[profile.release]
+# Size-optimized for WASM. Strip is safe for tracing: file!/line! are
+# compile-time literals, so log locations survive symbol stripping.
+# panic="abort" intentionally omitted — wasm-bindgen-futures and the JS
+# callback error paths rely on unwinding.
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true

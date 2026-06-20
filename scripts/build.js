@@ -64,22 +64,24 @@ const targets = [
   },
 ];
 
-async function buildTarget(target) {
-  console.log(`\n🔧 Building ${target.name}...`);
+async function buildTarget(target, release = false) {
+  const profile = release ? "release" : "debug";
+  console.log(`\n🔧 Building ${target.name} (${profile})...`);
 
   const wasmPath = path.join(
     rootDir,
-    "target/wasm32-unknown-unknown/debug",
+    `target/wasm32-unknown-unknown/${profile}`,
     target.wasm,
   );
   const outDir = path.join(rootDir, target.outDir);
 
   const cargoCmd = (() => {
+    const buildSub = release ? "build --release" : "build";
     try {
       execSync("rustup run stable cargo --version", { stdio: "ignore", env });
-      return `rustup run stable cargo build --target wasm32-unknown-unknown -p ${target.crate}`;
+      return `rustup run stable cargo ${buildSub} --target wasm32-unknown-unknown -p ${target.crate}`;
     } catch {
-      return `cargo build --target wasm32-unknown-unknown -p ${target.crate}`;
+      return `cargo ${buildSub} --target wasm32-unknown-unknown -p ${target.crate}`;
     }
   })();
   run(cargoCmd);
@@ -174,11 +176,11 @@ const buildAll = args.length === 0;
 const buildWeb = buildAll || args.includes("web");
 const buildExt = buildAll || args.includes("extension");
 const buildDom = buildAll || args.includes("dom");
-
+const release = args.includes("--release") || args.includes("release");
 (async () => {
-  if (buildWeb) await buildTarget(targets[0]);
-  if (buildExt) await buildTarget(targets[1]);
-  if (buildDom) await buildTarget(targets[2]);
+  if (buildWeb) await buildTarget(targets[0], release);
+  if (buildExt) await buildTarget(targets[1], release);
+  if (buildDom) await buildTarget(targets[2], release);
   if (buildExt) copyExtensionAssets();
 
   console.log("\n🎉 All builds complete!");
