@@ -192,6 +192,12 @@ export type PageSetFilesParams = {
 
 export type PageFindParams = { selector: string };
 
+export type PageDomParams = {
+	selector: string;
+	depth: number;
+	includeHidden: boolean;
+};
+
 export type PageGotoParams = {
 	url: string;
 	timeout?: bigint;

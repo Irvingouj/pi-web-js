@@ -29,6 +29,7 @@ import init, {
 	registerJsCallBatch as register_js_call_batch,
 	setLogLevel as setWasmLogLevel,
 	takeCachedVfsWriteBase64 as take_cached_vfs_write_base64,
+	webFsReadBase64 as web_fs_read_base64,
 } from "./extension_js.js";
 import { maybeStoreFetchResult } from "./fetch-store.js";
 import { resolveSetFilesParams } from "./resolve-set-files.js";
@@ -508,12 +509,9 @@ async function maybeResolveSetFilesParams(
 			if (cached !== undefined) {
 				return cached;
 			}
-			const handler = workerHandlerRegistry.get("readBase64");
-			if (!handler) {
-				throw new Error("readBase64 handler not registered");
-			}
-			const result = (await handler({ path })) as { data: string };
-			return result.data;
+			// Borrow-free OPFS read: fsReadBase64 via the session would re-enter runCellAsync's
+			// wasm-bindgen borrow and panic with "recursive use of an object detected".
+			return await web_fs_read_base64(path);
 		},
 	);
 	if (!resolved.ok) {

@@ -5,6 +5,7 @@ import {
 	isMarkdownVisible,
 	shouldInclude,
 } from "../src/shared/snapshot-dom.js";
+import { collectInlineSnapshot } from "../src/shared/collect-inline-snapshot.js";
 
 describe("snapshot-dom markdown visibility", () => {
 	beforeEach(() => {
@@ -120,5 +121,62 @@ describe("snapshot-dom markdown visibility", () => {
 		document.body.appendChild(div);
 
 		expect(getOwnVisibleText(div)).toBe("deep");
+	});
+});
+
+describe("hidden file input inclusion", () => {
+	beforeEach(() => {
+		document.body.innerHTML = "";
+	});
+
+	it("shouldInclude returns true for hidden input[type=file]", () => {
+		const input = document.createElement("input");
+		input.type = "file";
+		input.hidden = true;
+		document.body.appendChild(input);
+
+		expect(shouldInclude(input)).toBe(true);
+	});
+
+	it("shouldInclude returns false for display:none non-file input", () => {
+		const input = document.createElement("input");
+		input.type = "text";
+		input.style.display = "none";
+		document.body.appendChild(input);
+
+		expect(shouldInclude(input)).toBe(false);
+	});
+
+	it("inline snapshot includes hidden file input with accept and filesCount", () => {
+		const label = document.createElement("label");
+		const input = document.createElement("input");
+		input.type = "file";
+		input.hidden = true;
+		input.setAttribute("accept", ".pdf");
+		const button = document.createElement("button");
+		button.textContent = "Upload";
+		label.appendChild(input);
+		label.appendChild(button);
+		document.body.appendChild(label);
+
+		const result = collectInlineSnapshot(100);
+		const fileNode = result.nodes.find((n) => n.tag === "input");
+		expect(fileNode).toBeDefined();
+		expect(fileNode!.accept).toBe(".pdf");
+		expect(fileNode!.filesCount).toBe(0);
+		expect(fileNode!.refId).toMatch(/^e\d+$/);
+	});
+
+	it("inline snapshot excludes display:none non-file input", () => {
+		const div = document.createElement("div");
+		const input = document.createElement("input");
+		input.type = "text";
+		input.style.display = "none";
+		div.appendChild(input);
+		document.body.appendChild(div);
+
+		const result = collectInlineSnapshot(100);
+		const inputNode = result.nodes.find((n) => n.tag === "input");
+		expect(inputNode).toBeUndefined();
 	});
 });

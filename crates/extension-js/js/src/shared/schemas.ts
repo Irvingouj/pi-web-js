@@ -9,6 +9,7 @@ import type {
 	FsUpdateParams,
 	FsWriteParams,
 	PageCheckParams,
+	PageDomParams,
 	PageExtractParams,
 	PageFillParams,
 	PageFindParams,
@@ -379,6 +380,25 @@ export const PageDblClickParamsSchema = elementTargetParams();
 
 export const PageFindParamsSchema = z.object({
 	selector: z.string().describe("CSS selector to find elements"),
+});
+
+export const PageDomParamsSchema = z.object({
+	selector: z
+		.string()
+		.describe("CSS selector for the root element(s) to introspect"),
+	depth: z
+		.number()
+		.int()
+		.min(0)
+		.max(10)
+		.default(2)
+		.describe("How many descendant levels to include (0 = root only)"),
+	includeHidden: z
+		.boolean()
+		.default(true)
+		.describe(
+			"Include elements hidden by CSS/aria (default true — this tool's purpose is to see what the curated snapshot filters out)",
+		),
 });
 
 export const PageWaitForParamsSchema = z.object({
@@ -1106,6 +1126,81 @@ export const SnapshotResultSchema = z.object({
 		),
 });
 
+interface DomNode {
+	refId?: string;
+	tag: string;
+	role?: string;
+	name?: string;
+	text?: string;
+	attributes?: Record<string, string>;
+	hidden?: boolean;
+	hiddenReason?:
+		| "display-none"
+		| "visibility-hidden"
+		| "aria-hidden"
+		| "opacity-zero"
+		| "hidden-attr"
+		| "inert";
+	value?: string;
+	checked?: boolean;
+	disabled?: boolean;
+	readOnly?: boolean;
+	href?: string;
+	src?: string;
+	alt?: string;
+	accept?: string;
+	filesCount?: number;
+	children?: DomNode[];
+}
+
+export const DomNodeSchema: z.ZodType<DomNode> = z.object({
+	refId: refIdString().optional(),
+	tag: z.string(),
+	role: z.string().optional(),
+	name: z.string().optional(),
+	text: z.string().optional(),
+	attributes: z
+		.record(z.string())
+		.optional()
+		.describe("All HTML attributes (raw)"),
+	hidden: z.boolean().optional(),
+	hiddenReason: z
+		.enum([
+			"display-none",
+			"visibility-hidden",
+			"aria-hidden",
+			"opacity-zero",
+			"hidden-attr",
+			"inert",
+		])
+		.optional(),
+	value: z.string().optional(),
+	checked: z.boolean().optional(),
+	disabled: z.boolean().optional(),
+	readOnly: z.boolean().optional(),
+	href: z.string().optional(),
+	src: z.string().optional(),
+	alt: z.string().optional(),
+	accept: z
+		.string()
+		.optional()
+		.describe("For input[type=file]: accepted MIME/extensions"),
+	filesCount: z
+		.number()
+		.optional()
+		.describe("For input[type=file]: selected file count"),
+	children: z
+		.array(z.lazy(() => DomNodeSchema))
+		.optional()
+		.describe("Nested descendants up to `depth`"),
+});
+
+export const PageDomResultSchema = z.object({
+	nodes: z.array(DomNodeSchema),
+	url: z.string(),
+	title: z.string(),
+});
+
 export const ChromeTabSchema = z
 	.object({
 		id: z.number().optional().describe("Tab ID"),
@@ -1370,6 +1465,11 @@ type _AssertPageFind =
 	z.infer<typeof PageFindParamsSchema> extends PageFindParams ? true : never;
 type _AssertPageFindReverse =
 	PageFindParams extends z.infer<typeof PageFindParamsSchema> ? true : never;
+
+type _AssertPageDom =
+	z.infer<typeof PageDomParamsSchema> extends PageDomParams ? true : never;
+type _AssertPageDomReverse =
+	PageDomParams extends z.infer<typeof PageDomParamsSchema> ? true : never;
 
 type _AssertPageWaitFor =
 	z.infer<typeof PageWaitForParamsSchema> extends PageWaitForParams

@@ -5,6 +5,7 @@ import type {
 	PageCheckParams,
 	PageClickParams,
 	PageDblClickParams,
+	PageDomParams,
 	PageExtractParams,
 	PageFillParams,
 	PageFindParams,
@@ -28,6 +29,8 @@ import {
 import {
 	getAccessibleName,
 	getAccessibleRole,
+	getOwnVisibleText,
+	isSelfOrAncestorHidden,
 	readFormFields,
 	resolveAbsoluteUrl,
 	resolveContainerRefId,
@@ -252,6 +255,102 @@ export type Handler<T = unknown, R = unknown> = (
 	signal?: AbortSignal,
 ) => R | Promise<R>;
 
+type DomNode = {
+	refId?: string;
+	tag: string;
+	role?: string;
+	name?: string;
+	text?: string;
+	attributes?: Record<string, string>;
+	hidden?: boolean;
+	hiddenReason?:
+		| "display-none"
+		| "visibility-hidden"
+		| "aria-hidden"
+		| "opacity-zero"
+		| "hidden-attr"
+		| "inert";
+	value?: string;
+	checked?: boolean;
+	disabled?: boolean;
+	readOnly?: boolean;
+	href?: string;
+	src?: string;
+	alt?: string;
+	accept?: string;
+	filesCount?: number;
+	children?: DomNode[];
+};
+
+function hiddenReasonFor(
+	el: Element,
+):
+	| "display-none"
+	| "visibility-hidden"
+	| "aria-hidden"
+	| "opacity-zero"
+	| "hidden-attr"
+	| "inert"
+	| undefined {
+	if ((el as HTMLElement).hidden) return "hidden-attr";
+	if (el.getAttribute("aria-hidden") === "true") return "aria-hidden";
+	if ((el as HTMLElement).inert) return "inert";
+	const style = window.getComputedStyle(el);
+	if (style.display === "none") return "display-none";
+	if (style.visibility === "hidden") return "visibility-hidden";
+	if (style.opacity === "0") return "opacity-zero";
+	return undefined;
+}
+
+function buildDomNode(
+	el: Element,
+	depth: number,
+	includeHidden: boolean,
+): DomNode | null {
+	if (!includeHidden && isSelfOrAncestorHidden(el)) return null;
+	const tag = el.tagName.toLowerCase();
+	const node: DomNode = {
+		tag,
+		refId: allocateRefId(el),
+		role: getAccessibleRole(el),
+		name: getAccessibleName(el) || undefined,
+		text: getOwnVisibleText(el, 100) || undefined,
+	};
+	// raw attributes
+	const attrs: Record<string, string> = {};
+	for (const attr of Array.from(el.attributes)) attrs[attr.name] = attr.value;
+	if (Object.keys(attrs).length) node.attributes = attrs;
+	const hr = hiddenReasonFor(el);
+	if (hr) {
+		node.hidden = true;
+		node.hiddenReason = hr;
+	}
+	Object.assign(node, readFormFields(el));
+	if (el instanceof HTMLInputElement && el.type === "file") {
+		const accept = el.getAttribute("accept");
+		if (accept) node.accept = accept;
+		node.filesCount = el.files?.length ?? 0;
+	}
+	if (tag === "a") {
+		const href = resolveAbsoluteUrl(el.getAttribute("href"));
+		if (href) node.href = href;
+	}
+	if (tag === "img") {
+		const src = resolveAbsoluteUrl(el.getAttribute("src"));
+		if (src) node.src = src;
+		node.alt = el.getAttribute("alt") || undefined;
+	}
+	if (depth > 0) {
+		const kids: DomNode[] = [];
+		for (const child of Array.from(el.children)) {
+			const k = buildDomNode(child, depth - 1, includeHidden);
+			if (k) kids.push(k);
+		}
+		if (kids.length) node.children = kids;
+	}
+	return node;
+}
+
 export const handlers = {
 	click: (params: PageClickParams) => {
 		const refId = params.refId;
@@ -303,19 +402,36 @@ export const handlers = {
 	},
 
 	set_files: async (params: PageSetFilesParams) => {
-		const refId = params.refId;
-		const label = params.label;
 		const files = parseResolvedFiles(params);
-		const el = resolveTargetRaw(refId, label);
-		assertInteractable(el, "setFiles");
-		if (!(el instanceof HTMLInputElement) || el.type !== "file") {
-			const resolvedRefId = refId || el.getAttribute("data-ref-id") || "";
-			throwStructuredAgentError(
-				notInteractableError("setFiles", resolvedRefId, {
-					reason: "not_file_input",
-				}),
-			);
+		const rawEl = resolveTargetRaw(params.refId, params.label);
+		let el: HTMLInputElement;
+		// Descend: if the resolved target isn't itself a file input, search its
+		// subtree, then the wrapping <label>'s subtree, then a label[for] target.
+		if (rawEl instanceof HTMLInputElement && rawEl.type === "file") {
+			el = rawEl;
+		} else {
+			const fromSubtree = rawEl.querySelector('input[type="file"]');
+			const fromWrapperLabel = rawEl
+				.closest("label")
+				?.querySelector('input[type="file"]');
+			const forAttr = rawEl.getAttribute("for");
+			const fromForLabel = forAttr
+				? document.getElementById(forAttr)?.querySelector('input[type="file"]')
+				: null;
+			const maybeInput =
+				(fromSubtree ?? fromWrapperLabel ?? fromForLabel) as HTMLInputElement | null;
+			if (!maybeInput) {
+				const resolvedRefId = params.refId ?? "";
+				throwStructuredAgentError(
+					notInteractableError("setFiles", resolvedRefId, {
+						reason: "not_file_input",
+					}),
+				);
+			}
+			el = maybeInput;
 		}
+		// file inputs are hidden by convention (React/MUI/Chakra/dropzone) —
+		// skip assertInteractable; visibility is not required to set .files.
 		const dt = new DataTransfer();
 		const fileNames: string[] = [];
 		for (const payload of files) {
@@ -328,7 +444,7 @@ export const handlers = {
 		}
 		el.files = dt.files;
 		el.dispatchEvent(new Event("change", { bubbles: true }));
-		const resolvedRefId = refId || el.getAttribute("data-ref-id") || "";
+		const resolvedRefId = params.refId || el.getAttribute("data-ref-id") || "";
 		assertSetFilesEffect(el, resolvedRefId, fileNames);
 		return makeActionResult("setFiles", el, {
 			fileCount: fileNames.length,
@@ -597,6 +713,18 @@ export const handlers = {
 
 			return node;
 		});
+	},
+
+	dom: (params: PageDomParams) => {
+		syncRefIdCounterFromDom();
+		const selector = params.selector;
+		const depth = params.depth ?? 2;
+		const includeHidden = params.includeHidden ?? true;
+		const roots = Array.from(document.querySelectorAll(selector));
+		const nodes = roots
+			.map((el) => buildDomNode(el, depth, includeHidden))
+			.filter((n): n is DomNode => n !== null);
+		return { nodes, url: window.location.href, title: document.title };
 	},
 
 	wait_for: async (params: PageWaitForParams, signal) => {

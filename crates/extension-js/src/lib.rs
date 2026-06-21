@@ -113,3 +113,10 @@ pub fn take_cached_vfs_write_base64(path: &str) -> Option<String> {
 pub fn clear_vfs_write_cache() {
     vfs_write_cache::clear();
 }
+/// Borrow-free OPFS read for use from inside runCellAsync (e.g. setFiles path resolver).
+/// fsReadBase64 is an impl ExtensionSession method and re-enters the wasm-bindgen borrow
+/// held by runCellAsync; this free function reads OPFS without touching any session object.
+#[wasm_bindgen(js_name = webFsReadBase64)]
+pub async fn web_fs_read_base64(path: String) -> Result<String, String> {
+    web_fs::read_base64(&path).await.map_err(|e| e.wire_message())
+}

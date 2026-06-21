@@ -1209,6 +1209,52 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		handlerKey: "find",
 	},
 	{
+		action: "page_dom",
+		namespace: "page",
+		name: "dom",
+		description:
+			"Introspect raw DOM subtree by CSS selector — bypasses the curated snapshot's visibility filter. Read-only. Use when page.snapshot/find hide the element you need (e.g. hidden file inputs, shadowed widgets, aria-hidden regions).",
+		params: schemas.PageDomParamsSchema,
+		returns: schemas.PageDomResultSchema,
+		paramTypes: [
+			{
+				name: "selector",
+				type: "string",
+				required: true,
+				description: "CSS selector for root element(s)",
+			},
+			{
+				name: "depth",
+				type: "number",
+				required: false,
+				description: "Descendant levels (default 2, max 10)",
+			},
+			{
+				name: "includeHidden",
+				type: "boolean",
+				required: false,
+				description: "Include hidden elements (default true)",
+			},
+		],
+		returnDoc:
+			"{ nodes: [{ refId?, tag, role?, name?, attributes?, hidden?, hiddenReason?, accept?, filesCount?, children? }], url, title }",
+		errorCode: "E_NO_TAB",
+		example: 'page.dom({ selector: "input[type=file]", depth: 0 })',
+		agentMeta: {
+			prerequisites: ["Active tab with content script ready"],
+			notes: [
+				AWAIT_PROMISE_NOTE,
+				"Read-only: returns DOM structure, never executes code or mutates the page",
+				"Bypasses the snapshot visibility filter — use to find hidden/filtered elements the curated snapshot omits",
+				"Assigns refIds to returned elements so subsequent page.setFiles/click/fill can target them",
+				"Prefer page.snapshot for normal navigation; use page.dom only when the snapshot is insufficient",
+			],
+			tags: ["read"],
+			relatedApis: ["page.find", "page.snapshot_data", "page.setFiles"],
+		},
+		handlerKey: "dom",
+	},
+	{
 		action: "page_wait_for",
 		namespace: "page",
 		name: "wait_for",

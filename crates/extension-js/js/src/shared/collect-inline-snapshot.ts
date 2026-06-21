@@ -29,6 +29,8 @@ export type InlineSnapshotNode = {
 	postId?: string;
 	permalink?: string;
 	imageUrls?: string[];
+	accept?: string;
+	filesCount?: number;
 };
 
 export type InlineSnapshotResult = {
@@ -100,6 +102,12 @@ export function collectInlineSnapshot(maxNodes: number): InlineSnapshotResult {
 				if (tag === "input") {
 					const title = el.getAttribute("title");
 					if (title) node.title = title;
+					const inputEl = el as HTMLInputElement;
+					if (inputEl.type === "file") {
+						const accept = inputEl.getAttribute("accept");
+						if (accept) node.accept = accept;
+						node.filesCount = inputEl.files?.length ?? 0;
+					}
 				}
 				if (tag === "img" || tag === "a") {
 					const containerRefId = resolveContainerRefId(el);

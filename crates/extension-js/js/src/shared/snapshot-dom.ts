@@ -283,5 +283,6 @@ export function getAccessibleName(el: Element): string {
 }
 
 export function shouldInclude(el: Element): boolean {
+	if (el instanceof HTMLInputElement && el.type === "file") return true;
 	return isMarkdownVisible(el);
 }
