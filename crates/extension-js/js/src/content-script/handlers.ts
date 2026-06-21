@@ -1,4 +1,23 @@
 import { base64ToUint8Array } from "../shared/array-buffer.js";
+import type {
+	FetchParams,
+	PageAppendParams,
+	PageCheckParams,
+	PageClickParams,
+	PageDblClickParams,
+	PageExtractParams,
+	PageFillParams,
+	PageFindParams,
+	PageHoverParams,
+	PagePressParams,
+	PageScrollParams,
+	PageScrollToParams,
+	PageSelectParams,
+	PageSetFilesParams,
+	PageSnapshotQueryParams,
+	PageTypeParams,
+	PageWaitForParams,
+} from "../shared/generated.js";
 import { encodeFetchResponse } from "../shared/fetch-response.js";
 import { allocateRefId, syncRefIdCounterFromDom } from "../shared/ref-id.js";
 import {
@@ -14,6 +33,7 @@ import {
 	resolveContainerRefId,
 } from "../shared/snapshot-dom.js";
 import { filterNodes } from "../shared/snapshot-filter.js";
+import type { SnapshotFilter } from "../shared/snapshot-filter.js";
 import {
 	currentObservationId,
 	grantObservation,
@@ -28,15 +48,13 @@ import {
 	assertInteractable,
 	findElementByLabel,
 	getElementByRefId,
-	getNumberParam,
-	getStringParam,
+	resolveTargetRaw,
 	throwElementNotFound,
 } from "./dom-utils.js";
 import { logger } from "./logger.js";
 import { inlineSnapshot } from "./snapshot.js";
 
 export const DEFAULT_FETCH_TIMEOUT_MS = 30_000;
-const DEFAULT_WAIT_FOR_TIMEOUT_MS = 30_000;
 const DEFAULT_POLL_INTERVAL_MS = 100;
 
 function resolveMaxNodes(params: unknown): number {
@@ -50,39 +68,6 @@ function resolveMaxNodes(params: unknown): number {
 		maxNodes = Number(raw);
 	}
 	return Math.max(1, Math.min(10_000, Math.floor(maxNodes)));
-}
-
-function normalizeFetchParams(params: unknown): {
-	url: string;
-	method: string;
-	headers: Record<string, string>;
-	body: string | null;
-	timeout: number;
-} {
-	const obj = asRecord(params);
-	const options = asRecord(obj.options ?? {});
-	const url = String(obj.url ?? "");
-	const method = String(options.method ?? obj.method ?? "GET").toUpperCase();
-	const headersRaw = options.headers ?? obj.headers ?? {};
-	const headers =
-		typeof headersRaw === "object" && headersRaw !== null
-			? (headersRaw as Record<string, string>)
-			: {};
-	const bodyValue = options.body ?? obj.body ?? null;
-	const body =
-		bodyValue === null || bodyValue === undefined
-			? null
-			: typeof bodyValue === "string"
-				? bodyValue
-				: String(bodyValue);
-	const timeoutRaw = obj.timeout ?? options.timeout;
-	const timeout =
-		typeof timeoutRaw === "number"
-			? timeoutRaw
-			: typeof timeoutRaw === "bigint"
-				? Number(timeoutRaw)
-				: DEFAULT_FETCH_TIMEOUT_MS;
-	return { url, method, headers, body, timeout };
 }
 
 function sleepWithSignal(ms: number, signal?: AbortSignal): Promise<void> {
@@ -267,10 +252,10 @@ export type Handler<T = unknown, R = unknown> = (
 	signal?: AbortSignal,
 ) => R | Promise<R>;
 
-export const handlers: Record<string, Handler> = {
-	click: (params) => {
-		const refId = getStringParam(params, "refId");
-		const label = getStringParam(params, "label");
+export const handlers = {
+	click: (params: PageClickParams) => {
+		const refId = params.refId;
+		const label = params.label;
 		let el: Element | null;
 		if (refId) {
 			el = requireTarget(refId, "click");
@@ -287,10 +272,10 @@ export const handlers: Record<string, Handler> = {
 			verification: "required",
 		});
 	},
-	fill: (params) => {
-		const refId = getStringParam(params, "refId");
-		const label = getStringParam(params, "label");
-		const value = getStringParam(params, "value");
+	fill: (params: PageFillParams) => {
+		const refId = params.refId;
+		const label = params.label;
+		const value = params.value;
 		let el: Element | null;
 		if (refId) {
 			el = requireTarget(refId, "fill");
@@ -317,17 +302,11 @@ export const handlers: Record<string, Handler> = {
 		throw new Error("Element is not an input");
 	},
 
-	set_files: async (params) => {
-		const refId = getStringParam(params, "refId");
-		const label = getStringParam(params, "label");
+	set_files: async (params: PageSetFilesParams) => {
+		const refId = params.refId;
+		const label = params.label;
 		const files = parseResolvedFiles(params);
-		let el = refId ? getElementByRefId(refId) : null;
-		if (!el && label) {
-			el = findElementByLabel(label);
-		}
-		if (!el) {
-			throwElementNotFound(refId, label, true);
-		}
+		const el = resolveTargetRaw(refId, label);
 		assertInteractable(el, "setFiles");
 		if (!(el instanceof HTMLInputElement) || el.type !== "file") {
 			const resolvedRefId = refId || el.getAttribute("data-ref-id") || "";
@@ -357,17 +336,11 @@ export const handlers: Record<string, Handler> = {
 		});
 	},
 
-	type: (params) => {
-		const refId = getStringParam(params, "refId");
-		const label = getStringParam(params, "label");
-		const text = getStringParam(params, "text");
-		let el = refId ? getElementByRefId(refId) : null;
-		if (!el && label) {
-			el = findElementByLabel(label);
-		}
-		if (!el) {
-			throwElementNotFound(refId, label, true);
-		}
+	type: (params: PageTypeParams) => {
+		const refId = params.refId;
+		const label = params.label;
+		const text = params.text;
+		const el = resolveTargetRaw(refId, label);
 		assertInteractable(el, "type");
 		if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
 			el.value = text;
@@ -380,17 +353,11 @@ export const handlers: Record<string, Handler> = {
 		throw new Error("Element is not an input");
 	},
 
-	append: (params) => {
-		const refId = getStringParam(params, "refId");
-		const label = getStringParam(params, "label");
-		const text = getStringParam(params, "text");
-		let el = refId ? getElementByRefId(refId) : null;
-		if (!el && label) {
-			el = findElementByLabel(label);
-		}
-		if (!el) {
-			throwElementNotFound(refId, label, true);
-		}
+	append: (params: PageAppendParams) => {
+		const refId = params.refId;
+		const label = params.label;
+		const text = params.text;
+		const el = resolveTargetRaw(refId, label);
 		assertInteractable(el, "append");
 		if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
 			const before = el.value;
@@ -405,11 +372,11 @@ export const handlers: Record<string, Handler> = {
 		throw new Error("Element is not an input");
 	},
 
-	press: (params) => {
+	press: (params: PagePressParams) => {
 		if (!hasActiveObservation()) {
 			throwStructuredAgentError(observationRequiredError("press"));
 		}
-		const key = getStringParam(params, "key");
+		const key = params.key;
 		const evDown = new KeyboardEvent("keydown", { key, bubbles: true });
 		document.dispatchEvent(evDown);
 		const evUp = new KeyboardEvent("keyup", { key, bubbles: true });
@@ -422,17 +389,11 @@ export const handlers: Record<string, Handler> = {
 		});
 	},
 
-	select: (params) => {
-		const refId = getStringParam(params, "refId");
-		const label = getStringParam(params, "label");
-		const value = getStringParam(params, "value");
-		let el = refId ? getElementByRefId(refId) : null;
-		if (!el && label) {
-			el = findElementByLabel(label);
-		}
-		if (!el) {
-			throwElementNotFound(refId, label, true);
-		}
+	select: (params: PageSelectParams) => {
+		const refId = params.refId;
+		const label = params.label;
+		const value = params.value;
+		const el = resolveTargetRaw(refId, label);
 		assertInteractable(el, "select");
 		if (el instanceof HTMLSelectElement) {
 			el.value = value;
@@ -442,20 +403,11 @@ export const handlers: Record<string, Handler> = {
 		throw new Error("Element is not a select");
 	},
 
-	check: (params) => {
-		const refId = getStringParam(params, "refId");
-		const label = getStringParam(params, "label");
-		const checked = (() => {
-			const obj = asRecord(params);
-			return typeof obj.checked === "boolean" ? obj.checked : true;
-		})();
-		let el = refId ? getElementByRefId(refId) : null;
-		if (!el && label) {
-			el = findElementByLabel(label);
-		}
-		if (!el) {
-			throwElementNotFound(refId, label, true);
-		}
+	check: (params: PageCheckParams) => {
+		const refId = params.refId;
+		const label = params.label;
+		const checked = params.checked ?? true;
+		const el = resolveTargetRaw(refId, label);
 		assertInteractable(el, "check");
 		if (
 			el instanceof HTMLInputElement &&
@@ -468,16 +420,10 @@ export const handlers: Record<string, Handler> = {
 		throw new Error("Element is not a checkbox or radio");
 	},
 
-	hover: (params) => {
-		const refId = getStringParam(params, "refId");
-		const label = getStringParam(params, "label");
-		let el = refId ? getElementByRefId(refId) : null;
-		if (!el && label) {
-			el = findElementByLabel(label);
-		}
-		if (!el) {
-			throwElementNotFound(refId, label, true);
-		}
+	hover: (params: PageHoverParams) => {
+		const refId = params.refId;
+		const label = params.label;
+		const el = resolveTargetRaw(refId, label);
 		assertInteractable(el, "hover");
 		const ev = new MouseEvent("mouseenter", { bubbles: true });
 		el.dispatchEvent(ev);
@@ -490,11 +436,10 @@ export const handlers: Record<string, Handler> = {
 		return makeActionResult("unhover", null);
 	},
 
-	scroll: (params) => {
+	scroll: (params: PageScrollParams) => {
 		invalidateLease();
-		const obj = asRecord(params);
-		const direction = (obj.direction as string) ?? "down";
-		const amount = typeof obj.amount === "number" ? obj.amount : 300;
+		const direction = params.direction;
+		const amount = params.amount;
 		const top =
 			direction === "down" ? amount : direction === "up" ? -amount : 0;
 		const left =
@@ -503,16 +448,10 @@ export const handlers: Record<string, Handler> = {
 		return makeActionResult("scroll", null, { direction, amount });
 	},
 
-	dblclick: (params) => {
-		const refId = getStringParam(params, "refId");
-		const label = getStringParam(params, "label");
-		let el = refId ? getElementByRefId(refId) : null;
-		if (!el && label) {
-			el = findElementByLabel(label);
-		}
-		if (!el) {
-			throwElementNotFound(refId, label, true);
-		}
+	dblclick: (params: PageDblClickParams) => {
+		const refId = params.refId;
+		const label = params.label;
+		const el = resolveTargetRaw(refId, label);
 		const target = el as HTMLElement;
 		target.click();
 		target.click();
@@ -528,21 +467,15 @@ export const handlers: Record<string, Handler> = {
 		return makeActionResult("forward", null);
 	},
 
-	scroll_to: (params) => {
-		const refId = getStringParam(params, "refId");
-		const label = getStringParam(params, "label");
-		const x = getNumberParam(params, "x", 0);
-		const y = getNumberParam(params, "y", 0);
+	scroll_to: (params: PageScrollToParams) => {
+		const refId = params.refId;
+		const label = params.label;
+		const x = params.x ?? 0;
+		const y = params.y ?? 0;
 		if (refId || label) {
-			let el = refId ? getElementByRefId(refId) : null;
-			if (!el && label) {
-				el = findElementByLabel(label);
-			}
-			if (el) {
-				el.scrollIntoView({ behavior: "smooth" });
-				return makeActionResult("scroll_to", el);
-			}
-			throwElementNotFound(refId, label, true);
+			const el = resolveTargetRaw(refId, label);
+			el.scrollIntoView({ behavior: "smooth" });
+			return makeActionResult("scroll_to", el);
 		}
 		window.scrollTo({ top: y, left: x, behavior: "smooth" });
 		return makeActionResult("scroll_to", null, { amount: y });
@@ -600,7 +533,7 @@ export const handlers: Record<string, Handler> = {
 		return r.text;
 	},
 
-	snapshot_query: async (params) => {
+	snapshot_query: async (params: PageSnapshotQueryParams) => {
 		if (!document.body) {
 			throwStructuredAgentError({
 				message: "Document body not available for snapshot",
@@ -612,8 +545,7 @@ export const handlers: Record<string, Handler> = {
 		}
 		const maxNodes = resolveMaxNodes(params);
 		const r = inlineSnapshot(maxNodes);
-		const obj = asRecord(params);
-		const filter = obj.filter ? asRecord(obj.filter) : {};
+		const filter = (params.filter ?? {}) as SnapshotFilter;
 		const filtered = filterNodes(r.nodes, filter);
 		return {
 			text: "",
@@ -624,9 +556,9 @@ export const handlers: Record<string, Handler> = {
 		};
 	},
 
-	find: (params) => {
+	find: (params: PageFindParams) => {
 		syncRefIdCounterFromDom();
-		const selector = getStringParam(params, "selector");
+		const selector = params.selector;
 		const elements = Array.from(document.querySelectorAll(selector));
 		return elements.map((el) => {
 			const refId = allocateRefId(el);
@@ -667,15 +599,9 @@ export const handlers: Record<string, Handler> = {
 		});
 	},
 
-	wait_for: async (params, signal) => {
-		const selector = getStringParam(params, "selector");
-		const obj = asRecord(params);
-		const timeoutMs =
-			typeof obj.timeout === "number"
-				? obj.timeout
-				: typeof obj.timeout === "bigint"
-					? Number(obj.timeout)
-					: DEFAULT_WAIT_FOR_TIMEOUT_MS;
+	wait_for: async (params: PageWaitForParams, signal) => {
+		const selector = params.selector;
+		const timeoutMs = Number(params.timeout);
 		const start = Date.now();
 		while (true) {
 			if (signal?.aborted) {
@@ -695,9 +621,8 @@ export const handlers: Record<string, Handler> = {
 		}
 	},
 
-	extract: (params) => {
-		const obj = asRecord(params);
-		const fieldList = Array.isArray(obj.fields) ? obj.fields : [];
+	extract: (params: PageExtractParams) => {
+		const fieldList = params.fields;
 		const result: Record<string, unknown> = {};
 		for (const field of fieldList) {
 			if (field === "title") {
@@ -725,12 +650,15 @@ export const handlers: Record<string, Handler> = {
 		return result;
 	},
 
-	fetch: async (params, signal) => {
-		const { url, method, headers, body, timeout } =
-			normalizeFetchParams(params);
+	fetch: async (params: FetchParams, signal) => {
+		const url = params.url;
 		if (!url) {
 			throw new Error("fetch requires a url");
 		}
+		const method = params.method.toUpperCase();
+		const headers = params.headers;
+		const body = params.body;
+		const timeout = Number(params.timeout);
 
 		const controller = new AbortController();
 		const onRelayAbort = () => controller.abort();
@@ -757,4 +685,4 @@ export const handlers: Record<string, Handler> = {
 			signal?.removeEventListener("abort", onRelayAbort);
 		}
 	},
-};
+} as Record<string, (params: any, signal?: AbortSignal) => unknown>;

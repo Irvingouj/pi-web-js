@@ -196,3 +196,31 @@ export function throwElementNotFound(
 		category: "resource",
 	});
 }
+
+/**
+ * Resolve an element by refId (raw querySelector) with a label fallback.
+ *
+ * INTENTIONAL non-lease path: this deliberately bypasses the observation lease
+ * (requireTarget / requireTargetByLabel). The handlers that use this — type,
+ * append, select, check, hover, dblclick, set_files, scroll_to — mutate stable
+ * elements that rarely change between snapshot and action, so the lease's
+ * stale-element / fingerprint strictness is unnecessary here and would reject
+ * valid targets. Only `click` (and fill's refId path) use lease validation.
+ *
+ * Do NOT "unify" these handlers onto requireTarget — that changes behavior the
+ * project has explicitly chosen. If you need lease-validated resolution, use
+ * requireTarget/requireTargetByLabel directly (as click does).
+ */
+export function resolveTargetRaw(
+	refId: string | undefined,
+	label: string | undefined,
+): Element {
+	let el = refId ? getElementByRefId(refId) : null;
+	if (!el && label) {
+		el = findElementByLabel(label);
+	}
+	if (!el) {
+		throwElementNotFound(refId, label, true);
+	}
+	return el;
+}

@@ -1820,3 +1820,426 @@ describe("observation lease (B11/B13/B14): context and replacement", () => {
 		expect(result.ok).toBe(true);
 	});
 });
+
+describe("raw target resolution (resolveTargetRaw contract)", () => {
+	beforeEach(() => {
+		document.body.innerHTML = "";
+		for (const spec of buildContentScriptSpecs()) {
+			registerContentScriptSpec(spec);
+		}
+		resetLease();
+	});
+
+	// ---------------------------------------------------------------------------
+	// Case 1: valid refId → action succeeds (element found via getElementByRefId)
+	// ---------------------------------------------------------------------------
+	it.each([
+		{ handlerKey: "hover", handler: handlers.hover, action: "page_hover", extraParams: {} },
+		{ handlerKey: "dblclick", handler: handlers.dblclick, action: "page_dblclick", extraParams: {} },
+	])(
+		"$handlerKey: valid refId → action succeeds",
+		async ({ handler, action, handlerKey, extraParams }) => {
+			const el = document.createElement("div");
+			el.setAttribute("data-ref-id", "e1");
+			el.setAttribute("role", "button");
+			document.body.appendChild(el);
+
+			const result = await dispatchContentScriptCall(
+				action,
+				handlerKey,
+				handler,
+				{ refId: "e1", ...extraParams },
+			);
+			expect(result.ok).toBe(true);
+		},
+	);
+
+	it("type: valid refId → action succeeds", async () => {
+		const input = document.createElement("input");
+		input.type = "text";
+		input.setAttribute("data-ref-id", "e1");
+		document.body.appendChild(input);
+
+		const result = await dispatchContentScriptCall(
+			"page_type",
+			"type",
+			handlers.type,
+			{ refId: "e1", text: "hello" },
+		);
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect((result.value as { text?: string }).text).toBe("hello");
+		}
+	});
+
+	// ---------------------------------------------------------------------------
+	// Case 2: no refId, valid label → action succeeds (label fallback)
+	// ---------------------------------------------------------------------------
+	it.each([
+		{ handlerKey: "hover", handler: handlers.hover, action: "page_hover", extraParams: {} },
+		{ handlerKey: "dblclick", handler: handlers.dblclick, action: "page_dblclick", extraParams: {} },
+	])(
+		"$handlerKey: no refId, valid label → action succeeds",
+		async ({ handler, action, handlerKey, extraParams }) => {
+			const el = document.createElement("button");
+			el.setAttribute("aria-label", "Submit");
+			document.body.appendChild(el);
+
+			const result = await dispatchContentScriptCall(
+				action,
+				handlerKey,
+				handler,
+				{ label: "Submit", ...extraParams },
+			);
+			expect(result.ok).toBe(true);
+		},
+	);
+
+	it("type: no refId, valid label → action succeeds", async () => {
+		const input = document.createElement("input");
+		input.type = "text";
+		input.setAttribute("aria-label", "Email");
+		document.body.appendChild(input);
+
+		const result = await dispatchContentScriptCall(
+			"page_type",
+			"type",
+			handlers.type,
+			{ label: "Email", text: "hello@test.com" },
+		);
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect((result.value as { text?: string }).text).toBe("hello@test.com");
+		}
+	});
+
+	// ---------------------------------------------------------------------------
+	// Case 3: refId that matches nothing in DOM → E_STALE
+	// ---------------------------------------------------------------------------
+	it.each([
+		{ handlerKey: "hover", handler: handlers.hover, action: "page_hover", extraParams: {} },
+		{ handlerKey: "dblclick", handler: handlers.dblclick, action: "page_dblclick", extraParams: {} },
+	])(
+		"$handlerKey: refId not in DOM → E_STALE",
+		async ({ handler, action, handlerKey, extraParams }) => {
+			const result = await dispatchContentScriptCall(
+				action,
+				handlerKey,
+				handler,
+				{ refId: "e99", ...extraParams },
+			);
+			expect(result.ok).toBe(false);
+			if (!result.ok) {
+				expect(result.error.code).toBe("E_STALE");
+			}
+		},
+	);
+
+	it("type: refId not in DOM → E_STALE", async () => {
+		const result = await dispatchContentScriptCall(
+			"page_type",
+			"type",
+			handlers.type,
+			{ refId: "e99", text: "hello" },
+		);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_STALE");
+		}
+	});
+
+	// ---------------------------------------------------------------------------
+	// Case 4: no refId, label that matches nothing → E_NOT_FOUND
+	// ---------------------------------------------------------------------------
+	it.each([
+		{ handlerKey: "hover", handler: handlers.hover, action: "page_hover", extraParams: {} },
+		{ handlerKey: "dblclick", handler: handlers.dblclick, action: "page_dblclick", extraParams: {} },
+	])(
+		"$handlerKey: label not found → E_NOT_FOUND",
+		async ({ handler, action, handlerKey, extraParams }) => {
+			const result = await dispatchContentScriptCall(
+				action,
+				handlerKey,
+				handler,
+				{ label: "NonExistentLabelXYZ", ...extraParams },
+			);
+			expect(result.ok).toBe(false);
+			if (!result.ok) {
+				expect(result.error.code).toBe("E_NOT_FOUND");
+			}
+		},
+	);
+
+	it("type: label not found → E_NOT_FOUND", async () => {
+		const result = await dispatchContentScriptCall(
+			"page_type",
+			"type",
+			handlers.type,
+			{ label: "NonExistentLabelXYZ", text: "hello" },
+		);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_NOT_FOUND");
+		}
+	});
+
+	// ---------------------------------------------------------------------------
+	// Case 5: neither refId nor label → E_NOT_FOUND (via direct handler call,
+	//         since schema validation rejects missing refId+label before the handler)
+	// ---------------------------------------------------------------------------
+	it.each([
+		{ handlerKey: "hover", handler: handlers.hover },
+		{ handlerKey: "dblclick", handler: handlers.dblclick },
+	])(
+		"$handlerKey: neither refId nor label → E_NOT_FOUND (direct handler call)",
+		({ handler }) => {
+			expect(() => handler({})).toThrow();
+			try {
+				handler({});
+			} catch (err) {
+				const code = (err as Record<string, unknown>).code;
+				expect(code).toBe("E_NOT_FOUND");
+			}
+		},
+	);
+
+	it("type: neither refId nor label → E_NOT_FOUND (direct handler call)", () => {
+		expect(() => handlers.type({ text: "hello" })).toThrow();
+		try {
+			handlers.type({ text: "hello" });
+		} catch (err) {
+			const code = (err as Record<string, unknown>).code;
+			expect(code).toBe("E_NOT_FOUND");
+		}
+	});
+
+	// ---------------------------------------------------------------------------
+	// Case 6: both refId and label where they'd resolve to different elements → refId wins
+	// ---------------------------------------------------------------------------
+	it.each([
+		{ handlerKey: "hover", handler: handlers.hover, action: "page_hover", extraParams: {} },
+		{ handlerKey: "dblclick", handler: handlers.dblclick, action: "page_dblclick", extraParams: {} },
+	])(
+		"$handlerKey: both refId and label → refId wins (element found by refId)",
+		async ({ handler, action, handlerKey, extraParams }) => {
+			// Element A: has refId "e1" — this should be the target
+			const elA = document.createElement("button");
+			elA.setAttribute("data-ref-id", "e1");
+			elA.setAttribute("aria-label", "ButtonA");
+			elA.textContent = "ButtonA";
+			document.body.appendChild(elA);
+
+			// Element B: has label "ButtonB" — should NOT be targeted
+			const elB = document.createElement("button");
+			elB.setAttribute("aria-label", "ButtonB");
+			elB.textContent = "ButtonB";
+			document.body.appendChild(elB);
+
+			// Spy on dispatchEvent to verify elA (refId target) receives the event
+			const dispatchSpyA = vi.spyOn(elA, "dispatchEvent");
+			const dispatchSpyB = vi.spyOn(elB, "dispatchEvent");
+
+			const result = await dispatchContentScriptCall(
+				action,
+				handlerKey,
+				handler,
+				{ refId: "e1", label: "ButtonB", ...extraParams },
+			);
+			expect(result.ok).toBe(true);
+
+			// Verify refId element (elA) was the one acted upon
+			expect(dispatchSpyA).toHaveBeenCalled();
+			expect(dispatchSpyB).not.toHaveBeenCalled();
+
+			dispatchSpyA.mockRestore();
+			dispatchSpyB.mockRestore();
+		},
+	);
+
+	it("type: both refId and label → refId wins (element found by refId)", async () => {
+		const inputA = document.createElement("input");
+		inputA.type = "text";
+		inputA.setAttribute("data-ref-id", "e1");
+		inputA.setAttribute("aria-label", "InputA");
+		document.body.appendChild(inputA);
+
+		const inputB = document.createElement("input");
+		inputB.type = "text";
+		inputB.setAttribute("aria-label", "InputB");
+		document.body.appendChild(inputB);
+
+		const result = await dispatchContentScriptCall(
+			"page_type",
+			"type",
+			handlers.type,
+			{ refId: "e1", label: "InputB", text: "hello" },
+		);
+		expect(result.ok).toBe(true);
+		// refId element (inputA) gets the value, not inputB
+		expect(inputA.value).toBe("hello");
+		expect(inputB.value).toBe("");
+	});
+});
+
+describe("typed params: handler reads validated fields", () => {
+	beforeEach(() => {
+		document.body.innerHTML = "";
+		for (const spec of buildContentScriptSpecs()) {
+			registerContentScriptSpec(spec);
+		}
+		resetLease();
+	});
+
+	it("fill with { refId, value } → value is written to the element", async () => {
+		const input = document.createElement("input");
+		input.type = "text";
+		input.setAttribute("data-ref-id", "e1");
+		document.body.appendChild(input);
+		grantFromDom();
+
+		const result = await dispatchContentScriptCall(
+			"page_fill",
+			"fill",
+			handlers.fill,
+			{ refId: "e1", value: "hello world" },
+		);
+		expect(result.ok).toBe(true);
+		expect(input.value).toBe("hello world");
+	});
+
+	it("type with { refId, text } → the text is typed into the element", async () => {
+		const input = document.createElement("input");
+		input.type = "text";
+		input.setAttribute("data-ref-id", "e1");
+		document.body.appendChild(input);
+
+		const result = await dispatchContentScriptCall(
+			"page_type",
+			"type",
+			handlers.type,
+			{ refId: "e1", text: "typed text" },
+		);
+		expect(result.ok).toBe(true);
+		expect(input.value).toBe("typed text");
+	});
+
+	it("press with { key: 'Enter' } → dispatches KeyboardEvent with that key", () => {
+		let keyDownKey: string | undefined;
+		let keyUpKey: string | undefined;
+		document.addEventListener("keydown", (e) => {
+			keyDownKey = (e as KeyboardEvent).key;
+		});
+		document.addEventListener("keyup", (e) => {
+			keyUpKey = (e as KeyboardEvent).key;
+		});
+
+		// press requires active observation
+		grantFromDom();
+
+		const result = handlers.press({ key: "Enter" });
+		expect(result.ok).toBe(true);
+		expect(keyDownKey).toBe("Enter");
+		expect(keyUpKey).toBe("Enter");
+	});
+
+	it("scroll with { direction: 'up', amount: 100 } → calls window.scrollBy with top: -100", async () => {
+		const scrollBySpy = vi.spyOn(window, "scrollBy").mockImplementation(() => {});
+
+		const result = await dispatchContentScriptCall(
+			"page_scroll",
+			"scroll",
+			handlers.scroll,
+			{ direction: "up", amount: 100 },
+		);
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect((result.value as { amount?: number }).amount).toBe(100);
+		}
+		expect(scrollBySpy).toHaveBeenCalledWith({
+			top: -100,
+			left: 0,
+			behavior: "smooth",
+		});
+
+		scrollBySpy.mockRestore();
+	});
+
+	it("find with { selector: 'button' } → returns matching elements", async () => {
+		const btn1 = document.createElement("button");
+		btn1.textContent = "Click me";
+		document.body.appendChild(btn1);
+		const btn2 = document.createElement("button");
+		btn2.textContent = "Submit";
+		document.body.appendChild(btn2);
+
+		const result = await dispatchContentScriptCall(
+			"page_find",
+			"find",
+			handlers.find,
+			{ selector: "button" },
+		);
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			const nodes = result.value as Array<{ tag: string; refId: string }>;
+			expect(nodes.length).toBe(2);
+			expect(nodes.every((n) => n.tag === "button")).toBe(true);
+			expect(nodes.every((n) => typeof n.refId === "string")).toBe(true);
+		}
+	});
+
+	it("check with { refId } (no checked field) → defaults to checked true", async () => {
+		const cb = document.createElement("input");
+		cb.type = "checkbox";
+		cb.setAttribute("data-ref-id", "e1");
+		cb.checked = false;
+		document.body.appendChild(cb);
+
+		const result = await dispatchContentScriptCall(
+			"page_check",
+			"check",
+			handlers.check,
+			{ refId: "e1" },
+		);
+		expect(result.ok).toBe(true);
+		expect(cb.checked).toBe(true);
+	});
+
+	it("check with { refId, checked: false } → element.checked is false", async () => {
+		const cb = document.createElement("input");
+		cb.type = "checkbox";
+		cb.setAttribute("data-ref-id", "e1");
+		cb.checked = true;
+		document.body.appendChild(cb);
+
+		const result = await dispatchContentScriptCall(
+			"page_check",
+			"check",
+			handlers.check,
+			{ refId: "e1", checked: false },
+		);
+		expect(result.ok).toBe(true);
+		expect(cb.checked).toBe(false);
+	});
+
+	it("scroll_to with { x: 0, y: 500 } (no refId/label) → calls window.scrollTo with top 500", async () => {
+		const scrollToSpy = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+
+		const result = await dispatchContentScriptCall(
+			"page_scroll_to",
+			"scroll_to",
+			handlers.scroll_to,
+			{ x: 0, y: 500 },
+		);
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect((result.value as { amount?: number }).amount).toBe(500);
+		}
+		expect(scrollToSpy).toHaveBeenCalledWith({
+			top: 500,
+			left: 0,
+			behavior: "smooth",
+		});
+
+		scrollToSpy.mockRestore();
+	});
+});
