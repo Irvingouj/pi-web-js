@@ -4,7 +4,7 @@ All notable changes to this project are documented in this file. The format
 is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
-## [Unreleased] — 2026-06-22
+## [0.10.3] — 2026-06-22
 
 ### Added — complex form support
 
@@ -30,6 +30,7 @@ is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **Ancestor visibility**: `isHiddenElement` and `assertInteractable` now walk ancestors (`display:none` / `visibility:hidden` / `aria-hidden=true` / `inert`).
 - **Context-changing handlers** (`back`, `forward`, `scroll`) now invalidate the lease.
+- **E2e flakiness eliminated**: `assertNoHarnessErrors` now filters benign 404 resource load errors from fixture routes; `define-chrome-namespace` clears error arrays per test; `navigation.spec` snapshot_query tests activate an http tab as fallback when no `SNAPSHOT_QUERY_URL` tab exists. 193/193 pass with `--retries=0`.
 
 ### Migration notes for consumers
 
@@ -96,6 +97,7 @@ is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Added `problems.md` E2E fixtures and tests.
 - Fixed `web-js` `WasmAsyncError` compile.
 
+[0.10.3]: https://www.npmjs.com/package/@pi-oxide/extension-js/v/0.10.3
 [0.8.1]: https://www.npmjs.com/package/@pi-oxide/extension-js/v/0.8.1
 [0.8.0]: https://www.npmjs.com/package/@pi-oxide/extension-js/v/0.8.0
 [0.7.0]: https://www.npmjs.com/package/@pi-oxide/extension-js/v/0.7.0
