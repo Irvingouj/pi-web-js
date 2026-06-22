@@ -1,3 +1,11 @@
+// BigInt is not JSON-serializable in QuickJS. Zod schemas use bigintLike()
+// which accepts bigint | number, but the WASM transport layer serializes
+// params via JSON.stringify. Without this shim, any params object containing
+// a BigInt (e.g. timeout: 15000n) causes JSON.stringify to throw TypeError,
+// and js_value_to_json falls back to null → E_INVALID_PARAMS.
+if (typeof BigInt.prototype.toJSON !== 'function') {
+  BigInt.prototype.toJSON = function () { return Number(this); };
+}
 if (!globalThis.URL) {
   globalThis.URL = function URL(href, base) {
     var str = String(href);

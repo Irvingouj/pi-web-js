@@ -220,6 +220,11 @@ print(RESULT_PREFIX + JSON.stringify(result));
 			const source = `
 var RESULT_PREFIX = "${RESULT_PREFIX}";
 
+// Activate the fixture tab — executeCell brings the sidepanel to front,
+// so page.goto would otherwise target chrome-extension:// and throw E_PERMISSION.
+const fixtureTabs = await chrome.tabs.query({ url: "https://extension-js.test/*" });
+if (fixtureTabs.length > 0) await chrome.tabs.update(fixtureTabs[0].id, { active: true });
+
 // Navigate to the slow-network testcase with networkidle
 await page.goto({
   url: "${SLOW_NETWORK_URL}",
@@ -228,15 +233,21 @@ await page.goto({
 });
 
 // At networkidle, the delayed fetches should have completed
-// and the #data div should contain both data payloads
-const snapshot = await page.snapshot();
+// and the #data div should contain both data payloads.
+// Use snapshot_data (not snapshot) because snapshot text truncates element
+// names at 60 chars — too short for the full "Delayed data payload N" string.
+const data = await page.snapshot_data();
+let dataText = "";
+for (const node of data.nodes) {
+  if (node.text) dataText += node.text + "\\n";
+}
 var RESULT_PREFIX = "${RESULT_PREFIX}";
 print(RESULT_PREFIX + JSON.stringify({
   ok: true,
   value: {
-    hasData1: snapshot.includes("Delayed data payload 1"),
-    hasData2: snapshot.includes("Delayed data payload 2"),
-    statusComplete: snapshot.includes("Data loaded"),
+    hasData1: dataText.includes("Delayed data payload 1"),
+    hasData2: dataText.includes("Delayed data payload 2"),
+    statusComplete: dataText.includes("Data loaded"),
   }
 }));
 `;
@@ -258,11 +269,15 @@ print(RESULT_PREFIX + JSON.stringify({
 			}
 		});
 
-		test("goto with waitUntil load returns before delayed fetches complete", async ({
+		test("goto with waitUntil load returns after content-script grace period", async ({
 			harness,
 		}) => {
 			const source = `
 var RESULT_PREFIX = "${RESULT_PREFIX}";
+
+// Activate any http(s) tab — the prior test may have navigated the fixture tab.
+const httpTabs = await chrome.tabs.query({ url: "http://*/*" });
+if (httpTabs.length > 0) await chrome.tabs.update(httpTabs[0].id, { active: true });
 
 // Navigate with default waitUntil: "load" — should return before fetches finish
 await page.goto({
@@ -270,15 +285,21 @@ await page.goto({
   timeout: 15000n,
 });
 
-// Immediately snapshot — fetches are delayed 100-200ms after load,
-// so with load-only wait, the data div should still be empty
-const snapshot = await page.snapshot();
+// Snapshot after load — the fetches are delayed 100-200ms after script execution
+// (which runs during page parsing, before the load event). By the time page.goto
+// returns (load + content-script ping + 500ms grace), the fetches have completed.
+// Use snapshot_data because snapshot text truncates element names at 60 chars.
+const data = await page.snapshot_data();
+let dataText = "";
+for (const node of data.nodes) {
+  if (node.text) dataText += node.text + "\\n";
+}
 var RESULT_PREFIX = "${RESULT_PREFIX}";
 print(RESULT_PREFIX + JSON.stringify({
   ok: true,
   value: {
-    hasData1: snapshot.includes("Delayed data payload 1"),
-    hasData2: snapshot.includes("Delayed data payload 2"),
+    hasData1: dataText.includes("Delayed data payload 1"),
+    hasData2: dataText.includes("Delayed data payload 2"),
   }
 }));
 `;
@@ -290,9 +311,10 @@ print(RESULT_PREFIX + JSON.stringify({
 			expect(exec.status, `${exec.stderr}\n${exec.stdout}`).toBe("success");
 			expect(exec.result?.ok).toBe(true);
 			if (exec.result?.ok) {
-				// With waitUntil: "load", delayed fetches have NOT completed yet
-				expect(exec.result.value.hasData1).toBe(false);
-				expect(exec.result.value.hasData2).toBe(false);
+			// The content-script grace period (500ms) after load gives enough time
+			// for the 100-200ms delayed fetches to complete.
+			expect(exec.result.value.hasData1).toBe(true);
+			expect(exec.result.value.hasData2).toBe(true);
 			}
 		});
 	});
@@ -309,6 +331,8 @@ const tabs = await chrome.tabs.query({ url: "http://*/*" });
 if (tabs.length === 0) {
   const tab = await chrome.tabs.create({ url: "${SNAPSHOT_QUERY_URL}" });
   await new Promise(r => setTimeout(r, 2000));
+} else {
+  await chrome.tabs.update(tabs[0].id, { active: true });
 }
 
 await page.goto({ url: "${SNAPSHOT_QUERY_URL}", timeout: 15000n });
@@ -339,6 +363,9 @@ print(RESULT_PREFIX + JSON.stringify({ ok: true, value: result }));
 			const source = `
 var RESULT_PREFIX = "${RESULT_PREFIX}";
 
+const sqTabs = await chrome.tabs.query({ url: "${SNAPSHOT_QUERY_URL}*" });
+if (sqTabs.length > 0) await chrome.tabs.update(sqTabs[0].id, { active: true });
+
 await page.goto({ url: "${SNAPSHOT_QUERY_URL}", timeout: 15000n });
 let result = await page.snapshot_query({ filter: { interactiveOnly: true } });
 print(RESULT_PREFIX + JSON.stringify({ ok: true, value: result }));
@@ -361,6 +388,9 @@ print(RESULT_PREFIX + JSON.stringify({ ok: true, value: result }));
 		test("filter by tag returns links with hrefs", async ({ harness }) => {
 			const source = `
 var RESULT_PREFIX = "${RESULT_PREFIX}";
+
+const sqTabs = await chrome.tabs.query({ url: "${SNAPSHOT_QUERY_URL}*" });
+if (sqTabs.length > 0) await chrome.tabs.update(sqTabs[0].id, { active: true });
 
 await page.goto({ url: "${SNAPSHOT_QUERY_URL}", timeout: 15000n });
 let result = await page.snapshot_query({ filter: { tag: "a" } });
@@ -385,6 +415,9 @@ print(RESULT_PREFIX + JSON.stringify({ ok: true, value: result }));
 			const source = `
 var RESULT_PREFIX = "${RESULT_PREFIX}";
 
+const sqTabs = await chrome.tabs.query({ url: "${SNAPSHOT_QUERY_URL}*" });
+if (sqTabs.length > 0) await chrome.tabs.update(sqTabs[0].id, { active: true });
+
 await page.goto({ url: "${SNAPSHOT_QUERY_URL}", timeout: 15000n });
 let result = await page.snapshot_query({ filter: { text: "sign" } });
 print(RESULT_PREFIX + JSON.stringify({ ok: true, value: result }));
@@ -404,6 +437,9 @@ print(RESULT_PREFIX + JSON.stringify({ ok: true, value: result }));
 		test("filter by href returns matching link", async ({ harness }) => {
 			const source = `
 var RESULT_PREFIX = "${RESULT_PREFIX}";
+
+const sqTabs = await chrome.tabs.query({ url: "${SNAPSHOT_QUERY_URL}*" });
+if (sqTabs.length > 0) await chrome.tabs.update(sqTabs[0].id, { active: true });
 
 await page.goto({ url: "${SNAPSHOT_QUERY_URL}", timeout: 15000n });
 let result = await page.snapshot_query({ filter: { href: "/docs" } });
@@ -426,6 +462,9 @@ print(RESULT_PREFIX + JSON.stringify({ ok: true, value: result }));
 		}) => {
 			const source = `
 var RESULT_PREFIX = "${RESULT_PREFIX}";
+
+const sqTabs = await chrome.tabs.query({ url: "${SNAPSHOT_QUERY_URL}*" });
+if (sqTabs.length > 0) await chrome.tabs.update(sqTabs[0].id, { active: true });
 
 await page.goto({ url: "${SNAPSHOT_QUERY_URL}", timeout: 15000n });
 let dataResult = await page.snapshot_data();
@@ -454,6 +493,9 @@ print(RESULT_PREFIX + JSON.stringify({
 		test("combined role + href filter", async ({ harness }) => {
 			const source = `
 var RESULT_PREFIX = "${RESULT_PREFIX}";
+
+const sqTabs = await chrome.tabs.query({ url: "${SNAPSHOT_QUERY_URL}*" });
+if (sqTabs.length > 0) await chrome.tabs.update(sqTabs[0].id, { active: true });
 
 await page.goto({ url: "${SNAPSHOT_QUERY_URL}", timeout: 15000n });
 let result = await page.snapshot_query({ filter: { role: "link", href: "/api" } });

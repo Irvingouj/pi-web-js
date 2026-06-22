@@ -85,9 +85,14 @@ test.describe
 			>(
 				harness.sidepanel,
 				cellSource(
-					resultPrefixLine(),
-					activateStaleRefTabSource(),
-					`const oldRefId = ${JSON.stringify(oldRefId)};`,
+				resultPrefixLine(),
+				"// Activate the stale-ref tab WITHOUT navigating (to preserve content-script",
+				"// state from step 2). Establish a fresh observation via page.find, so the",
+				"// old refId from step 1 is not in the current targets → E_STALE.",
+				`let staleTabs = await chrome.tabs.query({ url: ${JSON.stringify(`${STALE_REF_URL}*`)} });`,
+				"if (staleTabs.length > 0) await chrome.tabs.update(staleTabs[0].id, { active: true });",
+				"await page.find('#action-btn');",
+				`const oldRefId = ${JSON.stringify(oldRefId)};`,
 					"let staleRefId = '';",
 					"let code = '';",
 					"try {",

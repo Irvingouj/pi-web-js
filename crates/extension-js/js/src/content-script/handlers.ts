@@ -544,17 +544,49 @@ export const handlers = {
 			return makeActionResult("select_option", el, { value: opt.value });
 		}
 		const control = el as HTMLElement;
+		const listboxesBefore = new Map(
+			Array.from(document.querySelectorAll<HTMLElement>('[role="listbox"]')).map(
+				(listbox) => [listbox, {
+					hidden: isSelfOrAncestorHidden(listbox),
+					content: listbox.innerHTML,
+				}],
+			),
+		);
+		for (const evName of ["mouseover", "mousedown", "mouseup"]) {
+			control.dispatchEvent(new MouseEvent(evName, { bubbles: true, cancelable: true }));
+		}
 		control.click();
-		const listboxId = control.getAttribute("aria-controls") || control.getAttribute("aria-owns");
-		const listboxRoot = listboxId ? document.getElementById(listboxId) : document;
-		const options = Array.from(
-			(listboxRoot || document).querySelectorAll('[role="listbox"] [role="option"]'),
-		) as HTMLElement[];
-		const match =
-			options.find((o) => (o.textContent || "").trim() === value) ||
-			options.find(
-				(o) => (o.textContent || "").trim().toLowerCase() === value.toLowerCase(),
-			);
+		const ownedIds = `${control.getAttribute("aria-controls") || ""} ${control.getAttribute("aria-owns") || ""}`
+			.trim()
+			.split(/\s+/)
+			.filter(Boolean);
+		const linkedRoots = ownedIds
+			.map((id) => document.getElementById(id))
+			.filter((root): root is HTMLElement => root instanceof HTMLElement);
+		const activatedRoots = Array.from(
+			document.querySelectorAll<HTMLElement>('[role="listbox"]'),
+		).filter(
+			(listbox) => {
+				const before = listboxesBefore.get(listbox);
+				return !isSelfOrAncestorHidden(listbox) &&
+					(!before || before.hidden || before.content !== listbox.innerHTML);
+			},
+		);
+		const nearbyRoots = Array.from(
+			control.querySelectorAll<HTMLElement>('[role="listbox"]'),
+		);
+		const roots = [...new Set([...linkedRoots, ...activatedRoots, ...nearbyRoots])];
+		const scopedOptions = roots.flatMap((root) =>
+			Array.from(root.querySelectorAll<HTMLElement>('[role="option"]')),
+		);
+		const options = [...new Set([
+			...scopedOptions,
+			...document.querySelectorAll<HTMLElement>('[role="listbox"] [role="option"]'),
+		])];
+		const normalizedValue = value.trim().toLowerCase();
+		const match = options.find(
+			(o) => (o.textContent || "").trim().toLowerCase() === normalizedValue,
+		);
 		if (!match) {
 			const candidates: StaleRefCandidate[] = options.map((o, i) => ({
 				refId: o.getAttribute("data-ref-id") || `opt${i}`,
@@ -726,8 +758,10 @@ export const handlers = {
 		syncRefIdCounterFromDom();
 		const selector = params.selector;
 		const elements = Array.from(document.querySelectorAll(selector));
-		return elements.map((el) => {
+		const observed: Array<{ refId: string; element: Element }> = [];
+		const nodes = elements.map((el) => {
 			const refId = allocateRefId(el);
+			observed.push({ refId, element: el });
 			const role = getAccessibleRole(el);
 			const name = getAccessibleName(el);
 			const node: Record<string, unknown> = {
@@ -763,6 +797,8 @@ export const handlers = {
 
 			return node;
 		});
+		grantObservation(observed);
+		return nodes;
 	},
 
 	dom: (params: PageDomParams) => {
