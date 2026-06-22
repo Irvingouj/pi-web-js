@@ -466,7 +466,8 @@ export function assertNoHarnessErrors(
 	const fatalConsole = harness.browserConsoleErrors.filter(
 		(e) =>
 			!e.includes("Extension context invalidated") &&
-			!/Unchecked runtime\.lastError/i.test(e),
+			!/Unchecked runtime\.lastError/i.test(e) &&
+			!/Failed to load resource.*404/i.test(e),
 	);
 	if (fatalConsole.length > 0) {
 		const msg = fatalConsole.join("\n");

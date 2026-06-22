@@ -365,6 +365,7 @@ var RESULT_PREFIX = "${RESULT_PREFIX}";
 
 const sqTabs = await chrome.tabs.query({ url: "${SNAPSHOT_QUERY_URL}*" });
 if (sqTabs.length > 0) await chrome.tabs.update(sqTabs[0].id, { active: true });
+else { const httpTabs = await chrome.tabs.query({ url: "http://*/*" }); if (httpTabs.length > 0) await chrome.tabs.update(httpTabs[0].id, { active: true }); }
 
 await page.goto({ url: "${SNAPSHOT_QUERY_URL}", timeout: 15000n });
 let result = await page.snapshot_query({ filter: { interactiveOnly: true } });
@@ -391,6 +392,7 @@ var RESULT_PREFIX = "${RESULT_PREFIX}";
 
 const sqTabs = await chrome.tabs.query({ url: "${SNAPSHOT_QUERY_URL}*" });
 if (sqTabs.length > 0) await chrome.tabs.update(sqTabs[0].id, { active: true });
+else { const httpTabs = await chrome.tabs.query({ url: "http://*/*" }); if (httpTabs.length > 0) await chrome.tabs.update(httpTabs[0].id, { active: true }); }
 
 await page.goto({ url: "${SNAPSHOT_QUERY_URL}", timeout: 15000n });
 let result = await page.snapshot_query({ filter: { tag: "a" } });
@@ -417,6 +419,7 @@ var RESULT_PREFIX = "${RESULT_PREFIX}";
 
 const sqTabs = await chrome.tabs.query({ url: "${SNAPSHOT_QUERY_URL}*" });
 if (sqTabs.length > 0) await chrome.tabs.update(sqTabs[0].id, { active: true });
+else { const httpTabs = await chrome.tabs.query({ url: "http://*/*" }); if (httpTabs.length > 0) await chrome.tabs.update(httpTabs[0].id, { active: true }); }
 
 await page.goto({ url: "${SNAPSHOT_QUERY_URL}", timeout: 15000n });
 let result = await page.snapshot_query({ filter: { text: "sign" } });
@@ -440,6 +443,7 @@ var RESULT_PREFIX = "${RESULT_PREFIX}";
 
 const sqTabs = await chrome.tabs.query({ url: "${SNAPSHOT_QUERY_URL}*" });
 if (sqTabs.length > 0) await chrome.tabs.update(sqTabs[0].id, { active: true });
+else { const httpTabs = await chrome.tabs.query({ url: "http://*/*" }); if (httpTabs.length > 0) await chrome.tabs.update(httpTabs[0].id, { active: true }); }
 
 await page.goto({ url: "${SNAPSHOT_QUERY_URL}", timeout: 15000n });
 let result = await page.snapshot_query({ filter: { href: "/docs" } });
@@ -465,6 +469,7 @@ var RESULT_PREFIX = "${RESULT_PREFIX}";
 
 const sqTabs = await chrome.tabs.query({ url: "${SNAPSHOT_QUERY_URL}*" });
 if (sqTabs.length > 0) await chrome.tabs.update(sqTabs[0].id, { active: true });
+else { const httpTabs = await chrome.tabs.query({ url: "http://*/*" }); if (httpTabs.length > 0) await chrome.tabs.update(httpTabs[0].id, { active: true }); }
 
 await page.goto({ url: "${SNAPSHOT_QUERY_URL}", timeout: 15000n });
 let dataResult = await page.snapshot_data();
@@ -496,6 +501,7 @@ var RESULT_PREFIX = "${RESULT_PREFIX}";
 
 const sqTabs = await chrome.tabs.query({ url: "${SNAPSHOT_QUERY_URL}*" });
 if (sqTabs.length > 0) await chrome.tabs.update(sqTabs[0].id, { active: true });
+else { const httpTabs = await chrome.tabs.query({ url: "http://*/*" }); if (httpTabs.length > 0) await chrome.tabs.update(httpTabs[0].id, { active: true }); }
 
 await page.goto({ url: "${SNAPSHOT_QUERY_URL}", timeout: 15000n });
 let result = await page.snapshot_query({ filter: { role: "link", href: "/api" } });

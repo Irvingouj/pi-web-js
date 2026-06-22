@@ -22,12 +22,17 @@ export function defineChromeNamespaceSpec(
 
 	test.describe
 		.serial(namespace, () => {
-			// Contract batch builds fixture per API; typically 4–8s per cell.
-			test.describe.configure({ timeout: 15_000 });
+		// Contract batch builds fixture per API; typically 4–8s per cell.
+		test.describe.configure({ timeout: 15_000 });
 
-			test.afterEach(({ harness }, testInfo) => {
-				assertNoHarnessErrors(harness, testInfo);
-			});
+		test.beforeEach(({ harness }) => {
+			harness.serviceWorkerErrors.length = 0;
+			harness.browserConsoleErrors.length = 0;
+		});
+
+		test.afterEach(({ harness }, testInfo) => {
+			assertNoHarnessErrors(harness, testInfo);
+		});
 
 			for (const apiCase of apiCases) {
 				const runTest = apiCase.skip ? test.skip : test;
