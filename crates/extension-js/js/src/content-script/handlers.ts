@@ -3,6 +3,7 @@ import type {
 	FetchParams,
 	PageAppendParams,
 	PageCheckParams,
+	PageCheckRadioParams,
 	PageClickParams,
 	PageDblClickParams,
 	PageDomParams,
@@ -15,6 +16,7 @@ import type {
 	PageScrollToParams,
 	PageSelectParams,
 	PageSelectOptionParams,
+	PageSubmitParams,
 	PageSetFilesParams,
 	PageSnapshotQueryParams,
 	PageTypeParams,
@@ -388,20 +390,32 @@ export const handlers = {
 			throwElementNotFound(refId, label, true);
 		}
 		assertInteractable(el, "fill");
-		if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
-			el.value = value;
-			const ev = new InputEvent("input", { bubbles: true });
-			el.dispatchEvent(ev);
-			const resolvedRefId = refId || el.getAttribute("data-ref-id") || "";
-			assertFillEffect("fill", el, resolvedRefId, value);
-			return makeActionResult("fill", el, {
-				value: el.value,
-				observationId: currentObservationId(),
-				dispatched: true,
-				verification: "required",
-			});
-		}
-		throw new Error("Element is not an input");
+	if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+		el.value = value;
+		const ev = new InputEvent("input", { bubbles: true });
+		el.dispatchEvent(ev);
+		const resolvedRefId = refId || el.getAttribute("data-ref-id") || "";
+		assertFillEffect("fill", el, resolvedRefId, value);
+		return makeActionResult("fill", el, {
+			value: el.value,
+			observationId: currentObservationId(),
+			dispatched: true,
+			verification: "required",
+		});
+	}
+	if (el instanceof HTMLElement && el.isContentEditable) {
+		el.innerText = value;
+		const ev = new InputEvent("input", { bubbles: true, inputType: "insertText", data: value });
+		el.dispatchEvent(ev);
+		const resolvedRefId = refId || el.getAttribute("data-ref-id") || "";
+		return makeActionResult("fill", el, {
+			value: el.innerText,
+			observationId: currentObservationId(),
+			dispatched: true,
+			verification: "required",
+		});
+	}
+	throw new Error("Element is not an input or contenteditable");
 	},
 
 	set_files: async (params: PageSetFilesParams) => {
@@ -496,11 +510,25 @@ export const handlers = {
 			throwStructuredAgentError(observationRequiredError("press"));
 		}
 		const key = params.key;
+		const refId = params.refId;
+		const label = params.label;
+		let target: EventTarget = document;
+		let el: Element | null = null;
+	if (refId || label) {
+		if (refId) {
+			el = requireTarget(refId, "press");
+		} else if (label) {
+			el = findElementByLabel(label);
+			if (!el) throwElementNotFound(refId, label, true);
+		}
+		assertInteractable(el as Element, "press");
+		target = el as Element;
+	}
 		const evDown = new KeyboardEvent("keydown", { key, bubbles: true });
-		document.dispatchEvent(evDown);
+		target.dispatchEvent(evDown);
 		const evUp = new KeyboardEvent("keyup", { key, bubbles: true });
-		document.dispatchEvent(evUp);
-		return makeActionResult("press", null, {
+		target.dispatchEvent(evUp);
+		return makeActionResult("press", el, {
 			key,
 			observationId: currentObservationId(),
 			dispatched: true,
@@ -515,6 +543,27 @@ export const handlers = {
 		const el = resolveTargetRaw(refId, label);
 		assertInteractable(el, "select");
 		if (el instanceof HTMLSelectElement) {
+			if (Array.isArray(value)) {
+				const wanted = new Set(value);
+				let count = 0;
+				for (const opt of Array.from(el.options)) {
+					const isOn = wanted.has(opt.value);
+					opt.selected = isOn;
+					if (isOn) count += 1;
+				}
+				if (!el.multiple && count > 1) {
+					throwStructuredAgentError(
+						notInteractableError("select", refId ?? "", {
+							reason: "single_select_multiple_values",
+						}),
+					);
+				}
+				el.dispatchEvent(new Event("change", { bubbles: true }));
+				const selected = Array.from(el.options)
+					.filter((o) => o.selected)
+					.map((o) => o.value);
+				return makeActionResult("select", el, { value: selected });
+			}
 			el.value = value;
 			el.dispatchEvent(new Event("change", { bubbles: true }));
 			return makeActionResult("select", el, { value: el.value });
@@ -618,6 +667,36 @@ export const handlers = {
 		throw new Error("Element is not a checkbox or radio");
 	},
 
+	check_radio: (params: PageCheckRadioParams) => {
+		const name = params.name;
+		const value = params.value;
+		const selector = `input[type="radio"][name="${CSS.escape(name)}"]`;
+		const radios = Array.from(
+			document.querySelectorAll<HTMLInputElement>(selector),
+		);
+		if (radios.length === 0) {
+			throwStructuredAgentError(
+				labelNotFoundError(`radio group "${name}"`, []),
+			);
+		}
+		const target = radios.find((r) => r.value === value);
+		if (!target) {
+			const candidates: StaleRefCandidate[] = radios.map((r, i) => ({
+				refId: `radio${i}`,
+				name: r.value || undefined,
+			}));
+			throwStructuredAgentError(
+				labelNotFoundError(`radio value "${value}" in group "${name}"`, candidates),
+			);
+		}
+		assertInteractable(target, "check_radio");
+		target.checked = true;
+		target.dispatchEvent(new Event("change", { bubbles: true }));
+		return makeActionResult("check_radio", target, {
+			checked: target.checked,
+			value: target.value,
+		});
+	},
 	hover: (params: PageHoverParams) => {
 		const refId = params.refId;
 		const label = params.label;
@@ -632,6 +711,35 @@ export const handlers = {
 		const ev = new MouseEvent("mouseleave", { bubbles: true });
 		document.body.dispatchEvent(ev);
 		return makeActionResult("unhover", null);
+	},
+
+	submit: (params: PageSubmitParams) => {
+		const refId = params.refId;
+		const label = params.label;
+		const el = resolveTargetRaw(refId, label);
+		let form: HTMLFormElement | null = null;
+		if (el instanceof HTMLFormElement) {
+			form = el;
+		} else if (el.closest("form")) {
+			form = el.closest("form");
+		}
+		if (!form) {
+			throwStructuredAgentError(
+				notInteractableError("submit", refId ?? "", {
+					reason: "not_form",
+				}),
+			);
+		}
+		if (typeof form.requestSubmit === "function") {
+			form.requestSubmit();
+		} else {
+			form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+		}
+		return makeActionResult("submit", form, {
+			dispatched: true,
+			observationId: currentObservationId(),
+			verification: "required",
+		});
 	},
 
 	scroll: (params: PageScrollParams) => {

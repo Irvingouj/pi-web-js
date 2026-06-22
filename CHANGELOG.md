@@ -4,7 +4,19 @@ All notable changes to this project are documented in this file. The format
 is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
-## [0.10.0] — 2026-06-19
+## [Unreleased] — 2026-06-22
+
+### Added — complex form support
+
+- **`page.select` accepts `value: string | string[]`**: multi-select support. Passing an array picks multiple options on `<select multiple>`; passing `[]` clears the selection. Single-select rejects arrays >1 with `E_NOT_INTERACTABLE` (`single_select_multiple_values`).
+- **`page.fill` accepts `[contenteditable]` elements**: sets `innerText` + dispatches `input`. Previously rejected non-input elements.
+- **`page.press` accepts optional `refId`/`label`**: dispatches `keydown`/`keyup` on the targeted element (falls back to `document` for backwards compatibility).
+- **`page.submit`** (new): calls `form.requestSubmit()` on a `<form>` element or the form owning the target. Fires submit listeners + validation.
+- **`page.checkRadio`** (new): picks a radio by `name` + `value` without needing a refId. Reports candidates when the value is missing.
+- **Snapshot option discoverability**: `<option>` nodes now expose `value` + `selected` fields in `page.snapshot_data()` / `page.snapshot()` results. `<select multiple>` exposes all selected values as a comma-joined `value`. Agents can now read valid option values from the snapshot and feed them to `page.select`.
+- **New testcase**: `testcases/complex-form/` — text, email, password, number, range, date, textarea, native select (single + multiple), radio group, checkbox group, file input, contenteditable, custom ARIA listbox, submit button.
+- **New spec**: `web/tests/e2e/extension/complex-form.spec.ts` — 15 serial tests covering all new APIs + regression of existing fill/select/setFiles/click/select_option on every element kind.
+
 
 ### Added — observation lease (content-script)
 

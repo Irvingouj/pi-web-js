@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Complex Form</title>
+  <style>
+    .row { margin: 8px 0; }
+    [contenteditable] { border: 1px solid #ccc; padding: 4px; min-height: 24px; display: inline-block; min-width: 200px; }
+    [role="listbox"] { border: 1px solid #999; display: inline-block; min-width: 120px; }
+    [role="option"] { padding: 4px; cursor: pointer; }
+    [role="option"][aria-selected="true"] { background: #cce5ff; }
+  </style>
+</head>
+<body>
+  <h1>Complex Form</h1>
+  <form id="form" onsubmit="return false">
+    <div class="row">
+      <label for="text">Text</label>
+      <input id="text" name="text" type="text" />
+    </div>
+    <div class="row">
+      <label for="email">Email</label>
+      <input id="email" name="email" type="email" />
+    </div>
+    <div class="row">
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" />
+    </div>
+    <div class="row">
+      <label for="number">Number</label>
+      <input id="number" name="number" type="number" />
+    </div>
+    <div class="row">
+      <label for="range">Range</label>
+      <input id="range" name="range" type="range" min="0" max="100" value="0" />
+    </div>
+    <div class="row">
+      <label for="date">Date</label>
+      <input id="date" name="date" type="date" />
+    </div>
+    <div class="row">
+      <label for="textarea">Textarea</label>
+      <textarea id="textarea" name="textarea"></textarea>
+    </div>
+    <div class="row">
+      <label for="select-single">Native Select Single</label>
+      <select id="select-single" name="select-single">
+        <option value="">--</option>
+        <option value="alpha">Alpha</option>
+        <option value="beta">Beta</option>
+        <option value="gamma">Gamma</option>
+      </select>
+    </div>
+    <div class="row">
+      <label for="select-multi">Native Select Multiple</label>
+      <select id="select-multi" name="select-multi" multiple size="4">
+        <option value="red">Red</option>
+        <option value="green">Green</option>
+        <option value="blue">Blue</option>
+        <option value="yellow">Yellow</option>
+      </select>
+    </div>
+    <div class="row">
+      <span>Radio Group</span>
+      <label><input type="radio" name="radio-grp" value="opt1" /> Opt1</label>
+      <label><input type="radio" name="radio-grp" value="opt2" /> Opt2</label>
+      <label><input type="radio" name="radio-grp" value="opt3" /> Opt3</label>
+    </div>
+    <div class="row">
+      <span>Checkbox Group</span>
+      <label><input type="checkbox" name="chk" value="c1" /> C1</label>
+      <label><input type="checkbox" name="chk" value="c2" /> C2</label>
+      <label><input type="checkbox" name="chk" value="c3" /> C3</label>
+    </div>
+    <div class="row">
+      <label for="file-single">File Single</label>
+      <input id="file-single" name="file-single" type="file" accept="image/*,.txt" />
+    </div>
+    <div class="row">
+      <label for="contenteditable">Contenteditable</label>
+      <div id="contenteditable" contenteditable="true" data-placeholder="editable text"></div>
+    </div>
+    <div class="row">
+      <span>Custom ARIA Listbox</span>
+      <div role="listbox" id="listbox" aria-label="listbox">
+        <div role="option" id="opt-x" aria-selected="false" data-value="X">X</div>
+        <div role="option" id="opt-y" aria-selected="false" data-value="Y">Y</div>
+        <div role="option" id="opt-z" aria-selected="false" data-value="Z">Z</div>
+      </div>
+    </div>
+    <div class="row">
+      <button type="submit" id="submit-btn">Submit</button>
+    </div>
+  </form>
+  <p id="status" aria-live="polite">idle</p>
+  <ul id="log"></ul>
+  <script>
+    var statusEl = document.getElementById("status");
+    var logEl = document.getElementById("log");
+
+    function setStatus(text) {
+      statusEl.textContent = text;
+      var li = document.createElement("li");
+      li.textContent = text;
+      logEl.appendChild(li);
+    }
+
+    function selectedMultiValues() {
+      var sel = document.getElementById("select-multi");
+      var vals = [];
+      for (var i = 0; i < sel.options.length; i++) {
+        if (sel.options[i].selected) vals.push(sel.options[i].value);
+      }
+      return vals.join(",");
+    }
+
+    function checkedBoxes() {
+      var boxes = document.querySelectorAll('input[name="chk"]:checked');
+      var vals = [];
+      for (var i = 0; i < boxes.length; i++) vals.push(boxes[i].value);
+      return vals.join(",");
+    }
+
+    function checkedRadio() {
+      var r = document.querySelector('input[name="radio-grp"]:checked');
+      return r ? r.value : "";
+    }
+
+    // Event handlers
+    document.getElementById("text").addEventListener("input", function (e) {
+      setStatus("text:" + e.target.value);
+    });
+    document.getElementById("email").addEventListener("input", function (e) {
+      setStatus("text:" + e.target.value);
+    });
+    document.getElementById("password").addEventListener("input", function (e) {
+      setStatus("text:" + e.target.value);
+    });
+    document.getElementById("text").addEventListener("keydown", function (e) {
+      setStatus("press:" + e.key);
+    });
+    document.getElementById("number").addEventListener("input", function (e) {
+      setStatus("number:" + e.target.value);
+    });
+    document.getElementById("range").addEventListener("input", function (e) {
+      setStatus("range:" + e.target.value);
+    });
+    document.getElementById("date").addEventListener("input", function (e) {
+      setStatus("date:" + e.target.value);
+    });
+    document.getElementById("date").addEventListener("change", function (e) {
+      setStatus("date:" + e.target.value);
+    });
+    document.getElementById("textarea").addEventListener("input", function (e) {
+      setStatus("textarea:" + e.target.value);
+    });
+    document.getElementById("select-single").addEventListener("change", function (e) {
+      setStatus("select-single:" + e.target.value);
+    });
+    document.getElementById("select-multi").addEventListener("change", function () {
+      setStatus("select-multi:" + selectedMultiValues());
+    });
+    Array.prototype.forEach.call(
+      document.querySelectorAll('input[name="radio-grp"]'),
+      function (r) {
+        r.addEventListener("change", function () {
+          setStatus("radio:" + checkedRadio());
+        });
+      },
+    );
+    Array.prototype.forEach.call(
+      document.querySelectorAll('input[name="chk"]'),
+      function (c) {
+        c.addEventListener("change", function () {
+          setStatus("checkbox:" + checkedBoxes());
+        });
+      },
+    );
+    document.getElementById("file-single").addEventListener("change", function (e) {
+      var f = e.target.files && e.target.files[0];
+      setStatus(f ? "file:" + f.name + ":" + f.size : "file:empty");
+    });
+    document.getElementById("contenteditable").addEventListener("input", function (e) {
+      setStatus("contenteditable:" + e.target.innerText);
+    });
+    // ARIA listbox
+    Array.prototype.forEach.call(
+      document.querySelectorAll('#listbox [role="option"]'),
+      function (opt) {
+        opt.addEventListener("click", function () {
+          Array.prototype.forEach.call(
+            document.querySelectorAll('#listbox [role="option"]'),
+            function (o) { o.setAttribute("aria-selected", "false"); },
+          );
+          opt.setAttribute("aria-selected", "true");
+          setStatus("listbox:" + opt.getAttribute("data-value"));
+        });
+      },
+    );
+    // Submit
+    document.getElementById("form").addEventListener("submit", function () {
+      setStatus("submitted");
+    });
+  </script>
+</body>
+</html>

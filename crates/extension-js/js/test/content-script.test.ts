@@ -2326,6 +2326,167 @@ describe("select_option handler", () => {
 		expect(optionClicked).toBe("Yes");
 	});
 
+	it("combobox opened by mousedown ignores an unrelated listbox", async () => {
+		const staleListbox = document.createElement("div");
+		staleListbox.setAttribute("role", "listbox");
+		staleListbox.innerHTML = '<div role="option">Canada</div>';
+
+		const control = document.createElement("input");
+		control.setAttribute("role", "combobox");
+		control.setAttribute("aria-label", "AI agreement");
+		control.addEventListener("mousedown", () => {
+			const listbox = document.createElement("div");
+			listbox.id = "ai-options";
+			listbox.setAttribute("role", "listbox");
+			listbox.innerHTML = '<div role="option">Yes</div><div role="option">No</div>';
+			control.setAttribute("aria-controls", listbox.id);
+			document.body.appendChild(listbox);
+		});
+		document.body.append(staleListbox, control);
+
+		const snap = await dispatchContentScriptCall(
+			"page_snapshot_data",
+			"snapshot",
+			handlers.snapshot,
+			{},
+		);
+		const refId = (snap.value as { nodes: Array<{ refId: string; role?: string }> }).nodes.find(
+			(n) => n.role === "combobox",
+		)!.refId;
+
+		let optionClicked = "";
+		document.addEventListener("click", (event) => {
+			const target = event.target as HTMLElement;
+			if (target.getAttribute("role") === "option") optionClicked = target.textContent || "";
+		}, true);
+
+		const result = await dispatchContentScriptCall(
+			"page_select_option",
+			"select_option",
+			handlers.select_option,
+			{ refId, value: "Yes" },
+		);
+		expect(result.ok).toBe(true);
+		expect(optionClicked).toBe("Yes");
+	});
+
+	it("unlinked combobox selects from the listbox it reveals", async () => {
+		const unrelated = document.createElement("div");
+		unrelated.setAttribute("role", "listbox");
+		unrelated.innerHTML = '<div role="option" data-source="unrelated">Yes</div>';
+
+		const options = document.createElement("div");
+		options.setAttribute("role", "listbox");
+		options.hidden = true;
+		options.innerHTML = '<div role="option" data-source="target">Yes</div>';
+
+		const control = document.createElement("input");
+		control.setAttribute("role", "combobox");
+		control.setAttribute("aria-label", "AI agreement");
+		control.addEventListener("mousedown", () => {
+			options.hidden = false;
+		});
+		document.body.append(unrelated, control, options);
+
+		const snap = await dispatchContentScriptCall(
+			"page_snapshot_data",
+			"snapshot",
+			handlers.snapshot,
+			{},
+		);
+		const refId = (snap.value as { nodes: Array<{ refId: string; role?: string }> }).nodes.find(
+			(n) => n.role === "combobox",
+		)!.refId;
+
+		let source = "";
+		document.addEventListener("click", (event) => {
+			const target = event.target as HTMLElement;
+			if (target.getAttribute("role") === "option") source = target.dataset.source || "";
+		}, true);
+
+		const result = await dispatchContentScriptCall(
+			"page_select_option",
+			"select_option",
+			handlers.select_option,
+			{ refId, value: "Yes" },
+		);
+		expect(result.ok).toBe(true);
+		expect(source).toBe("target");
+	});
+
+	it("unlinked combobox selects from the listbox whose options it replaces", async () => {
+		const unrelated = document.createElement("div");
+		unrelated.setAttribute("role", "listbox");
+		unrelated.innerHTML = '<div role="option" data-source="unrelated">Yes</div>';
+
+		const options = document.createElement("div");
+		options.setAttribute("role", "listbox");
+		options.innerHTML = '<div role="option">Choose</div>';
+
+		const control = document.createElement("input");
+		control.setAttribute("role", "combobox");
+		control.setAttribute("aria-label", "AI agreement");
+		control.addEventListener("mousedown", () => {
+			options.innerHTML = '<div role="option" data-source="target">Yes</div>';
+		});
+		document.body.append(unrelated, control, options);
+
+		const snap = await dispatchContentScriptCall(
+			"page_snapshot_data",
+			"snapshot",
+			handlers.snapshot,
+			{},
+		);
+		const refId = (snap.value as { nodes: Array<{ refId: string; role?: string }> }).nodes.find(
+			(n) => n.role === "combobox",
+		)!.refId;
+
+		let source = "";
+		document.addEventListener("click", (event) => {
+			const target = event.target as HTMLElement;
+			if (target.getAttribute("role") === "option") source = target.dataset.source || "";
+		}, true);
+
+		const result = await dispatchContentScriptCall(
+			"page_select_option",
+			"select_option",
+			handlers.select_option,
+			{ refId, value: "Yes" },
+		);
+		expect(result.ok).toBe(true);
+		expect(source).toBe("target");
+	});
+
+	it("falls back to document options when aria-controls is wrong", async () => {
+		document.body.innerHTML = `
+			<input role="combobox" aria-label="Choice" aria-controls="wrong-options">
+			<div id="wrong-options" role="listbox"><div role="option">Wrong</div></div>
+			<div role="listbox"><div role="option" data-target>Wanted</div></div>
+		`;
+		const snap = await dispatchContentScriptCall(
+			"page_snapshot_data",
+			"snapshot",
+			handlers.snapshot,
+			{},
+		);
+		const refId = (snap.value as { nodes: Array<{ refId: string; role?: string }> }).nodes.find(
+			(n) => n.role === "combobox",
+		)!.refId;
+		let clicked = false;
+		document.querySelector("[data-target]")!.addEventListener("click", () => {
+			clicked = true;
+		});
+
+		const result = await dispatchContentScriptCall(
+			"page_select_option",
+			"select_option",
+			handlers.select_option,
+			{ refId, value: "Wanted" },
+		);
+		expect(result.ok).toBe(true);
+		expect(clicked).toBe(true);
+	});
+
 	it("unknown option value returns E_NOT_FOUND with candidates", async () => {
 		const control = document.createElement("div");
 		control.setAttribute("role", "combobox");

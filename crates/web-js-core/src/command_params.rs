@@ -120,7 +120,34 @@ pub struct PageTypeParams {
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 pub struct PagePressParams {
+    #[serde(rename = "refId", default)]
+    pub ref_id: Option<String>,
+    #[serde(default)]
+    pub label: Option<String>,
     pub key: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[serde(untagged)]
+pub enum MaybeMultiValue {
+    Single(String),
+    Multi(Vec<String>),
+}
+
+impl MaybeMultiValue {
+    pub fn into_vec(self) -> Vec<String> {
+        match self {
+            MaybeMultiValue::Single(s) => vec![s],
+            MaybeMultiValue::Multi(v) => v,
+        }
+    }
+
+    pub fn first(&self) -> Option<&str> {
+        match self {
+            MaybeMultiValue::Single(s) => Some(s.as_str()),
+            MaybeMultiValue::Multi(v) => v.first().map(String::as_str),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -129,7 +156,7 @@ pub struct PageSelectParams {
     pub ref_id: Option<String>,
     #[serde(default)]
     pub label: Option<String>,
-    pub value: String,
+    pub value: MaybeMultiValue,
     #[serde(default)]
     pub selector: Option<String>,
 }

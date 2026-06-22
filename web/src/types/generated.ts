@@ -135,8 +135,10 @@ export type PageFindParams = { selector: string };
 export type PageGotoParams = { url: string };
 
 export type PageHoverParams = { refId?: string; label?: string };
+export type PageSubmitParams = { refId?: string; label?: string };
+export type PageCheckRadioParams = { name: string; value: string };
 
-export type PagePressParams = { key: string };
+export type PagePressParams = { refId?: string; label?: string; key: string };
 
 export type PageScrollParams = { direction: string; amount: number };
 
@@ -150,7 +152,7 @@ export type PageScrollToParams = {
 export type PageSelectParams = {
 	refId?: string;
 	label?: string;
-	value: string;
+	value: string | string[];
 };
 
 export type PageSelectOptionParams = {

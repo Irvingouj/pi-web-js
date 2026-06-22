@@ -331,11 +331,25 @@ export const PageAppendParamsSchema = elementTargetParams({
 });
 
 export const PagePressParamsSchema = z.object({
+	refId: refIdString()
+		.optional()
+		.describe("Element reference ID to dispatch the key on (e.g. e2). Omit to dispatch on document."),
+	label: z
+		.string()
+		.optional()
+		.describe("Human-readable element label. Omit to dispatch on document."),
 	key: z.string().describe("Key to press (e.g. Enter, Escape, ArrowDown)"),
 });
 
 export const PageSelectParamsSchema = elementTargetParams({
-	value: z.string().describe("Value to select in the dropdown"),
+	value: z
+		.union([
+			z.string().describe("Value to select in the dropdown"),
+			z
+				.array(z.string())
+				.describe("Values to select in a multiple dropdown (empty array clears selection)"),
+		])
+		.describe("Value (string) or values (array) to select in the dropdown"),
 });
 export const PageSelectOptionParamsSchema = elementTargetParams({
 	value: z.string().describe("Visible text of the option to select (matched case-insensitively)"),
@@ -346,8 +360,18 @@ export const PageCheckParamsSchema = elementTargetParams({
 		.optional()
 		.describe("Desired checked state (true to check, false to uncheck)"),
 });
+export const PageCheckRadioParamsSchema = z.object({
+	name: z
+		.string()
+		.min(1)
+		.describe("The `name` attribute of the radio group to pick from"),
+	value: z
+		.string()
+		.describe("The `value` of the radio option to check"),
+});
 export const PageHoverParamsSchema = elementTargetParams();
 export const PageUnhoverParamsSchema = z.object({});
+export const PageSubmitParamsSchema = elementTargetParams();
 
 export const PageScrollParamsSchema = z.object({
 	direction: z
@@ -525,6 +549,17 @@ export const TabCheckParamsSchema = tabElementTargetParams({
 		.describe("Desired checked state (true to check, false to uncheck)"),
 });
 export const TabHoverParamsSchema = tabElementTargetParams();
+export const TabSubmitParamsSchema = tabElementTargetParams();
+export const TabCheckRadioParamsSchema = z.object({
+	...tabIdField,
+	name: z
+		.string()
+		.min(1)
+		.describe("The `name` attribute of the radio group to pick from"),
+	value: z
+		.string()
+		.describe("The `value` of the radio option to check"),
+});
 export const TabUnhoverParamsSchema = z.object({
 	...tabIdField,
 });
@@ -990,9 +1025,9 @@ export const PageActionResultSchema = z.object({
 	role: z.string().optional().describe("ARIA role of the element"),
 	name: z.string().optional().describe("Accessible name of the element"),
 	value: z
-		.string()
+		.union([z.string(), z.array(z.string())])
 		.optional()
-		.describe("Final value of the element after the action"),
+		.describe("Final value of the element after the action (string, or string[] for multi-select)"),
 	checked: z.boolean().optional().describe("Checked state after the action"),
 	disabled: z.boolean().optional().describe("Whether the element is disabled"),
 	readOnly: z.boolean().optional().describe("Whether the element is read-only"),
@@ -1092,6 +1127,10 @@ export const SnapshotNodeSchema = z.object({
 	checked: z.boolean().optional().describe("Checked state"),
 	disabled: z.boolean().optional().describe("Whether the element is disabled"),
 	readOnly: z.boolean().optional().describe("Whether the element is read-only"),
+	selected: z
+		.boolean()
+		.optional()
+		.describe("For <option>: selected state"),
 	href: z.string().optional().describe("Absolute URL for link elements"),
 	src: z.string().optional().describe("Absolute URL for image elements"),
 	alt: z.string().optional().describe("Alternative text for image elements"),
@@ -1151,6 +1190,7 @@ interface DomNode {
 	checked?: boolean;
 	disabled?: boolean;
 	readOnly?: boolean;
+	selected?: boolean;
 	href?: string;
 	src?: string;
 	alt?: string;
@@ -1184,6 +1224,10 @@ export const DomNodeSchema: z.ZodType<DomNode> = z.object({
 	checked: z.boolean().optional(),
 	disabled: z.boolean().optional(),
 	readOnly: z.boolean().optional(),
+	selected: z
+		.boolean()
+		.optional()
+		.describe("For <option>: selected state"),
 	href: z.string().optional(),
 	src: z.string().optional(),
 	alt: z.string().optional(),

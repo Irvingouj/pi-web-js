@@ -170,6 +170,15 @@ api(
 	async ({ t }) => t.check({ refId: "input", checked: true }),
 	{ expected: "success" },
 );
+api("t.submit", "content-script", async ({ t }) => t.submit({ refId: "btn" }), {
+	expected: "success",
+});
+api(
+	"t.checkRadio",
+	"content-script",
+	async ({ t }) => t.checkRadio({ name: "radio-grp", value: "a" }),
+	{ expected: "success" },
+);
 api("t.hover", "content-script", async ({ t }) => t.hover({ refId: "btn" }), {
 	expected: "success",
 });
@@ -1407,6 +1416,12 @@ class TabHandle {
 	check(params) {
 		return web.tab.check({ ...params, tabId: this.tabId });
 	}
+	checkRadio(params) {
+		return web.tab.checkRadio({ ...params, tabId: this.tabId });
+	}
+	submit(params) {
+		return web.tab.submit({ ...params, tabId: this.tabId });
+	}
 	hover(params) {
 		return web.tab.hover({ ...params, tabId: this.tabId });
 	}
@@ -1635,6 +1650,7 @@ const MANIFEST = [
 	"t.append",
 	"t.back",
 	"t.check",
+	"t.checkRadio",
 	"t.click",
 	"t.close",
 	"t.dblclick",
@@ -1654,6 +1670,7 @@ const MANIFEST = [
 	"t.snapshot",
 	"t.snapshotData",
 	"t.title",
+	"t.submit",
 	"t.type",
 	"t.unhover",
 	"t.url",

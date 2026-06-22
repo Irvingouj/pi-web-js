@@ -47,12 +47,14 @@ export function readFormFields(el: Element): {
 	checked?: boolean;
 	disabled?: boolean;
 	readOnly?: boolean;
+	selected?: boolean;
 } {
 	const out: {
 		value?: string;
 		checked?: boolean;
 		disabled?: boolean;
 		readOnly?: boolean;
+		selected?: boolean;
 	} = {};
 	if (el instanceof HTMLInputElement) {
 		if (el.type !== "password" && el.type !== "hidden") {
@@ -68,7 +70,27 @@ export function readFormFields(el: Element): {
 		out.disabled = el.disabled;
 		out.readOnly = el.readOnly;
 	} else if (el instanceof HTMLSelectElement) {
+		if (el.multiple) {
+			// For <select multiple>, el.value only returns the first selected
+			// option. Expose all selected values joined by comma so agents can
+			// verify multi-select state from snapshot_data.
+			const selected: string[] = [];
+			for (const opt of Array.from(el.options)) {
+				if (opt.selected) selected.push(opt.value);
+			}
+			out.value = selected.join(",");
+		} else {
+			out.value = el.value;
+		}
+		out.disabled = el.disabled;
+	} else if (el instanceof HTMLOptionElement) {
+		// Expose value + selected so agents can read the valid option values
+		// of a <select> (single or multiple) from snapshot_data and feed them
+		// directly to page.select (string or string[]). Without this, the
+		// snapshot shows the option's visible text but not its underlying value,
+		// forcing agents to guess value vs text.
 		out.value = el.value;
+		out.selected = el.selected;
 		out.disabled = el.disabled;
 	}
 	return out;
@@ -81,10 +103,16 @@ export function enrichFormNode(
 		checked?: boolean;
 		disabled?: boolean;
 		readOnly?: boolean;
+		selected?: boolean;
 	},
 ): void {
 	const tag = el.tagName.toLowerCase();
-	if (tag !== "input" && tag !== "textarea" && tag !== "select") {
+	if (
+		tag !== "input" &&
+		tag !== "textarea" &&
+		tag !== "select" &&
+		tag !== "option"
+	) {
 		return;
 	}
 	Object.assign(node, readFormFields(el));
