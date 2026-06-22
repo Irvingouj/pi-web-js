@@ -1482,7 +1482,7 @@ describe("observation lease (B4): form scenario survives multiple fills", () => 
 	});
 });
 
-describe("observation lease (B3): branching click invalidates lease", () => {
+describe("observation lease (B3): branching click does NOT invalidate lease", () => {
 	beforeEach(() => {
 		document.body.innerHTML = "";
 		for (const spec of buildContentScriptSpecs()) {
@@ -1491,7 +1491,7 @@ describe("observation lease (B3): branching click invalidates lease", () => {
 		resetLease();
 	});
 
-	it("snapshot_data then click that adds a node then click second fails", async () => {
+	it("snapshot_data then click that adds a node then click second succeeds (lazy lease)", async () => {
 		const trigger = document.createElement("button");
 		trigger.setAttribute("aria-label", "Trigger");
 		document.body.appendChild(trigger);
@@ -1502,6 +1502,9 @@ describe("observation lease (B3): branching click invalidates lease", () => {
 		});
 		const other = document.createElement("button");
 		other.setAttribute("aria-label", "Other");
+		other.addEventListener("click", () => {
+			other.dataset.clicked = "yes";
+		});
 		document.body.appendChild(other);
 
 		const snap = await dispatchContentScriptCall(
@@ -1528,10 +1531,8 @@ describe("observation lease (B3): branching click invalidates lease", () => {
 			handlers.click,
 			{ refId: otherRef },
 		);
-		expect(second.ok).toBe(false);
-		if (!second.ok) {
-			expect(second.error.code).toBe("E_OBSERVATION_REQUIRED");
-		}
+		expect(second.ok).toBe(true);
+		expect(other.dataset.clicked).toBe("yes");
 	});
 });
 
@@ -1567,9 +1568,7 @@ describe("observation lease (B6): removed element invalidates lease", () => {
 		);
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
-			expect(["E_OBSERVATION_REQUIRED", "E_STALE"]).toContain(
-				result.error.code,
-			);
+			expect(result.error.code).toBe("E_STALE");
 		}
 	});
 });
@@ -2241,5 +2240,126 @@ describe("typed params: handler reads validated fields", () => {
 		});
 
 		scrollToSpy.mockRestore();
+	});
+});
+
+describe("select_option handler", () => {
+	beforeEach(() => {
+		document.body.innerHTML = "";
+		for (const spec of buildContentScriptSpecs()) {
+			registerContentScriptSpec(spec);
+		}
+		resetLease();
+	});
+
+	it("native <select> sets value and dispatches change", async () => {
+		const select = document.createElement("select");
+		select.setAttribute("aria-label", "Country");
+		select.innerHTML =
+			'<option value="">Pick</option><option value="ca">Canada</option><option value="us">USA</option>';
+		document.body.appendChild(select);
+
+		const snap = await dispatchContentScriptCall(
+			"page_snapshot_data",
+			"snapshot",
+			handlers.snapshot,
+			{},
+		);
+		const refId = (snap.value as { nodes: Array<{ refId: string }> }).nodes[0]
+			.refId;
+
+		const result = await dispatchContentScriptCall(
+			"page_select_option",
+			"select_option",
+			handlers.select_option,
+		{ refId, value: "Canada" },
+		);
+		expect(result.ok).toBe(true);
+		expect(select.value).toBe("ca");
+	});
+
+	it("react-select combobox: click control opens listbox, matching option is clicked", async () => {
+		const control = document.createElement("div");
+		control.setAttribute("role", "combobox");
+		control.setAttribute("aria-label", "Country");
+		control.setAttribute("aria-expanded", "false");
+		control.addEventListener("click", () => {
+			control.setAttribute("aria-expanded", "true");
+			const listbox = document.createElement("div");
+			listbox.setAttribute("role", "listbox");
+			const optYes = document.createElement("div");
+			optYes.setAttribute("role", "option");
+			optYes.textContent = "Yes";
+			const optNo = document.createElement("div");
+			optNo.setAttribute("role", "option");
+			optNo.textContent = "No";
+			listbox.append(optYes, optNo);
+			document.body.appendChild(listbox);
+		});
+		document.body.appendChild(control);
+
+		const snap = await dispatchContentScriptCall(
+			"page_snapshot_data",
+			"snapshot",
+			handlers.snapshot,
+			{},
+		);
+		const refId = (snap.value as { nodes: Array<{ refId: string }> }).nodes.find(
+			(n) => n.role === "combobox",
+		)!.refId;
+
+		let optionClicked = "";
+		document.addEventListener("click", (e) => {
+			const target = e.target as HTMLElement;
+			if (target.getAttribute("role") === "option") {
+				optionClicked = target.textContent || "";
+			}
+		}, true);
+
+		const result = await dispatchContentScriptCall(
+			"page_select_option",
+			"select_option",
+			handlers.select_option,
+			{ refId, value: "Yes" },
+		);
+		expect(result.ok).toBe(true);
+		expect(optionClicked).toBe("Yes");
+	});
+
+	it("unknown option value returns E_NOT_FOUND with candidates", async () => {
+		const control = document.createElement("div");
+		control.setAttribute("role", "combobox");
+		control.setAttribute("aria-label", "Country");
+		control.addEventListener("click", () => {
+			const listbox = document.createElement("div");
+			listbox.setAttribute("role", "listbox");
+			const optYes = document.createElement("div");
+			optYes.setAttribute("role", "option");
+			optYes.textContent = "Yes";
+			listbox.appendChild(optYes);
+			document.body.appendChild(listbox);
+		});
+		document.body.appendChild(control);
+
+		const snap = await dispatchContentScriptCall(
+			"page_snapshot_data",
+			"snapshot",
+			handlers.snapshot,
+			{},
+		);
+		const refId = (snap.value as { nodes: Array<{ refId: string }> }).nodes.find(
+			(n) => n.role === "combobox",
+		)!.refId;
+
+		const result = await dispatchContentScriptCall(
+			"page_select_option",
+			"select_option",
+			handlers.select_option,
+			{ refId, value: "Maybe" },
+		);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_NOT_FOUND");
+		}
 	});
 });

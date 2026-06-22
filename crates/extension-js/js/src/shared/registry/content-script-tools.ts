@@ -326,6 +326,51 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		handlerKey: "select",
 	},
 	{
+		action: "page_select_option",
+		namespace: "page",
+		name: "select_option",
+		description:
+			"Open a combobox (react-select/listbox) and click the option whose text matches value",
+		params: schemas.PageSelectOptionParamsSchema,
+		returns: schemas.PageActionResultSchema,
+		paramTypes: [
+			{
+				name: "refId",
+				type: "string",
+				required: false,
+				description: "Element reference ID (refId)",
+			},
+			{
+				name: "label",
+				type: "string",
+				required: false,
+				description: "Element label (label)",
+			},
+			{
+				name: "value",
+				type: "string",
+				required: false,
+				description: "Visible text of the option to select (matched case-insensitively)",
+			},
+		],
+		returnDoc: "{ ok: true, action: 'select_option', refId?, value? }",
+		errorCode: "E_NOT_FOUND",
+		example: 'page.select_option({ refId: "e2", value: "Canada" })',
+		agentMeta: {
+			prerequisites: [
+				"Ensure the target tab is active and the content script is ready before mutating",
+			],
+			notes: [
+				"Same content-script path as web.tab.*",
+				"Always operates on the active tab; use web.tab.* if you need to target a specific tabId",
+				"Drives react-select and other ARIA combobox patterns: clicks the control to open, then clicks the matching [role='option']",
+			],
+			tags: ["mutation", "write"],
+			relatedApis: ["web.tab.select_option"],
+		},
+		handlerKey: "select_option",
+	},
+	{
 		action: "page_check",
 		namespace: "page",
 		name: "check",
@@ -823,6 +868,57 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 			relatedApis: ["page.select"],
 		},
 		handlerKey: "select",
+	},
+	{
+		action: "tab_select_option",
+		namespace: "web.tab",
+		name: "select_option",
+		description:
+			"Open a combobox (react-select/listbox) in a tab and click the option whose text matches value",
+		params: schemas.TabSelectOptionParamsSchema,
+		returns: schemas.PageActionResultSchema,
+		paramTypes: [
+			{
+				name: "tabId",
+				type: "number",
+				required: true,
+				description: "Tab ID (literal)",
+			},
+			{
+				name: "refId",
+				type: "string",
+				required: false,
+				description: "Element reference ID (refId)",
+			},
+			{
+				name: "label",
+				type: "string",
+				required: false,
+				description: "Element label (label)",
+			},
+			{
+				name: "value",
+				type: "string",
+				required: false,
+				description: "Visible text of the option to select (matched case-insensitively)",
+			},
+		],
+		returnDoc: "{ ok: true, action: 'select_option', refId?, value? }",
+		errorCode: "E_NO_TAB",
+		example:
+			'web.tab.select_option({ tabId: 123, refId: "e2", value: "Canada" })',
+		agentMeta: {
+			prerequisites: [
+				"Ensure the target tab exists and the content script is ready before mutating",
+			],
+			notes: [
+				"Explicit tabId required; same handlers as page.*",
+				"Drives react-select and other ARIA combobox patterns: clicks the control to open, then clicks the matching [role='option']",
+			],
+			tags: ["mutation", "write"],
+			relatedApis: ["page.select_option"],
+		},
+		handlerKey: "select_option",
 	},
 	{
 		action: "tab_check",

@@ -14,6 +14,7 @@ import type {
 	PageScrollParams,
 	PageScrollToParams,
 	PageSelectParams,
+	PageSelectOptionParams,
 	PageSetFilesParams,
 	PageSnapshotQueryParams,
 	PageTypeParams,
@@ -22,10 +23,12 @@ import type {
 import { encodeFetchResponse } from "../shared/fetch-response.js";
 import { allocateRefId, syncRefIdCounterFromDom } from "../shared/ref-id.js";
 import {
+	labelNotFoundError,
 	notInteractableError,
 	observationRequiredError,
 	throwStructuredAgentError,
 } from "../shared/registry/agent-errors.js";
+import type { StaleRefCandidate } from "../shared/registry/agent-errors.js";
 import {
 	getAccessibleName,
 	getAccessibleRole,
@@ -517,6 +520,53 @@ export const handlers = {
 			return makeActionResult("select", el, { value: el.value });
 		}
 		throw new Error("Element is not a select");
+	},
+
+	select_option: (params: PageSelectOptionParams) => {
+		const value = params.value;
+		const el = resolveTargetRaw(params.refId, params.label);
+		assertInteractable(el, "select_option");
+		if (el instanceof HTMLSelectElement) {
+			const opt = Array.from(el.options).find(
+				(o) => (o.text || "").trim() === value,
+			) || Array.from(el.options).find(
+				(o) => (o.text || "").trim().toLowerCase() === value.toLowerCase(),
+			);
+			if (!opt) {
+				const candidates: StaleRefCandidate[] = Array.from(el.options).map((o, i) => ({
+					refId: `opt${i}`,
+					name: (o.text || "").trim() || undefined,
+				}));
+				throwStructuredAgentError(labelNotFoundError(value, candidates));
+			}
+			el.value = opt.value;
+			el.dispatchEvent(new Event("change", { bubbles: true }));
+			return makeActionResult("select_option", el, { value: opt.value });
+		}
+		const control = el as HTMLElement;
+		control.click();
+		const listboxId = control.getAttribute("aria-controls") || control.getAttribute("aria-owns");
+		const listboxRoot = listboxId ? document.getElementById(listboxId) : document;
+		const options = Array.from(
+			(listboxRoot || document).querySelectorAll('[role="listbox"] [role="option"]'),
+		) as HTMLElement[];
+		const match =
+			options.find((o) => (o.textContent || "").trim() === value) ||
+			options.find(
+				(o) => (o.textContent || "").trim().toLowerCase() === value.toLowerCase(),
+			);
+		if (!match) {
+			const candidates: StaleRefCandidate[] = options.map((o, i) => ({
+				refId: o.getAttribute("data-ref-id") || `opt${i}`,
+				name: (o.textContent || "").trim() || undefined,
+			}));
+			throwStructuredAgentError(labelNotFoundError(value, candidates));
+		}
+		for (const evName of ["mouseover", "mousedown", "mouseup"]) {
+			match.dispatchEvent(new MouseEvent(evName, { bubbles: true, cancelable: true }));
+		}
+		match.click();
+		return makeActionResult("select_option", el, { value });
 	},
 
 	check: (params: PageCheckParams) => {

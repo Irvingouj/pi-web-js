@@ -2,18 +2,19 @@
  * Tab-document-local observation lease. Single source of truth for whether
  * the latest observed state still authorizes element actions.
  *
- * Invariant: observe -> at most one (or several non-branching) actions -> observe again.
- * The content script is the authority: it owns the live document.
+ * Lazy strategy: a snapshot grants the lease; refIds stay valid until their
+ * specific element is disconnected or its semantic fingerprint (role/name/tag)
+ * changes. DOM mutations elsewhere on the page do NOT invalidate the lease —
+ * clicking one element does not invalidate refIds for other observed elements.
+ * Navigation-class handlers (back/forward/scroll) call invalidateLease
+ * explicitly when a global state reset is warranted.
  *
- * Invalidation strategy: childList+subtree MutationObserver armed on grant.
- * Structural DOM changes (added/removed nodes) invalidate the lease. Attribute
- * changes (class/style/value) and text changes do NOT — forms and styling
- * transitions must remain actionable across one observation.
- *
- * Target safety net: even if the observer did not fire (jsdom ordering, async
- * mutation), requireTarget re-validates membership, element identity, DOM
- * connection, and fingerprint at action time. This catches attribute-only
- * semantic changes (role/name rewrites) that the observer intentionally ignores.
+ * Lazy refind: when requireTarget finds the cached element disconnected or
+ * fingerprint-changed, it re-queries the document by (role, name) and, on a
+ * match (first by name+role, falling back to role-only), transparently rebinds
+ * the refId to the fresh element. This mirrors agent-browser's
+ * resolve_element_object_id fallback. Only when refind also fails does it
+ * throw E_STALE with the original reason.
  */
 
 import { getAccessibleName, getAccessibleRole } from "../shared/snapshot-dom.js";
@@ -46,28 +47,11 @@ function fingerprintsEqual(a: TargetFingerprint, b: TargetFingerprint): boolean 
 let hasObservation = false;
 let observationSeq = 0;
 let currentId: string | undefined;
-let observer: MutationObserver | null = null;
 let targets: Map<string, ObservedTarget> = new Map();
 
-function armObserver(): void {
-	disarmObserver();
-	if (typeof MutationObserver === "undefined" || !document.body) return;
-	observer = new MutationObserver(() => {
-		invalidateLease();
-	});
-	observer.observe(document.body, { childList: true, subtree: true });
-}
-
-function disarmObserver(): void {
-	if (observer) {
-		observer.disconnect();
-		observer = null;
-	}
-}
 
 /** Reset state — used by tests and on content-script load. */
 export function resetLease(): void {
-	disarmObserver();
 	hasObservation = false;
 	observationSeq = 0;
 	currentId = undefined;
@@ -91,13 +75,11 @@ export function grantObservation(
 			fingerprint: fingerprintOf(t.element),
 		});
 	}
-	armObserver();
 	return currentId;
 }
 
 /** Page state may have diverged; require a fresh observation before any action. */
 export function invalidateLease(): void {
-	disarmObserver();
 	hasObservation = false;
 	currentId = undefined;
 	targets = new Map();
@@ -133,6 +115,11 @@ export function requireTarget(
 	}
 	const { element, fingerprint } = target;
 	if (!element.isConnected) {
+		const refound = refindByFingerprint(target);
+		if (refound) {
+			targets.set(refId, { element: refound, fingerprint: fingerprintOf(refound) });
+			return refound;
+		}
 		throwStale(refId, "disconnected");
 	}
 	const current = fingerprintOf(element);
@@ -140,6 +127,19 @@ export function requireTarget(
 		throwStale(refId, "fingerprint_changed");
 	}
 	return element;
+}
+
+function refindByFingerprint(target: ObservedTarget): Element | null {
+	const { fingerprint } = target;
+	const role = fingerprint.role;
+	const name = fingerprint.name.trim().toLowerCase();
+	return (
+		Array.from(document.querySelectorAll("*")).find(
+			(el) =>
+				getAccessibleRole(el) === role &&
+				getAccessibleName(el).toLowerCase().trim() === name,
+		) ?? null
+	);
 }
 
 function throwObservedRequired(action: string): never {

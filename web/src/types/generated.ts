@@ -13,6 +13,7 @@ export type CommandParams =
 	| PageTypeParams
 	| PagePressParams
 	| PageSelectParams
+	| PageSelectOptionParams
 	| PageCheckParams
 	| PageHoverParams
 	| PageScrollParams
@@ -37,6 +38,7 @@ export type CommandParams =
 	| TabTypeParams
 	| TabPressParams
 	| TabSelectParams
+	| TabSelectOptionParams
 	| TabCheckParams
 	| TabHoverParams
 	| TabUnhoverParams
@@ -151,6 +153,12 @@ export type PageSelectParams = {
 	value: string;
 };
 
+export type PageSelectOptionParams = {
+	refId?: string;
+	label?: string;
+	value: string;
+};
+
 export type PageTypeParams = {
 	refId?: string;
 	label?: string;
@@ -212,6 +220,7 @@ export type TabScrollToParams = {
 };
 
 export type TabSelectParams = { tabId: bigint; refId: string; value: string };
+export type TabSelectOptionParams = { tabId: bigint; refId: string; value: string };
 
 export type TabTypeParams = { tabId: bigint; refId: string; text: string };
 

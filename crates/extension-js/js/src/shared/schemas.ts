@@ -337,6 +337,9 @@ export const PagePressParamsSchema = z.object({
 export const PageSelectParamsSchema = elementTargetParams({
 	value: z.string().describe("Value to select in the dropdown"),
 });
+export const PageSelectOptionParamsSchema = elementTargetParams({
+	value: z.string().describe("Visible text of the option to select (matched case-insensitively)"),
+});
 export const PageCheckParamsSchema = elementTargetParams({
 	checked: z
 		.boolean()
@@ -511,6 +514,9 @@ export const TabPressParamsSchema = z.object({
 });
 export const TabSelectParamsSchema = tabElementTargetParams({
 	value: z.string().describe("Value to select in the dropdown"),
+});
+export const TabSelectOptionParamsSchema = tabElementTargetParams({
+	value: z.string().describe("Visible text of the option to select (matched case-insensitively)"),
 });
 export const TabCheckParamsSchema = tabElementTargetParams({
 	checked: z
