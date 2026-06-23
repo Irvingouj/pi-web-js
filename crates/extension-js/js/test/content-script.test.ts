@@ -7,16 +7,16 @@ import {
 } from "../src/content-script/dom-utils.js";
 import { handlers } from "../src/content-script/handlers.js";
 import {
+	grantObservation,
+	hasActiveObservation,
+	resetLease,
+} from "../src/content-script/observation-lease.js";
+import {
 	dispatchContentScriptCall,
 	registerContentScriptSpec,
 } from "../src/content-script/registry.js";
 import { buildContentScriptSpecs } from "../src/content-script/schemas.js";
 import { inlineSnapshot } from "../src/content-script/snapshot.js";
-import {
-	grantObservation,
-	hasActiveObservation,
-	resetLease,
-} from "../src/content-script/observation-lease.js";
 
 /** Grant an observation lease for every element currently carrying a data-ref-id. */
 function grantFromDom(): void {
@@ -857,7 +857,7 @@ describe("stale refId errors", () => {
 		if (!result.ok) {
 			expect(result.error.code).toBe("E_STALE");
 			expect(result.error.details?.staleRefId).toBe(staleRefId);
-		// candidates optional under new lease path (requireTarget may fire before element scan)
+			// candidates optional under new lease path (requireTarget may fire before element scan)
 		}
 	});
 
@@ -1291,7 +1291,9 @@ describe("visibility with hidden ancestor (B10)", () => {
 		document.body.appendChild(wrapper);
 
 		const result = inlineSnapshot(500);
-		expect(result.nodes.find((n) => n.name === "Hidden button")).toBeUndefined();
+		expect(
+			result.nodes.find((n) => n.name === "Hidden button"),
+		).toBeUndefined();
 	});
 
 	it("omits element under aria-hidden=true ancestor from snapshot", () => {
@@ -1419,7 +1421,6 @@ describe("observation lease (B2): snapshot_data grants lease", () => {
 		}
 	});
 });
-
 
 describe("observation lease (B4): form scenario survives multiple fills", () => {
 	beforeEach(() => {
@@ -1833,25 +1834,37 @@ describe("raw target resolution (resolveTargetRaw contract)", () => {
 	// Case 1: valid refId → action succeeds (element found via getElementByRefId)
 	// ---------------------------------------------------------------------------
 	it.each([
-		{ handlerKey: "hover", handler: handlers.hover, action: "page_hover", extraParams: {} },
-		{ handlerKey: "dblclick", handler: handlers.dblclick, action: "page_dblclick", extraParams: {} },
-	])(
-		"$handlerKey: valid refId → action succeeds",
-		async ({ handler, action, handlerKey, extraParams }) => {
-			const el = document.createElement("div");
-			el.setAttribute("data-ref-id", "e1");
-			el.setAttribute("role", "button");
-			document.body.appendChild(el);
-
-			const result = await dispatchContentScriptCall(
-				action,
-				handlerKey,
-				handler,
-				{ refId: "e1", ...extraParams },
-			);
-			expect(result.ok).toBe(true);
+		{
+			handlerKey: "hover",
+			handler: handlers.hover,
+			action: "page_hover",
+			extraParams: {},
 		},
-	);
+		{
+			handlerKey: "dblclick",
+			handler: handlers.dblclick,
+			action: "page_dblclick",
+			extraParams: {},
+		},
+	])("$handlerKey: valid refId → action succeeds", async ({
+		handler,
+		action,
+		handlerKey,
+		extraParams,
+	}) => {
+		const el = document.createElement("div");
+		el.setAttribute("data-ref-id", "e1");
+		el.setAttribute("role", "button");
+		document.body.appendChild(el);
+
+		const result = await dispatchContentScriptCall(
+			action,
+			handlerKey,
+			handler,
+			{ refId: "e1", ...extraParams },
+		);
+		expect(result.ok).toBe(true);
+	});
 
 	it("type: valid refId → action succeeds", async () => {
 		const input = document.createElement("input");
@@ -1875,24 +1888,36 @@ describe("raw target resolution (resolveTargetRaw contract)", () => {
 	// Case 2: no refId, valid label → action succeeds (label fallback)
 	// ---------------------------------------------------------------------------
 	it.each([
-		{ handlerKey: "hover", handler: handlers.hover, action: "page_hover", extraParams: {} },
-		{ handlerKey: "dblclick", handler: handlers.dblclick, action: "page_dblclick", extraParams: {} },
-	])(
-		"$handlerKey: no refId, valid label → action succeeds",
-		async ({ handler, action, handlerKey, extraParams }) => {
-			const el = document.createElement("button");
-			el.setAttribute("aria-label", "Submit");
-			document.body.appendChild(el);
-
-			const result = await dispatchContentScriptCall(
-				action,
-				handlerKey,
-				handler,
-				{ label: "Submit", ...extraParams },
-			);
-			expect(result.ok).toBe(true);
+		{
+			handlerKey: "hover",
+			handler: handlers.hover,
+			action: "page_hover",
+			extraParams: {},
 		},
-	);
+		{
+			handlerKey: "dblclick",
+			handler: handlers.dblclick,
+			action: "page_dblclick",
+			extraParams: {},
+		},
+	])("$handlerKey: no refId, valid label → action succeeds", async ({
+		handler,
+		action,
+		handlerKey,
+		extraParams,
+	}) => {
+		const el = document.createElement("button");
+		el.setAttribute("aria-label", "Submit");
+		document.body.appendChild(el);
+
+		const result = await dispatchContentScriptCall(
+			action,
+			handlerKey,
+			handler,
+			{ label: "Submit", ...extraParams },
+		);
+		expect(result.ok).toBe(true);
+	});
 
 	it("type: no refId, valid label → action succeeds", async () => {
 		const input = document.createElement("input");
@@ -1916,23 +1941,35 @@ describe("raw target resolution (resolveTargetRaw contract)", () => {
 	// Case 3: refId that matches nothing in DOM → E_STALE
 	// ---------------------------------------------------------------------------
 	it.each([
-		{ handlerKey: "hover", handler: handlers.hover, action: "page_hover", extraParams: {} },
-		{ handlerKey: "dblclick", handler: handlers.dblclick, action: "page_dblclick", extraParams: {} },
-	])(
-		"$handlerKey: refId not in DOM → E_STALE",
-		async ({ handler, action, handlerKey, extraParams }) => {
-			const result = await dispatchContentScriptCall(
-				action,
-				handlerKey,
-				handler,
-				{ refId: "e99", ...extraParams },
-			);
-			expect(result.ok).toBe(false);
-			if (!result.ok) {
-				expect(result.error.code).toBe("E_STALE");
-			}
+		{
+			handlerKey: "hover",
+			handler: handlers.hover,
+			action: "page_hover",
+			extraParams: {},
 		},
-	);
+		{
+			handlerKey: "dblclick",
+			handler: handlers.dblclick,
+			action: "page_dblclick",
+			extraParams: {},
+		},
+	])("$handlerKey: refId not in DOM → E_STALE", async ({
+		handler,
+		action,
+		handlerKey,
+		extraParams,
+	}) => {
+		const result = await dispatchContentScriptCall(
+			action,
+			handlerKey,
+			handler,
+			{ refId: "e99", ...extraParams },
+		);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_STALE");
+		}
+	});
 
 	it("type: refId not in DOM → E_STALE", async () => {
 		const result = await dispatchContentScriptCall(
@@ -1951,23 +1988,35 @@ describe("raw target resolution (resolveTargetRaw contract)", () => {
 	// Case 4: no refId, label that matches nothing → E_NOT_FOUND
 	// ---------------------------------------------------------------------------
 	it.each([
-		{ handlerKey: "hover", handler: handlers.hover, action: "page_hover", extraParams: {} },
-		{ handlerKey: "dblclick", handler: handlers.dblclick, action: "page_dblclick", extraParams: {} },
-	])(
-		"$handlerKey: label not found → E_NOT_FOUND",
-		async ({ handler, action, handlerKey, extraParams }) => {
-			const result = await dispatchContentScriptCall(
-				action,
-				handlerKey,
-				handler,
-				{ label: "NonExistentLabelXYZ", ...extraParams },
-			);
-			expect(result.ok).toBe(false);
-			if (!result.ok) {
-				expect(result.error.code).toBe("E_NOT_FOUND");
-			}
+		{
+			handlerKey: "hover",
+			handler: handlers.hover,
+			action: "page_hover",
+			extraParams: {},
 		},
-	);
+		{
+			handlerKey: "dblclick",
+			handler: handlers.dblclick,
+			action: "page_dblclick",
+			extraParams: {},
+		},
+	])("$handlerKey: label not found → E_NOT_FOUND", async ({
+		handler,
+		action,
+		handlerKey,
+		extraParams,
+	}) => {
+		const result = await dispatchContentScriptCall(
+			action,
+			handlerKey,
+			handler,
+			{ label: "NonExistentLabelXYZ", ...extraParams },
+		);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_NOT_FOUND");
+		}
+	});
 
 	it("type: label not found → E_NOT_FOUND", async () => {
 		const result = await dispatchContentScriptCall(
@@ -1989,18 +2038,17 @@ describe("raw target resolution (resolveTargetRaw contract)", () => {
 	it.each([
 		{ handlerKey: "hover", handler: handlers.hover },
 		{ handlerKey: "dblclick", handler: handlers.dblclick },
-	])(
-		"$handlerKey: neither refId nor label → E_NOT_FOUND (direct handler call)",
-		({ handler }) => {
-			expect(() => handler({})).toThrow();
-			try {
-				handler({});
-			} catch (err) {
-				const code = (err as Record<string, unknown>).code;
-				expect(code).toBe("E_NOT_FOUND");
-			}
-		},
-	);
+	])("$handlerKey: neither refId nor label → E_NOT_FOUND (direct handler call)", ({
+		handler,
+	}) => {
+		expect(() => handler({})).toThrow();
+		try {
+			handler({});
+		} catch (err) {
+			const code = (err as Record<string, unknown>).code;
+			expect(code).toBe("E_NOT_FOUND");
+		}
+	});
 
 	it("type: neither refId nor label → E_NOT_FOUND (direct handler call)", () => {
 		expect(() => handlers.type({ text: "hello" })).toThrow();
@@ -2016,44 +2064,56 @@ describe("raw target resolution (resolveTargetRaw contract)", () => {
 	// Case 6: both refId and label where they'd resolve to different elements → refId wins
 	// ---------------------------------------------------------------------------
 	it.each([
-		{ handlerKey: "hover", handler: handlers.hover, action: "page_hover", extraParams: {} },
-		{ handlerKey: "dblclick", handler: handlers.dblclick, action: "page_dblclick", extraParams: {} },
-	])(
-		"$handlerKey: both refId and label → refId wins (element found by refId)",
-		async ({ handler, action, handlerKey, extraParams }) => {
-			// Element A: has refId "e1" — this should be the target
-			const elA = document.createElement("button");
-			elA.setAttribute("data-ref-id", "e1");
-			elA.setAttribute("aria-label", "ButtonA");
-			elA.textContent = "ButtonA";
-			document.body.appendChild(elA);
-
-			// Element B: has label "ButtonB" — should NOT be targeted
-			const elB = document.createElement("button");
-			elB.setAttribute("aria-label", "ButtonB");
-			elB.textContent = "ButtonB";
-			document.body.appendChild(elB);
-
-			// Spy on dispatchEvent to verify elA (refId target) receives the event
-			const dispatchSpyA = vi.spyOn(elA, "dispatchEvent");
-			const dispatchSpyB = vi.spyOn(elB, "dispatchEvent");
-
-			const result = await dispatchContentScriptCall(
-				action,
-				handlerKey,
-				handler,
-				{ refId: "e1", label: "ButtonB", ...extraParams },
-			);
-			expect(result.ok).toBe(true);
-
-			// Verify refId element (elA) was the one acted upon
-			expect(dispatchSpyA).toHaveBeenCalled();
-			expect(dispatchSpyB).not.toHaveBeenCalled();
-
-			dispatchSpyA.mockRestore();
-			dispatchSpyB.mockRestore();
+		{
+			handlerKey: "hover",
+			handler: handlers.hover,
+			action: "page_hover",
+			extraParams: {},
 		},
-	);
+		{
+			handlerKey: "dblclick",
+			handler: handlers.dblclick,
+			action: "page_dblclick",
+			extraParams: {},
+		},
+	])("$handlerKey: both refId and label → refId wins (element found by refId)", async ({
+		handler,
+		action,
+		handlerKey,
+		extraParams,
+	}) => {
+		// Element A: has refId "e1" — this should be the target
+		const elA = document.createElement("button");
+		elA.setAttribute("data-ref-id", "e1");
+		elA.setAttribute("aria-label", "ButtonA");
+		elA.textContent = "ButtonA";
+		document.body.appendChild(elA);
+
+		// Element B: has label "ButtonB" — should NOT be targeted
+		const elB = document.createElement("button");
+		elB.setAttribute("aria-label", "ButtonB");
+		elB.textContent = "ButtonB";
+		document.body.appendChild(elB);
+
+		// Spy on dispatchEvent to verify elA (refId target) receives the event
+		const dispatchSpyA = vi.spyOn(elA, "dispatchEvent");
+		const dispatchSpyB = vi.spyOn(elB, "dispatchEvent");
+
+		const result = await dispatchContentScriptCall(
+			action,
+			handlerKey,
+			handler,
+			{ refId: "e1", label: "ButtonB", ...extraParams },
+		);
+		expect(result.ok).toBe(true);
+
+		// Verify refId element (elA) was the one acted upon
+		expect(dispatchSpyA).toHaveBeenCalled();
+		expect(dispatchSpyB).not.toHaveBeenCalled();
+
+		dispatchSpyA.mockRestore();
+		dispatchSpyB.mockRestore();
+	});
 
 	it("type: both refId and label → refId wins (element found by refId)", async () => {
 		const inputA = document.createElement("input");
@@ -2142,7 +2202,9 @@ describe("typed params: handler reads validated fields", () => {
 	});
 
 	it("scroll with { direction: 'up', amount: 100 } → calls window.scrollBy with top: -100", async () => {
-		const scrollBySpy = vi.spyOn(window, "scrollBy").mockImplementation(() => {});
+		const scrollBySpy = vi
+			.spyOn(window, "scrollBy")
+			.mockImplementation(() => {});
 
 		const result = await dispatchContentScriptCall(
 			"page_scroll",
@@ -2221,7 +2283,9 @@ describe("typed params: handler reads validated fields", () => {
 	});
 
 	it("scroll_to with { x: 0, y: 500 } (no refId/label) → calls window.scrollTo with top 500", async () => {
-		const scrollToSpy = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+		const scrollToSpy = vi
+			.spyOn(window, "scrollTo")
+			.mockImplementation(() => {});
 
 		const result = await dispatchContentScriptCall(
 			"page_scroll_to",
@@ -2272,7 +2336,7 @@ describe("select_option handler", () => {
 			"page_select_option",
 			"select_option",
 			handlers.select_option,
-		{ refId, value: "Canada" },
+			{ refId, value: "Canada" },
 		);
 		expect(result.ok).toBe(true);
 		expect(select.value).toBe("ca");
@@ -2304,17 +2368,21 @@ describe("select_option handler", () => {
 			handlers.snapshot,
 			{},
 		);
-		const refId = (snap.value as { nodes: Array<{ refId: string }> }).nodes.find(
-			(n) => n.role === "combobox",
-		)!.refId;
+		const refId = (
+			snap.value as { nodes: Array<{ refId: string }> }
+		).nodes.find((n) => n.role === "combobox")!.refId;
 
 		let optionClicked = "";
-		document.addEventListener("click", (e) => {
-			const target = e.target as HTMLElement;
-			if (target.getAttribute("role") === "option") {
-				optionClicked = target.textContent || "";
-			}
-		}, true);
+		document.addEventListener(
+			"click",
+			(e) => {
+				const target = e.target as HTMLElement;
+				if (target.getAttribute("role") === "option") {
+					optionClicked = target.textContent || "";
+				}
+			},
+			true,
+		);
 
 		const result = await dispatchContentScriptCall(
 			"page_select_option",
@@ -2338,7 +2406,8 @@ describe("select_option handler", () => {
 			const listbox = document.createElement("div");
 			listbox.id = "ai-options";
 			listbox.setAttribute("role", "listbox");
-			listbox.innerHTML = '<div role="option">Yes</div><div role="option">No</div>';
+			listbox.innerHTML =
+				'<div role="option">Yes</div><div role="option">No</div>';
 			control.setAttribute("aria-controls", listbox.id);
 			document.body.appendChild(listbox);
 		});
@@ -2350,15 +2419,20 @@ describe("select_option handler", () => {
 			handlers.snapshot,
 			{},
 		);
-		const refId = (snap.value as { nodes: Array<{ refId: string; role?: string }> }).nodes.find(
-			(n) => n.role === "combobox",
-		)!.refId;
+		const refId = (
+			snap.value as { nodes: Array<{ refId: string; role?: string }> }
+		).nodes.find((n) => n.role === "combobox")!.refId;
 
 		let optionClicked = "";
-		document.addEventListener("click", (event) => {
-			const target = event.target as HTMLElement;
-			if (target.getAttribute("role") === "option") optionClicked = target.textContent || "";
-		}, true);
+		document.addEventListener(
+			"click",
+			(event) => {
+				const target = event.target as HTMLElement;
+				if (target.getAttribute("role") === "option")
+					optionClicked = target.textContent || "";
+			},
+			true,
+		);
 
 		const result = await dispatchContentScriptCall(
 			"page_select_option",
@@ -2373,7 +2447,8 @@ describe("select_option handler", () => {
 	it("unlinked combobox selects from the listbox it reveals", async () => {
 		const unrelated = document.createElement("div");
 		unrelated.setAttribute("role", "listbox");
-		unrelated.innerHTML = '<div role="option" data-source="unrelated">Yes</div>';
+		unrelated.innerHTML =
+			'<div role="option" data-source="unrelated">Yes</div>';
 
 		const options = document.createElement("div");
 		options.setAttribute("role", "listbox");
@@ -2394,15 +2469,20 @@ describe("select_option handler", () => {
 			handlers.snapshot,
 			{},
 		);
-		const refId = (snap.value as { nodes: Array<{ refId: string; role?: string }> }).nodes.find(
-			(n) => n.role === "combobox",
-		)!.refId;
+		const refId = (
+			snap.value as { nodes: Array<{ refId: string; role?: string }> }
+		).nodes.find((n) => n.role === "combobox")!.refId;
 
 		let source = "";
-		document.addEventListener("click", (event) => {
-			const target = event.target as HTMLElement;
-			if (target.getAttribute("role") === "option") source = target.dataset.source || "";
-		}, true);
+		document.addEventListener(
+			"click",
+			(event) => {
+				const target = event.target as HTMLElement;
+				if (target.getAttribute("role") === "option")
+					source = target.dataset.source || "";
+			},
+			true,
+		);
 
 		const result = await dispatchContentScriptCall(
 			"page_select_option",
@@ -2417,7 +2497,8 @@ describe("select_option handler", () => {
 	it("unlinked combobox selects from the listbox whose options it replaces", async () => {
 		const unrelated = document.createElement("div");
 		unrelated.setAttribute("role", "listbox");
-		unrelated.innerHTML = '<div role="option" data-source="unrelated">Yes</div>';
+		unrelated.innerHTML =
+			'<div role="option" data-source="unrelated">Yes</div>';
 
 		const options = document.createElement("div");
 		options.setAttribute("role", "listbox");
@@ -2437,15 +2518,20 @@ describe("select_option handler", () => {
 			handlers.snapshot,
 			{},
 		);
-		const refId = (snap.value as { nodes: Array<{ refId: string; role?: string }> }).nodes.find(
-			(n) => n.role === "combobox",
-		)!.refId;
+		const refId = (
+			snap.value as { nodes: Array<{ refId: string; role?: string }> }
+		).nodes.find((n) => n.role === "combobox")!.refId;
 
 		let source = "";
-		document.addEventListener("click", (event) => {
-			const target = event.target as HTMLElement;
-			if (target.getAttribute("role") === "option") source = target.dataset.source || "";
-		}, true);
+		document.addEventListener(
+			"click",
+			(event) => {
+				const target = event.target as HTMLElement;
+				if (target.getAttribute("role") === "option")
+					source = target.dataset.source || "";
+			},
+			true,
+		);
 
 		const result = await dispatchContentScriptCall(
 			"page_select_option",
@@ -2457,11 +2543,11 @@ describe("select_option handler", () => {
 		expect(source).toBe("target");
 	});
 
-	it("falls back to document options when aria-controls is wrong", async () => {
+	it("combobox with correct aria-controls selects from linked listbox", async () => {
 		document.body.innerHTML = `
-			<input role="combobox" aria-label="Choice" aria-controls="wrong-options">
-			<div id="wrong-options" role="listbox"><div role="option">Wrong</div></div>
-			<div role="listbox"><div role="option" data-target>Wanted</div></div>
+			<input role="combobox" aria-label="Choice" aria-controls="correct-options">
+			<div id="correct-options" role="listbox"><div role="option" data-target>Wanted</div></div>
+			<div role="listbox"><div role="option">Wrong</div></div>
 		`;
 		const snap = await dispatchContentScriptCall(
 			"page_snapshot_data",
@@ -2469,9 +2555,9 @@ describe("select_option handler", () => {
 			handlers.snapshot,
 			{},
 		);
-		const refId = (snap.value as { nodes: Array<{ refId: string; role?: string }> }).nodes.find(
-			(n) => n.role === "combobox",
-		)!.refId;
+		const refId = (
+			snap.value as { nodes: Array<{ refId: string; role?: string }> }
+		).nodes.find((n) => n.role === "combobox")!.refId;
 		let clicked = false;
 		document.querySelector("[data-target]")!.addEventListener("click", () => {
 			clicked = true;
@@ -2508,9 +2594,9 @@ describe("select_option handler", () => {
 			handlers.snapshot,
 			{},
 		);
-		const refId = (snap.value as { nodes: Array<{ refId: string }> }).nodes.find(
-			(n) => n.role === "combobox",
-		)!.refId;
+		const refId = (
+			snap.value as { nodes: Array<{ refId: string }> }
+		).nodes.find((n) => n.role === "combobox")!.refId;
 
 		const result = await dispatchContentScriptCall(
 			"page_select_option",
@@ -2521,6 +2607,390 @@ describe("select_option handler", () => {
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.code).toBe("E_NOT_FOUND");
+		}
+	});
+	it("persistent unrelated phone listbox does not poison degree combobox selection", async () => {
+		// Persistent, visible phone-country listbox — present BEFORE the target opens.
+		const phoneListbox = document.createElement("div");
+		phoneListbox.setAttribute("role", "listbox");
+		phoneListbox.id = "iti-0__country-listbox";
+		const optAf = document.createElement("div");
+		optAf.setAttribute("role", "option");
+		optAf.textContent = "Afghanistan +93";
+		const optCa = document.createElement("div");
+		optCa.setAttribute("role", "option");
+		optCa.textContent = "Canada +1";
+		phoneListbox.append(optAf, optCa);
+		document.body.appendChild(phoneListbox);
+
+		// Target combobox — no aria-controls / aria-owns (react-select portal shape).
+		const control = document.createElement("input");
+		control.setAttribute("role", "combobox");
+		control.setAttribute("aria-label", "Degree");
+		control.addEventListener("click", () => {
+			const listbox = document.createElement("div");
+			listbox.setAttribute("role", "listbox");
+			listbox.id = "react-select-degree--0-listbox";
+			const opt = document.createElement("div");
+			opt.setAttribute("role", "option");
+			opt.textContent = "Bachelor's Degree";
+			listbox.appendChild(opt);
+			document.body.appendChild(listbox);
+		});
+		document.body.appendChild(control);
+
+		const snap = await dispatchContentScriptCall(
+			"page_snapshot_data",
+			"snapshot",
+			handlers.snapshot,
+			{},
+		);
+		const refId = (
+			snap.value as {
+				nodes: Array<{ refId: string; role?: string; name?: string }>;
+			}
+		).nodes.find(
+			(n) => n.role === "combobox" && (n.name || "").includes("Degree"),
+		)!.refId;
+
+		// Happy path: selecting a value that exists in the degree listbox.
+		let optionClicked = "";
+		document.addEventListener(
+			"click",
+			(e) => {
+				const target = e.target as HTMLElement;
+				if (target.getAttribute("role") === "option") {
+					optionClicked = target.textContent || "";
+				}
+			},
+			true,
+		);
+
+		const okResult = await dispatchContentScriptCall(
+			"page_select_option",
+			"select_option",
+			handlers.select_option,
+			{ refId, value: "Bachelor's Degree" },
+		);
+		expect(okResult.ok).toBe(true);
+		expect(optionClicked).toBe("Bachelor's Degree");
+
+		// Error path: requesting a missing value must report candidates from the
+		// degree listbox ONLY — not the phone-country listbox.
+		const errResult = await dispatchContentScriptCall(
+			"page_select_option",
+			"select_option",
+			handlers.select_option,
+			{ refId, value: "NonExistent Degree" },
+		);
+		expect(errResult.ok).toBe(false);
+		if (!errResult.ok) {
+			expect(errResult.error.code).toBe("E_NOT_FOUND");
+			const candidates =
+				(errResult.error.details as { candidates?: Array<{ name?: string }> })
+					.candidates || [];
+			const candidateNames = candidates.map((c) => c.name || "");
+			// Must not contain any phone-country option.
+			for (const name of candidateNames) {
+				expect(name).not.toMatch(/Afghanistan|Canada/);
+			}
+		}
+	});
+	it("error includes searched and ignored listbox ids when option not found", async () => {
+		// Phone listbox — visible, persistent, unrelated to target.
+		const phoneListbox = document.createElement("div");
+		phoneListbox.setAttribute("role", "listbox");
+		phoneListbox.id = "iti-0__country-listbox";
+		phoneListbox.innerHTML =
+			'<div role="option">Afghanistan +93</div><div role="option">Canada +1</div>';
+		document.body.appendChild(phoneListbox);
+
+		// Degree combobox opens a portal listbox on click.
+		const control = document.createElement("input");
+		control.setAttribute("role", "combobox");
+		control.setAttribute("aria-label", "Degree");
+		control.addEventListener("click", () => {
+			const listbox = document.createElement("div");
+			listbox.setAttribute("role", "listbox");
+			listbox.id = "react-select-degree--0-listbox";
+			listbox.innerHTML = '<div role="option">Bachelor\'s Degree</div>';
+			document.body.appendChild(listbox);
+		});
+		document.body.appendChild(control);
+
+		const snap = await dispatchContentScriptCall(
+			"page_snapshot_data",
+			"snapshot",
+			handlers.snapshot,
+			{},
+		);
+		const refId = (
+			snap.value as {
+				nodes: Array<{ refId: string; role?: string; name?: string }>;
+			}
+		).nodes.find(
+			(n) => n.role === "combobox" && (n.name || "").includes("Degree"),
+		)!.refId;
+
+		const result = await dispatchContentScriptCall(
+			"page_select_option",
+			"select_option",
+			handlers.select_option,
+			{ refId, value: "NonExistent" },
+		);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_NOT_FOUND");
+			const details = result.error.details as Record<string, unknown>;
+			const searchedIds = (details.searchedIds as string[]) || [];
+			const ignoredIds = (details.ignoredIds as string[]) || [];
+			expect(searchedIds).toContain("react-select-degree--0-listbox");
+			expect(ignoredIds).toContain("iti-0__country-listbox");
+			const candidates = (details.candidates as Array<{ name?: string }>) || [];
+			for (const c of candidates) {
+				expect(c.name || "").not.toMatch(/Afghanistan|Canada/);
+			}
+		}
+	});
+	it("aria-owns standalone selects option from linked listbox", async () => {
+		document.body.innerHTML = `
+			<input role="combobox" aria-label="Pick" aria-owns="owned-list">
+			<div id="owned-list" role="listbox"><div role="option" data-target>Alpha</div></div>
+		`;
+		const snap = await dispatchContentScriptCall(
+			"page_snapshot_data",
+			"snapshot",
+			handlers.snapshot,
+			{},
+		);
+		const refId = (
+			snap.value as { nodes: Array<{ refId: string; role?: string }> }
+		).nodes.find((n) => n.role === "combobox")!.refId;
+		let clicked = false;
+		document.querySelector("[data-target]")!.addEventListener("click", () => {
+			clicked = true;
+		});
+		const result = await dispatchContentScriptCall(
+			"page_select_option",
+			"select_option",
+			handlers.select_option,
+			{ refId, value: "Alpha" },
+		);
+		expect(result.ok).toBe(true);
+		expect(clicked).toBe(true);
+	});
+
+	it("multi-id aria-controls resolves all linked listboxes", async () => {
+		document.body.innerHTML = `
+			<input role="combobox" aria-label="Pick" aria-controls="lb1 lb2">
+			<div id="lb1" role="listbox"><div role="option">Wrong</div></div>
+			<div id="lb2" role="listbox"><div role="option" data-target>Correct</div></div>
+		`;
+		const snap = await dispatchContentScriptCall(
+			"page_snapshot_data",
+			"snapshot",
+			handlers.snapshot,
+			{},
+		);
+		const refId = (
+			snap.value as { nodes: Array<{ refId: string; role?: string }> }
+		).nodes.find((n) => n.role === "combobox")!.refId;
+		let wrongClicked = false;
+		let correctClicked = false;
+		document.querySelectorAll('[role="option"]').forEach((opt) => {
+			opt.addEventListener("click", () => {
+				if (opt.textContent === "Wrong") wrongClicked = true;
+				if (opt.textContent === "Correct") correctClicked = true;
+			});
+		});
+		const result = await dispatchContentScriptCall(
+			"page_select_option",
+			"select_option",
+			handlers.select_option,
+			{ refId, value: "Correct" },
+		);
+		expect(result.ok).toBe(true);
+		expect(correctClicked).toBe(true);
+		expect(wrongClicked).toBe(false);
+	});
+
+	it("selects option when control itself is a listbox", async () => {
+		document.body.innerHTML = `
+			<div role="listbox" aria-label="Pick">
+				<div role="option" data-target>Alpha</div>
+				<div role="option">Beta</div>
+			</div>
+		`;
+		const snap = await dispatchContentScriptCall(
+			"page_snapshot_data",
+			"snapshot",
+			handlers.snapshot,
+			{},
+		);
+		const refId = (
+			snap.value as { nodes: Array<{ refId: string; role?: string }> }
+		).nodes.find((n) => n.role === "listbox")!.refId;
+		let clicked = false;
+		document.querySelector("[data-target]")!.addEventListener("click", () => {
+			clicked = true;
+		});
+		const result = await dispatchContentScriptCall(
+			"page_select_option",
+			"select_option",
+			handlers.select_option,
+			{ refId, value: "Alpha" },
+		);
+		expect(result.ok).toBe(true);
+		expect(clicked).toBe(true);
+	});
+
+	it("aria-controls pointing to non-listbox excludes it from searched ids", async () => {
+		document.body.innerHTML = `
+			<input role="combobox" aria-label="Pick" aria-controls="some-div">
+			<div id="some-div">plain content</div>
+			<div role="listbox"><div role="option">Real</div></div>
+		`;
+		const snap = await dispatchContentScriptCall(
+			"page_snapshot_data",
+			"snapshot",
+			handlers.snapshot,
+			{},
+		);
+		const refId = (
+			snap.value as { nodes: Array<{ refId: string; role?: string }> }
+		).nodes.find((n) => n.role === "combobox")!.refId;
+		const result = await dispatchContentScriptCall(
+			"page_select_option",
+			"select_option",
+			handlers.select_option,
+			{ refId, value: "Real" },
+		);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_NOT_FOUND");
+			const details = result.error.details as Record<string, unknown>;
+			const searchedIds = (details.searchedIds as string[]) || [];
+			expect(searchedIds).not.toContain("some-div");
+		}
+	});
+
+	it("nearbyRoots: listbox nested inside combobox", async () => {
+		document.body.innerHTML = `
+			<div role="combobox" aria-label="Pick">
+				<div role="listbox">
+					<div role="option" data-target>Nested Option</div>
+				</div>
+			</div>
+		`;
+		const snap = await dispatchContentScriptCall(
+			"page_snapshot_data",
+			"snapshot",
+			handlers.snapshot,
+			{},
+		);
+		const refId = (
+			snap.value as { nodes: Array<{ refId: string; role?: string }> }
+		).nodes.find((n) => n.role === "combobox")!.refId;
+		let clicked = false;
+		document.querySelector("[data-target]")!.addEventListener("click", () => {
+			clicked = true;
+		});
+		const result = await dispatchContentScriptCall(
+			"page_select_option",
+			"select_option",
+			handlers.select_option,
+			{ refId, value: "Nested Option" },
+		);
+		expect(result.ok).toBe(true);
+		expect(clicked).toBe(true);
+	});
+
+	it("case insensitive matching picks correct option", async () => {
+		const phoneListbox = document.createElement("div");
+		phoneListbox.setAttribute("role", "listbox");
+		phoneListbox.id = "iti-0__country-listbox";
+		phoneListbox.innerHTML =
+			'<div role="option">Afghanistan +93</div><div role="option">Canada +1</div>';
+		document.body.appendChild(phoneListbox);
+
+		const control = document.createElement("input");
+		control.setAttribute("role", "combobox");
+		control.setAttribute("aria-label", "Degree");
+		control.addEventListener("click", () => {
+			const listbox = document.createElement("div");
+			listbox.setAttribute("role", "listbox");
+			listbox.id = "react-select-degree--0-listbox";
+			listbox.innerHTML = '<div role="option">Bachelor\'s Degree</div>';
+			document.body.appendChild(listbox);
+		});
+		document.body.appendChild(control);
+
+		const snap = await dispatchContentScriptCall(
+			"page_snapshot_data",
+			"snapshot",
+			handlers.snapshot,
+			{},
+		);
+		const refId = (
+			snap.value as {
+				nodes: Array<{ refId: string; role?: string; name?: string }>;
+			}
+		).nodes.find(
+			(n) => n.role === "combobox" && (n.name || "").includes("Degree"),
+		)!.refId;
+
+		let optionClicked = "";
+		document.addEventListener(
+			"click",
+			(e) => {
+				const target = e.target as HTMLElement;
+				if (target.getAttribute("role") === "option") {
+					optionClicked = target.textContent || "";
+				}
+			},
+			true,
+		);
+
+		const result = await dispatchContentScriptCall(
+			"page_select_option",
+			"select_option",
+			handlers.select_option,
+			{ refId, value: "bachelor's degree" },
+		);
+		expect(result.ok).toBe(true);
+		expect(optionClicked).toBe("Bachelor's Degree");
+	});
+
+	it("roots empty when no listbox found returns clear error", async () => {
+		document.body.innerHTML = `
+			<input role="combobox" aria-label="No Popup">
+		`;
+		const snap = await dispatchContentScriptCall(
+			"page_snapshot_data",
+			"snapshot",
+			handlers.snapshot,
+			{},
+		);
+		const refId = (
+			snap.value as { nodes: Array<{ refId: string; role?: string }> }
+		).nodes.find((n) => n.role === "combobox")!.refId;
+		const result = await dispatchContentScriptCall(
+			"page_select_option",
+			"select_option",
+			handlers.select_option,
+			{ refId, value: "Anything" },
+		);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_NOT_FOUND");
+			expect(result.error.message).toContain("Candidates: none");
+			const details = result.error.details as Record<string, unknown>;
+			const searchedIds = (details.searchedIds as string[]) || [];
+			expect(searchedIds).toEqual([]);
+			const candidates = details.candidates as
+				| Array<{ name?: string }>
+				| undefined;
+			expect(candidates).toBeUndefined();
 		}
 	});
 });

@@ -4,6 +4,35 @@ All notable changes to this project are documented in this file. The format
 is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
+## [Unreleased]
+
+### Fixed — `page.select_option` listbox scoping (code review fixes)
+
+- **Unified error shape (B1+B2)**: combobox `select_option` no-long-found errors now go through `labelNotFoundError` instead of an inline `AsyncError`. The factory accepts an optional `extra` param (`searchedIds`, `ignoredIds`, `targetRefId`, `targetName`) and emits a dynamic hint. Empty candidates produce `Candidates: none` instead of a trailing `Candidates: ` with nothing after.
+- **Non-listbox `aria-controls` filtered (B4)**: `aria-controls`/`aria-owns` pointing to a non-listbox element (e.g. a plain `<div>`) is now excluded from `searchedIds` — only `role="listbox"` targets count.
+- **Lazy `ignoredIds` (W8+W10)**: `ignoredIds` is computed only on the error path from a single `allListboxes` snapshot instead of a redundant third `querySelectorAll` — eliminates a TOCTOU gap.
+- **Option-text signature (W9)**: `activatedRoots` detection compares option text signatures instead of raw `innerHTML`, removing fragility from attribute reordering/timestamps. Captures visible-but-content-changed listboxes that pure visibility tracking would miss.
+- **Deduplicated options (S15)**: `[...new Set(...)]` around the root flatMap removes duplicate option elements when listbox roots overlap.
+- **Two-pass matching (S17)**: combobox option matching now tries exact text first, then case-insensitive — aligned with the native `<select>` path.
+- **Renamed `resolveListboxRoots` → `activateAndResolveListboxRoots` (W7)**: name reflects that the function dispatches mouse events + click in addition to resolving roots.
+- **Unified import path (W11)**: `handlers.ts` imports error factories from `normalize-agent-error.js`, matching `action-result.ts` and `dom-utils.ts`.
+
+### Added — tests & E2E fixture
+
+- **7 new `select_option` unit tests** covering `aria-owns` standalone, multi-ID `aria-controls`, `selfRoot` (control is a listbox), `aria-controls` pointing to non-listbox, `nearbyRoots` (nested listbox), case-insensitive matching, and empty-roots error.
+- **Greenhouse-combobox E2E (B6)**: strengthened with a negative assertion — selecting `"Canada +1"` (phone-only value) on the degree combobox must return `{ ok: false }`, proving the scoping fix would fail if the global fallback were restored.
+
+### Fixed — `page.select_option` listbox scoping (initial)
+
+- **Scoped option search to target popup**: removed the global `document.querySelectorAll('[role="listbox"] [role="option"]')` fallback from `select_option`. Option search now uses only roots linked to the target combobox (`aria-controls`/`aria-owns`, activation-revealed listboxes, descendant listboxes, or the listbox itself when the refId points directly to one). Persistent unrelated listboxes like `#iti-0__country-listbox` (intl-tel-input, 244 country options) no longer poison the candidate set.
+- **Structured error diagnostics**: `select_option` errors on non-`<select>` comboboxes now include `targetRefId`, `targetName`, `searchedIds`, `ignoredIds`, and scoped `candidates` in `error.details` so the agent can see which listboxes were searched versus ignored instead of guessing from flat candidates.
+- **`activateAndResolveListboxRoots` helper** extracted from the `select_option` handler — collects linked/activated/nearby/self listbox roots and computes searched/ignored id lists.
+
+### Added — Greenhouse combobox E2E fixture
+
+- **New testcase**: `testcases/greenhouse-combobox/` — job application form with persistent `#iti-0__country-listbox` (5 country options) plus three react-select-style portal comboboxes (Degree, Veteran Status, Disability Status). The phone listbox remains visible in DOM after selection, replicating the Greenhouse poisoning condition.
+- **New spec**: `web/tests/e2e/extension/greenhouse-combobox.spec.ts` — verifies `select_option` fills all three react-select fields despite the persistent phone listbox.
+
 ## [0.10.3] — 2026-06-22
 
 ### Added — complex form support

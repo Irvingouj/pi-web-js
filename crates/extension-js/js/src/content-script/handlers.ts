@@ -1,4 +1,5 @@
 import { base64ToUint8Array } from "../shared/array-buffer.js";
+import { encodeFetchResponse } from "../shared/fetch-response.js";
 import type {
 	FetchParams,
 	PageAppendParams,
@@ -14,23 +15,22 @@ import type {
 	PagePressParams,
 	PageScrollParams,
 	PageScrollToParams,
-	PageSelectParams,
 	PageSelectOptionParams,
-	PageSubmitParams,
+	PageSelectParams,
 	PageSetFilesParams,
 	PageSnapshotQueryParams,
+	PageSubmitParams,
 	PageTypeParams,
 	PageWaitForParams,
 } from "../shared/generated.js";
-import { encodeFetchResponse } from "../shared/fetch-response.js";
 import { allocateRefId, syncRefIdCounterFromDom } from "../shared/ref-id.js";
+import type { StaleRefCandidate } from "../shared/registry/agent-errors.js";
 import {
 	labelNotFoundError,
 	notInteractableError,
 	observationRequiredError,
 	throwStructuredAgentError,
-} from "../shared/registry/agent-errors.js";
-import type { StaleRefCandidate } from "../shared/registry/agent-errors.js";
+} from "../shared/registry/normalize-agent-error.js";
 import {
 	getAccessibleName,
 	getAccessibleRole,
@@ -40,16 +40,8 @@ import {
 	resolveAbsoluteUrl,
 	resolveContainerRefId,
 } from "../shared/snapshot-dom.js";
-import { filterNodes } from "../shared/snapshot-filter.js";
 import type { SnapshotFilter } from "../shared/snapshot-filter.js";
-import {
-	currentObservationId,
-	grantObservation,
-	hasActiveObservation,
-	invalidateLease,
-	requireTarget,
-	requireTargetByLabel,
-} from "./observation-lease.js";
+import { filterNodes } from "../shared/snapshot-filter.js";
 import { assertFillEffect, makeActionResult } from "./action-result.js";
 import {
 	asRecord,
@@ -60,6 +52,14 @@ import {
 	throwElementNotFound,
 } from "./dom-utils.js";
 import { logger } from "./logger.js";
+import {
+	currentObservationId,
+	grantObservation,
+	hasActiveObservation,
+	invalidateLease,
+	requireTarget,
+	requireTargetByLabel,
+} from "./observation-lease.js";
 import { inlineSnapshot } from "./snapshot.js";
 
 export const DEFAULT_FETCH_TIMEOUT_MS = 30_000;
@@ -356,6 +356,90 @@ function buildDomNode(
 	return node;
 }
 
+/** Stable signature of a listbox's options — option text only, ignoring
+ *  attribute reordering, timestamps, and other non-content markup. */
+function listboxOptionSignature(listbox: HTMLElement): string {
+	return Array.from(listbox.querySelectorAll<HTMLElement>('[role="option"]'))
+		.map((o) => (o.textContent || "").trim())
+		.join("\n");
+}
+
+/**
+ * Activate a combobox control and collect the listbox roots that belong to it.
+ *
+ * Roots are gathered from four sources:
+ * 1. linkedRoots — elements referenced by the control's `aria-controls` / `aria-owns`
+ *    (only elements with role="listbox" are included).
+ * 2. activatedRoots — listboxes that became visible or were created after activation.
+ * 3. nearbyRoots  — listboxes nested inside the control element.
+ * 4. selfRoot     — the control itself when its role is "listbox".
+ *
+ * Unrelated listboxes that were already visible before activation
+ * (e.g. a persistent phone-country widget) are excluded.
+ *
+ * The control receives mouseover/mousedown/mouseup + click to trigger widget open.
+ */
+function activateAndResolveListboxRoots(control: HTMLElement): {
+	roots: HTMLElement[];
+	searchedIds: string[];
+	allListboxes: HTMLElement[];
+} {
+	const listboxesBefore = new Map(
+		Array.from(document.querySelectorAll<HTMLElement>('[role="listbox"]')).map(
+			(listbox) =>
+				[
+					listbox,
+					{
+						hidden: isSelfOrAncestorHidden(listbox),
+						sig: listboxOptionSignature(listbox),
+					},
+				] as const,
+		),
+	);
+	for (const evName of ["mouseover", "mousedown", "mouseup"]) {
+		control.dispatchEvent(
+			new MouseEvent(evName, { bubbles: true, cancelable: true }),
+		);
+	}
+	control.click();
+	const ownedIds =
+		`${control.getAttribute("aria-controls") || ""} ${control.getAttribute("aria-owns") || ""}`
+			.trim()
+			.split(/\s+/)
+			.filter(Boolean);
+	const linkedRoots = ownedIds
+		.map((id) => document.getElementById(id))
+		.filter(
+			(root): root is HTMLElement =>
+				root instanceof HTMLElement && root.getAttribute("role") === "listbox",
+		);
+	const allListboxes = Array.from(
+		document.querySelectorAll<HTMLElement>('[role="listbox"]'),
+	);
+	const activatedRoots = allListboxes.filter((listbox) => {
+		const before = listboxesBefore.get(listbox);
+		if (isSelfOrAncestorHidden(listbox)) return false;
+		if (!before) return true; // newly created after activation
+		if (before.hidden) return true; // hidden → visible
+		return listboxOptionSignature(listbox) !== before.sig; // content changed
+	});
+	const nearbyRoots = Array.from(
+		control.querySelectorAll<HTMLElement>('[role="listbox"]'),
+	);
+	// If the control itself is a listbox (refId points directly to it), include it.
+	const selfRoot = control.getAttribute("role") === "listbox" ? [control] : [];
+	const roots = [
+		...new Set([
+			...linkedRoots,
+			...activatedRoots,
+			...nearbyRoots,
+			...selfRoot,
+		]),
+	];
+	const searchedIds = roots.map((r) => r.id).filter(Boolean);
+
+	return { roots, searchedIds, allListboxes };
+}
 export const handlers = {
 	click: (params: PageClickParams) => {
 		const refId = params.refId;
@@ -390,32 +474,36 @@ export const handlers = {
 			throwElementNotFound(refId, label, true);
 		}
 		assertInteractable(el, "fill");
-	if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
-		el.value = value;
-		const ev = new InputEvent("input", { bubbles: true });
-		el.dispatchEvent(ev);
-		const resolvedRefId = refId || el.getAttribute("data-ref-id") || "";
-		assertFillEffect("fill", el, resolvedRefId, value);
-		return makeActionResult("fill", el, {
-			value: el.value,
-			observationId: currentObservationId(),
-			dispatched: true,
-			verification: "required",
-		});
-	}
-	if (el instanceof HTMLElement && el.isContentEditable) {
-		el.innerText = value;
-		const ev = new InputEvent("input", { bubbles: true, inputType: "insertText", data: value });
-		el.dispatchEvent(ev);
-		const resolvedRefId = refId || el.getAttribute("data-ref-id") || "";
-		return makeActionResult("fill", el, {
-			value: el.innerText,
-			observationId: currentObservationId(),
-			dispatched: true,
-			verification: "required",
-		});
-	}
-	throw new Error("Element is not an input or contenteditable");
+		if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+			el.value = value;
+			const ev = new InputEvent("input", { bubbles: true });
+			el.dispatchEvent(ev);
+			const resolvedRefId = refId || el.getAttribute("data-ref-id") || "";
+			assertFillEffect("fill", el, resolvedRefId, value);
+			return makeActionResult("fill", el, {
+				value: el.value,
+				observationId: currentObservationId(),
+				dispatched: true,
+				verification: "required",
+			});
+		}
+		if (el instanceof HTMLElement && el.isContentEditable) {
+			el.innerText = value;
+			const ev = new InputEvent("input", {
+				bubbles: true,
+				inputType: "insertText",
+				data: value,
+			});
+			el.dispatchEvent(ev);
+			const _resolvedRefId = refId || el.getAttribute("data-ref-id") || "";
+			return makeActionResult("fill", el, {
+				value: el.innerText,
+				observationId: currentObservationId(),
+				dispatched: true,
+				verification: "required",
+			});
+		}
+		throw new Error("Element is not an input or contenteditable");
 	},
 
 	set_files: async (params: PageSetFilesParams) => {
@@ -435,8 +523,9 @@ export const handlers = {
 			const fromForLabel = forAttr
 				? document.getElementById(forAttr)?.querySelector('input[type="file"]')
 				: null;
-			const maybeInput =
-				(fromSubtree ?? fromWrapperLabel ?? fromForLabel) as HTMLInputElement | null;
+			const maybeInput = (fromSubtree ??
+				fromWrapperLabel ??
+				fromForLabel) as HTMLInputElement | null;
 			if (!maybeInput) {
 				const resolvedRefId = params.refId ?? "";
 				throwStructuredAgentError(
@@ -514,16 +603,16 @@ export const handlers = {
 		const label = params.label;
 		let target: EventTarget = document;
 		let el: Element | null = null;
-	if (refId || label) {
-		if (refId) {
-			el = requireTarget(refId, "press");
-		} else if (label) {
-			el = findElementByLabel(label);
-			if (!el) throwElementNotFound(refId, label, true);
+		if (refId || label) {
+			if (refId) {
+				el = requireTarget(refId, "press");
+			} else if (label) {
+				el = findElementByLabel(label);
+				if (!el) throwElementNotFound(refId, label, true);
+			}
+			assertInteractable(el as Element, "press");
+			target = el as Element;
 		}
-		assertInteractable(el as Element, "press");
-		target = el as Element;
-	}
 		const evDown = new KeyboardEvent("keydown", { key, bubbles: true });
 		target.dispatchEvent(evDown);
 		const evUp = new KeyboardEvent("keyup", { key, bubbles: true });
@@ -576,16 +665,18 @@ export const handlers = {
 		const el = resolveTargetRaw(params.refId, params.label);
 		assertInteractable(el, "select_option");
 		if (el instanceof HTMLSelectElement) {
-			const opt = Array.from(el.options).find(
-				(o) => (o.text || "").trim() === value,
-			) || Array.from(el.options).find(
-				(o) => (o.text || "").trim().toLowerCase() === value.toLowerCase(),
-			);
+			const opt =
+				Array.from(el.options).find((o) => (o.text || "").trim() === value) ||
+				Array.from(el.options).find(
+					(o) => (o.text || "").trim().toLowerCase() === value.toLowerCase(),
+				);
 			if (!opt) {
-				const candidates: StaleRefCandidate[] = Array.from(el.options).map((o, i) => ({
-					refId: `opt${i}`,
-					name: (o.text || "").trim() || undefined,
-				}));
+				const candidates: StaleRefCandidate[] = Array.from(el.options).map(
+					(o, i) => ({
+						refId: `opt${i}`,
+						name: (o.text || "").trim() || undefined,
+					}),
+				);
 				throwStructuredAgentError(labelNotFoundError(value, candidates));
 			}
 			el.value = opt.value;
@@ -593,58 +684,46 @@ export const handlers = {
 			return makeActionResult("select_option", el, { value: opt.value });
 		}
 		const control = el as HTMLElement;
-		const listboxesBefore = new Map(
-			Array.from(document.querySelectorAll<HTMLElement>('[role="listbox"]')).map(
-				(listbox) => [listbox, {
-					hidden: isSelfOrAncestorHidden(listbox),
-					content: listbox.innerHTML,
-				}],
+		const { roots, searchedIds, allListboxes } =
+			activateAndResolveListboxRoots(control);
+		const options = [
+			...new Set(
+				roots.flatMap((root) =>
+					Array.from(root.querySelectorAll<HTMLElement>('[role="option"]')),
+				),
 			),
-		);
-		for (const evName of ["mouseover", "mousedown", "mouseup"]) {
-			control.dispatchEvent(new MouseEvent(evName, { bubbles: true, cancelable: true }));
-		}
-		control.click();
-		const ownedIds = `${control.getAttribute("aria-controls") || ""} ${control.getAttribute("aria-owns") || ""}`
-			.trim()
-			.split(/\s+/)
-			.filter(Boolean);
-		const linkedRoots = ownedIds
-			.map((id) => document.getElementById(id))
-			.filter((root): root is HTMLElement => root instanceof HTMLElement);
-		const activatedRoots = Array.from(
-			document.querySelectorAll<HTMLElement>('[role="listbox"]'),
-		).filter(
-			(listbox) => {
-				const before = listboxesBefore.get(listbox);
-				return !isSelfOrAncestorHidden(listbox) &&
-					(!before || before.hidden || before.content !== listbox.innerHTML);
-			},
-		);
-		const nearbyRoots = Array.from(
-			control.querySelectorAll<HTMLElement>('[role="listbox"]'),
-		);
-		const roots = [...new Set([...linkedRoots, ...activatedRoots, ...nearbyRoots])];
-		const scopedOptions = roots.flatMap((root) =>
-			Array.from(root.querySelectorAll<HTMLElement>('[role="option"]')),
-		);
-		const options = [...new Set([
-			...scopedOptions,
-			...document.querySelectorAll<HTMLElement>('[role="listbox"] [role="option"]'),
-		])];
+		];
 		const normalizedValue = value.trim().toLowerCase();
-		const match = options.find(
-			(o) => (o.textContent || "").trim().toLowerCase() === normalizedValue,
-		);
+		const match =
+			options.find((o) => (o.textContent || "").trim() === value.trim()) ||
+			options.find(
+				(o) => (o.textContent || "").trim().toLowerCase() === normalizedValue,
+			);
 		if (!match) {
 			const candidates: StaleRefCandidate[] = options.map((o, i) => ({
 				refId: o.getAttribute("data-ref-id") || `opt${i}`,
 				name: (o.textContent || "").trim() || undefined,
 			}));
-			throwStructuredAgentError(labelNotFoundError(value, candidates));
+			const ignoredIds = allListboxes
+				.filter((lb) => !roots.includes(lb) && !isSelfOrAncestorHidden(lb))
+				.map((r) => r.id)
+				.filter(Boolean);
+			throwStructuredAgentError(
+				labelNotFoundError(value, candidates, {
+					searchedIds,
+					ignoredIds,
+					targetRefId: control.getAttribute("data-ref-id") || undefined,
+					targetName:
+						control.getAttribute("aria-label") ||
+						control.getAttribute("data-ref-id") ||
+						"",
+				}),
+			);
 		}
 		for (const evName of ["mouseover", "mousedown", "mouseup"]) {
-			match.dispatchEvent(new MouseEvent(evName, { bubbles: true, cancelable: true }));
+			match.dispatchEvent(
+				new MouseEvent(evName, { bubbles: true, cancelable: true }),
+			);
 		}
 		match.click();
 		return makeActionResult("select_option", el, { value });
@@ -686,7 +765,10 @@ export const handlers = {
 				name: r.value || undefined,
 			}));
 			throwStructuredAgentError(
-				labelNotFoundError(`radio value "${value}" in group "${name}"`, candidates),
+				labelNotFoundError(
+					`radio value "${value}" in group "${name}"`,
+					candidates,
+				),
 			);
 		}
 		assertInteractable(target, "check_radio");
@@ -733,7 +815,9 @@ export const handlers = {
 		if (typeof form.requestSubmit === "function") {
 			form.requestSubmit();
 		} else {
-			form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+			form.dispatchEvent(
+				new Event("submit", { bubbles: true, cancelable: true }),
+			);
 		}
 		return makeActionResult("submit", form, {
 			dispatched: true,

@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Greenhouse Combobox Fixture</title>
+  <style>
+    .row { margin: 8px 0; }
+    input[role="combobox"] { padding: 4px 8px; min-width: 200px; }
+    [role="listbox"] { border: 1px solid #999; display: inline-block; min-width: 160px; }
+    [role="option"] { padding: 4px 8px; cursor: pointer; }
+    [role="option"]:hover { background: #f0f0f0; }
+    .selected-value { display: inline-block; margin-left: 8px; color: #333; font-style: italic; }
+  </style>
+</head>
+<body>
+  <h1>Job Application Form</h1>
+  <form id="app-form" onsubmit="return false">
+
+    <!-- Country — intl-tel-input shape: listbox present & visible from page load -->
+    <div class="row">
+      <label for="country-search">Country</label>
+      <input role="combobox" aria-label="Country" id="country-search" type="search" />
+      <div role="listbox" id="iti-0__country-listbox" aria-label="country options">
+        <div role="option" data-code="93">Afghanistan +93</div>
+        <div role="option" data-code="358">Aland Islands +358</div>
+        <div role="option" data-code="355">Albania +355</div>
+        <div role="option" data-code="1">Canada +1</div>
+        <div role="option" data-code="1">United States +1</div>
+      </div>
+    </div>
+
+    <!-- Degree — react-select portal shape -->
+    <div class="row">
+      <label for="degree-input">Degree</label>
+      <input role="combobox" aria-label="Degree" id="degree-input" type="text" />
+      <span class="selected-value" id="degree-value"></span>
+    </div>
+
+    <!-- Veteran Status — react-select portal shape -->
+    <div class="row">
+      <label for="veteran-input">Veteran Status</label>
+      <input role="combobox" aria-label="Veteran Status" id="veteran-input" type="text" />
+      <span class="selected-value" id="veteran-value"></span>
+    </div>
+
+    <!-- Disability Status — react-select portal shape -->
+    <div class="row">
+      <label for="disability-input">Disability Status</label>
+      <input role="combobox" aria-label="Disability Status" id="disability-input" type="text" />
+      <span class="selected-value" id="disability-value"></span>
+    </div>
+
+  </form>
+  <p id="status" aria-live="polite">idle</p>
+
+  <script>
+    var statusEl = document.getElementById("status");
+    var statusLog = [];
+
+    function setStatus(text) {
+      statusLog.push(text);
+      statusEl.textContent = statusLog.join(" | ");
+    }
+
+    // ─── Country (intl-tel-input): listbox stays in DOM ───
+    var countryListbox = document.getElementById("iti-0__country-listbox");
+    Array.prototype.forEach.call(
+      countryListbox.querySelectorAll('[role="option"]'),
+      function (opt) {
+        opt.addEventListener("click", function () {
+          var name = opt.textContent.split(" +")[0].trim();
+          var code = opt.getAttribute("data-code");
+          document.getElementById("country-search").value = name + " +" + code;
+          setStatus("country:" + name + "+" + code);
+          // Intentionally do NOT remove the listbox — it persists (the bug condition).
+        });
+      },
+    );
+
+    // ─── react-select-style portal listbox helper ───
+    function openPortal(inputId, listboxId, options, onSelect) {
+      var input = document.getElementById(inputId);
+      input.addEventListener("click", function () {
+        // Remove any existing portal for this field.
+        var existing = document.getElementById(listboxId);
+        if (existing) existing.remove();
+
+        var listbox = document.createElement("div");
+        listbox.setAttribute("role", "listbox");
+        listbox.id = listboxId;
+        options.forEach(function (label) {
+          var opt = document.createElement("div");
+          opt.setAttribute("role", "option");
+          opt.textContent = label;
+          opt.addEventListener("click", function () {
+            onSelect(label);
+            listbox.remove(); // react-select closes menu after selection
+          });
+          listbox.appendChild(opt);
+        });
+        // Portal: append to body, NOT inside the field wrapper.
+        document.body.appendChild(listbox);
+      });
+    }
+
+    openPortal("degree-input", "react-select-degree--0-listbox",
+      ["Bachelor's Degree", "Master's Degree", "Doctorate", "High School"],
+      function (label) {
+        document.getElementById("degree-value").textContent = label;
+        document.getElementById("degree-input").value = label;
+        setStatus("degree:" + label);
+      }
+    );
+
+    openPortal("veteran-input", "react-select-veteran--0-listbox",
+      ["Yes", "No", "I don't wish to answer"],
+      function (label) {
+        document.getElementById("veteran-value").textContent = label;
+        document.getElementById("veteran-input").value = label;
+        setStatus("veteran:" + label);
+      }
+    );
+
+    openPortal("disability-input", "react-select-disability--0-listbox",
+      ["Yes", "No", "I don't wish to answer"],
+      function (label) {
+        document.getElementById("disability-value").textContent = label;
+        document.getElementById("disability-input").value = label;
+        setStatus("disability:" + label);
+      }
+    );
+  </script>
+</body>
+</html>

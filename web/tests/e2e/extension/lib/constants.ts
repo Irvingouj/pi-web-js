@@ -33,6 +33,7 @@ export const FILE_UPLOAD_FORM_URL = `http://${TESTCASE_SERVER_HOST}:${TESTCASE_S
 export const SLOW_NETWORK_URL = `http://${TESTCASE_SERVER_HOST}:${TESTCASE_SERVER_PORT}/testcases/slow-network/`;
 export const SNAPSHOT_QUERY_URL = `http://${TESTCASE_SERVER_HOST}:${TESTCASE_SERVER_PORT}/testcases/snapshot-query/`;
 export const COMPLEX_FORM_URL = `http://${TESTCASE_SERVER_HOST}:${TESTCASE_SERVER_PORT}/testcases/complex-form/`;
+export const GREENHOUSE_COMBOBOX_URL = `http://${TESTCASE_SERVER_HOST}:${TESTCASE_SERVER_PORT}/testcases/greenhouse-combobox/`;
 export const RESULT_PREFIX = "__EXTENSION_CONTRACT_RESULT__";
 
 export const EXT_CONTRACT_APIS = process.env.EXT_CONTRACT_APIS === "1";

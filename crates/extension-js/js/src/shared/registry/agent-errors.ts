@@ -157,9 +157,15 @@ export function throwStructuredAgentError(error: AsyncError): never {
 export function labelNotFoundError(
 	label: string,
 	candidates?: StaleRefCandidate[],
+	extra?: {
+		searchedIds?: string[];
+		ignoredIds?: string[];
+		targetRefId?: string;
+		targetName?: string;
+	},
 ): AsyncError {
 	let message = `Element not found by label "${label}"`;
-	if (candidates?.length) {
+	if (candidates !== undefined) {
 		const labels = candidates
 			.map((c) => c.name || c.refId)
 			.filter(Boolean)
@@ -169,15 +175,25 @@ export function labelNotFoundError(
 				? `. Candidates: ${labels.join(", ")}`
 				: ". Candidates: none";
 	}
+	const hint = extra?.searchedIds?.length
+		? `Searched listbox(es): ${extra.searchedIds.join(", ")}. Ignored: ${(extra.ignoredIds || []).join(", ") || "none"}.`
+		: "No element matched this label. Check candidates or snapshot for visible controls.";
 	return {
 		message,
 		code: "E_NOT_FOUND",
 		category: "resource",
-		hint: "No element matched this label. Check candidates or snapshot for visible controls.",
+		hint,
 		recovery: [
 			"const d = await page.snapshot_data(); find the target in d.nodes",
 			"Try a more specific label or use refId from snapshot",
 		],
-		details: candidates?.length ? { label, candidates } : { label },
+		details: {
+			label,
+			...(extra?.targetRefId ? { targetRefId: extra.targetRefId } : {}),
+			...(extra?.targetName ? { targetName: extra.targetName } : {}),
+			...(extra?.searchedIds ? { searchedIds: extra.searchedIds } : {}),
+			...(extra?.ignoredIds ? { ignoredIds: extra.ignoredIds } : {}),
+			...(candidates?.length ? { candidates } : {}),
+		},
 	};
 }
