@@ -4,7 +4,7 @@ All notable changes to this project are documented in this file. The format
 is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
-## [Unreleased]
+## [0.11.0] — 2026-06-23
 
 ### Fixed — `page.select_option` listbox scoping (code review fixes)
 
@@ -126,6 +126,7 @@ is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Added `problems.md` E2E fixtures and tests.
 - Fixed `web-js` `WasmAsyncError` compile.
 
+[0.11.0]: https://www.npmjs.com/package/@pi-oxide/extension-js/v/0.11.0
 [0.10.3]: https://www.npmjs.com/package/@pi-oxide/extension-js/v/0.10.3
 [0.8.1]: https://www.npmjs.com/package/@pi-oxide/extension-js/v/0.8.1
 [0.8.0]: https://www.npmjs.com/package/@pi-oxide/extension-js/v/0.8.0
