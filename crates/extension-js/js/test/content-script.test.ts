@@ -969,6 +969,47 @@ describe("stale refId errors", () => {
 		scrollBy.mockRestore();
 	});
 
+	it("scroll targets a visible nested scroll container before window", () => {
+		const windowScrollBy = vi
+			.spyOn(window, "scrollBy")
+			.mockImplementation(() => {});
+		const pane = document.createElement("div");
+		pane.style.overflowY = "auto";
+		document.body.appendChild(pane);
+		Object.defineProperties(pane, {
+			clientHeight: { value: 200, configurable: true },
+			scrollHeight: { value: 800, configurable: true },
+			scrollTop: { value: 0, writable: true, configurable: true },
+		});
+		pane.getBoundingClientRect = () =>
+			({
+				left: 0,
+				top: 0,
+				right: 300,
+				bottom: 400,
+				width: 300,
+				height: 400,
+				x: 0,
+				y: 0,
+				toJSON: () => ({}),
+			}) as DOMRect;
+		pane.scrollBy = () => {};
+		const paneScrollBy = vi
+			.spyOn(pane, "scrollBy")
+			.mockImplementation(() => {});
+
+		handlers.scroll({ direction: "down", amount: 250 });
+
+		expect(paneScrollBy).toHaveBeenCalledWith({
+			top: 250,
+			left: 0,
+			behavior: "smooth",
+		});
+		expect(windowScrollBy).not.toHaveBeenCalled();
+		paneScrollBy.mockRestore();
+		windowScrollBy.mockRestore();
+	});
+
 	it("append returns E_NOT_INTERACTABLE when value assignment has no effect", async () => {
 		const input = document.createElement("input");
 		input.setAttribute("data-ref-id", "e9");

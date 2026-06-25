@@ -224,6 +224,89 @@ describe("snapshot dispatch", () => {
 		await session.stopWith(Promise.resolve());
 	});
 
+	it("page.snapshot targets frame 0 explicitly when merging frames", async () => {
+		const chromeApi = globalThis.chrome as typeof chrome & {
+			tabs: { sendMessage: ReturnType<typeof vi.fn> };
+			webNavigation: {
+				getAllFrames: ReturnType<typeof vi.fn>;
+			};
+		};
+		chromeApi.webNavigation = {
+			getAllFrames: vi.fn((_details, cb) => {
+				cb([
+					{ frameId: 0, url: "https://example.com/" },
+					{ frameId: 7, url: "https://ads.example/frame.html" },
+				]);
+			}),
+		};
+		chromeApi.tabs.sendMessage.mockImplementation(
+			async (
+				_tabId: number,
+				msg: Record<string, unknown>,
+				opts?: { frameId?: number },
+			) => {
+				if (msg.action === "ping") return { ok: true };
+				if (msg.type !== "registryCall" || msg.action !== "page_snapshot") {
+					return { ok: false, error: "unexpected message" };
+				}
+				if (opts?.frameId === 0) {
+					return {
+						ok: true,
+						value: "URL: https://example.com/\nTitle: Top\n\n- main \"Top Content\" [e1]",
+					};
+				}
+				if (opts?.frameId === 7) {
+					return {
+						ok: true,
+						value:
+							"URL: https://ads.example/frame.html\nTitle: Ad\n\n- img [e1]",
+					};
+				}
+				return {
+					ok: true,
+					value:
+						"URL: https://tracker.example/\nTitle: Tracker\n\n- img [e1]",
+				};
+			},
+		);
+
+		const initPromise = ExtensionSession.init();
+		setTimeout(() => {
+			const worker = workerInstances[workerInstances.length - 1];
+			worker?.onmessage?.({ data: { type: "ready" } } as MessageEvent);
+		}, 0);
+		const [session] = await initPromise;
+		const worker = workerInstances[workerInstances.length - 1];
+
+		worker.onmessage?.({
+			data: {
+				type: "asyncRelay",
+				id: "snap-frame-0",
+				owner: "content-script",
+				tabPolicy: "active",
+				command: { action: "page_snapshot", params: {} },
+			},
+		} as MessageEvent);
+
+		await new Promise((resolve) => setTimeout(resolve, 100));
+
+		const snapResult = postMessages.find(
+			(m): m is PostMessage =>
+				typeof m === "object" &&
+				m !== null &&
+				(m as PostMessage).type === "asyncRelayResult" &&
+				(m as PostMessage).id === "snap-frame-0",
+		);
+		const result = snapResult?.result as
+			| { ok: true; value: string }
+			| undefined;
+		expect(result?.value).toContain("Top Content");
+		expect(result?.value).toContain("--- Frame 7:");
+		expect(result?.value).not.toContain("Tracker");
+
+		await session.stopWith(Promise.resolve());
+	});
+
 	it("content-script relay on chrome:// tab fails preflight with E_PERMISSION before sendMessage", async () => {
 		const chromeApi = globalThis.chrome as {
 			tabs: {

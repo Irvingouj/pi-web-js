@@ -81,8 +81,7 @@ async function collectFrameSnapshots(
 	return Promise.all(
 		frames.map(async (frame): Promise<FrameSnapshot> => {
 			try {
-				const sendOpts =
-					frame.frameId !== 0 ? { frameId: frame.frameId } : undefined;
+				const sendOpts = { frameId: frame.frameId };
 				const raw = await chromeApi.tabs.sendMessage(
 					tabId,
 					{

@@ -591,7 +591,7 @@ export class ExtensionSession {
 					callId: cmd.call_id,
 					runId: cmd.runId,
 				},
-				frameId !== 0 ? { frameId } : undefined,
+				{ frameId },
 			);
 			const parsed = unwrapContentScriptMessage(result);
 			if (cancelled && parsed.ok) return parsed;

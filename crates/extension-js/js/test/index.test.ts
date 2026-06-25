@@ -606,6 +606,7 @@ describe("ExtensionSession fs namespace e2e", () => {
 				action: "tab_click",
 				params: { tabId: 1n, refId: "e1" },
 			}),
+			{ frameId: 0 },
 		);
 	});
 
@@ -633,6 +634,7 @@ describe("ExtensionSession fs namespace e2e", () => {
 				type: "registryCall",
 				action: "page_click",
 			}),
+			{ frameId: 0 },
 		);
 
 		const relayResult = postMessages.find(
@@ -685,6 +687,7 @@ describe("ExtensionSession fs namespace e2e", () => {
 				type: "registryCall",
 				action: "page_fill",
 			}),
+			{ frameId: 0 },
 		);
 		expect(sendMessage).not.toHaveBeenCalledWith(
 			99,

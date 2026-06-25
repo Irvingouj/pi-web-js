@@ -96,6 +96,62 @@ function sleepWithSignal(ms: number, signal?: AbortSignal): Promise<void> {
 	});
 }
 
+function scrollDelta(direction: string, amount: number): { top: number; left: number } {
+	return {
+		top: direction === "down" ? amount : direction === "up" ? -amount : 0,
+		left: direction === "right" ? amount : direction === "left" ? -amount : 0,
+	};
+}
+
+function isScrollableStyle(style: CSSStyleDeclaration, axis: "x" | "y"): boolean {
+	const overflow = axis === "y" ? style.overflowY : style.overflowX;
+	return overflow === "auto" || overflow === "scroll" || overflow === "overlay";
+}
+
+function canScrollElement(el: HTMLElement, direction: string): boolean {
+	const style = window.getComputedStyle(el);
+	if (direction === "up" || direction === "down") {
+		if (!isScrollableStyle(style, "y")) return false;
+		if (el.scrollHeight <= el.clientHeight) return false;
+		return direction === "down"
+			? el.scrollTop < el.scrollHeight - el.clientHeight
+			: el.scrollTop > 0;
+	}
+	if (!isScrollableStyle(style, "x")) return false;
+	if (el.scrollWidth <= el.clientWidth) return false;
+	return direction === "right"
+		? el.scrollLeft < el.scrollWidth - el.clientWidth
+		: el.scrollLeft > 0;
+}
+
+function visibleArea(el: HTMLElement): number {
+	const rect = el.getBoundingClientRect();
+	if (rect.width <= 0 || rect.height <= 0) return 0;
+	const width = Math.min(rect.right, window.innerWidth) - Math.max(rect.left, 0);
+	const height = Math.min(rect.bottom, window.innerHeight) - Math.max(rect.top, 0);
+	return Math.max(0, width) * Math.max(0, height);
+}
+
+function findScrollTarget(direction: string): HTMLElement | null {
+	const active = document.activeElement;
+	if (active instanceof HTMLElement && canScrollElement(active, direction)) {
+		return active;
+	}
+
+	let best: HTMLElement | null = null;
+	let bestArea = 0;
+	for (const el of Array.from(document.querySelectorAll<HTMLElement>("*"))) {
+		if (el === document.body || el === document.documentElement) continue;
+		if (!canScrollElement(el, direction)) continue;
+		const area = visibleArea(el);
+		if (area > bestArea) {
+			best = el;
+			bestArea = area;
+		}
+	}
+	return best;
+}
+
 type ResolvedBytesFile = {
 	kind: "bytes";
 	name: string;
@@ -830,10 +886,12 @@ export const handlers = {
 		invalidateLease();
 		const direction = params.direction;
 		const amount = params.amount;
-		const top =
-			direction === "down" ? amount : direction === "up" ? -amount : 0;
-		const left =
-			direction === "right" ? amount : direction === "left" ? -amount : 0;
+		const { top, left } = scrollDelta(direction, amount);
+		const target = findScrollTarget(direction);
+		if (target) {
+			target.scrollBy({ top, left, behavior: "smooth" });
+			return makeActionResult("scroll", target, { direction, amount });
+		}
 		window.scrollBy({ top, left, behavior: "smooth" });
 		return makeActionResult("scroll", null, { direction, amount });
 	},
