@@ -121,7 +121,7 @@ dependencies = [
 
 [[package]]
 name = "dom-semantic-tree"
-version = "0.11.1"
+version = "0.12.0"
 dependencies = [
  "js-sys",
  "serde",
@@ -142,7 +142,7 @@ checksum = "877a4ace8713b0bcf2a4e7eec82529c029f1d0619886d18145fea96c3ffe5c0f"
 
 [[package]]
 name = "extension-js"
-version = "0.11.1"
+version = "0.12.0"
 dependencies = [
  "data-encoding",
  "js-sys",
@@ -1090,7 +1090,7 @@ checksum = "3746ad029217960123cf2ebf939dda51eb931ba9f8f09c117e39c820b96aa794"
 
 [[package]]
 name = "web-fs"
-version = "0.11.1"
+version = "0.12.0"
 dependencies = [
  "data-encoding",
  "js-sys",
@@ -1105,7 +1105,7 @@ dependencies = [
 
 [[package]]
 name = "web-js"
-version = "0.11.1"
+version = "0.12.0"
 dependencies = [
  "console_error_panic_hook",
  "data-encoding",
@@ -1129,7 +1129,7 @@ dependencies = [
 
 [[package]]
 name = "web-js-base"
-version = "0.11.1"
+version = "0.12.0"
 dependencies = [
  "futures-util",
  "js-sys",
@@ -1145,7 +1145,7 @@ dependencies = [
 
 [[package]]
 name = "web-js-core"
-version = "0.11.1"
+version = "0.12.0"
 dependencies = [
  "dom-semantic-tree",
  "futures-util",

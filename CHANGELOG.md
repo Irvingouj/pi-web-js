@@ -5,6 +5,12 @@ is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
 
+## [0.12.1] — 2026-06-25
+
+### Fixed — npm publish
+
+- **Republished with all artifacts.** v0.12.0 shipped a tarball containing only `package.json`; the built `index.js`, `worker.js`, `content-script.js`, `extension_js.js`, and `.d.ts` files were missing. This release ships the complete package so the iframe support from 0.12.0 is actually consumable.
+- **Added `scripts/publish-npm.js`**: syncs the publish manifest into `pkg/`, verifies every `files` entry exists on disk before `npm publish`, and refuses to publish if any are missing. Prevents the empty-tarball failure from recurring.
 ## [0.12.0] — 2026-06-25
 
 ### Added — Cross-origin iframe support (multi-frame snapshot + actions)
@@ -138,6 +144,8 @@ is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Added `problems.md` E2E fixtures and tests.
 - Fixed `web-js` `WasmAsyncError` compile.
 
+[0.12.1]: https://www.npmjs.com/package/@pi-oxide/extension-js/v/0.12.1
+[0.12.0]: https://www.npmjs.com/package/@pi-oxide/extension-js/v/0.12.0
 [0.11.1]: https://www.npmjs.com/package/@pi-oxide/extension-js/v/0.11.1
 [0.11.0]: https://www.npmjs.com/package/@pi-oxide/extension-js/v/0.11.0
 [0.10.3]: https://www.npmjs.com/package/@pi-oxide/extension-js/v/0.10.3
