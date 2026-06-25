@@ -5,6 +5,15 @@ is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
 
+
+## [0.12.2] — 2026-06-25
+
+### Fixed — content-script
+
+- **`page.scroll` targets nested scroll containers.** Previously `scroll` always called `window.scrollBy`, so inner `overflow: auto` panes (chat panels, code regions, modals) never scrolled. The handler now picks the actual scrollable target: `document.activeElement` first if it can scroll in the requested direction, then the largest visible scrollable element (by viewport-intersected area), falling back to `window.scrollBy` only when none is found. Direction/bounds checks (`canScrollElement`) verify `overflow` style, `scrollHeight > clientHeight`, and remaining scroll margin before selecting.
+- **Explicit `frameId: 0` for `chrome.tabs.sendMessage`.** The top-frame relay path passed `undefined` as the sendMessage options, which makes Chrome broadcast the message to every frame in the tab. Multi-frame snapshot merge and single-frame content-script relays could be answered by a non-top frame. Now passes `{ frameId }` (including `0`) everywhere, isolating delivery to the intended frame.
+
+
 ## [0.12.1] — 2026-06-25
 
 ### Fixed — npm publish
@@ -144,6 +153,7 @@ is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Added `problems.md` E2E fixtures and tests.
 - Fixed `web-js` `WasmAsyncError` compile.
 
+[0.12.2]: https://www.npmjs.com/package/@pi-oxide/extension-js/v/0.12.2
 [0.12.1]: https://www.npmjs.com/package/@pi-oxide/extension-js/v/0.12.1
 [0.12.0]: https://www.npmjs.com/package/@pi-oxide/extension-js/v/0.12.0
 [0.11.1]: https://www.npmjs.com/package/@pi-oxide/extension-js/v/0.11.1
