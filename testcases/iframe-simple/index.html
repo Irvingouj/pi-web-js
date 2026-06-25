@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>iframe-simple — Parent</title>
+</head>
+<body>
+  <h1>Parent Page</h1>
+  <p id="parent-status">idle</p>
+  <button id="parent-btn">Parent Button</button>
+
+  <iframe
+    id="child-frame"
+    src="child.html"
+    style="width:400px;height:200px;border:1px solid #ccc;"
+  ></iframe>
+
+  <script>
+    document.getElementById("parent-btn").addEventListener("click", () => {
+      document.getElementById("parent-status").textContent = "parent-clicked";
+    });
+    window.addEventListener("message", (e) => {
+      if (e.data && e.data.type === "iframe-clicked") {
+        document.getElementById("parent-status").textContent = e.data.text;
+      }
+    });
+  </script>
+</body>
+</html>

@@ -4,6 +4,18 @@ All notable changes to this project are documented in this file. The format
 is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
+
+## [0.12.0] — 2026-06-25
+
+### Added — Cross-origin iframe support (multi-frame snapshot + actions)
+
+- **`all_frames: true`**: content script now injects into every frame (top + all iframes), enabled by `webNavigation` permission.
+- **Composite refIds**: top-frame elements keep plain `eN` refIds (backward compatible). Iframe elements get `f{frameId}_eN` refIds, globally unique across frames. Agent uses refId as-is — no extra `frameId` param on actions.
+- **Multi-frame snapshot merge**: `page.snapshot()` / `page.snapshot_data()` collect snapshots from all http(s) frames in parallel and merge them with `--- Frame N: <url> ---` boundary markers.
+- **Per-frame action routing**: `page.click({ refId: "f3_e5" })` parses the composite refId and routes the command to frame 3 with the local refId `e5`. Content script unchanged — always receives local refIds.
+- **New module `snapshot-merge.ts`**: pure-ish functional pipeline (enumerate → collect → merge) extracted from `extension-session.ts`. RefId rewriting (`rewriteTextRefIds`, `rewriteNodeRefIds`) and merge functions (`mergeText`, `mergeObject`) are testable in isolation.
+- **`sendToFrame` helper**: eliminates duplicate sendMessage logic; abort listener cleanup is `try/finally`-guaranteed.
+
 ## [0.11.0] — 2026-06-23
 
 ### Fixed — `page.select_option` listbox scoping (code review fixes)

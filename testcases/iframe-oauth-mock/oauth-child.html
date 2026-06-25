@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Google OAuth Mock</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 16px; }
+    .account { padding: 8px; margin: 4px 0; border: 1px solid #ddd; cursor: pointer; border-radius: 4px; }
+    .account:hover { background: #f0f0f0; }
+    .account.selected { background: #e8f0fe; border-color: #4285f4; }
+    #confirm-btn { margin-top: 12px; padding: 8px 24px; background: #4285f4; color: white; border: none; border-radius: 4px; cursor: pointer; }
+    #confirm-btn:disabled { background: #ccc; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+  <h2>Sign in with Google</h2>
+  <p>Choose an account</p>
+
+  <div id="account-list">
+    <div class="account" data-email="alice@gmail.com">alice@gmail.com</div>
+    <div class="account" data-email="bob@example.com">bob@example.com</div>
+  </div>
+
+  <button id="confirm-btn" disabled>Continue</button>
+  <p id="oauth-status"></p>
+
+  <script>
+    let selectedEmail = "";
+    const accounts = document.querySelectorAll(".account");
+    const confirmBtn = document.getElementById("confirm-btn");
+    const statusEl = document.getElementById("oauth-status");
+
+    accounts.forEach((el) => {
+      el.addEventListener("click", () => {
+        accounts.forEach((a) => a.classList.remove("selected"));
+        el.classList.add("selected");
+        selectedEmail = el.dataset.email || "";
+        confirmBtn.disabled = false;
+      });
+    });
+
+    confirmBtn.addEventListener("click", () => {
+      statusEl.textContent = "Signed in as " + selectedEmail;
+      confirmBtn.disabled = true;
+      confirmBtn.textContent = "Done";
+      window.parent.postMessage({ type: "oauth-done", email: selectedEmail }, "*");
+    });
+  </script>
+</body>
+</html>

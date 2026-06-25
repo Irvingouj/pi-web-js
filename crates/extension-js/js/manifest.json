@@ -1,7 +1,7 @@
 {
 	"manifest_version": 3,
 	"name": "JS Notebook",
-	"version": "0.9.1",
+	"version": "0.10.0",
 	"description": "Browser-based JavaScript notebook with Chrome extension APIs",
 	"permissions": [
 		"tabs",
@@ -21,7 +21,8 @@
 		"windows",
 		"tabGroups",
 		"sessions",
-		"downloads"
+		"downloads",
+		"webNavigation"
 	],
 	"host_permissions": ["<all_urls>"],
 	"background": {
@@ -44,7 +45,7 @@
 			"matches": ["<all_urls>"],
 			"js": ["content-script.js"],
 			"run_at": "document_start",
-			"all_frames": false
+			"all_frames": true
 		}
 	],
 	"content_security_policy": {

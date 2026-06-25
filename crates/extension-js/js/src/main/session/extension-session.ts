@@ -33,6 +33,10 @@ import {
 	setRunnerAbortController,
 } from "../runner/runtime.js";
 import {
+	executeMultiFrameSnapshot,
+	isSnapshotAction,
+} from "../runner/snapshot-merge.js";
+import {
 	initTabContext,
 	removeTabContextListeners,
 	resolveTabId,
@@ -72,6 +76,17 @@ type WorkerResponse =
 	  }
 	| { type: "ready" };
 
+const COMPOSITE_REFID = /^f(\d+)_(e\d+)$/;
+
+type FrameTarget = { frameId: number; localRefId: string } | null;
+
+function resolveFrameTarget(params: Record<string, unknown>): FrameTarget {
+	const rawRefId = typeof params.refId === "string" ? params.refId : undefined;
+	if (!rawRefId) return null;
+	const m = rawRefId.match(COMPOSITE_REFID);
+	if (!m) return null;
+	return { frameId: Number.parseInt(m[1], 10), localRefId: m[2] };
+}
 export class ExtensionSession {
 	private worker: Worker | null = null;
 	private pendingCalls = new Map<
@@ -496,14 +511,66 @@ export class ExtensionSession {
 		try {
 			tabId = resolveTabId(tabPolicy, params);
 		} catch (err: unknown) {
-			const message = err instanceof Error ? err.message : String(err);
 			return {
 				ok: false,
-				error: { message, code: "E_NO_TAB", category: "resource" },
+				error: {
+					message: err instanceof Error ? err.message : String(err),
+					code: "E_NO_TAB",
+					category: "resource",
+				},
 			};
 		}
 
+		let tabUrl = "";
+		try {
+			const tab = await chromeApi.tabs.get(tabId);
+			tabUrl = tab.url ?? "";
+		} catch {
+			/* ignore */
+		}
+
+		const urlPreflight = await preflightDomTab(tabId);
+		if (urlPreflight && !urlPreflight.ok) return urlPreflight;
+
+		const pingResult = await pingTabContentScript(tabId, CS_FAST_PING_MS);
+		if (!pingResult.ok) return pingResult;
+
+		// --- Iframe: multi-frame snapshot fanout ---
+		if (isSnapshotAction(cmd.action)) {
+			return executeMultiFrameSnapshot(cmd, tabId, relayId);
+		}
+
+		// --- Resolve target frame from composite refId ---
+		const target = resolveFrameTarget(params);
+		const dispatchedCmd = target
+			? { ...cmd, params: { ...params, refId: target.localRefId } }
+			: cmd;
+
+		return this.sendToFrame(
+			chromeApi,
+			dispatchedCmd,
+			tabId,
+			target?.frameId ?? 0,
+			relayId,
+			signal,
+			tabUrl,
+		);
+	}
+
+	/** Send a registryCall to a specific frame and unwrap the response. */
+	private async sendToFrame(
+		chromeApi: typeof chrome,
+		cmd: Command,
+		tabId: number,
+		frameId: number,
+		relayId: string | undefined,
+		signal: AbortSignal | undefined,
+		tabUrl: string,
+	): Promise<unknown> {
 		let cancelled = false;
+		const cleanup = () => {
+			signal?.removeEventListener("abort", onAbort);
+		};
 		const onAbort = () => {
 			cancelled = true;
 			if (!relayId) return;
@@ -513,43 +580,26 @@ export class ExtensionSession {
 		};
 		signal?.addEventListener("abort", onAbort, { once: true });
 
-		let tabUrl = "";
 		try {
-			const tab = await chromeApi.tabs.get(tabId);
-			tabUrl = tab.url ?? "";
-		} catch {
-			// ignore
-		}
-
-		const urlPreflight = await preflightDomTab(tabId);
-		if (urlPreflight && !urlPreflight.ok) {
-			return urlPreflight;
-		}
-
-		const pingResult = await pingTabContentScript(tabId, CS_FAST_PING_MS);
-		if (!pingResult.ok) {
-			return pingResult;
-		}
-
-		try {
-			const result = await chromeApi.tabs.sendMessage(tabId, {
-				type: "registryCall",
-				id: relayId,
-				action: cmd.action,
-				params: cmd.params,
-				callId: cmd.call_id,
-				runId: cmd.runId,
-			});
+			const result = await chromeApi.tabs.sendMessage(
+				tabId,
+				{
+					type: "registryCall",
+					id: relayId,
+					action: cmd.action,
+					params: cmd.params,
+					callId: cmd.call_id,
+					runId: cmd.runId,
+				},
+				frameId !== 0 ? { frameId } : undefined,
+			);
 			const parsed = unwrapContentScriptMessage(result);
-			if (cancelled && parsed.ok) {
-				return parsed;
-			}
-			if (cancelled) {
+			if (cancelled && parsed.ok) return parsed;
+			if (cancelled)
 				return {
 					ok: false,
 					error: { message: "Relay aborted", code: "E_ABORT" },
 				};
-			}
 			return parsed;
 		} catch (err: unknown) {
 			if (cancelled || signal?.aborted) {
@@ -567,7 +617,7 @@ export class ExtensionSession {
 				}),
 			};
 		} finally {
-			signal?.removeEventListener("abort", onAbort);
+			cleanup();
 		}
 	}
 
@@ -592,7 +642,11 @@ export class ExtensionSession {
 		});
 	}
 
-	async runCellAsync(code: string, stdin?: string, traceId?: string): Promise<CellResult> {
+	async runCellAsync(
+		code: string,
+		stdin?: string,
+		traceId?: string,
+	): Promise<CellResult> {
 		const id = this.generateId();
 		const runId = traceId || this.generateId();
 		const run = this.runQueue.then(async () => {

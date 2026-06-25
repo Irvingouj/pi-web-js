@@ -131,7 +131,7 @@ export const SleepParamsSchema = z.object({
 
 // ─── DOM interaction helpers ─────────────────────────────────────
 
-export const refIdString = () => z.string().regex(/^e\d+$/);
+export const refIdString = () => z.string().regex(/^(?:f\d+_)?e\d+$/);
 
 const POSITIONAL_HINT =
 	'use { refId: "e2" } or { label: "..." } object form, not positional arguments';
@@ -333,7 +333,9 @@ export const PageAppendParamsSchema = elementTargetParams({
 export const PagePressParamsSchema = z.object({
 	refId: refIdString()
 		.optional()
-		.describe("Element reference ID to dispatch the key on (e.g. e2). Omit to dispatch on document."),
+		.describe(
+			"Element reference ID to dispatch the key on (e.g. e2). Omit to dispatch on document.",
+		),
 	label: z
 		.string()
 		.optional()
@@ -347,12 +349,18 @@ export const PageSelectParamsSchema = elementTargetParams({
 			z.string().describe("Value to select in the dropdown"),
 			z
 				.array(z.string())
-				.describe("Values to select in a multiple dropdown (empty array clears selection)"),
+				.describe(
+					"Values to select in a multiple dropdown (empty array clears selection)",
+				),
 		])
 		.describe("Value (string) or values (array) to select in the dropdown"),
 });
 export const PageSelectOptionParamsSchema = elementTargetParams({
-	value: z.string().describe("Visible text of the option to select (matched case-insensitively)"),
+	value: z
+		.string()
+		.describe(
+			"Visible text of the option to select (matched case-insensitively)",
+		),
 });
 export const PageCheckParamsSchema = elementTargetParams({
 	checked: z
@@ -365,9 +373,7 @@ export const PageCheckRadioParamsSchema = z.object({
 		.string()
 		.min(1)
 		.describe("The `name` attribute of the radio group to pick from"),
-	value: z
-		.string()
-		.describe("The `value` of the radio option to check"),
+	value: z.string().describe("The `value` of the radio option to check"),
 });
 export const PageHoverParamsSchema = elementTargetParams();
 export const PageUnhoverParamsSchema = z.object({});
@@ -540,7 +546,11 @@ export const TabSelectParamsSchema = tabElementTargetParams({
 	value: z.string().describe("Value to select in the dropdown"),
 });
 export const TabSelectOptionParamsSchema = tabElementTargetParams({
-	value: z.string().describe("Visible text of the option to select (matched case-insensitively)"),
+	value: z
+		.string()
+		.describe(
+			"Visible text of the option to select (matched case-insensitively)",
+		),
 });
 export const TabCheckParamsSchema = tabElementTargetParams({
 	checked: z
@@ -556,9 +566,7 @@ export const TabCheckRadioParamsSchema = z.object({
 		.string()
 		.min(1)
 		.describe("The `name` attribute of the radio group to pick from"),
-	value: z
-		.string()
-		.describe("The `value` of the radio option to check"),
+	value: z.string().describe("The `value` of the radio option to check"),
 });
 export const TabUnhoverParamsSchema = z.object({
 	...tabIdField,
@@ -1027,7 +1035,9 @@ export const PageActionResultSchema = z.object({
 	value: z
 		.union([z.string(), z.array(z.string())])
 		.optional()
-		.describe("Final value of the element after the action (string, or string[] for multi-select)"),
+		.describe(
+			"Final value of the element after the action (string, or string[] for multi-select)",
+		),
 	checked: z.boolean().optional().describe("Checked state after the action"),
 	disabled: z.boolean().optional().describe("Whether the element is disabled"),
 	readOnly: z.boolean().optional().describe("Whether the element is read-only"),
@@ -1127,10 +1137,7 @@ export const SnapshotNodeSchema = z.object({
 	checked: z.boolean().optional().describe("Checked state"),
 	disabled: z.boolean().optional().describe("Whether the element is disabled"),
 	readOnly: z.boolean().optional().describe("Whether the element is read-only"),
-	selected: z
-		.boolean()
-		.optional()
-		.describe("For <option>: selected state"),
+	selected: z.boolean().optional().describe("For <option>: selected state"),
 	href: z.string().optional().describe("Absolute URL for link elements"),
 	src: z.string().optional().describe("Absolute URL for image elements"),
 	alt: z.string().optional().describe("Alternative text for image elements"),
@@ -1224,10 +1231,7 @@ export const DomNodeSchema: z.ZodType<DomNode> = z.object({
 	checked: z.boolean().optional(),
 	disabled: z.boolean().optional(),
 	readOnly: z.boolean().optional(),
-	selected: z
-		.boolean()
-		.optional()
-		.describe("For <option>: selected state"),
+	selected: z.boolean().optional().describe("For <option>: selected state"),
 	href: z.string().optional(),
 	src: z.string().optional(),
 	alt: z.string().optional(),

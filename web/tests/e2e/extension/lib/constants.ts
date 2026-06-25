@@ -34,6 +34,11 @@ export const SLOW_NETWORK_URL = `http://${TESTCASE_SERVER_HOST}:${TESTCASE_SERVE
 export const SNAPSHOT_QUERY_URL = `http://${TESTCASE_SERVER_HOST}:${TESTCASE_SERVER_PORT}/testcases/snapshot-query/`;
 export const COMPLEX_FORM_URL = `http://${TESTCASE_SERVER_HOST}:${TESTCASE_SERVER_PORT}/testcases/complex-form/`;
 export const GREENHOUSE_COMBOBOX_URL = `http://${TESTCASE_SERVER_HOST}:${TESTCASE_SERVER_PORT}/testcases/greenhouse-combobox/`;
+export const IFRAME_SIMPLE_URL = `http://${TESTCASE_SERVER_HOST}:${TESTCASE_SERVER_PORT}/testcases/iframe-simple/`;
+export const IFRAME_CROSS_ORIGIN_URL = `http://${TESTCASE_SERVER_HOST}:${TESTCASE_SERVER_PORT}/testcases/iframe-cross-origin/`;
+export const IFRAME_OAUTH_MOCK_URL = `http://${TESTCASE_SERVER_HOST}:${TESTCASE_SERVER_PORT}/testcases/iframe-oauth-mock/`;
+// Cross-origin iframe uses localhost (different origin from 127.0.0.1)
+export const IFRAME_CROSS_ORIGIN_CHILD_ORIGIN = `http://localhost:${TESTCASE_SERVER_PORT}`;
 export const RESULT_PREFIX = "__EXTENSION_CONTRACT_RESULT__";
 
 export const EXT_CONTRACT_APIS = process.env.EXT_CONTRACT_APIS === "1";

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>iframe-simple — Child</title>
+</head>
+<body>
+  <h2>Iframe Content</h2>
+  <input id="iframe-input" type="text" placeholder="type here" value="" />
+  <button id="iframe-btn">Click in iframe</button>
+  <p id="iframe-status">idle</p>
+
+  <script>
+    const btn = document.getElementById("iframe-btn");
+    const input = document.getElementById("iframe-input");
+    const status = document.getElementById("iframe-status");
+    btn.addEventListener("click", () => {
+      const val = input.value;
+      status.textContent = val ? "filled:" + val : "clicked";
+      window.parent.postMessage({ type: "iframe-clicked", text: status.textContent }, "*");
+    });
+  </script>
+</body>
+</html>

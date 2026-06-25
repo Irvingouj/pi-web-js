@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>iframe-cross-origin — Parent</title>
+</head>
+<body>
+  <h1>Cross-Origin Parent</h1>
+  <p id="parent-status">idle</p>
+  <button id="parent-btn">Parent Button</button>
+
+  <!-- Served from localhost:9292 (different origin from 127.0.0.1:9292) -->
+  <iframe
+    id="child-frame"
+    src="http://localhost:9292/testcases/iframe-cross-origin/child.html"
+    style="width:400px;height:200px;border:1px solid #c00;"
+  ></iframe>
+
+  <script>
+    document.getElementById("parent-btn").addEventListener("click", () => {
+      document.getElementById("parent-status").textContent = "parent-clicked";
+    });
+    window.addEventListener("message", (e) => {
+      if (e.data && e.data.type === "child-clicked") {
+        document.getElementById("parent-status").textContent = e.data.text;
+      }
+    });
+  </script>
+</body>
+</html>
