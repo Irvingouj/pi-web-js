@@ -6,7 +6,9 @@ is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
 
-## [0.12.2] — 2026-06-25
+## [0.12.2]
+
+## [0.12.3] - 2026-06-23 — 2026-06-25
 
 ### Fixed — content-script
 
@@ -153,6 +155,7 @@ is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Added `problems.md` E2E fixtures and tests.
 - Fixed `web-js` `WasmAsyncError` compile.
 
+[0.12.3]: https://www.npmjs.com/package/@pi-oxide/extension-js/v/0.12.3
 [0.12.2]: https://www.npmjs.com/package/@pi-oxide/extension-js/v/0.12.2
 [0.12.1]: https://www.npmjs.com/package/@pi-oxide/extension-js/v/0.12.1
 [0.12.0]: https://www.npmjs.com/package/@pi-oxide/extension-js/v/0.12.0
