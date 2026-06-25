@@ -34,6 +34,7 @@ export const SLOW_NETWORK_URL = `http://${TESTCASE_SERVER_HOST}:${TESTCASE_SERVE
 export const SNAPSHOT_QUERY_URL = `http://${TESTCASE_SERVER_HOST}:${TESTCASE_SERVER_PORT}/testcases/snapshot-query/`;
 export const COMPLEX_FORM_URL = `http://${TESTCASE_SERVER_HOST}:${TESTCASE_SERVER_PORT}/testcases/complex-form/`;
 export const GREENHOUSE_COMBOBOX_URL = `http://${TESTCASE_SERVER_HOST}:${TESTCASE_SERVER_PORT}/testcases/greenhouse-combobox/`;
+export const GREENHOUSE_REAL_URL = `http://${TESTCASE_SERVER_HOST}:${TESTCASE_SERVER_PORT}/testcases/greenhouse-real/`;
 export const IFRAME_SIMPLE_URL = `http://${TESTCASE_SERVER_HOST}:${TESTCASE_SERVER_PORT}/testcases/iframe-simple/`;
 export const IFRAME_CROSS_ORIGIN_URL = `http://${TESTCASE_SERVER_HOST}:${TESTCASE_SERVER_PORT}/testcases/iframe-cross-origin/`;
 export const IFRAME_OAUTH_MOCK_URL = `http://${TESTCASE_SERVER_HOST}:${TESTCASE_SERVER_PORT}/testcases/iframe-oauth-mock/`;

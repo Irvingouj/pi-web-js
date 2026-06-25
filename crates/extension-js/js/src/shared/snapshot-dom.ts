@@ -164,7 +164,8 @@ export function getAccessibleRole(el: Element): string {
 			type === "text" ||
 			type === "email" ||
 			type === "password" ||
-			type === "search"
+			type === "search" ||
+			type === "tel"
 		)
 			return "textbox";
 		if (type === "checkbox") return "checkbox";

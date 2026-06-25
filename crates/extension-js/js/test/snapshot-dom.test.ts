@@ -179,4 +179,27 @@ describe("hidden file input inclusion", () => {
 		const inputNode = result.nodes.find((n) => n.tag === "input");
 		expect(inputNode).toBeUndefined();
 	});
+
+	it("inline snapshot includes visible telephone inputs", () => {
+		const fieldset = document.createElement("fieldset");
+		const legend = document.createElement("legend");
+		legend.textContent = "Phone";
+		const input = document.createElement("input");
+		input.type = "tel";
+		input.setAttribute("aria-label", "Phone");
+		input.value = "+1-289-788-6925";
+		fieldset.appendChild(legend);
+		fieldset.appendChild(input);
+		document.body.appendChild(fieldset);
+
+		const result = collectInlineSnapshot(100);
+		const phoneNode = result.nodes.find(
+			(n) => n.tag === "input" && n.name === "Phone",
+		);
+		expect(phoneNode).toMatchObject({
+			role: "textbox",
+			tag: "input",
+			value: "+1-289-788-6925",
+		});
+	});
 });
