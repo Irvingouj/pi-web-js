@@ -7,15 +7,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { handlers } from "../src/content-script/handlers.js";
 import {
+	grantObservation,
+	resetLease,
+} from "../src/content-script/observation-lease.js";
+import {
 	dispatchContentScriptCall,
 	registerContentScriptSpec,
 } from "../src/content-script/registry.js";
 import { buildContentScriptSpecs } from "../src/content-script/schemas.js";
 import { inlineSnapshot } from "../src/content-script/snapshot.js";
-import {
-	grantObservation,
-	resetLease,
-} from "../src/content-script/observation-lease.js";
 
 beforeEach(() => {
 	resetLease();
@@ -23,7 +23,9 @@ beforeEach(() => {
 
 function grantFromDom() {
 	const els = Array.from(document.querySelectorAll("[data-ref-id]"));
-	grantObservation(els.map((el) => ({ refId: el.getAttribute("data-ref-id")!, element: el })));
+	grantObservation(
+		els.map((el) => ({ refId: el.getAttribute("data-ref-id")!, element: el })),
+	);
 }
 
 if (typeof globalThis.CSS === "undefined" || !globalThis.CSS.escape) {

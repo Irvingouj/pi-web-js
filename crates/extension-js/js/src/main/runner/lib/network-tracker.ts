@@ -48,12 +48,14 @@ export class NetworkTracker {
 			types: TRACKED_RESOURCE_TYPES,
 		};
 
-	this.onBeforeRequest = (details): chrome.webRequest.BlockingResponse | undefined => {
-		if (details.tabId === this.tabId) {
-			this.inFlight.set(details.requestId, Date.now());
-		}
-		return undefined;
-	};
+		this.onBeforeRequest = (
+			details,
+		): chrome.webRequest.BlockingResponse | undefined => {
+			if (details.tabId === this.tabId) {
+				this.inFlight.set(details.requestId, Date.now());
+			}
+			return undefined;
+		};
 		this.onCompleted = (details) => {
 			if (details.tabId === this.tabId) {
 				this.inFlight.delete(details.requestId);

@@ -350,7 +350,8 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 				name: "value",
 				type: "string",
 				required: false,
-				description: "Visible text of the option to select (matched case-insensitively)",
+				description:
+					"Visible text of the option to select (matched case-insensitively)",
 			},
 		],
 		returnDoc: "{ ok: true, action: 'select_option', refId?, value? }",
@@ -486,7 +487,8 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 				name: "refId",
 				type: "string",
 				required: false,
-				description: "Element reference ID of the form or any element inside it (refId)",
+				description:
+					"Element reference ID of the form or any element inside it (refId)",
 			},
 			{
 				name: "label",
@@ -516,7 +518,8 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		action: "page_check_radio",
 		namespace: "page",
 		name: "checkRadio",
-		description: "Check a radio option by group name and value in the active tab",
+		description:
+			"Check a radio option by group name and value in the active tab",
 		params: schemas.PageCheckRadioParamsSchema,
 		returns: schemas.PageActionResultSchema,
 		paramTypes: [
@@ -533,7 +536,8 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 				description: "The value of the radio option to check",
 			},
 		],
-		returnDoc: "{ ok: true, action: 'check_radio', refId?, checked: true, value }",
+		returnDoc:
+			"{ ok: true, action: 'check_radio', refId?, checked: true, value }",
 		errorCode: "E_MISSING_PARAM",
 		example: 'page.checkRadio({ name: "radio-grp", value: "opt2" })',
 		agentMeta: {
@@ -976,7 +980,8 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 				name: "value",
 				type: "string",
 				required: false,
-				description: "Visible text of the option to select (matched case-insensitively)",
+				description:
+					"Visible text of the option to select (matched case-insensitively)",
 			},
 		],
 		returnDoc: "{ ok: true, action: 'select_option', refId?, value? }",
@@ -1060,7 +1065,8 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 				name: "refId",
 				type: "string",
 				required: false,
-				description: "Element reference ID of the form or any element inside it (refId)",
+				description:
+					"Element reference ID of the form or any element inside it (refId)",
 			},
 			{
 				name: "label",
@@ -1109,9 +1115,11 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 				description: "The value of the radio option to check",
 			},
 		],
-		returnDoc: "{ ok: true, action: 'check_radio', refId?, checked: true, value }",
+		returnDoc:
+			"{ ok: true, action: 'check_radio', refId?, checked: true, value }",
 		errorCode: "E_NO_TAB",
-		example: 'web.tab.checkRadio({ tabId: 123, name: "radio-grp", value: "opt2" })',
+		example:
+			'web.tab.checkRadio({ tabId: 123, name: "radio-grp", value: "opt2" })',
 		agentMeta: {
 			prerequisites: [
 				"Ensure the target tab exists and the content script is ready before mutating",

@@ -222,7 +222,11 @@ export type TabScrollToParams = {
 };
 
 export type TabSelectParams = { tabId: bigint; refId: string; value: string };
-export type TabSelectOptionParams = { tabId: bigint; refId: string; value: string };
+export type TabSelectOptionParams = {
+	tabId: bigint;
+	refId: string;
+	value: string;
+};
 
 export type TabTypeParams = { tabId: bigint; refId: string; text: string };
 

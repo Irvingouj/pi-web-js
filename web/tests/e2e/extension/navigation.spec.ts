@@ -311,10 +311,10 @@ print(RESULT_PREFIX + JSON.stringify({
 			expect(exec.status, `${exec.stderr}\n${exec.stdout}`).toBe("success");
 			expect(exec.result?.ok).toBe(true);
 			if (exec.result?.ok) {
-			// The content-script grace period (500ms) after load gives enough time
-			// for the 100-200ms delayed fetches to complete.
-			expect(exec.result.value.hasData1).toBe(true);
-			expect(exec.result.value.hasData2).toBe(true);
+				// The content-script grace period (500ms) after load gives enough time
+				// for the 100-200ms delayed fetches to complete.
+				expect(exec.result.value.hasData1).toBe(true);
+				expect(exec.result.value.hasData2).toBe(true);
 			}
 		});
 	});

@@ -211,15 +211,15 @@ async function stubChromeWithGrantedPermissions(): Promise<void> {
 
 import { handlers } from "../src/content-script/handlers.js";
 import {
+	grantObservation,
+	resetLease,
+} from "../src/content-script/observation-lease.js";
+import {
 	dispatchContentScriptCall,
 	registerContentScriptSpec,
 } from "../src/content-script/registry.js";
 import { buildContentScriptSpecs } from "../src/content-script/schemas.js";
 import { inlineSnapshot } from "../src/content-script/snapshot.js";
-import {
-	grantObservation,
-	resetLease,
-} from "../src/content-script/observation-lease.js";
 
 /**
  * Grant an observation lease for every element currently carrying a
@@ -235,6 +235,7 @@ function grantFromDom(): void {
 		})),
 	);
 }
+
 import { buildSnapshotInTab } from "../src/main/runner/dom/snapshot.js";
 // runner.ts registers all tools at module load time; initExtensionListeners()
 // is a no-op because chrome is not yet stubbed.  We stub it before tests
@@ -348,7 +349,6 @@ function registerTestTool(tool: ReturnType<typeof makeTestTool>): void {
 		errorCode: tool.errorCode,
 	});
 }
-
 
 beforeEach(() => {
 	resetLease();

@@ -170,7 +170,11 @@ describe("T-006: page.dom raw-DOM introspection", () => {
 		);
 		expect(result.ok).toBe(true);
 		if (result.ok) {
-			const data = result.value as { nodes: unknown[]; url: string; title: string };
+			const data = result.value as {
+				nodes: unknown[];
+				url: string;
+				title: string;
+			};
 			expect(data.nodes.length).toBe(0);
 			expect(data.url).toBeDefined();
 			expect(data.title).toBeDefined();
@@ -200,8 +204,8 @@ describe("T-006: page.dom raw-DOM introspection", () => {
 			expect(divNode).toBeDefined();
 			expect(divNode?.attributes).toBeDefined();
 			if (divNode?.attributes) {
-				expect(divNode.attributes["class"]).toBe("my-class");
-				expect(divNode.attributes["id"]).toBe("my-id");
+				expect(divNode.attributes.class).toBe("my-class");
+				expect(divNode.attributes.id).toBe("my-id");
 			}
 		}
 	});

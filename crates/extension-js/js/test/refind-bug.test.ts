@@ -3,8 +3,12 @@
 // element that merely shares the same role. Only role+name exact match is
 // safe. Role-only or tag+role fallback is forbidden.
 
-import { describe, it, expect, beforeEach } from "vitest";
-import { resetLease, grantObservation, requireTarget } from "../src/content-script/observation-lease.js";
+import { beforeEach, describe, expect, it } from "vitest";
+import {
+	grantObservation,
+	requireTarget,
+	resetLease,
+} from "../src/content-script/observation-lease.js";
 
 describe("refind safety regression", () => {
 	beforeEach(() => {

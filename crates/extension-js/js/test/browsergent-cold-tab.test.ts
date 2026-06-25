@@ -15,15 +15,15 @@ import { setActiveTabId } from "../src/main/tab-context.js";
 import "../src/main/runner/index.js";
 import { handlers } from "../src/content-script/handlers.js";
 import {
+	grantObservation,
+	resetLease,
+} from "../src/content-script/observation-lease.js";
+import {
 	dispatchContentScriptCall,
 	registerContentScriptSpec,
 } from "../src/content-script/registry.js";
 import { buildContentScriptSpecs } from "../src/content-script/schemas.js";
 import { inlineSnapshot } from "../src/content-script/snapshot.js";
-import {
-	grantObservation,
-	resetLease,
-} from "../src/content-script/observation-lease.js";
 
 function grantFromDom() {
 	const els = Array.from(document.querySelectorAll("[data-ref-id]"));

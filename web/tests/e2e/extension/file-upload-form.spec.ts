@@ -130,85 +130,86 @@ test.describe
 			}
 		});
 
-	test("page.setFiles uploads via pre-existing vfs path across cells", async ({
-		harness,
-	}) => {
-		// Cell 1: write the file to VFS in its own cell. The JS write cache is
-		// consumed/discarded by the time this cell returns, so the upload cell
-		// below must resolve the pre-existing path via a borrow-free OPFS read
-		// (re-entering ExtensionSession.fsReadBase64 mid-runCellAsync panics).
-		const writeExec = await executeCell(
-			harness.sidepanel,
-			cellSource(
-				resultPrefixLine(),
-				activateFileUploadTabSource(),
-				`const assetUrl = ${JSON.stringify(PHOTO_ASSET_URL)};`,
-				"const fetchResult = await page.fetch(assetUrl);",
-				"await fs.writeBase64({ path: '/tmp/photo-preexisting.jpg', data: fetchResult.body });",
-				`print(RESULT_PREFIX + JSON.stringify({ ok: true, value: { written: true } }));`,
-			),
-			60_000,
-		);
-		expect(writeExec.status, `${writeExec.stderr}\n${writeExec.stdout}`).toBe(
-			"success",
-		);
-
-		// Cell 2: upload the pre-existing path. Today this panics with
-		// "recursive use of an object detected"; after the fix it resolves via
-		// the borrow-free free function and uploads the bytes.
-		const uploadExec = await executeCell<
-			ContractResult<{ statusText: string; fileCount: number }>
-		>(
-			harness.sidepanel,
-			cellSource(
-				resultPrefixLine(),
-				activateFileUploadTabSource(),
-				"const fileNodes = await page.find({ selector: 'input#file' });",
-				"if (!fileNodes.length || !fileNodes[0].refId) {",
-				'  throw new Error("file input refId not found");',
-				"}",
-				"const setResult = await page.setFiles({",
-				"  refId: fileNodes[0].refId,",
-				"  files: [{ path: '/tmp/photo-preexisting.jpg', name: 'photo.jpg', mimeType: 'image/jpeg' }],",
-				"});",
-				"const extracted = await page.extract(['text']);",
-				"const text = typeof extracted.text === 'string' ? extracted.text : '';",
-				"print(RESULT_PREFIX + JSON.stringify({ ok: true, value: {",
-				"  statusText: text,",
-				"  fileCount: setResult.fileCount,",
-				"} }));",
-			),
-			60_000,
-		);
-		expect(
-			uploadExec.status,
-			`${uploadExec.stderr}\n${uploadExec.stdout}`,
-		).toBe("success");
-		expect(uploadExec.result?.ok).toBe(true);
-		if (uploadExec.result?.ok) {
-			expect(uploadExec.result.value.statusText).toContain(
-				"uploaded:photo.jpg:6636",
+		test("page.setFiles uploads via pre-existing vfs path across cells", async ({
+			harness,
+		}) => {
+			// Cell 1: write the file to VFS in its own cell. The JS write cache is
+			// consumed/discarded by the time this cell returns, so the upload cell
+			// below must resolve the pre-existing path via a borrow-free OPFS read
+			// (re-entering ExtensionSession.fsReadBase64 mid-runCellAsync panics).
+			const writeExec = await executeCell(
+				harness.sidepanel,
+				cellSource(
+					resultPrefixLine(),
+					activateFileUploadTabSource(),
+					`const assetUrl = ${JSON.stringify(PHOTO_ASSET_URL)};`,
+					"const fetchResult = await page.fetch(assetUrl);",
+					"await fs.writeBase64({ path: '/tmp/photo-preexisting.jpg', data: fetchResult.body });",
+					`print(RESULT_PREFIX + JSON.stringify({ ok: true, value: { written: true } }));`,
+				),
+				60_000,
 			);
-			expect(uploadExec.result.value.fileCount).toBe(1);
-		}
+			expect(writeExec.status, `${writeExec.stderr}\n${writeExec.stdout}`).toBe(
+				"success",
+			);
 
-		// Cell 3: prove the acting runtime is still healthy after the cross-cell
-		// upload — the regression that today leaves ExtensionJsClient dead.
-		const healthExec = await executeCell<
-			ContractResult<{ ok: boolean; url: string }>
-		>(
-			harness.sidepanel,
-			cellSource(
-				resultPrefixLine(),
-				"const url = await page.url();",
-				`print(RESULT_PREFIX + JSON.stringify({ ok: true, value: { ok: true, url } }));`,
-			),
-			60_000,
-		);
-		expect(healthExec.status, `${healthExec.stderr}\n${healthExec.stdout}`).toBe(
-			"success",
-		);
-	});
+			// Cell 2: upload the pre-existing path. Today this panics with
+			// "recursive use of an object detected"; after the fix it resolves via
+			// the borrow-free free function and uploads the bytes.
+			const uploadExec = await executeCell<
+				ContractResult<{ statusText: string; fileCount: number }>
+			>(
+				harness.sidepanel,
+				cellSource(
+					resultPrefixLine(),
+					activateFileUploadTabSource(),
+					"const fileNodes = await page.find({ selector: 'input#file' });",
+					"if (!fileNodes.length || !fileNodes[0].refId) {",
+					'  throw new Error("file input refId not found");',
+					"}",
+					"const setResult = await page.setFiles({",
+					"  refId: fileNodes[0].refId,",
+					"  files: [{ path: '/tmp/photo-preexisting.jpg', name: 'photo.jpg', mimeType: 'image/jpeg' }],",
+					"});",
+					"const extracted = await page.extract(['text']);",
+					"const text = typeof extracted.text === 'string' ? extracted.text : '';",
+					"print(RESULT_PREFIX + JSON.stringify({ ok: true, value: {",
+					"  statusText: text,",
+					"  fileCount: setResult.fileCount,",
+					"} }));",
+				),
+				60_000,
+			);
+			expect(
+				uploadExec.status,
+				`${uploadExec.stderr}\n${uploadExec.stdout}`,
+			).toBe("success");
+			expect(uploadExec.result?.ok).toBe(true);
+			if (uploadExec.result?.ok) {
+				expect(uploadExec.result.value.statusText).toContain(
+					"uploaded:photo.jpg:6636",
+				);
+				expect(uploadExec.result.value.fileCount).toBe(1);
+			}
+
+			// Cell 3: prove the acting runtime is still healthy after the cross-cell
+			// upload — the regression that today leaves ExtensionJsClient dead.
+			const healthExec = await executeCell<
+				ContractResult<{ ok: boolean; url: string }>
+			>(
+				harness.sidepanel,
+				cellSource(
+					resultPrefixLine(),
+					"const url = await page.url();",
+					`print(RESULT_PREFIX + JSON.stringify({ ok: true, value: { ok: true, url } }));`,
+				),
+				60_000,
+			);
+			expect(
+				healthExec.status,
+				`${healthExec.stderr}\n${healthExec.stdout}`,
+			).toBe("success");
+		});
 
 		test("page.setFiles uploads via fetch handle", async ({ harness }) => {
 			const exec = await executeCell<

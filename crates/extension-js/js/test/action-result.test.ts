@@ -17,7 +17,9 @@ beforeEach(() => {
 
 function grantFromDom() {
 	const els = Array.from(document.querySelectorAll("[data-ref-id]"));
-	grantObservation(els.map((el) => ({ refId: el.getAttribute("data-ref-id")!, element: el })));
+	grantObservation(
+		els.map((el) => ({ refId: el.getAttribute("data-ref-id")!, element: el })),
+	);
 }
 
 // Polyfill CSS.escape for jsdom test environments where it is unavailable

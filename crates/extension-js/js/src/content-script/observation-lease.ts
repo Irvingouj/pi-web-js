@@ -17,7 +17,10 @@
  * throw E_STALE with the original reason.
  */
 
-import { getAccessibleName, getAccessibleRole } from "../shared/snapshot-dom.js";
+import {
+	getAccessibleName,
+	getAccessibleRole,
+} from "../shared/snapshot-dom.js";
 
 export interface ObservedTarget {
 	element: Element;
@@ -38,17 +41,17 @@ function fingerprintOf(el: Element): TargetFingerprint {
 	};
 }
 
-function fingerprintsEqual(a: TargetFingerprint, b: TargetFingerprint): boolean {
-	return (
-		a.tag === b.tag && a.role === b.role && a.name === b.name
-	);
+function fingerprintsEqual(
+	a: TargetFingerprint,
+	b: TargetFingerprint,
+): boolean {
+	return a.tag === b.tag && a.role === b.role && a.name === b.name;
 }
 
 let hasObservation = false;
 let observationSeq = 0;
 let currentId: string | undefined;
 let targets: Map<string, ObservedTarget> = new Map();
-
 
 /** Reset state — used by tests and on content-script load. */
 export function resetLease(): void {
@@ -102,10 +105,7 @@ export function currentObservationId(): string | undefined {
  *
  * Returns the validated element on success.
  */
-export function requireTarget(
-	refId: string,
-	action: string,
-): Element {
+export function requireTarget(refId: string, action: string): Element {
 	if (!hasObservation) {
 		throwObservedRequired(action);
 	}
@@ -117,7 +117,10 @@ export function requireTarget(
 	if (!element.isConnected) {
 		const refound = refindByFingerprint(target);
 		if (refound) {
-			targets.set(refId, { element: refound, fingerprint: fingerprintOf(refound) });
+			targets.set(refId, {
+				element: refound,
+				fingerprint: fingerprintOf(refound),
+			});
 			return refound;
 		}
 		throwStale(refId, "disconnected");
@@ -189,10 +192,7 @@ function throwStale(refId: string, reason: string): never {
  * Resolve a label against the latest observation. Throws E_AMBIGUOUS_TARGET
  * if multiple observed targets share the label. Returns the unique element.
  */
-export function requireTargetByLabel(
-	label: string,
-	action: string,
-): Element {
+export function requireTargetByLabel(label: string, action: string): Element {
 	if (!hasObservation) {
 		throwObservedRequired(action);
 	}

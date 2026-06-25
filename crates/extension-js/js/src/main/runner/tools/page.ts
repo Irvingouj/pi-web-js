@@ -1,5 +1,6 @@
 /// <reference types="chrome" />
 import { z } from "zod";
+import { logger } from "../../../shared/logger.js";
 import { CONTENT_SCRIPT_TOOL_SPECS } from "../../../shared/registry/content-script-tools.js";
 import { defineContentScriptTool } from "../../../shared/registry/define-content-script-tool.js";
 import {
@@ -7,7 +8,6 @@ import {
 	noTabError,
 } from "../../../shared/registry/normalize-agent-error.js";
 import * as schemas from "../../../shared/schemas.js";
-import { logger } from "../../../shared/logger.js";
 import { dispatchTool, registerJsCall } from "../../../shared/tool-registry.js";
 import { NetworkTracker } from "../lib/network-tracker.js";
 import {
@@ -372,7 +372,9 @@ registerJsCall({
 	returns: schemas.ChromeTabArraySchema,
 	owner: "main-thread",
 	handler: async (params, _ctx) => {
-		const tabs = unwrapResult(await dispatchTool("chrome_tabs_query", [params]));
+		const tabs = unwrapResult(
+			await dispatchTool("chrome_tabs_query", [params]),
+		);
 		return (Array.isArray(tabs) ? tabs : []).map((t) => ({
 			...t,
 			tabId: t?.id,

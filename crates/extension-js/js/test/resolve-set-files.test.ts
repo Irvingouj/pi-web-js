@@ -129,8 +129,16 @@ describe("resolveSetFilesParams", () => {
 			const files = (result.value as { files: unknown[] }).files;
 			expect(files.length).toBe(3);
 			expect(files[0]).toMatchObject({ kind: "url", name: "x.jpg" });
-			expect(files[1]).toMatchObject({ kind: "bytes", name: "y.bin", data: "ZGF0YQ==" });
-			expect(files[2]).toMatchObject({ kind: "bytes", name: "z.txt", data: "YWJj" });
+			expect(files[1]).toMatchObject({
+				kind: "bytes",
+				name: "y.bin",
+				data: "ZGF0YQ==",
+			});
+			expect(files[2]).toMatchObject({
+				kind: "bytes",
+				name: "z.txt",
+				data: "YWJj",
+			});
 		}
 	});
 });

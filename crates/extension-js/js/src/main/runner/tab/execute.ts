@@ -191,8 +191,7 @@ export async function waitForTabLoad(
 		tabUrl.length > 0 &&
 		tabUrl !== preNavigationUrl;
 
-	const graceMs =
-		options?.loadGraceMs ?? 5_000;
+	const graceMs = options?.loadGraceMs ?? 5_000;
 
 	try {
 		await new Promise<void>((resolve, reject) => {
