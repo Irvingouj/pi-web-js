@@ -1,5 +1,4 @@
 import { allocateRefId, syncRefIdCounterFromDom } from "../cs/ref-id.js";
-import { throwStructuredAgentError } from "./agent-errors.js";
 import {
 	enrichFormNode,
 	getAccessibleName,
@@ -12,6 +11,7 @@ import {
 	resolvePermalinkLink,
 	shouldInclude,
 } from "../cs/snapshot-dom.js";
+import { throwStructuredAgentError } from "./agent-errors.js";
 
 export type InlineSnapshotNode = {
 	refId: string;
@@ -81,7 +81,9 @@ const enrichValidationProxy: Enricher = (el, node) => {
 	if (!isValidationProxyInput(el)) return;
 	node.controlType = "validation-proxy";
 	node.actionable = false;
-	const forControl = el.closest('[role="combobox"]')?.getAttribute("data-ref-id");
+	const forControl = el
+		.closest('[role="combobox"]')
+		?.getAttribute("data-ref-id");
 	if (forControl) node.forControl = forControl;
 };
 
@@ -90,9 +92,13 @@ const enrichDropdown: Enricher = (el, node) => {
 	if (node.role !== "combobox" && node.tag !== "select") return;
 	node.controlType = "dropdown";
 	node.recommendedAction = "select_option";
-	node.controls = el.getAttribute("aria-controls") || el.getAttribute("aria-owns") || undefined;
+	node.controls =
+		el.getAttribute("aria-controls") ||
+		el.getAttribute("aria-owns") ||
+		undefined;
 	const expanded = el.getAttribute("aria-expanded");
-	node.expanded = expanded === "true" ? true : expanded === "false" ? false : undefined;
+	node.expanded =
+		expanded === "true" ? true : expanded === "false" ? false : undefined;
 };
 
 const enrichLink: Enricher = (el, node) => {
@@ -159,7 +165,11 @@ const enrich = (el: Element, node: InlineSnapshotNode): void =>
 // Node construction: pure transform, element + context → fully-built node.
 // ---------------------------------------------------------------------------
 
-const buildNode = (el: Element, depth: number, parentRefId: string): InlineSnapshotNode => {
+const buildNode = (
+	el: Element,
+	_depth: number,
+	parentRefId: string,
+): InlineSnapshotNode => {
 	const node: InlineSnapshotNode = {
 		refId: allocateRefId(el),
 		role: getAccessibleRole(el),
@@ -168,7 +178,8 @@ const buildNode = (el: Element, depth: number, parentRefId: string): InlineSnaps
 	};
 	const name = getAccessibleName(el);
 	if (name) node.name = name;
-	if ((node.tag === "img" || node.tag === "a") && parentRefId) node.parentRefId = parentRefId;
+	if ((node.tag === "img" || node.tag === "a") && parentRefId)
+		node.parentRefId = parentRefId;
 	enrich(el, node);
 	return node;
 };
@@ -188,7 +199,10 @@ const renderNodeLine = (node: InlineSnapshotNode, depth: number): string => {
 	const fields: Array<[unknown, string]> = [
 		[node.name, `"${node.name?.replace(/"/g, '\\"')}"`],
 		[`[${node.refId}]`, `[${node.refId}]`],
-		[node.text && node.text !== node.name, `text="${node.text?.replace(/"/g, '\\"')}"`],
+		[
+			node.text && node.text !== node.name,
+			`text="${node.text?.replace(/"/g, '\\"')}"`,
+		],
 		[node.value, `value="${node.value?.replace(/"/g, '\\"')}"`],
 		[node.required, "required"],
 		[node.invalid, "invalid"],
@@ -198,7 +212,10 @@ const renderNodeLine = (node: InlineSnapshotNode, depth: number): string => {
 		[node.actionable === false, "actionable=false"],
 		[node.forControl, `forControl="${node.forControl}"`],
 		[node.errorMessage, `error="${node.errorMessage?.replace(/"/g, '\\"')}"`],
-		[!node.errorMessage && node.validationMessage, `validation="${node.validationMessage?.replace(/"/g, '\\"')}"`],
+		[
+			!node.errorMessage && node.validationMessage,
+			`validation="${node.validationMessage?.replace(/"/g, '\\"')}"`,
+		],
 	];
 
 	return [
@@ -338,9 +355,15 @@ const walkTree = (root: Element, maxNodes: number) => {
 	const lines: string[] = [];
 
 	const walk = (el: Element, depth: number, parentRefId: string): void => {
-		const guard = pipe(rejectExcludedTags, rejectNotIncluded, rejectAtCapacity(nodes.length, maxNodes));
+		const guard = pipe(
+			rejectExcludedTags,
+			rejectNotIncluded,
+			rejectAtCapacity(nodes.length, maxNodes),
+		);
 		const frame = guard({ kind: "enter", el, depth, parentRefId });
-		const outcome = resolveOutcome(frame.kind === "reject" ? frame : toEmit(frame));
+		const outcome = resolveOutcome(
+			frame.kind === "reject" ? frame : toEmit(frame),
+		);
 
 		if (outcome.emitted) {
 			nodes.push(outcome.emitted.node);
@@ -408,7 +431,12 @@ export function collectInlineSnapshot(maxNodes: number): InlineSnapshotResult {
 			: { nodes: [], lines: [] };
 
 		return {
-			text: [`URL: ${window.location.href}`, `Title: ${document.title}`, "", ...lines].join("\n"),
+			text: [
+				`URL: ${window.location.href}`,
+				`Title: ${document.title}`,
+				"",
+				...lines,
+			].join("\n"),
 			nodes,
 			formErrors: deriveFormErrors(nodes),
 			url: window.location.href,

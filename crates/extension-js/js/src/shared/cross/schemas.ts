@@ -1,17 +1,18 @@
 /** Schemas barrel — re-exports all domain schemas. Import path unchanged. */
-import { z } from "zod";
-export * from "./schemas/helpers.js";
-export * from "./schemas/storage.js";
+import type { z } from "zod";
+
+export * from "./schemas/chrome.js";
 export * from "./schemas/clipboard.js";
+export * from "./schemas/fs.js";
+export * from "./schemas/helpers.js";
+export * from "./schemas/host.js";
 export * from "./schemas/network.js";
 export * from "./schemas/page.js";
-export * from "./schemas/tab.js";
+export * from "./schemas/returns.js";
 export * from "./schemas/sidepanel.js";
 export * from "./schemas/snapshot.js";
-export * from "./schemas/fs.js";
-export * from "./schemas/chrome.js";
-export * from "./schemas/host.js";
-export * from "./schemas/returns.js";
+export * from "./schemas/storage.js";
+export * from "./schemas/tab.js";
 
 // ─── Type-satisfaction checks ──────────────────────────────────
 // These reference schemas across domains; kept in the barrel with cross-domain imports.
@@ -43,37 +44,40 @@ import type {
 	StorageGetParams,
 	StorageSetParams,
 } from "./generated.js";
-import { FetchParamsSchema, SleepParamsSchema } from "./schemas/network.js";
-import {
-	StorageGetParamsSchema,
-	StorageSetParamsSchema,
-	StorageDeleteParamsSchema,
-} from "./schemas/storage.js";
-import {
+import type {
+	FsCopyParamsSchema,
+	FsHashParamsSchema,
+	FsPathParamsSchema,
+	FsReadRangeParamsSchema,
+	FsUpdateParamsSchema,
+	FsWriteParamsSchema,
+} from "./schemas/fs.js";
+import type {
+	FetchParamsSchema,
+	SleepParamsSchema,
+} from "./schemas/network.js";
+import type {
+	PageCheckParamsSchema,
+	PageDomParamsSchema,
+	PageExtractParamsSchema,
+	PageFillParamsSchema,
+	PageFindParamsSchema,
 	PageGotoParamsSchema,
 	PagePressParamsSchema,
 	PageScrollParamsSchema,
 	PageScrollToParamsSchema,
-	PageFindParamsSchema,
-	PageDomParamsSchema,
-	PageWaitForParamsSchema,
-	PageWaitParamsSchema,
-	PageFillParamsSchema,
+	PageSelectParamsSchema,
 	PageSetFilesParamsSchema,
 	PageTypeParamsSchema,
-	PageCheckParamsSchema,
-	PageSelectParamsSchema,
-	PageExtractParamsSchema,
+	PageWaitForParamsSchema,
+	PageWaitParamsSchema,
 } from "./schemas/page.js";
-import {
-	FsPathParamsSchema,
-	FsCopyParamsSchema,
-	FsWriteParamsSchema,
-	FsReadRangeParamsSchema,
-	FsUpdateParamsSchema,
-	FsHashParamsSchema,
-} from "./schemas/fs.js";
-import { DomSnapshotParamsSchema } from "./schemas/snapshot.js";
+import type { DomSnapshotParamsSchema } from "./schemas/snapshot.js";
+import type {
+	StorageDeleteParamsSchema,
+	StorageGetParamsSchema,
+	StorageSetParamsSchema,
+} from "./schemas/storage.js";
 
 // ─── Type-satisfaction checks ──────────────────────────────────
 // Ensure zod-inferred types align with ts-rs generated types.

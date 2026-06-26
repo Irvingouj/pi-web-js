@@ -1,37 +1,9 @@
 import { z } from "zod";
-import type {
-	DomSnapshotParams,
-	FetchParams,
-	FsCopyParams,
-	FsHashParams,
-	FsPathParams,
-	FsReadRangeParams,
-	FsUpdateParams,
-	FsWriteParams,
-	PageCheckParams,
-	PageDomParams,
-	PageExtractParams,
-	PageFillParams,
-	PageFindParams,
-	PageGotoParams,
-	PagePressParams,
-	PageScrollParams,
-	PageScrollToParams,
-	PageSelectParams,
-	PageSetFilesParams,
-	PageTypeParams,
-	PageWaitForParams,
-	PageWaitParams,
-	SleepParams,
-	StorageDeleteParams,
-	StorageGetParams,
-	StorageSetParams,
-} from "../generated.js";
+import type { PageExtractParams } from "../generated.js";
 import {
 	bigintLike,
-	refIdString,
 	elementTargetParams,
-	tabElementTargetParams,
+	refIdString,
 	requireRefIdLabelOrCoordinates,
 } from "./helpers.js";
 
@@ -265,4 +237,3 @@ export const PageCloseParamsSchema = z.union([
 	z.object({}).passthrough(),
 ]);
 export const PageActiveTabParamsSchema = z.object({});
-

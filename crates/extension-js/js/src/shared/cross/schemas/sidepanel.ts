@@ -75,4 +75,3 @@ export const SidepanelSnapshotDataParamsSchema = z.object({
 		.default(500n)
 		.describe("Maximum number of nodes to include in snapshot"),
 });
-

@@ -1,5 +1,4 @@
 import { z } from "zod";
-import type { FetchParams, SleepParams } from "../generated.js";
 import { bigintLike } from "./helpers.js";
 
 // ─── Network / Sleep schemas ───────────────────────────────────
@@ -30,4 +29,3 @@ export const FetchParamsSchema = z
 export const SleepParamsSchema = z.object({
 	duration: bigintLike().describe("Duration to sleep in milliseconds"),
 });
-

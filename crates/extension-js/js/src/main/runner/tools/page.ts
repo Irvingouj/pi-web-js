@@ -1,14 +1,17 @@
 /// <reference types="chrome" />
 import { z } from "zod";
-import { logger } from "../../../shared/main/logger.js";
 import { CONTENT_SCRIPT_TOOL_SPECS } from "../../../shared/cross/content-script-tools.js";
-import { defineContentScriptTool } from "../../../shared/main/define-content-script-tool.js";
 import {
 	contentScriptMissingError,
 	noTabError,
 } from "../../../shared/cross/normalize-agent-error.js";
 import * as schemas from "../../../shared/cross/schemas.js";
-import { dispatchTool, registerJsCall } from "../../../shared/main/tool-registry.js";
+import { defineContentScriptTool } from "../../../shared/main/define-content-script-tool.js";
+import { logger } from "../../../shared/main/logger.js";
+import {
+	dispatchTool,
+	registerJsCall,
+} from "../../../shared/main/tool-registry.js";
 import { NetworkTracker } from "../lib/network-tracker.js";
 import {
 	CONTENT_SCRIPT_GRACE_MS,

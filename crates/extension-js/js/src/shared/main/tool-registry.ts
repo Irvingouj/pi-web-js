@@ -1,5 +1,4 @@
 import type { z } from "zod";
-import { logger } from "./logger.js";
 import {
 	clearContentScriptActions,
 	isContentScriptAction,
@@ -13,8 +12,9 @@ import type {
 	ToolDefinition,
 	ToolDoc,
 } from "../cross/manifest.js";
-import { inferOwner } from "./routes.js";
 import { zodToParamDocs, zodToReturnType } from "../cross/zod-to-docs.js";
+import { logger } from "./logger.js";
+import { inferOwner } from "./routes.js";
 
 export type {
 	AsyncError,

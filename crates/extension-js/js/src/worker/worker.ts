@@ -2,7 +2,10 @@
 // Loads extension-js WASM and communicates with main thread.
 
 import type { z } from "zod";
+import { formatValidationError } from "../shared/cross/dispatch.js";
 import type { FsActionMap } from "../shared/cross/fs-types.js";
+import * as schemas from "../shared/cross/schemas.js";
+import type { DispatchContext } from "../shared/cross/types.js";
 import type { LogLevel } from "../shared/main/logger.js";
 import {
 	logger,
@@ -10,13 +13,7 @@ import {
 	registerWasmSetLogLevel,
 	setLogLevel,
 } from "../shared/main/logger.js";
-import { formatValidationError } from "../shared/cross/dispatch.js";
-import {
-	getRoute,
-	populateRoutesFromManifest,
-} from "../shared/main/routes.js";
-import type { DispatchContext } from "../shared/cross/types.js";
-import * as schemas from "../shared/cross/schemas.js";
+import { getRoute, populateRoutesFromManifest } from "../shared/main/routes.js";
 import {
 	coerceWasmParams,
 	manifestEntryToWasm,

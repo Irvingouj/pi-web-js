@@ -16,8 +16,8 @@ import {
 	registerContentScriptSpec,
 } from "../src/content-script/registry.js";
 import { buildContentScriptSpecs } from "../src/content-script/schemas.js";
-import { collectInlineSnapshot as inlineSnapshot } from "../src/shared/cross/collect-inline-snapshot.js";
 import { notInteractableError } from "../src/shared/cross/agent-errors.js";
+import { collectInlineSnapshot as inlineSnapshot } from "../src/shared/cross/collect-inline-snapshot.js";
 
 /** Grant an observation lease for every element currently carrying a data-ref-id. */
 function grantFromDom(): void {
@@ -3102,10 +3102,7 @@ describe("select_option handler", () => {
 		control.setAttribute("role", "combobox");
 		control.setAttribute("aria-label", "Degree");
 		control.addEventListener("click", () => {
-			control.setAttribute(
-				"aria-controls",
-				"react-select-degree--0-listbox",
-			);
+			control.setAttribute("aria-controls", "react-select-degree--0-listbox");
 			const listbox = document.createElement("div");
 			listbox.setAttribute("role", "listbox");
 			listbox.id = "react-select-degree--0-listbox";
@@ -3139,9 +3136,7 @@ describe("select_option handler", () => {
 			expect(result.error.code).toBe("E_NOT_FOUND");
 			const details = result.error.details as Record<string, unknown>;
 			expect(details.ariaControlsBefore).toBeNull();
-			expect(details.ariaControlsAfter).toBe(
-				"react-select-degree--0-listbox",
-			);
+			expect(details.ariaControlsAfter).toBe("react-select-degree--0-listbox");
 			expect(details.isDropdown).toBe(true);
 			expect(details.targetName).toContain("Degree");
 		}
@@ -3370,7 +3365,11 @@ describe("form_errors in snapshot_data", () => {
 		);
 		expect(snap.ok).toBe(true);
 		if (!snap.ok) return;
-		const formErrors = (snap.value as { formErrors?: Array<{ field: string; error: string; refId: string }> }).formErrors;
+		const formErrors = (
+			snap.value as {
+				formErrors?: Array<{ field: string; error: string; refId: string }>;
+			}
+		).formErrors;
 		expect(formErrors).toBeDefined();
 		expect(formErrors!.length).toBe(2);
 		expect(formErrors![0]).toMatchObject({
@@ -3417,7 +3416,8 @@ describe("form_errors in snapshot_data", () => {
 		);
 		expect(snap.ok).toBe(true);
 		if (!snap.ok) return;
-		const formErrors = (snap.value as { formErrors?: Array<{ refId: string }> }).formErrors;
+		const formErrors = (snap.value as { formErrors?: Array<{ refId: string }> })
+			.formErrors;
 		expect(formErrors).toBeDefined();
 		const proxyEntry = formErrors!.find((e) => e.refId === "e11");
 		expect(proxyEntry).toBeUndefined();

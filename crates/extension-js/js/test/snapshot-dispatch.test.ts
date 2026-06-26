@@ -252,7 +252,8 @@ describe("snapshot dispatch", () => {
 				if (opts?.frameId === 0) {
 					return {
 						ok: true,
-						value: "URL: https://example.com/\nTitle: Top\n\n- main \"Top Content\" [e1]",
+						value:
+							'URL: https://example.com/\nTitle: Top\n\n- main "Top Content" [e1]',
 					};
 				}
 				if (opts?.frameId === 7) {
@@ -264,8 +265,7 @@ describe("snapshot dispatch", () => {
 				}
 				return {
 					ok: true,
-					value:
-						"URL: https://tracker.example/\nTitle: Tracker\n\n- img [e1]",
+					value: "URL: https://tracker.example/\nTitle: Tracker\n\n- img [e1]",
 				};
 			},
 		);

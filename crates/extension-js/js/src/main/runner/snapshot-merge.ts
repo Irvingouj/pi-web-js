@@ -3,8 +3,8 @@
 /// <reference types="chrome" />
 
 import type { InlineSnapshotNode } from "../../shared/cross/collect-inline-snapshot.js";
-import { unwrapContentScriptMessage } from "../../shared/main/content-script-response.js";
 import type { Command } from "../../shared/cross/manifest.js";
+import { unwrapContentScriptMessage } from "../../shared/main/content-script-response.js";
 
 // ─── Types ───────────────────────────────────────────────────────
 

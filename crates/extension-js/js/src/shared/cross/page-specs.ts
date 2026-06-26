@@ -3,8 +3,8 @@
  * Extracted from content-script-tools.ts by namespace.
  */
 import { z } from "zod";
-import * as schemas from "./schemas.js";
 import type { JsCallSpec } from "./manifest.js";
+import * as schemas from "./schemas.js";
 
 export const AWAIT_PROMISE_NOTE =
 	"Returns a Promise; await before reading the result. For a cell's last line, use `page.snapshot()` without a leading await so the cell returns the settled value.";
@@ -353,7 +353,8 @@ export const PAGE_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		],
 		returnDoc: "{ ok: true, action: 'select_option', refId?, value? }",
 		errorCode: "E_NOT_FOUND",
-		example: 'page.select_option({ refId: degree.refId, value: "Bachelor\'s Degree" })',
+		example:
+			'page.select_option({ refId: degree.refId, value: "Bachelor\'s Degree" })',
 		agentMeta: {
 			prerequisites: [
 				"Ensure the target tab is active and the content script is ready before mutating",

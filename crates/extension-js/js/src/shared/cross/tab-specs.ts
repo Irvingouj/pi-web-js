@@ -3,10 +3,11 @@
  * Extracted from content-script-tools.ts by namespace.
  */
 import { z } from "zod";
-import * as schemas from "./schemas.js";
 import { AWAIT_PROMISE_NOTE } from "./page-specs.js";
+import * as schemas from "./schemas.js";
 
 export type { ContentScriptToolSpec } from "./page-specs.js";
+
 import type { ContentScriptToolSpec } from "./page-specs.js";
 
 export const TAB_TOOL_SPECS: readonly ContentScriptToolSpec[] = [

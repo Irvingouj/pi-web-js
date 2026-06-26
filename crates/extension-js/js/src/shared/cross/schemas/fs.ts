@@ -1,12 +1,4 @@
 import { z } from "zod";
-import type {
-	FsCopyParams,
-	FsHashParams,
-	FsPathParams,
-	FsReadRangeParams,
-	FsUpdateParams,
-	FsWriteParams,
-} from "../generated.js";
 import { bigintLike } from "./helpers.js";
 
 // ─── Filesystem schemas ────────────────────────────────────────
@@ -44,4 +36,3 @@ export const FsHashParamsSchema = z.object({
 		.default("sha256")
 		.describe("Hash algorithm (e.g. sha256, md5)"),
 });
-

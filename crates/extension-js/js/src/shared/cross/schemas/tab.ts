@@ -1,16 +1,11 @@
 import { z } from "zod";
 import {
-	bigintLike,
 	refIdString,
-	elementTargetParams,
+	requireRefIdLabelOrCoordinates,
 	tabElementTargetParams,
 	tabIdField,
-	requireRefIdLabelOrCoordinates,
 } from "./helpers.js";
-import {
-	SetFileSourceSchema,
-	ResolvedSetFileSchema,
-} from "./page.js";
+import { ResolvedSetFileSchema, SetFileSourceSchema } from "./page.js";
 
 // ─── Tab action schemas ────────────────────────────────────────
 
@@ -216,4 +211,3 @@ export const TabSnapshotDataParamsSchema = z
 		options: z.object({}).passthrough().optional().describe("Snapshot options"),
 	})
 	.passthrough();
-

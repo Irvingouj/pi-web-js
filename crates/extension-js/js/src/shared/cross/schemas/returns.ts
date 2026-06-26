@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { JsonSerializableResultSchema } from "./host.js";
 import { refIdString } from "./helpers.js";
+import { JsonSerializableResultSchema } from "./host.js";
 
 // ─── Return value schemas ──────────────────────────────────────
 
@@ -42,8 +42,16 @@ export const PageActionResultSchema = z.object({
 				tag: z.string(),
 				role: z.string().optional(),
 				name: z.string().optional(),
-				field: z.string().optional().describe("Accessible field label or nearest label text"),
-				error: z.string().optional().describe("Linked visible error text from aria-errormessage/aria-describedby"),
+				field: z
+					.string()
+					.optional()
+					.describe("Accessible field label or nearest label text"),
+				error: z
+					.string()
+					.optional()
+					.describe(
+						"Linked visible error text from aria-errormessage/aria-describedby",
+					),
 				value: z.string().optional(),
 				required: z.boolean().optional(),
 				validationMessage: z.string().optional(),
@@ -148,8 +156,13 @@ export const SnapshotNodeSchema = z.object({
 	controlType: z
 		.string()
 		.optional()
-		.describe('Plain-language control type, e.g. "dropdown" for combobox/select'),
-	actionable: z.boolean().optional().describe("Whether this node can be acted on directly"),
+		.describe(
+			'Plain-language control type, e.g. "dropdown" for combobox/select',
+		),
+	actionable: z
+		.boolean()
+		.optional()
+		.describe("Whether this node can be acted on directly"),
 	forControl: z
 		.string()
 		.optional()
@@ -162,7 +175,10 @@ export const SnapshotNodeSchema = z.object({
 		.string()
 		.optional()
 		.describe("ID(s) of controlled popup/listbox elements, when exposed"),
-	expanded: z.boolean().optional().describe("Expanded state for popup controls"),
+	expanded: z
+		.boolean()
+		.optional()
+		.describe("Expanded state for popup controls"),
 	name: z.string().optional().describe("Accessible name of the element"),
 	text: z.string().optional().describe("Visible text content of the element"),
 	value: z.string().optional().describe("Element value"),
@@ -521,4 +537,3 @@ export const ChromeSystemStorageInfoSchema = z.array(
 		capacity: z.number().describe("Storage capacity"),
 	}),
 );
-

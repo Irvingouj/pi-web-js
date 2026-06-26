@@ -1,5 +1,4 @@
 import { z } from "zod";
-import type { DomSnapshotParams } from "../generated.js";
 import { bigintLike } from "./helpers.js";
 
 // ─── DOM schemas ───────────────────────────────────────────────
@@ -21,7 +20,6 @@ export const DomFormatParamsSchema = z.object({
 		.describe("Raw DOM snapshot data to format"),
 	format: z.string().optional().describe("Output format (e.g. markdown, html)"),
 });
-
 
 // ─── Page snapshot schemas ─────────────────────────────────────
 
@@ -98,4 +96,3 @@ export const TabSnapshotQueryParamsSchema =
 	PageSnapshotQueryParamsSchema.extend({
 		tabId: z.number().describe("Tab ID"),
 	});
-

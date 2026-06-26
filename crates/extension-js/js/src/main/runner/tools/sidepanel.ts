@@ -4,8 +4,8 @@ import {
 	findElementByLabel,
 	throwElementNotFound,
 } from "../../../content-script/dom-utils.js";
-import { logger } from "../../../shared/main/logger.js";
 import * as schemas from "../../../shared/cross/schemas.js";
+import { logger } from "../../../shared/main/logger.js";
 import { registerJsCall } from "../../../shared/main/tool-registry.js";
 import type { DomSnapshotParams } from "../runtime.js";
 import {

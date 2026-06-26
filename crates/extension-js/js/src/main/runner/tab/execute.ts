@@ -1,8 +1,8 @@
 /// <reference types="chrome" />
 
-import { logger } from "../../../shared/main/logger.js";
-import { unwrapContentScriptMessage } from "../../../shared/main/content-script-response.js";
 import { contentScriptMissingError } from "../../../shared/cross/normalize-agent-error.js";
+import { unwrapContentScriptMessage } from "../../../shared/main/content-script-response.js";
+import { logger } from "../../../shared/main/logger.js";
 import type { AsyncResponse } from "../../../shared/main/tool-registry.js";
 import { throwIfAborted } from "../../../shared/main/tool-registry.js";
 import { normalizeChromeError } from "../chrome/internals.js";

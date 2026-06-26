@@ -255,11 +255,11 @@ import {
 	initCapabilities,
 	resetCapabilities,
 } from "../src/main/runner/tools/chrome/capability.js";
-import { logger } from "../src/shared/main/logger.js";
 import {
 	addContentScriptAction,
 	getContentScriptActions,
 } from "../src/shared/cross/content-script-actions.js";
+import { logger } from "../src/shared/main/logger.js";
 import {
 	clearJsRegistry,
 	clearRegistry,

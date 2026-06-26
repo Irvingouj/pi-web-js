@@ -129,4 +129,3 @@ export const ChromeDownloadsShowParamsSchema = z.union([
 export const ChromeSystemCpuGetInfoParamsSchema = z.record(z.unknown());
 export const ChromeSystemMemoryGetInfoParamsSchema = z.record(z.unknown());
 export const ChromeSystemStorageGetInfoParamsSchema = z.record(z.unknown());
-

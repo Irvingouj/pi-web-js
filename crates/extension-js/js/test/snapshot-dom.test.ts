@@ -276,7 +276,8 @@ describe("hidden file input inclusion", () => {
 
 describe("role=presentation visible text", () => {
 	it("text inside role=presentation element appears in snapshot text", () => {
-		document.body.innerHTML = '<div role="presentation">This field is required.</div>';
+		document.body.innerHTML =
+			'<div role="presentation">This field is required.</div>';
 		const result = collectInlineSnapshot(100);
 		expect(result.text).toContain("This field is required.");
 	});

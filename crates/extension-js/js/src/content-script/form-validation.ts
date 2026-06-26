@@ -78,7 +78,8 @@ function resolveFieldLabel(
 		if (label?.textContent?.trim()) return label.textContent.trim();
 	}
 	const wrappingLabel = el.closest("label");
-	if (wrappingLabel?.textContent?.trim()) return wrappingLabel.textContent.trim();
+	if (wrappingLabel?.textContent?.trim())
+		return wrappingLabel.textContent.trim();
 	const prev = el.previousElementSibling;
 	if (prev?.tagName === "LABEL" && prev.textContent?.trim())
 		return prev.textContent.trim();

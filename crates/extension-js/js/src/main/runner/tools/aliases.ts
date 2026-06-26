@@ -1,7 +1,7 @@
 /// <reference types="chrome" />
 import { z } from "zod";
-import { logger } from "../../../shared/main/logger.js";
 import * as schemas from "../../../shared/cross/schemas.js";
+import { logger } from "../../../shared/main/logger.js";
 import {
 	dispatchTool,
 	registerJsCall,

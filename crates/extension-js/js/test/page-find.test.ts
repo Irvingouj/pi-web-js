@@ -2,11 +2,11 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { handlers } from "../src/content-script/handlers.js";
+import { resetLease } from "../src/content-script/observation-lease.js";
 import {
 	dispatchContentScriptCall,
 	registerContentScriptSpec,
 } from "../src/content-script/registry.js";
-import { resetLease } from "../src/content-script/observation-lease.js";
 import { buildContentScriptSpecs } from "../src/content-script/schemas.js";
 
 const mockAddListener = vi.fn();
@@ -309,7 +309,9 @@ describe("page.find refIds are directly actionable (contract)", () => {
 			{ refId, value: "hello" },
 		);
 		expect(fillResult.ok).toBe(true);
-		expect((document.getElementById("i") as HTMLInputElement).value).toBe("hello");
+		expect((document.getElementById("i") as HTMLInputElement).value).toBe(
+			"hello",
+		);
 	});
 
 	it("find on multiple elements leases all their refIds (contract)", async () => {
@@ -352,6 +354,8 @@ describe("page.find refIds are directly actionable (contract)", () => {
 			{ refId: inputRef, value: "world" },
 		);
 		expect(fillResult.ok).toBe(true);
-		expect((document.getElementById("b") as HTMLInputElement).value).toBe("world");
+		expect((document.getElementById("b") as HTMLInputElement).value).toBe(
+			"world",
+		);
 	});
 });

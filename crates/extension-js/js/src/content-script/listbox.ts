@@ -164,5 +164,11 @@ export function activateAndResolveListboxRoots(control: HTMLElement): {
 	const ariaControlsAfter = control.getAttribute("aria-controls");
 	const searchedIds = roots.map((r) => r.id).filter(Boolean);
 
-	return { roots, searchedIds, allListboxes, ariaControlsBefore, ariaControlsAfter };
+	return {
+		roots,
+		searchedIds,
+		allListboxes,
+		ariaControlsBefore,
+		ariaControlsAfter,
+	};
 }

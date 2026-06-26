@@ -93,7 +93,8 @@ export function notInteractableError(
 	details?: Record<string, unknown>,
 ): AsyncError {
 	const isDropdown =
-		details?.controlType === "dropdown" || details?.nearbyControlType === "dropdown";
+		details?.controlType === "dropdown" ||
+		details?.nearbyControlType === "dropdown";
 	const recovery = isDropdown
 		? [
 				`await page.select_option({ refId: ${JSON.stringify(refId)}, value: "..." }) — this is a dropdown; fill/type do not work on combobox/proxy inputs`,
@@ -207,9 +208,15 @@ export function labelNotFoundError(
 			...(extra?.targetName ? { targetName: extra.targetName } : {}),
 			...(extra?.searchedIds ? { searchedIds: extra.searchedIds } : {}),
 			...(extra?.ignoredIds ? { ignoredIds: extra.ignoredIds } : {}),
-			...(extra?.ariaControlsBefore !== undefined ? { ariaControlsBefore: extra.ariaControlsBefore } : {}),
-			...(extra?.ariaControlsAfter !== undefined ? { ariaControlsAfter: extra.ariaControlsAfter } : {}),
-			...(extra?.isDropdown !== undefined ? { isDropdown: extra.isDropdown } : {}),
+			...(extra?.ariaControlsBefore !== undefined
+				? { ariaControlsBefore: extra.ariaControlsBefore }
+				: {}),
+			...(extra?.ariaControlsAfter !== undefined
+				? { ariaControlsAfter: extra.ariaControlsAfter }
+				: {}),
+			...(extra?.isDropdown !== undefined
+				? { isDropdown: extra.isDropdown }
+				: {}),
 			...(candidates?.length ? { candidates } : {}),
 		},
 	};

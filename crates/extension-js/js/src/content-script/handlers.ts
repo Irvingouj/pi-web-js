@@ -1,3 +1,5 @@
+import type { StaleRefCandidate } from "../shared/cross/agent-errors.js";
+import { collectInlineSnapshot as inlineSnapshot } from "../shared/cross/collect-inline-snapshot.js";
 import { encodeFetchResponse } from "../shared/cross/fetch-response.js";
 import type {
 	FetchParams,
@@ -22,14 +24,15 @@ import type {
 	PageTypeParams,
 	PageWaitForParams,
 } from "../shared/cross/generated.js";
-import { allocateRefId, syncRefIdCounterFromDom } from "../shared/cs/ref-id.js";
-import type { StaleRefCandidate } from "../shared/cross/agent-errors.js";
 import {
 	labelNotFoundError,
 	notInteractableError,
 	observationRequiredError,
 	throwStructuredAgentError,
 } from "../shared/cross/normalize-agent-error.js";
+import type { SnapshotFilter } from "../shared/cross/snapshot-filter.js";
+import { filterNodes } from "../shared/cross/snapshot-filter.js";
+import { allocateRefId, syncRefIdCounterFromDom } from "../shared/cs/ref-id.js";
 import {
 	getAccessibleName,
 	getAccessibleRole,
@@ -38,9 +41,9 @@ import {
 	resolveAbsoluteUrl,
 	resolveContainerRefId,
 } from "../shared/cs/snapshot-dom.js";
-import type { SnapshotFilter } from "../shared/cross/snapshot-filter.js";
-import { filterNodes } from "../shared/cross/snapshot-filter.js";
 import { assertFillEffect, makeActionResult } from "./action-result.js";
+import type { DomNode } from "./dom-tree.js";
+import { buildDomNode } from "./dom-tree.js";
 import {
 	asRecord,
 	assertInteractable,
@@ -49,6 +52,14 @@ import {
 	resolveTargetRaw,
 	throwElementNotFound,
 } from "./dom-utils.js";
+import {
+	assertSetFilesEffect,
+	fileFromBytes,
+	fileFromUrl,
+	parseResolvedFiles,
+} from "./file-resolution.js";
+import { invalidFormControls } from "./form-validation.js";
+import { activateAndResolveListboxRoots } from "./listbox.js";
 import { logger } from "./logger.js";
 import {
 	currentObservationId,
@@ -58,17 +69,6 @@ import {
 	requireTarget,
 	requireTargetByLabel,
 } from "./observation-lease.js";
-import { collectInlineSnapshot as inlineSnapshot } from "../shared/cross/collect-inline-snapshot.js";
-import {
-	assertSetFilesEffect,
-	fileFromBytes,
-	fileFromUrl,
-	parseResolvedFiles,
-} from "./file-resolution.js";
-import { buildDomNode } from "./dom-tree.js";
-import type { DomNode } from "./dom-tree.js";
-import { invalidFormControls } from "./form-validation.js";
-import { activateAndResolveListboxRoots } from "./listbox.js";
 
 export const DEFAULT_FETCH_TIMEOUT_MS = 30_000;
 const DEFAULT_POLL_INTERVAL_MS = 100;
@@ -430,8 +430,13 @@ export const handlers = {
 			});
 		}
 		const control = el as HTMLElement;
-		const { roots, searchedIds, allListboxes, ariaControlsBefore, ariaControlsAfter } =
-			activateAndResolveListboxRoots(control);
+		const {
+			roots,
+			searchedIds,
+			allListboxes,
+			ariaControlsBefore,
+			ariaControlsAfter,
+		} = activateAndResolveListboxRoots(control);
 		const options = [
 			...new Set(
 				roots.flatMap((root) =>

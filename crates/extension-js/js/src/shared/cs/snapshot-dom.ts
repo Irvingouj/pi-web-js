@@ -414,13 +414,18 @@ export function isValidationProxyInput(el: Element): boolean {
 }
 
 function safeCssEscape(s: string): string {
-	return typeof CSS !== "undefined" && CSS.escape ? CSS.escape(s) : s.replace(/["\\]/g, "\\$&");
+	return typeof CSS !== "undefined" && CSS.escape
+		? CSS.escape(s)
+		: s.replace(/["\\]/g, "\\$&");
 }
 
 /** Resolve a human-readable field label from <label> element associations.
  *  Tries: accessible name → label[for=id] → wrapping <label> → preceding sibling
  *  <label> → parent's first <label> child. Falls back to the refId. */
-export function resolveFieldLabel(el: Element | null, fallback: string): string {
+export function resolveFieldLabel(
+	el: Element | null,
+	fallback: string,
+): string {
 	if (el) {
 		const id = el.getAttribute("id");
 		if (id) {
@@ -435,7 +440,8 @@ export function resolveFieldLabel(el: Element | null, fallback: string): string 
 		const parent = el.parentElement;
 		if (parent) {
 			const parentLabel = parent.querySelector("label");
-			if (parentLabel?.textContent?.trim()) return parentLabel.textContent.trim();
+			if (parentLabel?.textContent?.trim())
+				return parentLabel.textContent.trim();
 		}
 	}
 	return fallback;

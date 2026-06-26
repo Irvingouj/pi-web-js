@@ -24,4 +24,3 @@ export const JsonSerializableResultSchema = z.union([
 ]);
 
 export const HostCallResultSchema = JsonSerializableResultSchema;
-
