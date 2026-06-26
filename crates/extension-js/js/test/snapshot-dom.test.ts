@@ -81,13 +81,15 @@ describe("snapshot-dom markdown visibility", () => {
 		expect(isMarkdownVisible(inert)).toBe(false);
 	});
 
-	it("excludes presentation role", () => {
+	it("includes presentation role with visible direct text", () => {
 		const decorative = document.createElement("span");
 		decorative.setAttribute("role", "presentation");
 		decorative.textContent = "decorative";
 		document.body.appendChild(decorative);
 
-		expect(isMarkdownVisible(decorative)).toBe(false);
+		// role=presentation/none suppresses AT semantics but the text IS
+		// visually visible — snapshot must capture it.
+		expect(isMarkdownVisible(decorative)).toBe(true);
 	});
 
 	it("returns nested text when no direct text nodes exist", () => {
@@ -218,5 +220,77 @@ describe("hidden file input inclusion", () => {
 			invalid: true,
 		});
 		expect(proxyNode!.validationMessage).toBeTruthy();
+	});
+
+	it("inline snapshot shows linked visible field errors", () => {
+		const label = document.createElement("label");
+		label.htmlFor = "question";
+		label.textContent = "Question";
+		const input = document.createElement("input");
+		input.id = "question";
+		input.required = true;
+		input.setAttribute("aria-label", "Question");
+		input.setAttribute("aria-invalid", "true");
+		input.setAttribute("aria-errormessage", "question-error");
+		input.setAttribute("aria-describedby", "question-error");
+		const error = document.createElement("p");
+		error.id = "question-error";
+		error.textContent = "This field is required.";
+		document.body.append(label, input, error);
+
+		const result = collectInlineSnapshot(100);
+		const inputNode = result.nodes.find((n) => n.tag === "input");
+		const errorNode = result.nodes.find((n) => n.tag === "p");
+		expect(inputNode).toMatchObject({
+			name: "Question",
+			required: true,
+			invalid: true,
+			errorMessage: "This field is required.",
+		});
+		expect(errorNode?.name).toBe("This field is required.");
+		expect(result.text).toContain('error="This field is required."');
+		expect(result.text).toContain('"This field is required."');
+	});
+
+	it("inline snapshot makes dropdown controls obvious", () => {
+		const input = document.createElement("input");
+		input.setAttribute("role", "combobox");
+		input.setAttribute("aria-label", "Degree");
+		input.setAttribute("aria-expanded", "true");
+		input.setAttribute("aria-controls", "degree-listbox");
+		document.body.appendChild(input);
+
+		const result = collectInlineSnapshot(100);
+		const node = result.nodes.find((n) => n.role === "combobox");
+		expect(node).toMatchObject({
+			controlType: "dropdown",
+			recommendedAction: "select_option",
+			controls: "degree-listbox",
+			expanded: true,
+		});
+		expect(result.text).toContain('- dropdown "Degree"');
+		expect(result.text).toContain('opens="degree-listbox"');
+		expect(result.text).toContain('use="select_option"');
+	});
+});
+
+describe("role=presentation visible text", () => {
+	it("text inside role=presentation element appears in snapshot text", () => {
+		document.body.innerHTML = '<div role="presentation">This field is required.</div>';
+		const result = collectInlineSnapshot(100);
+		expect(result.text).toContain("This field is required.");
+	});
+
+	it("text inside role=none element appears in snapshot text", () => {
+		document.body.innerHTML = '<span role="none">Required</span>';
+		const result = collectInlineSnapshot(100);
+		expect(result.text).toContain("Required");
+	});
+
+	it("role=presentation wrapper with text in child still captures text via child", () => {
+		document.body.innerHTML =
+			'<div role="presentation"><span>Error: pick a value</span></div>';
+		const result = collectInlineSnapshot(100);
+		expect(result.text).toContain("Error: pick a value");
 	});
 });

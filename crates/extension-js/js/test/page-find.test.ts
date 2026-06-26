@@ -6,6 +6,7 @@ import {
 	dispatchContentScriptCall,
 	registerContentScriptSpec,
 } from "../src/content-script/registry.js";
+import { resetLease } from "../src/content-script/observation-lease.js";
 import { buildContentScriptSpecs } from "../src/content-script/schemas.js";
 
 const mockAddListener = vi.fn();
@@ -250,5 +251,107 @@ describe("T-002: page.find returns non-null refId + src", () => {
 		if (readonlyResult.ok) {
 			expect(readonlyResult.value[0].readOnly).toBe(true);
 		}
+	});
+});
+
+describe("page.find refIds are directly actionable (contract)", () => {
+	beforeEach(() => {
+		document.body.innerHTML = "";
+		for (const spec of buildContentScriptSpecs()) {
+			registerContentScriptSpec(spec);
+		}
+		resetLease();
+	});
+
+	it("find button refId is clickable without intermediate snapshot (contract)", async () => {
+		document.body.innerHTML = `<button id="b">Go</button>`;
+		let clicked = false;
+		document.getElementById("b")!.addEventListener("click", () => {
+			clicked = true;
+		});
+
+		const findResult = await dispatchContentScriptCall(
+			"page_find",
+			"find",
+			handlers.find,
+			{ selector: "button" },
+		);
+		expect(findResult.ok).toBe(true);
+		if (!findResult.ok) return;
+		const refId = findResult.value[0].refId;
+
+		const clickResult = await dispatchContentScriptCall(
+			"page_click",
+			"click",
+			handlers.click,
+			{ refId },
+		);
+		expect(clickResult.ok).toBe(true);
+		expect(clicked).toBe(true);
+	});
+
+	it("find input refId is fillable without intermediate snapshot (contract)", async () => {
+		document.body.innerHTML = `<input id="i" value="">`;
+		const findResult = await dispatchContentScriptCall(
+			"page_find",
+			"find",
+			handlers.find,
+			{ selector: "input" },
+		);
+		expect(findResult.ok).toBe(true);
+		if (!findResult.ok) return;
+		const refId = findResult.value[0].refId;
+
+		const fillResult = await dispatchContentScriptCall(
+			"page_fill",
+			"fill",
+			handlers.fill,
+			{ refId, value: "hello" },
+		);
+		expect(fillResult.ok).toBe(true);
+		expect((document.getElementById("i") as HTMLInputElement).value).toBe("hello");
+	});
+
+	it("find on multiple elements leases all their refIds (contract)", async () => {
+		document.body.innerHTML = `<button id="a">A</button><input id="b" value="">`;
+		let aClicked = false;
+		document.getElementById("a")!.addEventListener("click", () => {
+			aClicked = true;
+		});
+
+		const findResult = await dispatchContentScriptCall(
+			"page_find",
+			"find",
+			handlers.find,
+			{ selector: "button, input" },
+		);
+		expect(findResult.ok).toBe(true);
+		if (!findResult.ok) return;
+		const buttonRef = findResult.value.find(
+			(n: { tag: string }) => n.tag === "button",
+		)!.refId;
+		const inputRef = findResult.value.find(
+			(n: { tag: string }) => n.tag === "input",
+		)!.refId;
+
+		// Click the button using its refId from find — no intermediate snapshot.
+		const clickResult = await dispatchContentScriptCall(
+			"page_click",
+			"click",
+			handlers.click,
+			{ refId: buttonRef },
+		);
+		expect(clickResult.ok).toBe(true);
+		expect(aClicked).toBe(true);
+
+		// Fill the input using its refId from the SAME find result.
+		const fillResult = await dispatchContentScriptCall(
+			"page_fill",
+			"fill",
+			handlers.fill,
+			{ refId: inputRef, value: "world" },
+		);
+		expect(fillResult.ok).toBe(true);
+		expect((document.getElementById("b") as HTMLInputElement).value).toBe("world");
 	});
 });

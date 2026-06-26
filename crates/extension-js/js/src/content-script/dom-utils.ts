@@ -24,19 +24,33 @@ export function getElementByRefId(refId: string): Element | null {
 }
 
 export function assertInteractable(el: Element, action: string): void {
+	const isDropdownControl =
+		el instanceof HTMLSelectElement ||
+		el.getAttribute("role") === "combobox" ||
+		// Only classify a child of a combobox as a dropdown when it's a hidden
+		// validation-proxy shim — a visible search input inside a combobox is a
+		// textbox, not a dropdown, and suggesting select_option for it is wrong.
+		(isSelfOrAncestorHidden(el) && el.closest('[role="combobox"]') !== null);
+	const controlType = isDropdownControl ? "dropdown" : undefined;
 	if (
 		(el as HTMLElement).hasAttribute("disabled") ||
 		(el as HTMLElement).getAttribute("aria-disabled") === "true"
 	) {
 		const refId = el.getAttribute("data-ref-id") || undefined;
 		throwStructuredAgentError(
-			notInteractableError(action, refId ?? "", { reason: "disabled" }),
+			notInteractableError(action, refId ?? "", {
+				reason: "disabled",
+				...(controlType ? { controlType } : {}),
+			}),
 		);
 	}
 	if (isSelfOrAncestorHidden(el)) {
 		const refId = el.getAttribute("data-ref-id") || undefined;
 		throwStructuredAgentError(
-			notInteractableError(action, refId ?? "", { reason: "hidden" }),
+			notInteractableError(action, refId ?? "", {
+				reason: "hidden",
+				...(controlType ? { controlType } : {}),
+			}),
 		);
 	}
 }

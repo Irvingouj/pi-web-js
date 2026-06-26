@@ -36,6 +36,8 @@ import {
 	getAccessibleRole,
 	getOwnVisibleText,
 	isSelfOrAncestorHidden,
+	isValidationProxyInput,
+	readErrorMessage,
 	readFormFields,
 	resolveAbsoluteUrl,
 	resolveContainerRefId,
@@ -69,13 +71,13 @@ function resolveMaxNodes(params: unknown): number {
 	const obj = asRecord(params);
 	const opts = asRecord(obj.options ?? obj);
 	const raw = opts.max_nodes ?? obj.max_nodes;
-	let maxNodes = 500;
+	let maxNodes = 10_000;
 	if (typeof raw === "number" && Number.isFinite(raw)) {
 		maxNodes = raw;
 	} else if (typeof raw === "bigint") {
 		maxNodes = Number(raw);
 	}
-	return Math.max(1, Math.min(10_000, Math.floor(maxNodes)));
+	return Math.max(1, Math.min(50_000, Math.floor(maxNodes)));
 }
 
 function sleepWithSignal(ms: number, signal?: AbortSignal): Promise<void> {
@@ -555,20 +557,59 @@ const invalidFormControls = (form: HTMLFormElement) =>
 		>("input, textarea, select"),
 	)
 		.filter(
-			(el) => !el.checkValidity() || el.getAttribute("aria-invalid") === "true",
+			(el) =>
+				(!el.checkValidity() || el.getAttribute("aria-invalid") === "true") &&
+				!isValidationProxyInput(el),
 		)
-		.map((el) => ({
-			refId: el.getAttribute("data-ref-id") || undefined,
-			tag: el.tagName.toLowerCase(),
-			role: getAccessibleRole(el),
-			name: getAccessibleName(el) || undefined,
-			value:
-				el instanceof HTMLInputElement && el.type === "password"
-					? undefined
-					: el.value,
-			required: el.required || el.getAttribute("aria-required") === "true",
-			validationMessage: el.validationMessage || undefined,
-		}));
+		.map((el) => {
+			const name = getAccessibleName(el) || undefined;
+			let field = name;
+		if (!field) {
+			const id = el.getAttribute("id");
+			if (id) {
+				const safeId =
+					typeof CSS !== "undefined" && CSS.escape
+						? CSS.escape(id)
+						: id.replace(/["\\]/g, "\\$&");
+				const label = document.querySelector(`label[for="${safeId}"]`);
+				if (label?.textContent?.trim()) field = label.textContent.trim();
+			}
+			if (!field) {
+				const wrappingLabel = el.closest("label");
+				if (wrappingLabel?.textContent?.trim())
+					field = wrappingLabel.textContent.trim();
+			}
+			if (!field) {
+				const prev = el.previousElementSibling;
+				if (prev?.tagName === "LABEL" && prev.textContent?.trim())
+					field = prev.textContent.trim();
+			}
+			if (!field) {
+				const parent = el.parentElement;
+				if (parent) {
+					const parentLabel = parent.querySelector("label");
+					if (parentLabel?.textContent?.trim())
+						field = parentLabel.textContent.trim();
+				}
+			}
+			if (!field) field = el.getAttribute("data-ref-id") || undefined;
+		}
+			const error = readErrorMessage(el) || el.validationMessage || "";
+			return {
+				refId: el.getAttribute("data-ref-id") || undefined,
+				tag: el.tagName.toLowerCase(),
+				role: getAccessibleRole(el),
+				name,
+				field,
+				error,
+				value:
+					el instanceof HTMLInputElement && el.type === "password"
+						? undefined
+						: el.value,
+				required: el.required || el.getAttribute("aria-required") === "true",
+				validationMessage: el.validationMessage || undefined,
+			};
+		});
 
 /**
  * Activate a combobox control and collect the listbox roots that belong to it.
@@ -589,7 +630,10 @@ function activateAndResolveListboxRoots(control: HTMLElement): {
 	roots: HTMLElement[];
 	searchedIds: string[];
 	allListboxes: HTMLElement[];
+	ariaControlsBefore: string | null;
+	ariaControlsAfter: string | null;
 } {
+	const ariaControlsBefore = control.getAttribute("aria-controls");
 	const beforeMap = snapshotListboxes();
 
 	activateElement(control);
@@ -601,9 +645,10 @@ function activateAndResolveListboxRoots(control: HTMLElement): {
 			({ roots, allListboxes } = resolveListboxRoots(control, beforeMap));
 		}
 	}
+	const ariaControlsAfter = control.getAttribute("aria-controls");
 	const searchedIds = roots.map((r) => r.id).filter(Boolean);
 
-	return { roots, searchedIds, allListboxes };
+	return { roots, searchedIds, allListboxes, ariaControlsBefore, ariaControlsAfter };
 }
 export const handlers = {
 	click: (params: PageClickParams) => {
@@ -853,7 +898,7 @@ export const handlers = {
 			});
 		}
 		const control = el as HTMLElement;
-		const { roots, searchedIds, allListboxes } =
+		const { roots, searchedIds, allListboxes, ariaControlsBefore, ariaControlsAfter } =
 			activateAndResolveListboxRoots(control);
 		const options = [
 			...new Set(
@@ -886,6 +931,9 @@ export const handlers = {
 						control.getAttribute("aria-label") ||
 						control.getAttribute("data-ref-id") ||
 						"",
+					ariaControlsBefore,
+					ariaControlsAfter,
+					isDropdown: true,
 				}),
 			);
 		}

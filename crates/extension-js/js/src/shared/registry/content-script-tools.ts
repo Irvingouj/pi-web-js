@@ -330,7 +330,7 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		namespace: "page",
 		name: "select_option",
 		description:
-			"Open a combobox (react-select/listbox) and click the option whose text matches value",
+			"Select a value from a dropdown/combobox (native select, react-select, ARIA listbox) by clicking the option whose visible text matches value",
 		params: schemas.PageSelectOptionParamsSchema,
 		returns: schemas.PageActionResultSchema,
 		paramTypes: [
@@ -356,7 +356,7 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		],
 		returnDoc: "{ ok: true, action: 'select_option', refId?, value? }",
 		errorCode: "E_NOT_FOUND",
-		example: 'page.select_option({ refId: "e2", value: "Canada" })',
+		example: 'page.select_option({ refId: degree.refId, value: "Bachelor\'s Degree" })',
 		agentMeta: {
 			prerequisites: [
 				"Ensure the target tab is active and the content script is ready before mutating",
@@ -364,7 +364,9 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 			notes: [
 				"Same content-script path as web.tab.*",
 				"Always operates on the active tab; use web.tab.* if you need to target a specific tabId",
-				"Drives react-select and other ARIA combobox patterns: clicks the control to open, then clicks the matching [role='option']",
+				"RULE: every dropdown (combobox/select/listbox) MUST use page.select_option({refId, value}). NEVER page.fill, page.type, or page.click on a dropdown control or its validation-proxy input.",
+				"Use this for snapshot nodes printed as dropdown or nodes with controlType='dropdown'; do not use page.fill/type on those controls",
+				"Drives react-select and other ARIA combobox patterns: clicks the control to open, follows the controlled listbox where available, then clicks the matching [role='option']",
 			],
 			tags: ["mutation", "write"],
 			relatedApis: ["web.tab.select_option"],
@@ -1307,7 +1309,8 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		action: "page_snapshot",
 		namespace: "page",
 		name: "snapshot",
-		description: "Capture full DOM snapshot",
+		description:
+			"Capture a broad, text-first page snapshot. Default behavior is intentionally generous: visible text, form values, required/invalid state, and linked field error text are included with actionable refIds where possible.",
 		params: schemas.PageSnapshotParamsSchema,
 		returns: z.string(),
 		paramTypes: [
@@ -1315,13 +1318,15 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 				name: "max_nodes",
 				type: "number",
 				required: false,
-				description: "Maximum nodes to include (literal)",
+				description:
+					"Maximum nodes to include (literal). Defaults high; lower it only when you intentionally want a smaller snapshot.",
 			},
 			{
 				name: "options",
 				type: "{ max_nodes?: number }",
 				required: false,
-				description: "Snapshot options (literal)",
+				description:
+					"Snapshot options (literal). Use max_nodes only to opt into less output.",
 			},
 		],
 		returnDoc: "Snapshot text",
@@ -1331,9 +1336,11 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 			notes: [
 				AWAIT_PROMISE_NOTE,
 				"Content-script path; same refIds as mutations",
+				"Do not assume accessibility-only output: snapshot includes visible text and validation/error text even when it is not interactive",
+				"If the needed data, options, hidden input, or attributes are still missing, call page.dom({ selector, depth, includeHidden: true }) directly",
 			],
 			tags: ["snapshot", "read"],
-			relatedApis: ["page.snapshot_data", "web.tab.snapshot"],
+			relatedApis: ["page.snapshot_data", "page.dom", "web.tab.snapshot"],
 		},
 		handlerKey: "snapshot_text",
 	},
@@ -1341,7 +1348,8 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		action: "page_snapshot_text",
 		namespace: "page",
 		name: "snapshot_text",
-		description: "Capture DOM snapshot and return text representation",
+		description:
+			"Capture a broad text-first DOM snapshot and return only its text representation",
 		params: schemas.PageSnapshotTextParamsSchema,
 		returns: z.string(),
 		paramTypes: [
@@ -1349,7 +1357,8 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 				name: "max_nodes",
 				type: "number",
 				required: false,
-				description: "Maximum nodes to include (literal)",
+				description:
+					"Maximum nodes to include (literal). Defaults high; lower it only when intentionally limiting output.",
 			},
 		],
 		returnDoc: "Snapshot text",
@@ -1361,7 +1370,8 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		action: "page_snapshot_data",
 		namespace: "page",
 		name: "snapshot_data",
-		description: "Get page snapshot data",
+		description:
+			"Get broad page snapshot data. Includes visible text, form values, required/invalid state, linked error text, and actionable refIds where possible.",
 		params: schemas.PageSnapshotDataParamsSchema,
 		returns: schemas.SnapshotResultSchema,
 		paramTypes: [
@@ -1369,7 +1379,8 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 				name: "max_nodes",
 				type: "number",
 				required: false,
-				description: "Maximum nodes to include (literal)",
+				description:
+					"Maximum nodes to include (literal). Defaults high; lower it only when intentionally limiting output.",
 			},
 		],
 		returnDoc: "{ text, nodes, url, title, viewport }",
@@ -1378,11 +1389,13 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		agentMeta: {
 			notes: [
 				AWAIT_PROMISE_NOTE,
-				"Content-script path; nodes include refId for targeting",
+				"Content-script path; nodes include refId for targeting when an element can be acted on",
+				"Snapshot is text-first and broad by default; filtering/limiting is opt-in via snapshot_query or max_nodes",
 				"After mutations, call snapshot_data() again to verify state",
+				"If a widget's raw attributes or hidden nodes matter, inspect them with page.dom({ selector, depth, includeHidden: true })",
 			],
 			tags: ["snapshot", "read"],
-			relatedApis: ["page.click", "web.tab.snapshot_data"],
+			relatedApis: ["page.click", "page.dom", "web.tab.snapshot_data"],
 		},
 		handlerKey: "snapshot",
 	},
@@ -1391,7 +1404,7 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		namespace: "page",
 		name: "snapshot_query",
 		description:
-			"Query page snapshot with semantic filtering by role, tag, text, name, etc.",
+			"Opt-in filtered snapshot query by role, tag, text, name, etc. Use this only when you intentionally want less than the default broad snapshot.",
 		params: schemas.PageSnapshotQueryParamsSchema,
 		returns: schemas.SnapshotResultSchema,
 		paramTypes: [
@@ -1415,10 +1428,11 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 			notes: [
 				AWAIT_PROMISE_NOTE,
 				"Content-script path; filters nodes by role, tag, text, name, interactiveOnly, href, src",
-				"More efficient than page.snapshot_data() when only specific elements are needed",
+				"More efficient than page.snapshot_data() when only specific elements are needed, but it can hide useful text by design",
+				"If filtering hides the data you need, use page.snapshot_data() or page.dom({ selector, depth, includeHidden: true })",
 			],
 			tags: ["snapshot", "read"],
-			relatedApis: ["page.snapshot_data", "page.find"],
+			relatedApis: ["page.snapshot_data", "page.dom", "page.find"],
 		},
 		handlerKey: "snapshot_query",
 	},
@@ -1463,6 +1477,8 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		agentMeta: {
 			notes: [
 				"Assigns data-ref-id on matched elements when missing so results include actionable refIds",
+				"Returned refIds are immediately actionable — call page.click/fill/select_option on them without an intermediate snapshot_data",
+				"For dropdowns found via find, use page.select_option — not fill/type",
 			],
 			tags: ["read"],
 		},
@@ -1473,7 +1489,7 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		namespace: "page",
 		name: "dom",
 		description:
-			"Introspect raw DOM subtree by CSS selector — bypasses the curated snapshot's visibility filter. Read-only. Use when page.snapshot/find hide the element you need (e.g. hidden file inputs, shadowed widgets, aria-hidden regions).",
+			"Introspect raw DOM subtree by CSS selector. Read-only. Use this whenever snapshot/find do not expose enough data: hidden inputs, validation shims, raw attributes, dropdown/listbox ownership, shadowed widgets, aria-hidden regions, or exact DOM structure.",
 		params: schemas.PageDomParamsSchema,
 		returns: schemas.PageDomResultSchema,
 		paramTypes: [
@@ -1505,9 +1521,10 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 			notes: [
 				AWAIT_PROMISE_NOTE,
 				"Read-only: returns DOM structure, never executes code or mutates the page",
-				"Bypasses the snapshot visibility filter — use to find hidden/filtered elements the curated snapshot omits",
+				"Bypasses snapshot filtering and can include hidden nodes by default",
 				"Assigns refIds to returned elements so subsequent page.setFiles/click/fill can target them",
-				"Prefer page.snapshot for normal navigation; use page.dom only when the snapshot is insufficient",
+				"Use page.dom immediately when struggling to find data in snapshot output; do not keep guessing selectors from the accessibility tree",
+				"If a dom node is a dropdown (role=combobox/tag=select/controlType=dropdown), use page.select_option on its refId",
 			],
 			tags: ["read"],
 			relatedApis: ["page.find", "page.snapshot_data", "page.setFiles"],
@@ -1643,7 +1660,8 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		action: "tab_snapshot",
 		namespace: "web.tab",
 		name: "snapshot",
-		description: "Get tab snapshot",
+		description:
+			"Get a broad, text-first tab snapshot. Includes visible text, form values, validation/error text, and actionable refIds where possible.",
 		params: schemas.TabSnapshotParamsSchema,
 		returns: z.string(),
 		fields: ["tabId"],
@@ -1658,19 +1676,28 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 				name: "max_nodes",
 				type: "number",
 				required: false,
-				description: "Maximum nodes to include (literal)",
+				description:
+					"Maximum nodes to include (literal). Defaults high; lower it only when intentionally limiting output.",
 			},
 		],
 		returnDoc: "Snapshot text",
 		errorCode: "E_SNAPSHOT",
 		example: "web.tab.snapshot({ tabId: 123 })",
+		agentMeta: {
+			notes: [
+				AWAIT_PROMISE_NOTE,
+				"Use web.tab.dom or page.dom if raw attributes, hidden nodes, or exact dropdown ownership are missing",
+			],
+			tags: ["snapshot", "read"],
+			relatedApis: ["web.tab.snapshot_data", "page.dom"],
+		},
 		handlerKey: "snapshot_text",
 	},
 	{
 		action: "tab_snapshot_text",
 		namespace: "web.tab",
 		name: "snapshot_text",
-		description: "Get tab snapshot text",
+		description: "Get broad, text-first tab snapshot text",
 		params: schemas.TabSnapshotTextParamsSchema,
 		returns: z.string(),
 		fields: ["tabId"],
@@ -1691,7 +1718,8 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		action: "tab_snapshot_data",
 		namespace: "web.tab",
 		name: "snapshot_data",
-		description: "Get tab snapshot data",
+		description:
+			"Get broad tab snapshot data. Includes visible text, form values, validation/error text, and actionable refIds where possible.",
 		params: schemas.TabSnapshotDataParamsSchema,
 		returns: schemas.SnapshotResultSchema,
 		fields: ["tabId"],
@@ -1706,6 +1734,15 @@ export const CONTENT_SCRIPT_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		returnDoc: "Snapshot data",
 		errorCode: "E_SNAPSHOT",
 		example: "web.tab.snapshot_data({ tabId: 123 })",
+		agentMeta: {
+			notes: [
+				AWAIT_PROMISE_NOTE,
+				"Filtering/limiting is opt-in; this broad snapshot is the default",
+				"Use page.dom({ selector, depth, includeHidden: true }) when raw DOM attributes or hidden nodes matter",
+			],
+			tags: ["snapshot", "read"],
+			relatedApis: ["web.tab.snapshot", "page.dom"],
+		},
 		handlerKey: "snapshot",
 	},
 	{

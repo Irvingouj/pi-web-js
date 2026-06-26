@@ -305,6 +305,7 @@ describe("manifest documentation export", () => {
 		expect(pageSnapshot?.tags).toEqual(["snapshot", "read"]);
 		expect(pageSnapshot?.relatedApis).toEqual([
 			"page.snapshot_data",
+			"page.dom",
 			"web.tab.snapshot",
 		]);
 
@@ -315,6 +316,7 @@ describe("manifest documentation export", () => {
 		expect(pageSnapshotData?.tags).toEqual(["snapshot", "read"]);
 		expect(pageSnapshotData?.relatedApis).toEqual([
 			"page.click",
+			"page.dom",
 			"web.tab.snapshot_data",
 		]);
 	});

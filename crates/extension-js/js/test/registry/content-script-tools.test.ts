@@ -110,3 +110,23 @@ describe("defineContentScriptTool", () => {
 		expect(() => freezeJsRegistry()).not.toThrow();
 	});
 });
+
+describe("dropdown rule in agent docs", () => {
+	beforeEach(() => {
+		clearContentScriptActions();
+	});
+
+	it("select_option agentMeta enforces dropdown rule and uses degree example", async () => {
+		const { CONTENT_SCRIPT_TOOL_SPECS } = await import(
+			"../../src/shared/registry/content-script-tools.js"
+		);
+		const spec = CONTENT_SCRIPT_TOOL_SPECS.find(
+			(s) => s.action === "page_select_option",
+		);
+		expect(spec).toBeDefined();
+		if (!spec) return;
+		const notes = (spec.agentMeta?.notes || []).join(" ");
+		expect(notes).toMatch(/NEVER page\.fill.*dropdown/i);
+		expect(spec.example).toContain("select_option({ refId: degree.refId");
+	});
+});

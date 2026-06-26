@@ -1061,6 +1061,8 @@ export const PageActionResultSchema = z.object({
 				tag: z.string(),
 				role: z.string().optional(),
 				name: z.string().optional(),
+				field: z.string().optional().describe("Accessible field label or nearest label text"),
+				error: z.string().optional().describe("Linked visible error text from aria-errormessage/aria-describedby"),
 				value: z.string().optional(),
 				required: z.boolean().optional(),
 				validationMessage: z.string().optional(),
@@ -1162,9 +1164,38 @@ export const SnapshotNodeSchema = z.object({
 	refId: refIdString().describe("Element reference ID (e.g. e2)"),
 	role: z.string().describe("ARIA role of the element"),
 	tag: z.string().describe("HTML tag name"),
+	controlType: z
+		.string()
+		.optional()
+		.describe('Plain-language control type, e.g. "dropdown" for combobox/select'),
+	actionable: z.boolean().optional().describe("Whether this node can be acted on directly"),
+	forControl: z
+		.string()
+		.optional()
+		.describe("refId of the dropdown this validation-proxy belongs to"),
+	recommendedAction: z
+		.string()
+		.optional()
+		.describe("Recommended page.* action for this control"),
+	controls: z
+		.string()
+		.optional()
+		.describe("ID(s) of controlled popup/listbox elements, when exposed"),
+	expanded: z.boolean().optional().describe("Expanded state for popup controls"),
 	name: z.string().optional().describe("Accessible name of the element"),
 	text: z.string().optional().describe("Visible text content of the element"),
 	value: z.string().optional().describe("Element value"),
+	required: z.boolean().optional().describe("Whether the element is required"),
+	valid: z.boolean().optional().describe("Constraint validity state"),
+	invalid: z.boolean().optional().describe("Constraint invalidity state"),
+	validationMessage: z
+		.string()
+		.optional()
+		.describe("Browser constraint validation message"),
+	errorMessage: z
+		.string()
+		.optional()
+		.describe("Visible error text linked to the field"),
 	checked: z.boolean().optional().describe("Checked state"),
 	disabled: z.boolean().optional().describe("Whether the element is disabled"),
 	readOnly: z.boolean().optional().describe("Whether the element is read-only"),
@@ -1191,8 +1222,26 @@ export const SnapshotNodeSchema = z.object({
 });
 
 export const SnapshotResultSchema = z.object({
-	text: z.string().describe("Plain text representation of the page"),
-	nodes: z.array(SnapshotNodeSchema).describe("Array of interactive nodes"),
+	text: z
+		.string()
+		.describe(
+			"Broad text-first representation of the page, including visible text, form values, and validation/error text",
+		),
+	nodes: z
+		.array(SnapshotNodeSchema)
+		.describe(
+			"Broad snapshot nodes with refIds where possible; not limited to interactive elements",
+		),
+	formErrors: z
+		.array(
+			z.object({
+				field: z.string().describe("Field label or refId"),
+				error: z.string().describe("Linked visible error text"),
+				refId: z.string().describe("refId of the invalid control"),
+			}),
+		)
+		.optional()
+		.describe("Visible linked form errors grouped by field"),
 	url: z.string().describe("Current page URL"),
 	title: z.string().describe("Current page title"),
 	viewport: z

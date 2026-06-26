@@ -92,16 +92,24 @@ export function notInteractableError(
 	refId: string,
 	details?: Record<string, unknown>,
 ): AsyncError {
+	const isDropdown =
+		details?.controlType === "dropdown" || details?.nearbyControlType === "dropdown";
+	const recovery = isDropdown
+		? [
+				`await page.select_option({ refId: ${JSON.stringify(refId)}, value: "..." }) — this is a dropdown; fill/type do not work on combobox/proxy inputs`,
+				"Re-snapshot and use select_option with the option's visible text",
+			]
+		: [
+				`await page.click({ refId: ${JSON.stringify(refId)} }) then await page.type({ refId: ${JSON.stringify(refId)}, text: "..." })`,
+				'Or await page.press({ key: "Enter" }) after fill',
+				"Re-snapshot and confirm URL or node state changed",
+			];
 	return {
 		message: `${action} on ${refId} returned no effect.`,
 		code: "E_NOT_INTERACTABLE",
 		category: "resource",
 		hint: "Some sites ignore programmatic value assignment; value may not appear in snapshot_data.",
-		recovery: [
-			`await page.click({ refId: ${JSON.stringify(refId)} }) then await page.type({ refId: ${JSON.stringify(refId)}, text: "..." })`,
-			'Or await page.press({ key: "Enter" }) after fill',
-			"Re-snapshot and confirm URL or node state changed",
-		],
+		recovery,
 		details: { refId, ...details },
 	};
 }
@@ -162,6 +170,9 @@ export function labelNotFoundError(
 		ignoredIds?: string[];
 		targetRefId?: string;
 		targetName?: string;
+		ariaControlsBefore?: string | null;
+		ariaControlsAfter?: string | null;
+		isDropdown?: boolean;
 	},
 ): AsyncError {
 	let message = `Element not found by label "${label}"`;
@@ -175,9 +186,12 @@ export function labelNotFoundError(
 				? `. Candidates: ${labels.join(", ")}`
 				: ". Candidates: none";
 	}
-	const hint = extra?.searchedIds?.length
+	let hint = extra?.searchedIds?.length
 		? `Searched listbox(es): ${extra.searchedIds.join(", ")}. Ignored: ${(extra.ignoredIds || []).join(", ") || "none"}.`
 		: "No element matched this label. Check candidates or snapshot for visible controls.";
+	if (extra?.isDropdown) {
+		hint = `Target is a dropdown (combobox). ${hint}`;
+	}
 	return {
 		message,
 		code: "E_NOT_FOUND",
@@ -193,6 +207,9 @@ export function labelNotFoundError(
 			...(extra?.targetName ? { targetName: extra.targetName } : {}),
 			...(extra?.searchedIds ? { searchedIds: extra.searchedIds } : {}),
 			...(extra?.ignoredIds ? { ignoredIds: extra.ignoredIds } : {}),
+			...(extra?.ariaControlsBefore !== undefined ? { ariaControlsBefore: extra.ariaControlsBefore } : {}),
+			...(extra?.ariaControlsAfter !== undefined ? { ariaControlsAfter: extra.ariaControlsAfter } : {}),
+			...(extra?.isDropdown !== undefined ? { isDropdown: extra.isDropdown } : {}),
 			...(candidates?.length ? { candidates } : {}),
 		},
 	};

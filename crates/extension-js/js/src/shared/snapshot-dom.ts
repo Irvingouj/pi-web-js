@@ -52,6 +52,7 @@ export function readFormFields(el: Element): {
 	valid?: boolean;
 	invalid?: boolean;
 	validationMessage?: string;
+	errorMessage?: string;
 } {
 	const out: {
 		value?: string;
@@ -63,6 +64,7 @@ export function readFormFields(el: Element): {
 		valid?: boolean;
 		invalid?: boolean;
 		validationMessage?: string;
+		errorMessage?: string;
 	} = {};
 	if (el instanceof HTMLInputElement) {
 		if (el.type !== "password" && el.type !== "hidden") {
@@ -114,6 +116,7 @@ function enrichValidity(
 		valid?: boolean;
 		invalid?: boolean;
 		validationMessage?: string;
+		errorMessage?: string;
 	},
 ): void {
 	const required = el.required || el.getAttribute("aria-required") === "true";
@@ -122,9 +125,34 @@ function enrichValidity(
 	if (required) out.required = true;
 	out.valid = valid;
 	out.invalid = !valid;
+	const errorMessage = readErrorMessage(el);
+	if (errorMessage) {
+		out.errorMessage = errorMessage;
+	}
 	if (!valid && el.validationMessage) {
 		out.validationMessage = el.validationMessage;
 	}
+}
+
+export function readErrorMessage(el: Element): string | undefined {
+	const ids = [
+		...(el.getAttribute("aria-errormessage") || "").split(/\s+/),
+		...(el.getAttribute("aria-describedby") || "").split(/\s+/),
+	].filter(Boolean);
+	for (const id of ids) {
+		const msgEl = document.getElementById(id);
+		if (!msgEl) continue;
+		const msg = msgEl.textContent?.trim();
+		if (!msg) continue;
+		// Return text from alert/live regions unconditionally — they are
+		// validation error containers by convention.
+		const role = msgEl.getAttribute("role");
+		const ariaLive = msgEl.getAttribute("aria-live");
+		if (role === "alert" || (ariaLive && ariaLive !== "off")) return msg;
+		// For other elements, only return if the text looks like an error.
+		if (/error|required|select|please|invalid/i.test(msg)) return msg;
+	}
+	return undefined;
 }
 
 export function enrichFormNode(
@@ -139,6 +167,7 @@ export function enrichFormNode(
 		valid?: boolean;
 		invalid?: boolean;
 		validationMessage?: string;
+		errorMessage?: string;
 	},
 ): void {
 	const tag = el.tagName.toLowerCase();
@@ -287,8 +316,8 @@ export function isMarkdownVisible(el: Element): boolean {
 	if (isHiddenElement(el)) return false;
 
 	const role = getAccessibleRole(el);
-	if (role === "presentation" || role === "none") return false;
-	if (role !== "generic") return true;
+	const isPresentational = role === "presentation" || role === "none";
+	if (role !== "generic" && !isPresentational) return true;
 
 	const ariaLive = el.getAttribute("aria-live");
 	if (ariaLive && ariaLive !== "off") return true;
@@ -349,6 +378,7 @@ export function getAccessibleName(el: Element): string {
 export function shouldInclude(el: Element): boolean {
 	if (el instanceof HTMLInputElement && el.type === "file") return true;
 	if (isInvalidFormControl(el)) return true;
+	if (isValidationProxyInput(el)) return true;
 	return isMarkdownVisible(el);
 }
 
@@ -363,4 +393,50 @@ function isInvalidFormControl(el: Element): boolean {
 		return false;
 	}
 	return !el.checkValidity() || el.getAttribute("aria-invalid") === "true";
+}
+
+/** Detect a hidden validation-shim input inside a combobox wrapper (react-select).
+ *  These inputs carry required/aria-required for form validation but are not
+ *  user-visible; they must appear in the snapshot labeled as validation-proxy. */
+export function isValidationProxyInput(el: Element): boolean {
+	if (!(el instanceof HTMLInputElement)) return false;
+	if (el.closest('[role="combobox"]') === null) return false;
+	const isHidden =
+		el.type === "hidden" ||
+		el.getAttribute("aria-hidden") === "true" ||
+		el.tabIndex === -1;
+	if (!isHidden) return false;
+	return (
+		el.required ||
+		el.getAttribute("aria-required") === "true" ||
+		(el.getAttribute("aria-describedby") || "").length > 0
+	);
+}
+
+function safeCssEscape(s: string): string {
+	return typeof CSS !== "undefined" && CSS.escape ? CSS.escape(s) : s.replace(/["\\]/g, "\\$&");
+}
+
+/** Resolve a human-readable field label from <label> element associations.
+ *  Tries: accessible name → label[for=id] → wrapping <label> → preceding sibling
+ *  <label> → parent's first <label> child. Falls back to the refId. */
+export function resolveFieldLabel(el: Element | null, fallback: string): string {
+	if (el) {
+		const id = el.getAttribute("id");
+		if (id) {
+			const label = document.querySelector(`label[for="${safeCssEscape(id)}"]`);
+			if (label?.textContent?.trim()) return label.textContent.trim();
+		}
+		const wrapping = el.closest("label");
+		if (wrapping?.textContent?.trim()) return wrapping.textContent.trim();
+		const prev = el.previousElementSibling;
+		if (prev?.tagName === "LABEL" && prev.textContent?.trim())
+			return prev.textContent.trim();
+		const parent = el.parentElement;
+		if (parent) {
+			const parentLabel = parent.querySelector("label");
+			if (parentLabel?.textContent?.trim()) return parentLabel.textContent.trim();
+		}
+	}
+	return fallback;
 }

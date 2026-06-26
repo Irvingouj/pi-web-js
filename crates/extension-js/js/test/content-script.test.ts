@@ -17,6 +17,7 @@ import {
 } from "../src/content-script/registry.js";
 import { buildContentScriptSpecs } from "../src/content-script/schemas.js";
 import { inlineSnapshot } from "../src/content-script/snapshot.js";
+import { notInteractableError } from "../src/shared/registry/agent-errors.js";
 
 /** Grant an observation lease for every element currently carrying a data-ref-id. */
 function grantFromDom(): void {
@@ -3087,6 +3088,64 @@ describe("select_option handler", () => {
 			expect(candidates).toBeUndefined();
 		}
 	});
+	it("error includes aria-controls before/after and isDropdown when option not found", async () => {
+		// Persistent, visible phone listbox — unrelated to target.
+		const phoneListbox = document.createElement("div");
+		phoneListbox.setAttribute("role", "listbox");
+		phoneListbox.id = "iti-0__country-listbox";
+		phoneListbox.innerHTML =
+			'<div role="option">Afghanistan +93</div><div role="option">Canada +1</div>';
+		document.body.appendChild(phoneListbox);
+
+		// Degree combobox — no aria-controls before click, gains one after click.
+		const control = document.createElement("input");
+		control.setAttribute("role", "combobox");
+		control.setAttribute("aria-label", "Degree");
+		control.addEventListener("click", () => {
+			control.setAttribute(
+				"aria-controls",
+				"react-select-degree--0-listbox",
+			);
+			const listbox = document.createElement("div");
+			listbox.setAttribute("role", "listbox");
+			listbox.id = "react-select-degree--0-listbox";
+			listbox.innerHTML = '<div role="option">Bachelor\'s Degree</div>';
+			document.body.appendChild(listbox);
+		});
+		document.body.appendChild(control);
+
+		const snap = await dispatchContentScriptCall(
+			"page_snapshot_data",
+			"snapshot",
+			handlers.snapshot,
+			{},
+		);
+		const refId = (
+			snap.value as {
+				nodes: Array<{ refId: string; role?: string; name?: string }>;
+			}
+		).nodes.find(
+			(n) => n.role === "combobox" && (n.name || "").includes("Degree"),
+		)!.refId;
+
+		const result = await dispatchContentScriptCall(
+			"page_select_option",
+			"select_option",
+			handlers.select_option,
+			{ refId, value: "NonExistent" },
+		);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_NOT_FOUND");
+			const details = result.error.details as Record<string, unknown>;
+			expect(details.ariaControlsBefore).toBeNull();
+			expect(details.ariaControlsAfter).toBe(
+				"react-select-degree--0-listbox",
+			);
+			expect(details.isDropdown).toBe(true);
+			expect(details.targetName).toContain("Degree");
+		}
+	});
 });
 
 describe("submit handler validation receipts", () => {
@@ -3137,5 +3196,230 @@ describe("submit handler validation receipts", () => {
 				value: "",
 			});
 		}
+	});
+	it("invalidControls include linked visible error and nearest real field", async () => {
+		document.body.innerHTML = `
+			<form aria-label="App">
+				<div><label>Email</label><input required type="email" value="bad" aria-describedby="email-err" data-ref-id="e30">
+					<span id="email-err" role="alert">Enter a valid email.</span></div>
+				<button type="submit">Submit</button>
+			</form>
+		`;
+		const snap = await dispatchContentScriptCall(
+			"page_snapshot_data",
+			"snapshot",
+			handlers.snapshot,
+			{},
+		);
+		const formRef = (
+			snap.value as { nodes: Array<{ refId: string; role?: string }> }
+		).nodes.find((n) => n.role === "form")!.refId;
+
+		const result = await dispatchContentScriptCall(
+			"page_submit",
+			"submit",
+			handlers.submit,
+			{ refId: formRef },
+		);
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			const receipt = result.value as {
+				valid?: boolean;
+				invalid?: boolean;
+				invalidControls?: Array<{
+					refId?: string;
+					field?: string;
+					error?: string;
+					validationMessage?: string;
+				}>;
+			};
+			expect(receipt.valid).toBe(false);
+			expect(receipt.invalidControls).toHaveLength(1);
+			expect(receipt.invalidControls![0]).toMatchObject({
+				refId: "e30",
+				field: "Email",
+				error: "Enter a valid email.",
+			});
+			expect(receipt.invalidControls![0].validationMessage).toEqual(
+				expect.any(String),
+			);
+		}
+	});
+});
+
+describe("notInteractableError recovery", () => {
+	it("recovery says select_option when target is a dropdown", () => {
+		const err = notInteractableError("fill", "e5", {
+			controlType: "dropdown",
+		});
+		const recoveryText = (err.recovery || []).join(" ");
+		expect(recoveryText).toContain("page.select_option");
+	});
+
+	it("recovery says select_option when nearby field is a dropdown", () => {
+		const err = notInteractableError("fill", "e5", {
+			nearbyControlType: "dropdown",
+		});
+		const recoveryText = (err.recovery || []).join(" ");
+		expect(recoveryText).toContain("page.select_option");
+	});
+
+	it("recovery stays generic for non-dropdown", () => {
+		const err = notInteractableError("fill", "e5", {});
+		const recoveryText = (err.recovery || []).join(" ");
+		expect(recoveryText).not.toContain("select_option");
+	});
+});
+
+describe("validation-proxy labeling", () => {
+	beforeEach(() => {
+		document.body.innerHTML = "";
+		for (const spec of buildContentScriptSpecs()) {
+			registerContentScriptSpec(spec);
+		}
+		resetLease();
+	});
+
+	it("hidden required input inside combobox wrapper is labeled validation-proxy", async () => {
+		document.body.innerHTML = `
+			<div role="combobox" aria-label="Degree" aria-expanded="false" data-ref-id="e10">
+				<div role="textbox" aria-hidden="true" tabindex="-1">
+					<input type="hidden" required aria-describedby="degree-error" data-ref-id="e11">
+				</div>
+			</div>
+			<span id="degree-error">This field is required.</span>
+		`;
+		const snap = await dispatchContentScriptCall(
+			"page_snapshot_data",
+			"snapshot",
+			handlers.snapshot,
+			{},
+		);
+		const nodes = (snap.value as { nodes: Array<Record<string, unknown>> })
+			.nodes;
+		const proxyNode = nodes.find((n) => n.refId === "e11");
+		expect(proxyNode).toBeDefined();
+		expect(proxyNode!.controlType).toBe("validation-proxy");
+		expect(proxyNode!.actionable).toBe(false);
+		expect(proxyNode!.forControl).toBe("e10");
+	});
+
+	it("snapshot text renders validation-proxy not textbox", async () => {
+		document.body.innerHTML = `
+			<div role="combobox" aria-label="Degree" aria-expanded="false" data-ref-id="e10">
+				<input type="hidden" required aria-hidden="true" tabindex="-1" data-ref-id="e11">
+			</div>
+		`;
+		const snap = await dispatchContentScriptCall(
+			"page_snapshot_data",
+			"snapshot",
+			handlers.snapshot,
+			{},
+		);
+		const text = snap.value as { text: string };
+		// The hidden input should appear as validation-proxy in the text, not textbox.
+		expect(text.text).toContain("validation-proxy");
+		// It should NOT appear as a plain textbox in the snapshot text.
+		const proxyLine = text.text.split("\n").find((l) => l.includes("e11"));
+		expect(proxyLine).toBeDefined();
+		expect(proxyLine!.includes("textbox")).toBe(false);
+	});
+
+	it("visible normal textbox is not mislabeled", async () => {
+		document.body.innerHTML = `<input type="text" aria-label="Name">`;
+		const snap = await dispatchContentScriptCall(
+			"page_snapshot_data",
+			"snapshot",
+			handlers.snapshot,
+			{},
+		);
+		const nodes = (snap.value as { nodes: Array<Record<string, unknown>> })
+			.nodes;
+		const textNode = nodes.find((n) => n.tag === "input");
+		expect(textNode).toBeDefined();
+		expect(textNode!.controlType).toBeUndefined();
+	});
+});
+
+describe("form_errors in snapshot_data", () => {
+	beforeEach(() => {
+		document.body.innerHTML = "";
+		for (const spec of buildContentScriptSpecs()) {
+			registerContentScriptSpec(spec);
+		}
+		resetLease();
+	});
+
+	it("formErrors groups visible linked errors by field", async () => {
+		document.body.innerHTML = `
+			<form aria-label="App">
+				<div><label>Do you have startup experience?</label>
+					<input required aria-describedby="q1-err" data-ref-id="e215">
+					<span id="q1-err" role="alert">This field is required.</span></div>
+				<div><label>Degree</label>
+					<select required aria-invalid="true" aria-describedby="deg-err" data-ref-id="e216">
+						<option value="">Pick</option></select>
+					<span id="deg-err">Select a degree.</span></div>
+			</form>
+		`;
+		const snap = await dispatchContentScriptCall(
+			"page_snapshot_data",
+			"snapshot",
+			handlers.snapshot,
+			{},
+		);
+		expect(snap.ok).toBe(true);
+		if (!snap.ok) return;
+		const formErrors = (snap.value as { formErrors?: Array<{ field: string; error: string; refId: string }> }).formErrors;
+		expect(formErrors).toBeDefined();
+		expect(formErrors!.length).toBe(2);
+		expect(formErrors![0]).toMatchObject({
+			field: "Do you have startup experience?",
+			error: "This field is required.",
+			refId: "e215",
+		});
+		expect(formErrors![1]).toMatchObject({
+			field: "Degree",
+			error: "Select a degree.",
+			refId: "e216",
+		});
+	});
+
+	it("formErrors empty when no invalid controls", async () => {
+		document.body.innerHTML = `
+			<form aria-label="App">
+				<input aria-label="Name" value="ok">
+			</form>
+		`;
+		const snap = await dispatchContentScriptCall(
+			"page_snapshot_data",
+			"snapshot",
+			handlers.snapshot,
+			{},
+		);
+		expect(snap.ok).toBe(true);
+		if (!snap.ok) return;
+		const formErrors = (snap.value as { formErrors?: unknown[] }).formErrors;
+		expect(formErrors).toEqual([]);
+	});
+
+	it("formErrors omits hidden validation-proxy shims", async () => {
+		document.body.innerHTML = `
+			<div role="combobox" aria-label="Degree" aria-expanded="false" data-ref-id="e10">
+				<input type="hidden" required aria-hidden="true" tabindex="-1" data-ref-id="e11">
+			</div>
+		`;
+		const snap = await dispatchContentScriptCall(
+			"page_snapshot_data",
+			"snapshot",
+			handlers.snapshot,
+			{},
+		);
+		expect(snap.ok).toBe(true);
+		if (!snap.ok) return;
+		const formErrors = (snap.value as { formErrors?: Array<{ refId: string }> }).formErrors;
+		expect(formErrors).toBeDefined();
+		const proxyEntry = formErrors!.find((e) => e.refId === "e11");
+		expect(proxyEntry).toBeUndefined();
 	});
 });
