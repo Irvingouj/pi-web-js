@@ -22,6 +22,10 @@ export type InlineSnapshotNode = {
 	disabled?: boolean;
 	readOnly?: boolean;
 	selected?: boolean;
+	required?: boolean;
+	valid?: boolean;
+	invalid?: boolean;
+	validationMessage?: string;
 	href?: string;
 	src?: string;
 	alt?: string;

@@ -96,14 +96,20 @@ function sleepWithSignal(ms: number, signal?: AbortSignal): Promise<void> {
 	});
 }
 
-function scrollDelta(direction: string, amount: number): { top: number; left: number } {
+function scrollDelta(
+	direction: string,
+	amount: number,
+): { top: number; left: number } {
 	return {
 		top: direction === "down" ? amount : direction === "up" ? -amount : 0,
 		left: direction === "right" ? amount : direction === "left" ? -amount : 0,
 	};
 }
 
-function isScrollableStyle(style: CSSStyleDeclaration, axis: "x" | "y"): boolean {
+function isScrollableStyle(
+	style: CSSStyleDeclaration,
+	axis: "x" | "y",
+): boolean {
 	const overflow = axis === "y" ? style.overflowY : style.overflowX;
 	return overflow === "auto" || overflow === "scroll" || overflow === "overlay";
 }
@@ -127,8 +133,10 @@ function canScrollElement(el: HTMLElement, direction: string): boolean {
 function visibleArea(el: HTMLElement): number {
 	const rect = el.getBoundingClientRect();
 	if (rect.width <= 0 || rect.height <= 0) return 0;
-	const width = Math.min(rect.right, window.innerWidth) - Math.max(rect.left, 0);
-	const height = Math.min(rect.bottom, window.innerHeight) - Math.max(rect.top, 0);
+	const width =
+		Math.min(rect.right, window.innerWidth) - Math.max(rect.left, 0);
+	const height =
+		Math.min(rect.bottom, window.innerHeight) - Math.max(rect.top, 0);
 	return Math.max(0, width) * Math.max(0, height);
 }
 
@@ -420,6 +428,148 @@ function listboxOptionSignature(listbox: HTMLElement): string {
 		.join("\n");
 }
 
+type ListboxBefore = Map<HTMLElement, { hidden: boolean; sig: string }>;
+
+const listboxes = () =>
+	Array.from(document.querySelectorAll<HTMLElement>('[role="listbox"]'));
+
+const uniqueElements = <T extends Element>(elements: T[]): T[] => [
+	...new Set(elements),
+];
+
+const idRefs = (el: HTMLElement, attrs: string[]): string[] =>
+	attrs
+		.flatMap((attr) => (el.getAttribute(attr) || "").trim().split(/\s+/))
+		.filter(Boolean);
+
+const isListbox = (el: Element | null): el is HTMLElement =>
+	el instanceof HTMLElement && el.getAttribute("role") === "listbox";
+
+const isPopupTrigger = (button: HTMLElement): boolean => {
+	const hasPopup = (button.getAttribute("aria-haspopup") || "")
+		.toLowerCase()
+		.includes("listbox");
+	const controlsListbox = idRefs(button, ["aria-controls"]).some((id) =>
+		isListbox(document.getElementById(id)),
+	);
+	const expands = button.hasAttribute("aria-expanded");
+	const label = (
+		button.getAttribute("aria-label") ||
+		button.textContent ||
+		""
+	).toLowerCase();
+	return (
+		hasPopup ||
+		controlsListbox ||
+		expands ||
+		/\b(open|show|toggle|expand|menu|options|flyout|dropdown)\b/.test(label)
+	);
+};
+
+function findNearbyPopupTrigger(control: HTMLElement): HTMLElement | null {
+	const scopes: Element[] = [];
+	for (
+		let scope = control.parentElement, depth = 0;
+		scope && depth < 4;
+		scope = scope.parentElement, depth++
+	) {
+		scopes.push(scope);
+	}
+	return (
+		scopes
+			.flatMap((scope) =>
+				Array.from(scope.querySelectorAll<HTMLElement>("button")),
+			)
+			.find(
+				(button) =>
+					button !== control &&
+					!isSelfOrAncestorHidden(button) &&
+					isPopupTrigger(button),
+			) || null
+	);
+}
+
+const snapshotListboxes = (): ListboxBefore =>
+	new Map(
+		listboxes().map(
+			(listbox) =>
+				[
+					listbox,
+					{
+						hidden: isSelfOrAncestorHidden(listbox),
+						sig: listboxOptionSignature(listbox),
+					},
+				] as const,
+		),
+	);
+
+const linkedListboxes = (control: HTMLElement): HTMLElement[] =>
+	idRefs(control, ["aria-controls", "aria-owns"])
+		.map((id) => document.getElementById(id))
+		.filter(isListbox);
+
+const activatedListboxes = (beforeMap: ListboxBefore): HTMLElement[] =>
+	listboxes().filter((listbox) => {
+		const before = beforeMap.get(listbox);
+		if (isSelfOrAncestorHidden(listbox)) return false;
+		if (!before) return true;
+		if (before.hidden) return true;
+		return listboxOptionSignature(listbox) !== before.sig;
+	});
+
+const nestedListboxes = (control: HTMLElement): HTMLElement[] =>
+	Array.from(control.querySelectorAll<HTMLElement>('[role="listbox"]'));
+
+const selfListbox = (control: HTMLElement): HTMLElement[] =>
+	isListbox(control) ? [control] : [];
+
+const activateElement = (target: HTMLElement): void => {
+	for (const evName of ["mouseover", "mousedown", "mouseup"]) {
+		target.dispatchEvent(
+			new MouseEvent(evName, { bubbles: true, cancelable: true }),
+		);
+	}
+	target.click();
+};
+
+const resolveListboxRoots = (
+	control: HTMLElement,
+	beforeMap: ListboxBefore,
+): { roots: HTMLElement[]; allListboxes: HTMLElement[] } => {
+	const allListboxes = listboxes();
+	return {
+		allListboxes,
+		roots: uniqueElements([
+			...linkedListboxes(control),
+			...activatedListboxes(beforeMap),
+			...nestedListboxes(control),
+			...selfListbox(control),
+		]),
+	};
+};
+
+const invalidFormControls = (form: HTMLFormElement) =>
+	Array.from(
+		form.querySelectorAll<
+			HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+		>("input, textarea, select"),
+	)
+		.filter(
+			(el) => !el.checkValidity() || el.getAttribute("aria-invalid") === "true",
+		)
+		.map((el) => ({
+			refId: el.getAttribute("data-ref-id") || undefined,
+			tag: el.tagName.toLowerCase(),
+			role: getAccessibleRole(el),
+			name: getAccessibleName(el) || undefined,
+			value:
+				el instanceof HTMLInputElement && el.type === "password"
+					? undefined
+					: el.value,
+			required: el.required || el.getAttribute("aria-required") === "true",
+			validationMessage: el.validationMessage || undefined,
+		}));
+
 /**
  * Activate a combobox control and collect the listbox roots that belong to it.
  *
@@ -440,58 +590,17 @@ function activateAndResolveListboxRoots(control: HTMLElement): {
 	searchedIds: string[];
 	allListboxes: HTMLElement[];
 } {
-	const listboxesBefore = new Map(
-		Array.from(document.querySelectorAll<HTMLElement>('[role="listbox"]')).map(
-			(listbox) =>
-				[
-					listbox,
-					{
-						hidden: isSelfOrAncestorHidden(listbox),
-						sig: listboxOptionSignature(listbox),
-					},
-				] as const,
-		),
-	);
-	for (const evName of ["mouseover", "mousedown", "mouseup"]) {
-		control.dispatchEvent(
-			new MouseEvent(evName, { bubbles: true, cancelable: true }),
-		);
+	const beforeMap = snapshotListboxes();
+
+	activateElement(control);
+	let { roots, allListboxes } = resolveListboxRoots(control, beforeMap);
+	if (roots.length === 0) {
+		const trigger = findNearbyPopupTrigger(control);
+		if (trigger) {
+			activateElement(trigger);
+			({ roots, allListboxes } = resolveListboxRoots(control, beforeMap));
+		}
 	}
-	control.click();
-	const ownedIds =
-		`${control.getAttribute("aria-controls") || ""} ${control.getAttribute("aria-owns") || ""}`
-			.trim()
-			.split(/\s+/)
-			.filter(Boolean);
-	const linkedRoots = ownedIds
-		.map((id) => document.getElementById(id))
-		.filter(
-			(root): root is HTMLElement =>
-				root instanceof HTMLElement && root.getAttribute("role") === "listbox",
-		);
-	const allListboxes = Array.from(
-		document.querySelectorAll<HTMLElement>('[role="listbox"]'),
-	);
-	const activatedRoots = allListboxes.filter((listbox) => {
-		const before = listboxesBefore.get(listbox);
-		if (isSelfOrAncestorHidden(listbox)) return false;
-		if (!before) return true; // newly created after activation
-		if (before.hidden) return true; // hidden → visible
-		return listboxOptionSignature(listbox) !== before.sig; // content changed
-	});
-	const nearbyRoots = Array.from(
-		control.querySelectorAll<HTMLElement>('[role="listbox"]'),
-	);
-	// If the control itself is a listbox (refId points directly to it), include it.
-	const selfRoot = control.getAttribute("role") === "listbox" ? [control] : [];
-	const roots = [
-		...new Set([
-			...linkedRoots,
-			...activatedRoots,
-			...nearbyRoots,
-			...selfRoot,
-		]),
-	];
 	const searchedIds = roots.map((r) => r.id).filter(Boolean);
 
 	return { roots, searchedIds, allListboxes };
@@ -737,7 +846,11 @@ export const handlers = {
 			}
 			el.value = opt.value;
 			el.dispatchEvent(new Event("change", { bubbles: true }));
-			return makeActionResult("select_option", el, { value: opt.value });
+			return makeActionResult("select_option", el, {
+				value: opt.value,
+				selectedText: (opt.text || "").trim(),
+				verification: "required",
+			});
 		}
 		const control = el as HTMLElement;
 		const { roots, searchedIds, allListboxes } =
@@ -782,7 +895,11 @@ export const handlers = {
 			);
 		}
 		match.click();
-		return makeActionResult("select_option", el, { value });
+		return makeActionResult("select_option", el, {
+			value: el instanceof HTMLInputElement ? el.value : value,
+			selectedText: (match.textContent || "").trim(),
+			verification: "required",
+		});
 	},
 
 	check: (params: PageCheckParams) => {
@@ -875,8 +992,12 @@ export const handlers = {
 				new Event("submit", { bubbles: true, cancelable: true }),
 			);
 		}
+		const valid = form.checkValidity();
 		return makeActionResult("submit", form, {
 			dispatched: true,
+			valid,
+			invalid: !valid,
+			invalidControls: invalidFormControls(form),
 			observationId: currentObservationId(),
 			verification: "required",
 		});

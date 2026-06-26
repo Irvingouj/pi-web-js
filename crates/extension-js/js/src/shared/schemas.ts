@@ -1041,7 +1041,38 @@ export const PageActionResultSchema = z.object({
 	checked: z.boolean().optional().describe("Checked state after the action"),
 	disabled: z.boolean().optional().describe("Whether the element is disabled"),
 	readOnly: z.boolean().optional().describe("Whether the element is read-only"),
+	required: z.boolean().optional().describe("Whether the element is required"),
+	valid: z
+		.boolean()
+		.optional()
+		.describe("HTML constraint validity after the action, when available"),
+	invalid: z
+		.boolean()
+		.optional()
+		.describe("Inverse validity / aria-invalid state after the action"),
+	validationMessage: z
+		.string()
+		.optional()
+		.describe("Browser validation message when the element is invalid"),
+	invalidControls: z
+		.array(
+			z.object({
+				refId: refIdString().optional(),
+				tag: z.string(),
+				role: z.string().optional(),
+				name: z.string().optional(),
+				value: z.string().optional(),
+				required: z.boolean().optional(),
+				validationMessage: z.string().optional(),
+			}),
+		)
+		.optional()
+		.describe("Invalid form controls after submit, when available"),
 	text: z.string().optional().describe("Text content of the element"),
+	selectedText: z
+		.string()
+		.optional()
+		.describe("Visible option text selected by select_option"),
 	key: z
 		.string()
 		.optional()

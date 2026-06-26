@@ -58,6 +58,8 @@ describe("action-result", () => {
 			value: "hello",
 			disabled: true,
 			readOnly: false,
+			invalid: false,
+			valid: true,
 		});
 	});
 

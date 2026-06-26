@@ -48,6 +48,10 @@ export function readFormFields(el: Element): {
 	disabled?: boolean;
 	readOnly?: boolean;
 	selected?: boolean;
+	required?: boolean;
+	valid?: boolean;
+	invalid?: boolean;
+	validationMessage?: string;
 } {
 	const out: {
 		value?: string;
@@ -55,6 +59,10 @@ export function readFormFields(el: Element): {
 		disabled?: boolean;
 		readOnly?: boolean;
 		selected?: boolean;
+		required?: boolean;
+		valid?: boolean;
+		invalid?: boolean;
+		validationMessage?: string;
 	} = {};
 	if (el instanceof HTMLInputElement) {
 		if (el.type !== "password" && el.type !== "hidden") {
@@ -65,10 +73,12 @@ export function readFormFields(el: Element): {
 		}
 		out.disabled = el.disabled;
 		out.readOnly = el.readOnly;
+		enrichValidity(el, out);
 	} else if (el instanceof HTMLTextAreaElement) {
 		out.value = el.value;
 		out.disabled = el.disabled;
 		out.readOnly = el.readOnly;
+		enrichValidity(el, out);
 	} else if (el instanceof HTMLSelectElement) {
 		if (el.multiple) {
 			// For <select multiple>, el.value only returns the first selected
@@ -83,6 +93,7 @@ export function readFormFields(el: Element): {
 			out.value = el.value;
 		}
 		out.disabled = el.disabled;
+		enrichValidity(el, out);
 	} else if (el instanceof HTMLOptionElement) {
 		// Expose value + selected so agents can read the valid option values
 		// of a <select> (single or multiple) from snapshot_data and feed them
@@ -96,6 +107,26 @@ export function readFormFields(el: Element): {
 	return out;
 }
 
+function enrichValidity(
+	el: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement,
+	out: {
+		required?: boolean;
+		valid?: boolean;
+		invalid?: boolean;
+		validationMessage?: string;
+	},
+): void {
+	const required = el.required || el.getAttribute("aria-required") === "true";
+	const ariaInvalid = el.getAttribute("aria-invalid") === "true";
+	const valid = !ariaInvalid && el.checkValidity();
+	if (required) out.required = true;
+	out.valid = valid;
+	out.invalid = !valid;
+	if (!valid && el.validationMessage) {
+		out.validationMessage = el.validationMessage;
+	}
+}
+
 export function enrichFormNode(
 	el: Element,
 	node: {
@@ -104,6 +135,10 @@ export function enrichFormNode(
 		disabled?: boolean;
 		readOnly?: boolean;
 		selected?: boolean;
+		required?: boolean;
+		valid?: boolean;
+		invalid?: boolean;
+		validationMessage?: string;
 	},
 ): void {
 	const tag = el.tagName.toLowerCase();
@@ -313,5 +348,19 @@ export function getAccessibleName(el: Element): string {
 
 export function shouldInclude(el: Element): boolean {
 	if (el instanceof HTMLInputElement && el.type === "file") return true;
+	if (isInvalidFormControl(el)) return true;
 	return isMarkdownVisible(el);
+}
+
+function isInvalidFormControl(el: Element): boolean {
+	if (
+		!(
+			el instanceof HTMLInputElement ||
+			el instanceof HTMLTextAreaElement ||
+			el instanceof HTMLSelectElement
+		)
+	) {
+		return false;
+	}
+	return !el.checkValidity() || el.getAttribute("aria-invalid") === "true";
 }

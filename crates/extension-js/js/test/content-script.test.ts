@@ -2380,6 +2380,14 @@ describe("select_option handler", () => {
 			{ refId, value: "Canada" },
 		);
 		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(
+				result.value as { value?: string; selectedText?: string },
+			).toMatchObject({
+				value: "ca",
+				selectedText: "Canada",
+			});
+		}
 		expect(select.value).toBe("ca");
 	});
 
@@ -2603,6 +2611,51 @@ describe("select_option handler", () => {
 		document.querySelector("[data-target]")!.addEventListener("click", () => {
 			clicked = true;
 		});
+
+		const result = await dispatchContentScriptCall(
+			"page_select_option",
+			"select_option",
+			handlers.select_option,
+			{ refId, value: "Wanted" },
+		);
+		expect(result.ok).toBe(true);
+		expect(clicked).toBe(true);
+	});
+
+	it("combobox uses nearby popup trigger when input itself does not open options", async () => {
+		document.body.innerHTML = `
+			<div>
+				<label for="choice">Choice</label>
+				<input id="choice" role="combobox" aria-labelledby="choice-label">
+				<button type="button" aria-haspopup="listbox" aria-label="Open options">v</button>
+			</div>
+		`;
+		const button = document.querySelector("button")!;
+		button.addEventListener("click", () => {
+			const listbox = document.createElement("div");
+			listbox.id = "choice-listbox";
+			listbox.setAttribute("role", "listbox");
+			listbox.innerHTML = '<div role="option" data-target>Wanted</div>';
+			document.body.appendChild(listbox);
+		});
+		const snap = await dispatchContentScriptCall(
+			"page_snapshot_data",
+			"snapshot",
+			handlers.snapshot,
+			{},
+		);
+		const refId = (
+			snap.value as { nodes: Array<{ refId: string; role?: string }> }
+		).nodes.find((n) => n.role === "combobox")!.refId;
+		let clicked = false;
+		document.addEventListener(
+			"click",
+			(event) => {
+				const target = event.target as HTMLElement;
+				if (target.matches('[role="option"][data-target]')) clicked = true;
+			},
+			true,
+		);
 
 		const result = await dispatchContentScriptCall(
 			"page_select_option",
@@ -3032,6 +3085,57 @@ describe("select_option handler", () => {
 				| Array<{ name?: string }>
 				| undefined;
 			expect(candidates).toBeUndefined();
+		}
+	});
+});
+
+describe("submit handler validation receipts", () => {
+	beforeEach(() => {
+		document.body.innerHTML = "";
+		for (const spec of buildContentScriptSpecs()) {
+			registerContentScriptSpec(spec);
+		}
+		resetLease();
+	});
+
+	it("returns invalidControls when form constraint validation fails", async () => {
+		document.body.innerHTML = `
+			<form aria-label="Application">
+				<input aria-label="Visible" value="ok">
+				<input required aria-hidden="true" tabindex="-1" value="">
+				<button type="submit">Submit</button>
+			</form>
+		`;
+		const snap = await dispatchContentScriptCall(
+			"page_snapshot_data",
+			"snapshot",
+			handlers.snapshot,
+			{},
+		);
+		const formRef = (
+			snap.value as { nodes: Array<{ refId: string; role?: string }> }
+		).nodes.find((n) => n.role === "form")!.refId;
+
+		const result = await dispatchContentScriptCall(
+			"page_submit",
+			"submit",
+			handlers.submit,
+			{ refId: formRef },
+		);
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			const receipt = result.value as {
+				valid?: boolean;
+				invalid?: boolean;
+				invalidControls?: Array<{ required?: boolean; value?: string }>;
+			};
+			expect(receipt.valid).toBe(false);
+			expect(receipt.invalid).toBe(true);
+			expect(receipt.invalidControls).toHaveLength(1);
+			expect(receipt.invalidControls![0]).toMatchObject({
+				required: true,
+				value: "",
+			});
 		}
 	});
 });

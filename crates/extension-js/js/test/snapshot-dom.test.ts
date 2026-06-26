@@ -202,4 +202,21 @@ describe("hidden file input inclusion", () => {
 			value: "+1-289-788-6925",
 		});
 	});
+
+	it("inline snapshot includes invalid hidden validation proxies", () => {
+		const input = document.createElement("input");
+		input.required = true;
+		input.setAttribute("aria-hidden", "true");
+		document.body.appendChild(input);
+
+		const result = collectInlineSnapshot(100);
+		const proxyNode = result.nodes.find((n) => n.tag === "input");
+		expect(proxyNode).toMatchObject({
+			role: "textbox",
+			required: true,
+			valid: false,
+			invalid: true,
+		});
+		expect(proxyNode!.validationMessage).toBeTruthy();
+	});
 });

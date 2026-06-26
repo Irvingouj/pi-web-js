@@ -66,4 +66,34 @@ test.describe
 				expect(exec.result.value.value).toBe("");
 			}
 		});
+
+		test("greenhouse real page submit reports invalid hidden controls", async ({
+			harness,
+		}) => {
+			await activateTestcaseTab(harness.fixtureTab, GREENHOUSE_REAL_URL);
+
+			const exec = await runAgentCell<
+				ContractResult<{ invalidCount: number; emptyRequiredCount: number }>
+			>(
+				harness.sidepanel,
+				[
+					activateTabSource(GREENHOUSE_REAL_URL),
+					"const snap = await page.snapshot_data({ max_nodes: 1200 });",
+					"const form = snap.nodes.find(n => n.role === 'form');",
+					"if (!form) throw new Error('application form not found');",
+					"const receipt = await page.submit({ refId: form.refId });",
+					"const invalid = receipt.invalidControls || [];",
+					"const emptyRequired = invalid.filter(n => n.required && (n.value || '') === '');",
+					"print(RESULT_PREFIX + JSON.stringify({ ok: true, value: { invalidCount: invalid.length, emptyRequiredCount: emptyRequired.length } }));",
+				].join("\n"),
+				20_000,
+			);
+
+			expect(exec.status, `${exec.stderr}\n${exec.stdout}`).toBe("success");
+			expect(exec.result?.ok).toBe(true);
+			if (exec.result?.ok) {
+				expect(exec.result.value.invalidCount).toBeGreaterThan(0);
+				expect(exec.result.value.emptyRequiredCount).toBeGreaterThan(0);
+			}
+		});
 	});
