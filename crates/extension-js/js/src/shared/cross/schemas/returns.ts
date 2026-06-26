@@ -280,6 +280,10 @@ interface DomNode {
 	alt?: string;
 	accept?: string;
 	filesCount?: number;
+	controlType?: string;
+	recommendedAction?: string;
+	controls?: string;
+	expanded?: boolean;
 	children?: DomNode[];
 }
 
@@ -320,6 +324,10 @@ export const DomNodeSchema: z.ZodType<DomNode> = z.object({
 		.number()
 		.optional()
 		.describe("For input[type=file]: selected file count"),
+	controlType: z.string().optional(),
+	recommendedAction: z.string().optional(),
+	controls: z.string().optional(),
+	expanded: z.boolean().optional(),
 	children: z
 		.array(z.lazy(() => DomNodeSchema))
 		.optional()

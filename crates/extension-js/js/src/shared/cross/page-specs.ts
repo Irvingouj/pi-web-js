@@ -874,7 +874,7 @@ export const PAGE_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 				AWAIT_PROMISE_NOTE,
 				"Read-only: returns DOM structure, never executes code or mutates the page",
 				"Bypasses snapshot filtering and can include hidden nodes by default",
-				"Assigns refIds to returned elements so subsequent page.setFiles/click/fill can target them",
+			"Assigns refIds to returned elements; those refIds are immediately actionable by page.click/fill/select_option/setFiles in the same cell — no intermediate snapshot_data needed",
 				"Use page.dom immediately when struggling to find data in snapshot output; do not keep guessing selectors from the accessibility tree",
 				"If a dom node is a dropdown (role=combobox/tag=select/controlType=dropdown), use page.select_option on its refId",
 			],

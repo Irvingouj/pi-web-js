@@ -763,9 +763,11 @@ export const handlers = {
 		const depth = params.depth ?? 2;
 		const includeHidden = params.includeHidden ?? true;
 		const roots = Array.from(document.querySelectorAll(selector));
+		const observed: Array<{ refId: string; element: Element }> = [];
 		const nodes = roots
-			.map((el) => buildDomNode(el, depth, includeHidden))
+			.map((el) => buildDomNode(el, depth, includeHidden, observed))
 			.filter((n): n is DomNode => n !== null);
+		grantObservation(observed);
 		return { nodes, url: window.location.href, title: document.title };
 	},
 

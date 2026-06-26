@@ -1101,6 +1101,253 @@ describe("stale refId errors", () => {
 			expect(result.value[0].role).toBe("heading");
 		}
 	});
+});
+
+describe("dom handler", () => {
+	beforeEach(() => {
+		document.body.innerHTML = "";
+		for (const spec of buildContentScriptSpecs()) {
+			registerContentScriptSpec(spec);
+		}
+		resetLease();
+	});
+
+	it("dom refId → click actually fires the click handler", async () => {
+		document.body.innerHTML = `<button id="x">Go</button>`;
+		let clicked = false;
+		document.getElementById("x")!.addEventListener("click", () => {
+			clicked = true;
+		});
+		const dom = await dispatchContentScriptCall(
+			"page_dom",
+			"dom",
+			handlers.dom,
+			{ selector: "button", depth: 0, includeHidden: false },
+		);
+		expect(dom.ok).toBe(true);
+		if (!dom.ok) return;
+		const refId = (
+			dom.value as { nodes: Array<{ refId: string }> }
+		).nodes[0]!.refId;
+		expect(refId).toMatch(/^e\d+$/);
+		// No snapshot_data call between dom() and click():
+		const click = await dispatchContentScriptCall(
+			"page_click",
+			"click",
+			handlers.click,
+			{ refId },
+		);
+		expect(click.ok).toBe(true);
+		expect(clicked).toBe(true);
+	});
+
+	it("dom refId → fill actually sets the input value", async () => {
+		document.body.innerHTML = `<input id="i" type="text">`;
+		const input = document.getElementById("i") as HTMLInputElement;
+		const dom = await dispatchContentScriptCall(
+			"page_dom",
+			"dom",
+			handlers.dom,
+			{ selector: "input", depth: 0, includeHidden: false },
+		);
+		expect(dom.ok).toBe(true);
+		if (!dom.ok) return;
+		const refId = (
+			dom.value as { nodes: Array<{ refId: string }> }
+		).nodes[0]!.refId;
+		const fill = await dispatchContentScriptCall(
+			"page_fill",
+			"fill",
+			handlers.fill,
+			{ refId, value: "hello" },
+		);
+		expect(fill.ok).toBe(true);
+		expect(input.value).toBe("hello");
+	});
+
+	it("dom emits dropdown hints (controlType, recommendedAction, controls, expanded) on a combobox", async () => {
+		document.body.innerHTML = `
+			<input role="combobox" aria-label="Degree" aria-expanded="false" aria-controls="deg-list">
+			<div id="deg-list" role="listbox"><div role="option">Bachelor's</div></div>
+		`;
+		const dom = await dispatchContentScriptCall(
+			"page_dom",
+			"dom",
+			handlers.dom,
+			{ selector: "[role='combobox']", depth: 0, includeHidden: false },
+		);
+		if (!dom.ok) return;
+		const node = (
+			dom.value as { nodes: Array<Record<string, unknown>> }
+		).nodes[0]!;
+		expect(node.controlType).toBe("dropdown");
+		expect(node.recommendedAction).toBe("select_option");
+		expect(node.controls).toBe("deg-list");
+		expect(node.expanded).toBe(false);
+	});
+
+	it("dom refId → select_option: combobox discovered via dom() selects the option (the motivating smoke test)", async () => {
+		// The real user journey: agent calls dom() on a combobox, sees
+		// recommendedAction: select_option, and select_option works on that refId.
+		const control = document.createElement("div");
+		control.setAttribute("role", "combobox");
+		control.setAttribute("aria-label", "Country");
+		control.setAttribute("aria-expanded", "false");
+		control.setAttribute("aria-controls", "lb");
+		control.addEventListener("click", () => {
+			control.setAttribute("aria-expanded", "true");
+			const listbox = document.createElement("div");
+			listbox.id = "lb";
+			listbox.setAttribute("role", "listbox");
+			const opt = document.createElement("div");
+			opt.setAttribute("role", "option");
+			opt.textContent = "Canada";
+			listbox.appendChild(opt);
+			document.body.appendChild(listbox);
+		});
+		document.body.appendChild(control);
+
+		const dom = await dispatchContentScriptCall(
+			"page_dom",
+			"dom",
+			handlers.dom,
+			{ selector: "[role='combobox']", depth: 0, includeHidden: false },
+		);
+		expect(dom.ok).toBe(true);
+		if (!dom.ok) return;
+		const refId = (
+			dom.value as { nodes: Array<{ refId: string }> }
+		).nodes[0]!.refId;
+		// Sanity: dom() told the agent this is a dropdown to select_option.
+		expect(
+			(dom.value as { nodes: Array<Record<string, unknown>> }).nodes[0]!
+				.recommendedAction,
+		).toBe("select_option");
+
+		let optionClicked = "";
+		document.addEventListener(
+			"click",
+			(e) => {
+				const target = e.target as HTMLElement;
+				if (target.getAttribute("role") === "option") {
+					optionClicked = target.textContent || "";
+				}
+			},
+			true,
+		);
+
+		const result = await dispatchContentScriptCall(
+			"page_select_option",
+			"select_option",
+			handlers.select_option,
+			{ refId, value: "Canada" },
+		);
+		expect(result.ok).toBe(true);
+		expect(optionClicked).toBe("Canada");
+	});
+
+	it("dom with depth>0 observes nested children — a child refId is clickable", async () => {
+		document.body.innerHTML = `
+			<div id="root">
+				<button id="child">Nested</button>
+			</div>
+		`;
+		let clicked = false;
+		document.getElementById("child")!.addEventListener("click", () => {
+			clicked = true;
+		});
+		const dom = await dispatchContentScriptCall(
+			"page_dom",
+			"dom",
+			handlers.dom,
+			{ selector: "#root", depth: 1, includeHidden: false },
+		);
+		expect(dom.ok).toBe(true);
+		if (!dom.ok) return;
+		const node = (
+			dom.value as { nodes: Array<{ children?: Array<{ refId: string }> }> }
+		).nodes[0]!;
+		expect(node.children).toBeDefined();
+		const childRefId = node.children![0]!.refId;
+		expect(childRefId).toMatch(/^e\d+$/);
+		const click = await dispatchContentScriptCall(
+			"page_click",
+			"click",
+			handlers.click,
+			{ refId: childRefId },
+		);
+		expect(click.ok).toBe(true);
+		expect(clicked).toBe(true);
+	});
+
+	it("dom with includeHidden:true (default) observes hidden elements — lease valid, click correctly rejects as not-interactable", async () => {
+		// The production default is includeHidden:true ("see everything" mode).
+		// A hidden element must get a refId AND be in the observation lease,
+		// but click must still reject it as E_NOT_INTERACTABLE (not E_STALE) —
+		// dom() observes everything but does not bypass interactability checks.
+		document.body.innerHTML = `<button id="h" style="display:none" hidden>Hidden</button>`;
+		const dom = await dispatchContentScriptCall(
+			"page_dom",
+			"dom",
+			handlers.dom,
+			{ selector: "button" }, // no includeHidden → defaults true
+		);
+		expect(dom.ok).toBe(true);
+		if (!dom.ok) return;
+		const nodes = (
+			dom.value as { nodes: Array<{ refId?: string; hidden?: boolean }> }
+		).nodes;
+		expect(nodes).toHaveLength(1);
+		expect(nodes[0]!.hidden).toBe(true);
+		const refId = nodes[0]!.refId!;
+		expect(refId).toMatch(/^e\d+$/);
+		const click = await dispatchContentScriptCall(
+			"page_click",
+			"click",
+			handlers.click,
+			{ refId },
+		);
+		// Lease is valid (not stale); element is genuinely hidden → not interactable.
+		expect(click.ok).toBe(false);
+		if (!click.ok) {
+			expect(click.error.code).toBe("E_NOT_INTERACTABLE");
+			expect(click.error.code).not.toBe("E_STALE");
+		}
+	});
+
+	it("dom emits dropdown hints on a native <select> element", async () => {
+		document.body.innerHTML = `<select aria-label="Country"><option value="">Pick</option><option value="ca">Canada</option></select>`;
+		const dom = await dispatchContentScriptCall(
+			"page_dom",
+			"dom",
+			handlers.dom,
+			{ selector: "select", depth: 0, includeHidden: false },
+		);
+		if (!dom.ok) return;
+		const node = (
+			dom.value as { nodes: Array<Record<string, unknown>> }
+		).nodes[0]!;
+		expect(node.controlType).toBe("dropdown");
+		expect(node.recommendedAction).toBe("select_option");
+	});
+
+	it("dom sets expanded:undefined when aria-expanded is absent", async () => {
+		// combobox without aria-expanded — expanded should be undefined, not false.
+		document.body.innerHTML = `<input role="combobox" aria-label="NoExp">`;
+		const dom = await dispatchContentScriptCall(
+			"page_dom",
+			"dom",
+			handlers.dom,
+			{ selector: "[role='combobox']", depth: 0, includeHidden: false },
+		);
+		if (!dom.ok) return;
+		const node = (
+			dom.value as { nodes: Array<Record<string, unknown>> }
+		).nodes[0]!;
+		expect(node.controlType).toBe("dropdown");
+		expect("expanded" in node && node.expanded !== undefined).toBe(false);
+	});
+});
 
 	it("extract returns requested fields", async () => {
 		document.title = "Page";
@@ -1152,7 +1399,6 @@ describe("stale refId errors", () => {
 		expect(changed).toBe(true);
 		document.body.removeChild(radio);
 	});
-});
 
 describe("set_files handler", () => {
 	beforeEach(() => {

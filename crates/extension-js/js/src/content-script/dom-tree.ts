@@ -15,6 +15,7 @@ import {
 	readFormFields,
 	resolveAbsoluteUrl,
 } from "../shared/cs/snapshot-dom.js";
+import { enrichDropdown } from "../shared/cross/collect-inline-snapshot.js";
 
 export type DomNode = {
 	refId?: string;
@@ -40,6 +41,11 @@ export type DomNode = {
 	alt?: string;
 	accept?: string;
 	filesCount?: number;
+	// Dropdown hints (parity with snapshot_data combobox nodes)
+	controlType?: string;
+	recommendedAction?: string;
+	controls?: string;
+	expanded?: boolean;
 	children?: DomNode[];
 };
 
@@ -67,12 +73,15 @@ export function buildDomNode(
 	el: Element,
 	depth: number,
 	includeHidden: boolean,
+	observed?: Array<{ refId: string; element: Element }>,
 ): DomNode | null {
 	if (!includeHidden && isSelfOrAncestorHidden(el)) return null;
 	const tag = el.tagName.toLowerCase();
+	const refId = allocateRefId(el);
+	if (observed) observed.push({ refId, element: el });
 	const node: DomNode = {
 		tag,
-		refId: allocateRefId(el),
+		refId,
 		role: getAccessibleRole(el),
 		name: getAccessibleName(el) || undefined,
 		text: getOwnVisibleText(el, 100) || undefined,
@@ -87,6 +96,7 @@ export function buildDomNode(
 		node.hiddenReason = hr;
 	}
 	Object.assign(node, readFormFields(el));
+	enrichDropdown(el, node);
 	if (el instanceof HTMLInputElement && el.type === "file") {
 		const accept = el.getAttribute("accept");
 		if (accept) node.accept = accept;
@@ -104,7 +114,7 @@ export function buildDomNode(
 	if (depth > 0) {
 		const kids: DomNode[] = [];
 		for (const child of Array.from(el.children)) {
-			const k = buildDomNode(child, depth - 1, includeHidden);
+			const k = buildDomNode(child, depth - 1, includeHidden, observed);
 			if (k) kids.push(k);
 		}
 		if (kids.length) node.children = kids;

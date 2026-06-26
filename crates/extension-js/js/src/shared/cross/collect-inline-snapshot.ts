@@ -87,7 +87,17 @@ const enrichValidationProxy: Enricher = (el, node) => {
 	if (forControl) node.forControl = forControl;
 };
 
-const enrichDropdown: Enricher = (el, node) => {
+export const enrichDropdown = (
+	el: Element,
+	node: {
+		role?: string;
+		tag: string;
+		controlType?: string;
+		recommendedAction?: string;
+		controls?: string;
+		expanded?: boolean;
+	},
+) => {
 	if (node.controlType === "validation-proxy") return;
 	if (node.role !== "combobox" && node.tag !== "select") return;
 	node.controlType = "dropdown";
