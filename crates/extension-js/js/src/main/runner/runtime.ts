@@ -5,7 +5,7 @@ export {
 	type Command,
 	setRunnerAbortController,
 	throwIfAborted,
-} from "../../shared/tool-registry.js";
+} from "../../shared/main/tool-registry.js";
 
 export {
 	getActiveTabId,

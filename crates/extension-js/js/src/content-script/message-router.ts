@@ -1,5 +1,5 @@
-import { toHandlerAction } from "../shared/registry/content-script-actions.js";
-import { normalizeAgentError } from "../shared/registry/normalize-agent-error.js";
+import { toHandlerAction } from "../shared/cross/content-script-actions.js";
+import { normalizeAgentError } from "../shared/cross/normalize-agent-error.js";
 import { asRecord } from "./dom-utils.js";
 import { handlers } from "./handlers.js";
 import { logger } from "./logger.js";

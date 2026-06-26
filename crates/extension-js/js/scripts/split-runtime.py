@@ -27,24 +27,24 @@ RANGES: list[tuple[str, int, int]] = [
 
 HEADERS: dict[str, str] = {
     "lib/constants.ts": "",
-    "lib/types.ts": '''import type { DomFormatParams, DomSnapshotParams, FetchParams } from "../../../shared/generated.js";
+    "lib/types.ts": '''import type { DomFormatParams, DomSnapshotParams, FetchParams } from "../../../shared/cross/generated.js";
 
 export type { DomFormatParams, DomSnapshotParams, FetchParams };
 
 ''',
-    "lib/host-registry.ts": '''import { getTool } from "../../../shared/tool-registry.js";
+    "lib/host-registry.ts": '''import { getTool } from "../../../shared/main/tool-registry.js";
 import type { HostHandler } from "./types.js";
 
 ''',
-    "lib/params.ts": '''import type { AsyncResponse } from "../../../shared/tool-registry.js";
+    "lib/params.ts": '''import type { AsyncResponse } from "../../../shared/main/tool-registry.js";
 import { makeError } from "./types.js";
 import { asRecord } from "./params-helpers.js";
 
 ''',
     "dom/snapshot-inline.ts": "",
-    "command.ts": '''import type { AsyncResponse, Command } from "../../../shared/tool-registry.js";
-import { dispatchTool, getRunnerSignal, logger } from "../../../shared/tool-registry.js";
-import { logger as logModule } from "../../../shared/logger.js";
+    "command.ts": '''import type { AsyncResponse, Command } from "../../../shared/main/tool-registry.js";
+import { dispatchTool, getRunnerSignal, logger } from "../../../shared/main/tool-registry.js";
+import { logger as logModule } from "../../../shared/main/logger.js";
 import { isValidMainThreadAction } from "./lib/host-registry.js";
 import { normalizeParams } from "./lib/params.js";
 import { handleHostCallAction } from "./host.js";
@@ -53,23 +53,23 @@ const logger = logModule.child("runner");
 
 ''',
     "fetch.ts": '''import type { FetchParams } from "./lib/types.js";
-import type { AsyncResponse } from "../../../shared/tool-registry.js";
-import { throwIfAborted } from "../../../shared/tool-registry.js";
+import type { AsyncResponse } from "../../../shared/main/tool-registry.js";
+import { throwIfAborted } from "../../../shared/main/tool-registry.js";
 import { makeError } from "./lib/types.js";
 
 ''',
-    "tab/execute.ts": '''import type { AsyncResponse } from "../../../shared/tool-registry.js";
-import { logger } from "../../../shared/logger.js";
-import { throwIfAborted } from "../../../shared/tool-registry.js";
+    "tab/execute.ts": '''import type { AsyncResponse } from "../../../shared/main/tool-registry.js";
+import { logger } from "../../../shared/main/logger.js";
+import { throwIfAborted } from "../../../shared/main/tool-registry.js";
 import { getActiveTabId } from "../../tab-context.js";
 import { normalizeChromeError } from "../chrome/internals.js";
 import { INJECTION_DELAY_MS, RETRY_DELAY_MS } from "../lib/constants.js";
 
 ''',
-    "tab/messaging.ts": '''import type { AsyncResponse } from "../../../shared/tool-registry.js";
-import { logger } from "../../../shared/logger.js";
-import { throwIfAborted } from "../../../shared/tool-registry.js";
-import { unwrapContentScriptMessage } from "../../../shared/registry/content-script-response.js";
+    "tab/messaging.ts": '''import type { AsyncResponse } from "../../../shared/main/tool-registry.js";
+import { logger } from "../../../shared/main/logger.js";
+import { throwIfAborted } from "../../../shared/main/tool-registry.js";
+import { unwrapContentScriptMessage } from "../../../shared/main/content-script-response.js";
 import { getActiveTabId } from "../../tab-context.js";
 import { normalizeChromeError } from "../chrome/internals.js";
 import { INJECTION_DELAY_MS, RETRY_DELAY_MS } from "../lib/constants.js";
@@ -80,10 +80,10 @@ import type { TabMessage } from "../lib/types.js";
 
 ''',
     "dom/snapshot.ts": '''import { collectDocument, formatSnapshot, init as initDomSnapshot } from "@pi-oxide/dom-semantic-tree";
-import type { TreeSnapshot } from "../../../shared/generated.js";
+import type { TreeSnapshot } from "../../../shared/cross/generated.js";
 import type { DomFormatParams, DomSnapshotParams } from "./lib/types.js";
-import type { AsyncResponse } from "../../../shared/tool-registry.js";
-import { logger } from "../../../shared/logger.js";
+import type { AsyncResponse } from "../../../shared/main/tool-registry.js";
+import { logger } from "../../../shared/main/logger.js";
 
 let domSnapshotReady: Promise<void> | null = null;
 
@@ -95,19 +95,19 @@ export function ensureDomSnapshot(): Promise<void> {
 }
 
 ''',
-    "host.ts": '''import type { AsyncResponse } from "../../../shared/tool-registry.js";
-import { logger } from "../../../shared/logger.js";
+    "host.ts": '''import type { AsyncResponse } from "../../../shared/main/tool-registry.js";
+import { logger } from "../../../shared/main/logger.js";
 import { hostHandlers } from "./lib/host-registry.js";
 
 ''',
     "chrome/internals.ts": '''import { z } from "zod";
-import { logger } from "../../../shared/logger.js";
+import { logger } from "../../../shared/main/logger.js";
 import {
 	registerJsCall,
 	type CallContext,
 	type ToolDocParam,
-} from "../../../shared/tool-registry.js";
-import type { AsyncError } from "../../../shared/tool-registry.js";
+} from "../../../shared/main/tool-registry.js";
+import type { AsyncError } from "../../../shared/main/tool-registry.js";
 import { asRecord } from "../lib/params.js";
 import { makeError } from "../lib/types.js";
 
@@ -162,7 +162,7 @@ export {
 	type Command,
 	setRunnerAbortController,
 	throwIfAborted,
-} from "../../shared/tool-registry.js";
+} from "../../shared/main/tool-registry.js";
 
 export {
 	getActiveTabId,
@@ -220,7 +220,7 @@ def main() -> None:
 
     # Fix lib/params to only have normalizeParams + unwrapResult after helpers extracted
     params_body = slice_lines(text, 191, 256)  # normalizers through unwrapResult
-    params_imports = '''import type { AsyncResponse } from "../../../shared/tool-registry.js";
+    params_imports = '''import type { AsyncResponse } from "../../../shared/main/tool-registry.js";
 import { makeError } from "./types.js";
 import { asRecord } from "./params-helpers.js";
 

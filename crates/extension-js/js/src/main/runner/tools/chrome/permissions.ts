@@ -1,6 +1,6 @@
 /// <reference types="chrome" />
 import { z } from "zod";
-import { registerJsCall } from "../../../../shared/tool-registry.js";
+import { registerJsCall } from "../../../../shared/main/tool-registry.js";
 import {
 	invokeNative,
 	normalizeParityArgs,

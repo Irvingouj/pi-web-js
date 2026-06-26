@@ -4,7 +4,7 @@
 export {
 	type Command,
 	setRunnerAbortController,
-} from "../../shared/tool-registry.js";
+} from "../../shared/main/tool-registry.js";
 export {
 	executeMainThreadCommand,
 	getActiveTabId,

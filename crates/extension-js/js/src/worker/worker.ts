@@ -2,26 +2,26 @@
 // Loads extension-js WASM and communicates with main thread.
 
 import type { z } from "zod";
-import type { FsActionMap } from "../shared/fs-types.js";
-import type { LogLevel } from "../shared/logger.js";
+import type { FsActionMap } from "../shared/cross/fs-types.js";
+import type { LogLevel } from "../shared/main/logger.js";
 import {
 	logger,
 	numericToLogLevel,
 	registerWasmSetLogLevel,
 	setLogLevel,
-} from "../shared/logger.js";
-import { formatValidationError } from "../shared/registry/dispatch.js";
+} from "../shared/main/logger.js";
+import { formatValidationError } from "../shared/cross/dispatch.js";
 import {
 	getRoute,
 	populateRoutesFromManifest,
-} from "../shared/registry/routes.js";
-import type { DispatchContext } from "../shared/registry/types.js";
-import * as schemas from "../shared/schemas.js";
+} from "../shared/main/routes.js";
+import type { DispatchContext } from "../shared/cross/types.js";
+import * as schemas from "../shared/cross/schemas.js";
 import {
 	coerceWasmParams,
 	manifestEntryToWasm,
 	type SerializableJsCallManifestEntry,
-} from "../shared/tool-registry.js";
+} from "../shared/main/tool-registry.js";
 import { clearAllBlobStores, clearRun } from "./binary-blob-store.js";
 import init, {
 	clearVfsWriteCache as clear_vfs_write_cache,

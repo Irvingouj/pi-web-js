@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { InlineSnapshotNode } from "../src/shared/collect-inline-snapshot.js";
-import { filterNodes } from "../src/shared/snapshot-filter.js";
+import type { InlineSnapshotNode } from "../src/shared/cross/collect-inline-snapshot.js";
+import { filterNodes } from "../src/shared/cross/snapshot-filter.js";
 
 function node(
 	overrides: Partial<InlineSnapshotNode> &

@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
 	arrayBufferToBase64,
 	base64ToUint8Array,
-} from "../src/shared/array-buffer.js";
+} from "../src/shared/cross/array-buffer.js";
 
 describe("base64ToUint8Array", () => {
 	it("round-trips with arrayBufferToBase64", () => {

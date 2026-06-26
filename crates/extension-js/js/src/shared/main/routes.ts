@@ -1,6 +1,6 @@
-import { isContentScriptAction } from "./content-script-actions.js";
-import type { ExecutionContextId } from "./manifest.js";
-import type { Route, TabPolicy } from "./types.js";
+import { isContentScriptAction } from "../cross/content-script-actions.js";
+import type { ExecutionContextId } from "../cross/manifest.js";
+import type { Route, TabPolicy } from "../cross/types.js";
 
 const routes = new Map<string, Route>();
 

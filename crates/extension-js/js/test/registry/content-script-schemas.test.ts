@@ -6,7 +6,7 @@ import {
 	buildContentScriptSpecs,
 	buildInfraContentScriptSpecs,
 } from "../../src/content-script/schemas.js";
-import { CONTENT_SCRIPT_TOOL_SPECS } from "../../src/shared/registry/content-script-tools.js";
+import { CONTENT_SCRIPT_TOOL_SPECS } from "../../src/shared/cross/content-script-tools.js";
 
 describe("buildContentScriptSpecs", () => {
 	it("produces one spec per CONTENT_SCRIPT_TOOL_SPECS entry", () => {

@@ -1,12 +1,12 @@
-import { arrayBufferToBase64 } from "../shared/array-buffer.js";
+import { arrayBufferToBase64 } from "../shared/cross/array-buffer.js";
 import type {
 	PageSetFilesParams,
 	TabSetFilesParams,
-} from "../shared/generated.js";
+} from "../shared/cross/generated.js";
 import {
 	PageSetFilesParamsSchema,
 	TabSetFilesParamsSchema,
-} from "../shared/schemas.js";
+} from "../shared/cross/schemas.js";
 import { takeBlob } from "./binary-blob-store.js";
 
 export type ResolvedSetFile =

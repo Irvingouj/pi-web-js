@@ -1,7 +1,7 @@
 /// <reference types="chrome" />
 
-import { logger } from "../../shared/logger.js";
-import type { AsyncResponse } from "../../shared/tool-registry.js";
+import { logger } from "../../shared/main/logger.js";
+import type { AsyncResponse } from "../../shared/main/tool-registry.js";
 import { hostHandlers } from "./lib/host-registry.js";
 
 export async function handleHostCallAction(

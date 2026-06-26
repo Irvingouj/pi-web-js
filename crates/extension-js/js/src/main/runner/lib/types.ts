@@ -4,7 +4,7 @@ import type {
 	DomSnapshotParams,
 	FetchParams,
 	TreeSnapshot,
-} from "../../../shared/generated.js";
+} from "../../../shared/cross/generated.js";
 
 export type { DomFormatParams, DomSnapshotParams, FetchParams };
 

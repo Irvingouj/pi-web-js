@@ -9,7 +9,7 @@ import { z } from "zod";
 
 // @pi-oxide/dom-semantic-tree is aliased to ./__mocks__/dom-semantic-tree.js via vitest.config.ts
 
-vi.mock("../src/shared/logger.js", () => ({
+vi.mock("../src/shared/main/logger.js", () => ({
 	logger: {
 		debug: vi.fn(),
 		error: vi.fn(),
@@ -219,7 +219,7 @@ import {
 	registerContentScriptSpec,
 } from "../src/content-script/registry.js";
 import { buildContentScriptSpecs } from "../src/content-script/schemas.js";
-import { inlineSnapshot } from "../src/content-script/snapshot.js";
+import { collectInlineSnapshot as inlineSnapshot } from "../src/shared/cross/collect-inline-snapshot.js";
 
 /**
  * Grant an observation lease for every element currently carrying a
@@ -255,11 +255,11 @@ import {
 	initCapabilities,
 	resetCapabilities,
 } from "../src/main/runner/tools/chrome/capability.js";
-import { logger } from "../src/shared/logger.js";
+import { logger } from "../src/shared/main/logger.js";
 import {
 	addContentScriptAction,
 	getContentScriptActions,
-} from "../src/shared/registry/content-script-actions.js";
+} from "../src/shared/cross/content-script-actions.js";
 import {
 	clearJsRegistry,
 	clearRegistry,
@@ -271,7 +271,7 @@ import {
 	registerJsCall,
 	setRunnerAbortController,
 	throwIfAborted,
-} from "../src/shared/tool-registry.js";
+} from "../src/shared/main/tool-registry.js";
 
 // ─── Polyfills ───────────────────────────────────────────────────
 

@@ -1,5 +1,5 @@
-import * as schemas from "../../../shared/schemas.js";
-import { registerJsCall } from "../../../shared/tool-registry.js";
+import * as schemas from "../../../shared/cross/schemas.js";
+import { registerJsCall } from "../../../shared/main/tool-registry.js";
 import { asRecord, handleHostCallAction, unwrapResult } from "../runtime.js";
 
 // ─── Host call ───────────────────────────────────────────────────

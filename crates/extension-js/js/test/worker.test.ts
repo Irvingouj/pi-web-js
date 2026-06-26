@@ -2,9 +2,9 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ExtensionSession } from "../__mocks__/extension_js";
-import { coerceWasmParams } from "../src/shared/registry/manifest.js";
-import { clearRoutes, setRoute } from "../src/shared/registry/routes.js";
-import type { SerializableJsCallManifestEntry } from "../src/shared/tool-registry.js";
+import { coerceWasmParams } from "../src/shared/cross/manifest.js";
+import { clearRoutes, setRoute } from "../src/shared/main/routes.js";
+import type { SerializableJsCallManifestEntry } from "../src/shared/main/tool-registry.js";
 import {
 	createExecutableCallback,
 	extensionDispatch,

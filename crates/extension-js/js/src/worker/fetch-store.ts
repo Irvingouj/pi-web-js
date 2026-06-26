@@ -1,6 +1,6 @@
 import type { z } from "zod";
-import { base64ToUint8Array } from "../shared/array-buffer.js";
-import type { FetchValueSchema } from "../shared/schemas.js";
+import { base64ToUint8Array } from "../shared/cross/array-buffer.js";
+import type { FetchValueSchema } from "../shared/cross/schemas.js";
 import { storeBlob } from "./binary-blob-store.js";
 
 type FetchValue = z.infer<typeof FetchValueSchema>;

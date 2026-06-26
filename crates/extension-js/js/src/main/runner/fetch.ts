@@ -1,8 +1,8 @@
 /// <reference types="chrome" />
 
-import { encodeFetchResponse } from "../../shared/fetch-response.js";
-import type { AsyncResponse } from "../../shared/tool-registry.js";
-import { throwIfAborted } from "../../shared/tool-registry.js";
+import { encodeFetchResponse } from "../../shared/cross/fetch-response.js";
+import type { AsyncResponse } from "../../shared/main/tool-registry.js";
+import { throwIfAborted } from "../../shared/main/tool-registry.js";
 import { DEFAULT_TIMEOUT_MS } from "./lib/constants.js";
 import type { FetchParams, FetchValue } from "./lib/types.js";
 

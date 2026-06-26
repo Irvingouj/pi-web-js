@@ -1,5 +1,5 @@
 import { z } from "zod";
-import * as schemas from "../schemas.js";
+import * as schemas from "./schemas.js";
 import type { JsCallSpec } from "./manifest.js";
 
 const AWAIT_PROMISE_NOTE =

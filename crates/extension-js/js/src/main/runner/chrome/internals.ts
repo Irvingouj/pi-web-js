@@ -1,12 +1,12 @@
 /// <reference types="chrome" />
 import { z } from "zod";
-import { logger } from "../../../shared/logger.js";
-import type { AsyncError } from "../../../shared/tool-registry.js";
+import { logger } from "../../../shared/main/logger.js";
+import type { AsyncError } from "../../../shared/main/tool-registry.js";
 import {
 	type CallContext,
 	registerJsCall,
 	type ToolDocParam,
-} from "../../../shared/tool-registry.js";
+} from "../../../shared/main/tool-registry.js";
 import { makeError } from "../lib/types.js";
 import {
 	checkPermission,

@@ -16,8 +16,8 @@ import {
 	registerContentScriptSpec,
 } from "../src/content-script/registry.js";
 import { buildContentScriptSpecs } from "../src/content-script/schemas.js";
-import { inlineSnapshot } from "../src/content-script/snapshot.js";
-import { notInteractableError } from "../src/shared/registry/agent-errors.js";
+import { collectInlineSnapshot as inlineSnapshot } from "../src/shared/cross/collect-inline-snapshot.js";
+import { notInteractableError } from "../src/shared/cross/agent-errors.js";
 
 /** Grant an observation lease for every element currently carrying a data-ref-id. */
 function grantFromDom(): void {

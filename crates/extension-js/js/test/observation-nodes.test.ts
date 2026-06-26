@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { inlineSnapshot } from "../src/content-script/snapshot.js";
+import { collectInlineSnapshot as inlineSnapshot } from "../src/shared/cross/collect-inline-snapshot.js";
 
 const mockAddListener = vi.fn();
 

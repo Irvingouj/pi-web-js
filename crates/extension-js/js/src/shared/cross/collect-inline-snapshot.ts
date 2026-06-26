@@ -1,5 +1,5 @@
-import { allocateRefId, syncRefIdCounterFromDom } from "./ref-id.js";
-import { throwStructuredAgentError } from "./registry/agent-errors.js";
+import { allocateRefId, syncRefIdCounterFromDom } from "../cs/ref-id.js";
+import { throwStructuredAgentError } from "./agent-errors.js";
 import {
 	enrichFormNode,
 	getAccessibleName,
@@ -11,7 +11,7 @@ import {
 	resolveFieldLabel,
 	resolvePermalinkLink,
 	shouldInclude,
-} from "./snapshot-dom.js";
+} from "../cs/snapshot-dom.js";
 
 export type InlineSnapshotNode = {
 	refId: string;

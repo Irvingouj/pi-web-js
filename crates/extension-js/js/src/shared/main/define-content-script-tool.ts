@@ -1,6 +1,6 @@
-import { registerContentScriptJsCall } from "../tool-registry.js";
-import { addContentScriptAction } from "./content-script-actions.js";
-import type { ContentScriptToolSpec } from "./content-script-tools.js";
+import { registerContentScriptJsCall } from "./tool-registry.js";
+import { addContentScriptAction } from "../cross/content-script-actions.js";
+import type { ContentScriptToolSpec } from "../cross/content-script-tools.js";
 
 /** Register a content-script tool on the main thread.
  *  - Adds a manifest entry via registerContentScriptJsCall

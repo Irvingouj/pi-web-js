@@ -4,8 +4,8 @@ export type {
 	CellResult as JsRunResult,
 	WasmGlobalsSnapshot as JsGlobalsSnapshot,
 } from "../../pkg/extension_js.js";
-export type { LogLevel } from "../shared/logger.js";
-export { LOG_LEVEL_NUMERIC, setLogLevel } from "../shared/logger.js";
+export type { LogLevel } from "../shared/main/logger.js";
+export { LOG_LEVEL_NUMERIC, setLogLevel } from "../shared/main/logger.js";
 export {
 	registerHostHandler,
 	registerHostHandlers,

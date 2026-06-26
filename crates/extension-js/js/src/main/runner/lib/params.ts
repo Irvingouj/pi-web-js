@@ -2,7 +2,7 @@
 import {
 	type AsyncResponse,
 	coerceWasmParams,
-} from "../../../shared/tool-registry.js";
+} from "../../../shared/main/tool-registry.js";
 import { DEFAULT_SCROLL_AMOUNT, DEFAULT_TIMEOUT_MS } from "./constants.js";
 import { makeError } from "./types.js";
 

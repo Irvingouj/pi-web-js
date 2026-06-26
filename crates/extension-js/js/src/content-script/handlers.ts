@@ -1,4 +1,4 @@
-import { encodeFetchResponse } from "../shared/fetch-response.js";
+import { encodeFetchResponse } from "../shared/cross/fetch-response.js";
 import type {
 	FetchParams,
 	PageAppendParams,
@@ -21,15 +21,15 @@ import type {
 	PageSubmitParams,
 	PageTypeParams,
 	PageWaitForParams,
-} from "../shared/generated.js";
-import { allocateRefId, syncRefIdCounterFromDom } from "../shared/ref-id.js";
-import type { StaleRefCandidate } from "../shared/registry/agent-errors.js";
+} from "../shared/cross/generated.js";
+import { allocateRefId, syncRefIdCounterFromDom } from "../shared/cs/ref-id.js";
+import type { StaleRefCandidate } from "../shared/cross/agent-errors.js";
 import {
 	labelNotFoundError,
 	notInteractableError,
 	observationRequiredError,
 	throwStructuredAgentError,
-} from "../shared/registry/normalize-agent-error.js";
+} from "../shared/cross/normalize-agent-error.js";
 import {
 	getAccessibleName,
 	getAccessibleRole,
@@ -37,9 +37,9 @@ import {
 	readFormFields,
 	resolveAbsoluteUrl,
 	resolveContainerRefId,
-} from "../shared/snapshot-dom.js";
-import type { SnapshotFilter } from "../shared/snapshot-filter.js";
-import { filterNodes } from "../shared/snapshot-filter.js";
+} from "../shared/cs/snapshot-dom.js";
+import type { SnapshotFilter } from "../shared/cross/snapshot-filter.js";
+import { filterNodes } from "../shared/cross/snapshot-filter.js";
 import { assertFillEffect, makeActionResult } from "./action-result.js";
 import {
 	asRecord,
@@ -58,7 +58,7 @@ import {
 	requireTarget,
 	requireTargetByLabel,
 } from "./observation-lease.js";
-import { inlineSnapshot } from "./snapshot.js";
+import { collectInlineSnapshot as inlineSnapshot } from "../shared/cross/collect-inline-snapshot.js";
 import {
 	assertSetFilesEffect,
 	fileFromBytes,

@@ -1,9 +1,9 @@
 /// <reference types="chrome" />
 import { z } from "zod";
-import { CONTENT_SCRIPT_TOOL_SPECS } from "../../../shared/registry/content-script-tools.js";
-import { defineContentScriptTool } from "../../../shared/registry/define-content-script-tool.js";
-import * as schemas from "../../../shared/schemas.js";
-import { dispatchTool, registerJsCall } from "../../../shared/tool-registry.js";
+import { CONTENT_SCRIPT_TOOL_SPECS } from "../../../shared/cross/content-script-tools.js";
+import { defineContentScriptTool } from "../../../shared/main/define-content-script-tool.js";
+import * as schemas from "../../../shared/cross/schemas.js";
+import { dispatchTool, registerJsCall } from "../../../shared/main/tool-registry.js";
 import {
 	asRecord,
 	extractTabId,

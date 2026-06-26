@@ -10,20 +10,20 @@ import type {
 	FsWriteParams,
 	WasmGlobalsSnapshot,
 } from "../../../pkg/extension_js.js";
-import type { InlineSnapshotResult } from "../../shared/collect-inline-snapshot.js";
-import type { FsAction, FsActionMap } from "../../shared/fs-types.js";
-import type { LogLevel } from "../../shared/logger.js";
+import type { InlineSnapshotResult } from "../../shared/cross/collect-inline-snapshot.js";
+import type { FsAction, FsActionMap } from "../../shared/cross/fs-types.js";
+import type { LogLevel } from "../../shared/main/logger.js";
 import {
 	LOG_LEVEL_NUMERIC,
 	logger,
 	setLogLevel as setMainLogLevel,
-} from "../../shared/logger.js";
-import { unwrapContentScriptMessage } from "../../shared/registry/content-script-response.js";
-import type { Command } from "../../shared/registry/manifest.js";
-import { normalizeAgentError } from "../../shared/registry/normalize-agent-error.js";
-import type { TabPolicy } from "../../shared/registry/types.js";
-import type { SnapshotFilter } from "../../shared/snapshot-filter.js";
-import type { SerializableJsCallManifestEntry } from "../../shared/tool-registry.js";
+} from "../../shared/main/logger.js";
+import { unwrapContentScriptMessage } from "../../shared/main/content-script-response.js";
+import type { Command } from "../../shared/cross/manifest.js";
+import { normalizeAgentError } from "../../shared/cross/normalize-agent-error.js";
+import type { TabPolicy } from "../../shared/cross/types.js";
+import type { SnapshotFilter } from "../../shared/cross/snapshot-filter.js";
+import type { SerializableJsCallManifestEntry } from "../../shared/main/tool-registry.js";
 import { CS_FAST_PING_MS } from "../runner/lib/constants.js";
 import {
 	executeMainThreadCommand,
@@ -124,12 +124,12 @@ export class ExtensionSession {
 		}
 
 		// 2. Freeze registry
-		const { freezeJsRegistry } = await import("../../shared/tool-registry.js");
+		const { freezeJsRegistry } = await import("../../shared/main/tool-registry.js");
 		freezeJsRegistry();
 
 		// 3. Get manifest
 		const { getSerializableJsManifest } = await import(
-			"../../shared/tool-registry.js"
+			"../../shared/main/tool-registry.js"
 		);
 		const manifest = getSerializableJsManifest();
 

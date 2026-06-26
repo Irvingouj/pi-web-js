@@ -6,7 +6,7 @@ import {
 	Logger,
 	registerWasmSetLogLevel,
 	setLogLevel,
-} from "../src/shared/logger.js";
+} from "../src/shared/main/logger.js";
 
 describe("Logger", () => {
 	let consoleLogSpy: ReturnType<typeof vi.spyOn>;

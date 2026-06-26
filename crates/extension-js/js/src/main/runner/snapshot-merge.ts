@@ -2,9 +2,9 @@
 // Pure-ish: enumerate → collect → merge pipeline.
 /// <reference types="chrome" />
 
-import type { InlineSnapshotNode } from "../../shared/collect-inline-snapshot.js";
-import { unwrapContentScriptMessage } from "../../shared/registry/content-script-response.js";
-import type { Command } from "../../shared/registry/manifest.js";
+import type { InlineSnapshotNode } from "../../shared/cross/collect-inline-snapshot.js";
+import { unwrapContentScriptMessage } from "../../shared/main/content-script-response.js";
+import type { Command } from "../../shared/cross/manifest.js";
 
 // ─── Types ───────────────────────────────────────────────────────
 

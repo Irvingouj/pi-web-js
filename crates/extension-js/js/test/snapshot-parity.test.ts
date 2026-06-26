@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it } from "vitest";
-import { inlineSnapshot } from "../src/content-script/snapshot.js";
+import { collectInlineSnapshot as inlineSnapshot } from "../src/shared/cross/collect-inline-snapshot.js";
 import { buildSnapshotInTab } from "../src/main/runner/dom/snapshot.js";
-import { collectInlineSnapshot } from "../src/shared/collect-inline-snapshot.js";
+import { collectInlineSnapshot } from "../src/shared/cross/collect-inline-snapshot.js";
 
 describe("inline snapshot parity", () => {
 	it("buildSnapshotInTab matches collectInlineSnapshot", () => {

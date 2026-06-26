@@ -5,7 +5,7 @@ import {
 	freezeJsRegistry,
 	getSerializableJsManifest,
 	manifestEntryToWasm,
-} from "../src/shared/tool-registry.js";
+} from "../src/shared/main/tool-registry.js";
 import "../src/main/runner/index.js";
 
 const wasmPath = path.resolve(__dirname, "_real_wasm.js");

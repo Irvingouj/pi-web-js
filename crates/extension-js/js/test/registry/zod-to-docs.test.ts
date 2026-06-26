@@ -6,7 +6,7 @@ import {
 	describeSchema,
 	zodToParamDocs,
 	zodToReturnType,
-} from "../../src/shared/registry/zod-to-docs.js";
+} from "../../src/shared/cross/zod-to-docs.js";
 
 describe("zodToParamDocs", () => {
 	it("unwraps ZodEffects (preprocess) before reading shape", () => {

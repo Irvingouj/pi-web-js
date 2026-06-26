@@ -1,5 +1,5 @@
-import { logger } from "../shared/logger.js";
-import type { TabPolicy } from "../shared/registry/types.js";
+import { logger } from "../shared/main/logger.js";
+import type { TabPolicy } from "../shared/cross/types.js";
 
 let activeTabId: number | null = null;
 let listenersAttached = false;

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { beforeEach, describe, expect, it } from "vitest";
-import { inlineSnapshot } from "../src/content-script/snapshot.js";
+import { collectInlineSnapshot as inlineSnapshot } from "../src/shared/cross/collect-inline-snapshot.js";
 
 describe("T-005: max_nodes bounds snapshot work", () => {
 	beforeEach(() => {

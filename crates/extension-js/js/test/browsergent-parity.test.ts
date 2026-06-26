@@ -15,7 +15,7 @@ import {
 	registerContentScriptSpec,
 } from "../src/content-script/registry.js";
 import { buildContentScriptSpecs } from "../src/content-script/schemas.js";
-import { inlineSnapshot } from "../src/content-script/snapshot.js";
+import { collectInlineSnapshot as inlineSnapshot } from "../src/shared/cross/collect-inline-snapshot.js";
 
 beforeEach(() => {
 	resetLease();

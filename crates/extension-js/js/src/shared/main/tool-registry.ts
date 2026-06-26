@@ -3,8 +3,8 @@ import { logger } from "./logger.js";
 import {
 	clearContentScriptActions,
 	isContentScriptAction,
-} from "./registry/content-script-actions.js";
-import { dispatchValidated } from "./registry/dispatch.js";
+} from "../cross/content-script-actions.js";
+import { dispatchValidated } from "../cross/dispatch.js";
 import type {
 	AsyncResponse,
 	CallContext,
@@ -12,9 +12,9 @@ import type {
 	SerializableJsCallManifestEntry,
 	ToolDefinition,
 	ToolDoc,
-} from "./registry/manifest.js";
-import { inferOwner } from "./registry/routes.js";
-import { zodToParamDocs, zodToReturnType } from "./registry/zod-to-docs.js";
+} from "../cross/manifest.js";
+import { inferOwner } from "./routes.js";
+import { zodToParamDocs, zodToReturnType } from "../cross/zod-to-docs.js";
 
 export type {
 	AsyncError,
@@ -27,8 +27,8 @@ export type {
 	ToolDefinition,
 	ToolDoc,
 	ToolDocParam,
-} from "./registry/manifest.js";
-export { coerceWasmParams, manifestEntryToWasm } from "./registry/manifest.js";
+} from "../cross/manifest.js";
+export { coerceWasmParams, manifestEntryToWasm } from "../cross/manifest.js";
 
 const log = logger.child("tool-registry");
 

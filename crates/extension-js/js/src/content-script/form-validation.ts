@@ -9,7 +9,7 @@ import {
 	getAccessibleRole,
 	isValidationProxyInput,
 	readErrorMessage,
-} from "../shared/snapshot-dom.js";
+} from "../shared/cs/snapshot-dom.js";
 
 export type InvalidFormControl = {
 	refId: string | undefined;

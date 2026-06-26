@@ -1,5 +1,5 @@
 /// <reference types="chrome" />
-import * as schemas from "../../../../shared/schemas.js";
+import * as schemas from "../../../../shared/cross/schemas.js";
 import { registerChromePassthrough } from "../../chrome/internals.js";
 import { zChromeAny } from "./register-helpers.js";
 

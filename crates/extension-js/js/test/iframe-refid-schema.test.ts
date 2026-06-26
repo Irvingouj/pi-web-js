@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it } from "vitest";
-import { refIdString } from "../src/shared/schemas.js";
+import { refIdString } from "../src/shared/cross/schemas.js";
 
 describe("refId schema (iframe composite refIds)", () => {
 	it("accepts plain refId (top frame, backward compatible)", () => {

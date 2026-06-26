@@ -12,7 +12,7 @@ import type {
 	FsStringResult,
 	FsWriteParams,
 	FsWriteResult,
-} from "../../pkg/extension_js.js";
+} from "../../../pkg/extension_js.js";
 
 export type FsActionMap = {
 	exists: { params: FsPathParams; result: FsExistsResult };

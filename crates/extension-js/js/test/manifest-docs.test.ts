@@ -5,7 +5,7 @@ import { z } from "zod";
 
 // Load the full runner tool registrations.
 import "../src/main/runner/index.js";
-import { manifestEntryToWasm } from "../src/shared/registry/manifest.js";
+import { manifestEntryToWasm } from "../src/shared/cross/manifest.js";
 import {
 	clearRegistry,
 	freezeJsRegistry,
@@ -14,7 +14,7 @@ import {
 	registerContentScriptJsCall,
 	registerJsCall,
 	removeToolForTest,
-} from "../src/shared/tool-registry.js";
+} from "../src/shared/main/tool-registry.js";
 
 const KNOWN_OWNERS = new Set([
 	"main-thread",
@@ -527,7 +527,7 @@ describe("manifest documentation export", () => {
 	});
 
 	it("manifestEntryToWasm handles empty agentMeta arrays correctly", () => {
-		const entry: import("../src/shared/registry/manifest.js").SerializableJsCallManifestEntry =
+		const entry: import("../src/shared/cross/manifest.js").SerializableJsCallManifestEntry =
 			{
 				action: "empty_meta_test",
 				namespace: "test",
@@ -554,7 +554,7 @@ describe("manifest documentation export", () => {
 	});
 
 	it("manifestEntryToWasm handles partial agentMeta correctly", () => {
-		const entry: import("../src/shared/registry/manifest.js").SerializableJsCallManifestEntry =
+		const entry: import("../src/shared/cross/manifest.js").SerializableJsCallManifestEntry =
 			{
 				action: "partial_meta_test",
 				namespace: "test",

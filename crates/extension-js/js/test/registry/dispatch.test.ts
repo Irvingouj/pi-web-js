@@ -2,8 +2,8 @@
 
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { dispatchValidated } from "../../src/shared/registry/dispatch.js";
-import { MutationReturnSchema } from "../../src/shared/schemas.js";
+import { dispatchValidated } from "../../src/shared/cross/dispatch.js";
+import { MutationReturnSchema } from "../../src/shared/cross/schemas.js";
 
 describe("dispatchValidated with MutationReturnSchema", () => {
 	it("passes when handler returns null", async () => {

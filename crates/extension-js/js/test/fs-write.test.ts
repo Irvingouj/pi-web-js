@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { clearRoutes } from "../src/shared/registry/routes.js";
-import { FsWriteParamsSchema } from "../src/shared/schemas.js";
+import { clearRoutes } from "../src/shared/main/routes.js";
+import { FsWriteParamsSchema } from "../src/shared/cross/schemas.js";
 import {
 	extensionDispatch,
 	registerWorkerHandler,

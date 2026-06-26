@@ -12,7 +12,7 @@ OUT = ROOT / "src/main/runner/tools/chrome"
 
 IMPORT_HEADER = '''/// <reference types="chrome" />
 import { z } from "zod";
-import * as schemas from "../../../../shared/schemas.js";
+import * as schemas from "../../../../shared/cross/schemas.js";
 import { registerChromePassthrough } from "../../chrome/internals.js";
 
 '''

@@ -4,7 +4,7 @@ import {
 	labelNotFoundError,
 	normalizeAgentError,
 	staleRefError,
-} from "../src/shared/registry/normalize-agent-error.js";
+} from "../src/shared/cross/normalize-agent-error.js";
 
 describe("normalizeAgentError", () => {
 	it("maps Receiving end does not exist to E_CONTENT_SCRIPT with recovery", () => {

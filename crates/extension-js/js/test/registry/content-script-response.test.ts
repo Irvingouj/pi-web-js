@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
 	parseAsyncError,
 	unwrapContentScriptMessage,
-} from "../../src/shared/registry/content-script-response.js";
+} from "../../src/shared/main/content-script-response.js";
 
 describe("parseAsyncError", () => {
 	it("preserves structured validation errors", () => {

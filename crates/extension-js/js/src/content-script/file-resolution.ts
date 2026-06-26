@@ -3,9 +3,9 @@
  * payloads (base64 bytes or fetched URL) into real `File` objects and
  * verifies they landed on the input.
  */
-import { base64ToUint8Array } from "../shared/array-buffer.js";
-import { throwStructuredAgentError } from "../shared/registry/normalize-agent-error.js";
-import { notInteractableError } from "../shared/registry/agent-errors.js";
+import { base64ToUint8Array } from "../shared/cross/array-buffer.js";
+import { throwStructuredAgentError } from "../shared/cross/normalize-agent-error.js";
+import { notInteractableError } from "../shared/cross/agent-errors.js";
 import { asRecord } from "./dom-utils.js";
 
 export type ResolvedBytesFile = {

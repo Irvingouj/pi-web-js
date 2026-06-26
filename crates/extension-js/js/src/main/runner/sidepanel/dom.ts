@@ -1,6 +1,6 @@
 /// <reference types="chrome" />
 
-import { refIdString } from "../../../shared/schemas.js";
+import { refIdString } from "../../../shared/cross/schemas.js";
 import { asRecord } from "../lib/params.js";
 
 /**

@@ -1,12 +1,12 @@
 /// <reference types="chrome" />
 import { z } from "zod";
-import { logger } from "../../../shared/logger.js";
-import * as schemas from "../../../shared/schemas.js";
+import { logger } from "../../../shared/main/logger.js";
+import * as schemas from "../../../shared/cross/schemas.js";
 import {
 	dispatchTool,
 	registerJsCall,
 	type ToolDocParam,
-} from "../../../shared/tool-registry.js";
+} from "../../../shared/main/tool-registry.js";
 import { requireArgumentArray, unwrapResult } from "../runtime.js";
 import {
 	checkPermission,

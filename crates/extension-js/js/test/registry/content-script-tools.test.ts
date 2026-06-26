@@ -8,13 +8,13 @@ import {
 	clearContentScriptActions,
 	getContentScriptActions,
 	isContentScriptAction,
-} from "../../src/shared/registry/content-script-actions.js";
-import { defineContentScriptTool } from "../../src/shared/registry/define-content-script-tool.js";
+} from "../../src/shared/cross/content-script-actions.js";
+import { defineContentScriptTool } from "../../src/shared/main/define-content-script-tool.js";
 import {
 	clearJsRegistry,
 	freezeJsRegistry,
 	getSerializableJsManifest,
-} from "../../src/shared/tool-registry.js";
+} from "../../src/shared/main/tool-registry.js";
 
 describe("content-script action set", () => {
 	beforeEach(() => {
@@ -118,7 +118,7 @@ describe("dropdown rule in agent docs", () => {
 
 	it("select_option agentMeta enforces dropdown rule and uses degree example", async () => {
 		const { CONTENT_SCRIPT_TOOL_SPECS } = await import(
-			"../../src/shared/registry/content-script-tools.js"
+			"../../src/shared/cross/content-script-tools.js"
 		);
 		const spec = CONTENT_SCRIPT_TOOL_SPECS.find(
 			(s) => s.action === "page_select_option",

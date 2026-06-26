@@ -3,10 +3,10 @@
  *
  * Walks an element subtree to a bounded depth, emitting a serializable node
  * per element with tag/role/name/text/raw-attributes/form-state/hidden-reason.
- * Distinct from the inline-snapshot pipeline (`shared/collect-inline-snapshot`),
+ * Distinct from the inline-snapshot pipeline (`shared/cross/collect-inline-snapshot`),
  * which produces a ref-id-annotated markdown rendering for agent consumption.
  */
-import { allocateRefId } from "../shared/ref-id.js";
+import { allocateRefId } from "../shared/cs/ref-id.js";
 import {
 	getAccessibleName,
 	getAccessibleRole,
@@ -14,7 +14,7 @@ import {
 	isSelfOrAncestorHidden,
 	readFormFields,
 	resolveAbsoluteUrl,
-} from "../shared/snapshot-dom.js";
+} from "../shared/cs/snapshot-dom.js";
 
 export type DomNode = {
 	refId?: string;

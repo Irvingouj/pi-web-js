@@ -1,4 +1,4 @@
-import * as schemas from "../../../../shared/schemas.js";
+import * as schemas from "../../../../shared/cross/schemas.js";
 import { registerChromePassthrough } from "../../chrome/internals.js";
 import { zChromeVoid } from "./register-helpers.js";
 

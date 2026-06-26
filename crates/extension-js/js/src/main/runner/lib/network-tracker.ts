@@ -1,5 +1,5 @@
 /// <reference types="chrome" />
-import { logger } from "../../../shared/logger.js";
+import { logger } from "../../../shared/main/logger.js";
 import { NETWORK_IDLE_QUIET_MS } from "./constants.js";
 
 const log = logger.child("runner");

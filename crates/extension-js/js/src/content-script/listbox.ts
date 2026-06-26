@@ -12,7 +12,7 @@
  * Unrelated listboxes already visible before activation (e.g. a persistent
  * phone-country widget) are excluded.
  */
-import { isSelfOrAncestorHidden } from "../shared/snapshot-dom.js";
+import { isSelfOrAncestorHidden } from "../shared/cs/snapshot-dom.js";
 
 /** Stable signature of a listbox's options — option text only, ignoring
  *  attribute reordering, timestamps, and other non-content markup. */

@@ -20,7 +20,7 @@
 import {
 	getAccessibleName,
 	getAccessibleRole,
-} from "../shared/snapshot-dom.js";
+} from "../shared/cs/snapshot-dom.js";
 
 export interface ObservedTarget {
 	element: Element;

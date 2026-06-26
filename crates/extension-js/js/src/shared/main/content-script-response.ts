@@ -1,4 +1,4 @@
-import type { AsyncError, AsyncResponse } from "./manifest.js";
+import type { AsyncError, AsyncResponse } from "../cross/manifest.js";
 
 const TRANSPORT_ERROR: AsyncError = {
 	message: "Content script error",

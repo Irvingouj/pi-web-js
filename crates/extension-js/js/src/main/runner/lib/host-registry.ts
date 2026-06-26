@@ -1,5 +1,5 @@
 /// <reference types="chrome" />
-import { getTool } from "../../../shared/tool-registry.js";
+import { getTool } from "../../../shared/main/tool-registry.js";
 import type { HostHandler } from "./types.js";
 
 // ─── Host handler registry ─────────────────────────────────────

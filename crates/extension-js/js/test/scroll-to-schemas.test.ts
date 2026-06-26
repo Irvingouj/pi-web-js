@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
 	PageScrollToParamsSchema,
 	TabScrollToParamsSchema,
-} from "../src/shared/schemas.js";
+} from "../src/shared/cross/schemas.js";
 
 describe("scroll_to param schemas", () => {
 	it("PageScrollToParamsSchema accepts coordinates without refId", () => {

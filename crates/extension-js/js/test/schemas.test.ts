@@ -14,7 +14,7 @@ import {
 	PageSetFilesParamsSchema,
 	PageSnapshotQueryParamsSchema,
 	TabSnapshotQueryParamsSchema,
-} from "../src/shared/schemas.js";
+} from "../src/shared/cross/schemas.js";
 import {
 	extensionDispatch,
 	registerWorkerHandlerValidated,

@@ -1,8 +1,8 @@
 /// <reference types="chrome" />
 
-import { logger as logModule } from "../../shared/logger.js";
-import type { AsyncResponse, Command } from "../../shared/tool-registry.js";
-import { dispatchTool, getRunnerSignal } from "../../shared/tool-registry.js";
+import { logger as logModule } from "../../shared/main/logger.js";
+import type { AsyncResponse, Command } from "../../shared/main/tool-registry.js";
+import { dispatchTool, getRunnerSignal } from "../../shared/main/tool-registry.js";
 import { isNativeParityAction, normalizeParityArgs } from "./chrome/native.js";
 import { handleHostCallAction } from "./host.js";
 import { isValidMainThreadAction } from "./lib/host-registry.js";

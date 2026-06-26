@@ -3,7 +3,7 @@ import {
 	notInteractableError,
 	staleRefError,
 	throwStructuredAgentError,
-} from "../shared/registry/normalize-agent-error.js";
+} from "../shared/cross/normalize-agent-error.js";
 import {
 	enrichFormNode,
 	getAccessibleName,
@@ -11,7 +11,7 @@ import {
 	INTERACTIVE_SELECTOR,
 	isSelfOrAncestorHidden,
 	shouldInclude,
-} from "../shared/snapshot-dom.js";
+} from "../shared/cs/snapshot-dom.js";
 
 export { enrichFormNode, getAccessibleName, getAccessibleRole, shouldInclude };
 

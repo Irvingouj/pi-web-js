@@ -1,6 +1,6 @@
 import type { z } from "zod";
-import { dispatchValidated } from "../shared/registry/dispatch.js";
-import { coerceWasmParams } from "../shared/registry/manifest.js";
+import { dispatchValidated } from "../shared/cross/dispatch.js";
+import { coerceWasmParams } from "../shared/cross/manifest.js";
 
 export type ContentScriptHandler = (
 	params: unknown,

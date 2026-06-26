@@ -4,13 +4,13 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
 	addContentScriptAction,
 	clearContentScriptActions,
-} from "../../src/shared/registry/content-script-actions.js";
+} from "../../src/shared/cross/content-script-actions.js";
 import {
 	clearRoutes,
 	inferTabPolicy,
 	populateRoutesFromManifest,
 	routeFromOwner,
-} from "../../src/shared/registry/routes.js";
+} from "../../src/shared/main/routes.js";
 
 describe("registry routes", () => {
 	beforeEach(() => {

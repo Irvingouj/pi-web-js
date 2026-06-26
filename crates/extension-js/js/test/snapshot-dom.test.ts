@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { collectInlineSnapshot } from "../src/shared/collect-inline-snapshot.js";
+import { collectInlineSnapshot } from "../src/shared/cross/collect-inline-snapshot.js";
 import {
 	getOwnVisibleText,
 	hasDirectTextContent,
 	isMarkdownVisible,
 	shouldInclude,
-} from "../src/shared/snapshot-dom.js";
+} from "../src/shared/cs/snapshot-dom.js";
 
 describe("snapshot-dom markdown visibility", () => {
 	beforeEach(() => {

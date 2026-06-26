@@ -1,7 +1,7 @@
 /// <reference types="chrome" />
 import { z } from "zod";
-import * as schemas from "../../../shared/schemas.js";
-import { registerJsCall } from "../../../shared/tool-registry.js";
+import * as schemas from "../../../shared/cross/schemas.js";
+import { registerJsCall } from "../../../shared/main/tool-registry.js";
 import type { FetchParams } from "../runtime.js";
 import { handleFetch, unwrapResult } from "../runtime.js";
 

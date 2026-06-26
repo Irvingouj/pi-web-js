@@ -1,11 +1,9 @@
 import {
 	notInteractableError,
 	throwStructuredAgentError,
-} from "../shared/registry/normalize-agent-error.js";
-import type { PageActionResult } from "../shared/schemas.js";
-import { readFormFields } from "../shared/snapshot-dom.js";
-
-export { readFormFields };
+} from "../shared/cross/normalize-agent-error.js";
+import type { PageActionResult } from "../shared/cross/schemas.js";
+import { readFormFields } from "../shared/cs/snapshot-dom.js";
 
 export function makeActionResult(
 	action: string,
