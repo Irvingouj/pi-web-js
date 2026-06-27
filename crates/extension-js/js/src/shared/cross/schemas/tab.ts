@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+	bigintLike,
 	refIdString,
 	requireRefIdLabelOrCoordinates,
 	tabElementTargetParams,
@@ -209,5 +210,21 @@ export const TabSnapshotDataParamsSchema = z
 			.describe("Target tab ID"),
 		max_nodes: z.number().optional().describe("Maximum nodes to include"),
 		options: z.object({}).passthrough().optional().describe("Snapshot options"),
+	})
+	.passthrough();
+
+export const TabGotoParamsSchema = z
+	.object({
+		...tabIdField,
+		url: z.string().describe("URL to navigate the tab to"),
+		timeout: bigintLike()
+			.optional()
+			.describe("Navigation timeout in milliseconds"),
+		waitUntil: z
+			.enum(["load", "networkidle"])
+			.optional()
+			.describe(
+				"When to consider navigation complete: 'load' (tab status complete) or 'networkidle' (no in-flight requests for 500ms)",
+			),
 	})
 	.passthrough();

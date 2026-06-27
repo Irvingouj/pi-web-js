@@ -5,6 +5,25 @@ is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
 
+## [0.13.2] — 2026-06-27
+
+### Added — `web.tab.goto` (tab-scoped navigation)
+
+- **New primitive `web.tab.goto({ tabId, url, waitUntil?, timeout? })`.** Previously the only navigation API was `page.goto`, which resolves the *active* tab — forcing the agent into `web.tab.activate(tabId); page.goto(url)` whenever it needed to navigate a specific tab. This introduced global active-tab state, made parallel multi-tab research impossible, and risked activating a site tab near the Browsergent side panel. `web.tab.goto` navigates a specific `tabId` directly: parallelizable via `Promise.all`, no active-tab mutation, and applies the same `chrome-extension://` / `chrome://` rejection as `page.goto` — but against the *target* tab's pre-navigation URL.
+- **Shared `navigateTab()` helper** (`runner/tab/execute.ts`): the navigation core (navListener → `tabs.update` → `waitForTabLoad` → post-nav URL guards → `networkidle` → content-script ping → final tab get) is extracted once and consumed by both `page.goto` (after active-tab resolution) and `web.tab.goto` (after `tabId` extraction). Removes ~90 lines of duplication; both handlers' observable contracts unchanged.
+- **Schema-validated tab returns.** `navigateTab` and both handlers now parse the pre-/post-navigation tab through `ChromeTabSchema.safeParse` instead of inline-casting `unknown` to `{ url?: string }`, closing a type hole where the manifest-declared `ChromeTab` return shape was never validated at runtime.
+
+### Fixed — error contracts
+
+- **`web.tab.goto` rejects nonexistent `tabId` with `E_NO_TAB`** before delegating to `navigateTab`, instead of surfacing a raw `chrome_tabs_update` error.
+- **Post-navigation "Navigation did not start" guard** (status complete + URL unchanged + URL ≠ requested) now runs only when the post-nav tab parses against `ChromeTabSchema`, so a malformed `chrome.tabs.get` response skips the guard rather than reading fabricated fields.
+
+### Tests
+
+- 5 new `tab_goto` tests: happy path, `E_PERMISSION` for both `chrome-extension://` and `chrome://` target tabs, `E_NAVIGATION` for non-http(s) URLs, timeout, redirect success.
+- 5 more: `E_MISSING_PARAM` for missing `tabId`, `E_NO_TAB` for nonexistent `tabId`, `navListener` removal on the timeout/error path (no listener leak), and the "Navigation did not start" guard.
+- Full `runner.test.ts` suite (212 tests) and `manifest-docs.test.ts` (31 tests) green.
+
 
 ## [0.12.2]
 
@@ -155,6 +174,7 @@ is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Added `problems.md` E2E fixtures and tests.
 - Fixed `web-js` `WasmAsyncError` compile.
 
+[0.13.2]: https://www.npmjs.com/package/@pi-oxide/extension-js/v/0.13.2
 [0.12.3]: https://www.npmjs.com/package/@pi-oxide/extension-js/v/0.12.3
 [0.12.2]: https://www.npmjs.com/package/@pi-oxide/extension-js/v/0.12.2
 [0.12.1]: https://www.npmjs.com/package/@pi-oxide/extension-js/v/0.12.1

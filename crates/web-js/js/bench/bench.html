@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>QuickJS ephemeral-VM bench — @pi-oxide/web-js</title>
+<style>
+  body {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    background: #0d1117;
+    color: #c9d1d9;
+    margin: 2em;
+    line-height: 1.5;
+  }
+  h1 { font-size: 1.05em; color: #58a6ff; margin: 0 0 1em; }
+  .row { display: flex; flex-wrap: wrap; gap: 0.6em; align-items: center; }
+  button {
+    font: inherit;
+    padding: 0.45em 0.9em;
+    background: #238636;
+    color: #fff;
+    border: 0;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  button:disabled { opacity: 0.5; cursor: default; }
+  label { color: #8b949e; font-size: 0.9em; }
+  input {
+    font: inherit;
+    background: #161b22;
+    color: #c9d1d9;
+    border: 1px solid #30363d;
+    border-radius: 4px;
+    padding: 0.25em 0.45em;
+  }
+  input[type="number"] { width: 5em; }
+  #code { width: 26em; }
+  pre {
+    background: #161b22;
+    border: 1px solid #30363d;
+    padding: 1em;
+    border-radius: 6px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin-top: 1em;
+  }
+  .hint { color: #8b949e; font-size: 0.85em; max-width: 82ch; margin-top: 1.5em; }
+  code { background: #161b22; padding: 0.1em 0.35em; border-radius: 3px; }
+</style>
+</head>
+<body>
+<h1>QuickJS ephemeral-VM bench — @pi-oxide/web-js</h1>
+
+<div class="row">
+  <button id="run">Run bench</button>
+  <label>iterations <input id="iters" type="number" value="200" min="10" /></label>
+  <label>warmup <input id="warmup" type="number" value="10" min="0" /></label>
+  <label>cell code <input id="code" type="text" value="1+1" /></label>
+</div>
+
+<pre id="out">ready — click "Run bench".</pre>
+
+<p class="hint">
+  Measures the per-handler cost of
+  <code>new WebSession() → runCellAsync(code) → free()</code> — a fresh QuickJS
+  Runtime+Context per event, deallocated after. The <b>bootstrap</b> line is the
+  one-off module decode+compile+instantiate (Phase A). <b>init</b> = Runtime+Context
+  + bindings (Phase B+C). <b>Memory</b> is the wasm linear heap; a plateau means the
+  Rust allocator is reusing its pool across handlers — the core argument for the
+  ephemeral model vs a persistent VM.
+  <br /><br />
+  Serve: <code>node crates/web-js/js/bench/serve.mjs</code> → open the printed URL.
+</p>
+
+<script type="module">
+  const $ = (id) => document.getElementById(id);
+  let bootstrapMs = null;
+  let mod = null;
+
+  $("run").addEventListener("click", async () => {
+    $("run").disabled = true;
+    const out = $("out");
+    try {
+      if (!mod) {
+        out.textContent = "loading wasm module (measuring cold bootstrap… this takes a few seconds)…";
+        // Time the dynamic import: this transitively imports web_js.js, which
+        // base64-decodes + compiles + instantiates + runs __wbindgen_start.
+        const t0 = performance.now();
+        mod = await import("./bench.mjs");
+        bootstrapMs = performance.now() - t0;
+      }
+      out.textContent = "running (warmup + steady-state sampling)…";
+      const report = await mod.runBench({
+        iterations: Number($("iters").value) || 200,
+        warmup: Number($("warmup").value) || 10,
+        code: $("code").value || "1+1",
+        heavyCode:
+          "var s='';for(var i=0;i<20000;i++){s+=i;} JSON.stringify(s).length",
+      });
+      out.textContent = mod.formatReport(report, bootstrapMs);
+      console.log("bench:report", report);
+      console.log("bench:json", JSON.stringify(report));
+    } catch (e) {
+      out.textContent = `error: ${e && e.stack ? e.stack : e}`;
+      console.error(e);
+    } finally {
+      $("run").disabled = false;
+    }
+  });
+</script>
+</body>
+</html>

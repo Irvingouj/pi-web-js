@@ -1,12 +1,25 @@
 /// <reference types="chrome" />
+import type { z } from "zod";
 
 import { contentScriptMissingError } from "../../../shared/cross/normalize-agent-error.js";
+import * as schemas from "../../../shared/cross/schemas.js";
 import { unwrapContentScriptMessage } from "../../../shared/main/content-script-response.js";
 import { logger } from "../../../shared/main/logger.js";
-import type { AsyncResponse } from "../../../shared/main/tool-registry.js";
-import { throwIfAborted } from "../../../shared/main/tool-registry.js";
+import {
+	type AsyncResponse,
+	dispatchTool,
+	throwIfAborted,
+} from "../../../shared/main/tool-registry.js";
 import { normalizeChromeError } from "../chrome/internals.js";
-import { DEFAULT_POLL_INTERVAL_MS } from "../lib/constants.js";
+import {
+	CONTENT_SCRIPT_GRACE_MS,
+	DEFAULT_POLL_INTERVAL_MS,
+	DEFAULT_TIMEOUT_MS,
+	NETWORK_IDLE_QUIET_MS,
+} from "../lib/constants.js";
+import { NetworkTracker } from "../lib/network-tracker.js";
+import { unwrapResult } from "../lib/params.js";
+import { makeError } from "../lib/types.js";
 
 function sleep(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
@@ -335,4 +348,137 @@ export async function waitForTabLoad(
 		}
 		return normalizeChromeError(err);
 	}
+}
+
+export interface NavigateTabOptions {
+	tabId: number;
+	url: string;
+	preNavigationUrl: string | undefined;
+	waitUntil?: "load" | "networkidle";
+	timeoutMs?: number;
+	traceId?: string;
+	logPrefix: string;
+}
+
+/**
+ * Shared navigation core used by both page.goto (active-tab) and
+ * web.tab.goto (tab-scoped). Handles tabs.update, waitForTabLoad,
+ * post-nav URL guards, networkidle, content-script ping, and final tab get.
+ */
+export async function navigateTab(
+	options: NavigateTabOptions,
+): Promise<z.infer<typeof schemas.ChromeTabSchema>> {
+	const {
+		tabId,
+		url,
+		preNavigationUrl,
+		waitUntil,
+		timeoutMs = DEFAULT_TIMEOUT_MS,
+		traceId = "?",
+		logPrefix,
+	} = options;
+
+	const chromeApi = window.chrome;
+	let navSawLoading = false;
+	const navListener = (
+		updatedTabId: number,
+		changeInfo: { status?: string },
+	) => {
+		if (updatedTabId !== tabId) return;
+		if (changeInfo.status === "loading") {
+			navSawLoading = true;
+		}
+	};
+	chromeApi?.tabs?.onUpdated?.addListener(navListener);
+	try {
+		const updateResult = await dispatchTool("chrome_tabs_update", [
+			tabId,
+			{ url },
+		]);
+		if (!updateResult.ok) {
+			return unwrapResult(updateResult);
+		}
+		const loadResult = await waitForTabLoad(tabId, timeoutMs, {
+			preNavigationUrl,
+			getNavSawLoading: () => navSawLoading,
+			runId: traceId,
+		});
+		if (!loadResult.ok) {
+			return unwrapResult(loadResult);
+		}
+		logger.debug(`${logPrefix}_tab_load_complete`, { traceId, tabId });
+	} finally {
+		chromeApi?.tabs?.onUpdated?.removeListener(navListener);
+	}
+
+	const tabCheck = await dispatchTool("chrome_tabs_get", [tabId]);
+	if (tabCheck.ok && tabCheck.value) {
+		const parsed = schemas.ChromeTabSchema.safeParse(tabCheck.value);
+		if (parsed.success) {
+			const currentUrl = parsed.data.url ?? "";
+			if (
+				currentUrl &&
+				!currentUrl.startsWith("http:") &&
+				!currentUrl.startsWith("https:")
+			) {
+				throw makeError(
+					`Navigation blocked: cannot script ${currentUrl}`,
+					"E_NAVIGATION",
+					"navigation",
+				);
+			}
+			if (
+				preNavigationUrl &&
+				parsed.data.status === "complete" &&
+				currentUrl === preNavigationUrl &&
+				currentUrl !== url
+			) {
+				throw makeError(
+					`Navigation did not start for ${url}`,
+					"E_NAVIGATION",
+					"navigation",
+				);
+			}
+		}
+	}
+
+	if (waitUntil === "networkidle") {
+		const tracker = new NetworkTracker(tabId);
+		try {
+			logger.debug(`${logPrefix}_network_idle_start`, { traceId, tabId });
+			tracker.start();
+			const networkTimeout = Math.max(NETWORK_IDLE_QUIET_MS * 2, timeoutMs);
+			await tracker.waitForIdle(networkTimeout, traceId);
+		} catch (idleErr) {
+			logger.debug(`${logPrefix}_network_idle_timeout`, {
+				traceId,
+				tabId,
+				error: idleErr instanceof Error ? idleErr.message : String(idleErr),
+			});
+			throw makeError(
+				idleErr instanceof Error ? idleErr.message : String(idleErr),
+				"E_NAVIGATION",
+				"navigation",
+			);
+		} finally {
+			tracker.dispose();
+			logger.debug(`${logPrefix}_network_idle_done`, { traceId, tabId });
+		}
+	}
+
+	const pingResult = await pingTabContentScript(tabId, timeoutMs);
+	if (!pingResult.ok) {
+		return unwrapResult(pingResult);
+	}
+	await new Promise((resolve) => setTimeout(resolve, CONTENT_SCRIPT_GRACE_MS));
+	const freshTab = await dispatchTool("chrome_tabs_get", [tabId]);
+	const parsed = schemas.ChromeTabSchema.safeParse(unwrapResult(freshTab));
+	if (!parsed.success) {
+		throw makeError(
+			`Navigation completed but the resulting tab failed schema validation: ${parsed.error.message}`,
+			"E_UNKNOWN",
+			"navigation",
+		);
+	}
+	return parsed.data;
 }

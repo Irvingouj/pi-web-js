@@ -3,14 +3,17 @@ import { z } from "zod";
 import { CONTENT_SCRIPT_TOOL_SPECS } from "../../../shared/cross/content-script-tools.js";
 import * as schemas from "../../../shared/cross/schemas.js";
 import { defineContentScriptTool } from "../../../shared/main/define-content-script-tool.js";
+import { logger } from "../../../shared/main/logger.js";
 import {
 	dispatchTool,
 	registerJsCall,
 } from "../../../shared/main/tool-registry.js";
 import {
 	asRecord,
+	DEFAULT_TIMEOUT_MS,
 	extractTabId,
 	makeError,
+	navigateTab,
 	resolveActiveTabId,
 	unwrapResult,
 	waitForTabLoad,
@@ -281,4 +284,104 @@ registerJsCall({
 	returnDoc: "true",
 	errorCode: "E_NO_TAB",
 	example: "web.tab.wait_for_load({ tabId: 123, timeout: 5000 })",
+});
+
+registerJsCall({
+	action: "tab_goto",
+	namespace: "web.tab",
+	name: "goto",
+	description:
+		"Navigate a specific tab to a URL (tab-scoped; avoids active-tab global state)",
+	params: schemas.TabGotoParamsSchema,
+	returns: schemas.ChromeTabSchema,
+	fields: ["url"],
+	owner: "main-thread",
+	handler: async (params, ctx) => {
+		const tabId = extractTabId(asRecord(params));
+		if (tabId === null) {
+			throw makeError("tab_goto requires a tabId", "E_MISSING_PARAM");
+		}
+		const traceId = ctx.runId ?? "?";
+		logger.debug("tab_goto_start", {
+			traceId,
+			tabId,
+			url: params.url,
+			waitUntil: params.waitUntil ?? "load",
+			timeoutMs: Number(params.timeout) || DEFAULT_TIMEOUT_MS,
+		});
+
+		if (!params.url.startsWith("http:") && !params.url.startsWith("https:")) {
+			throw makeError(
+				`Navigation blocked: URL scheme not supported (${params.url})`,
+				"E_NAVIGATION",
+				"navigation",
+			);
+		}
+
+		const preNavResult = await dispatchTool("chrome_tabs_get", [tabId]);
+		if (!preNavResult.ok || !preNavResult.value) {
+			throw makeError(
+				`tab_goto: tab ${tabId} not found`,
+				"E_NO_TAB",
+				"extension",
+			);
+		}
+		const preNavTab = schemas.ChromeTabSchema.safeParse(preNavResult.value);
+		if (!preNavTab.success) {
+			throw makeError(
+				`tab_goto: tab ${tabId} failed schema validation`,
+				"E_UNKNOWN",
+				"extension",
+			);
+		}
+		const preNavigationUrl = preNavTab.data.url;
+
+		if (
+			preNavigationUrl &&
+			(preNavigationUrl.startsWith("chrome-extension://") ||
+				preNavigationUrl.startsWith("chrome://"))
+		) {
+			throw makeError(
+				`Refusing to navigate tab ${tabId} (${preNavigationUrl}) — it is a chrome-extension:// or chrome:// page. Use web.tab.list() to find an http(s) tab.`,
+				"E_PERMISSION",
+				"navigation",
+			);
+		}
+
+		const timeoutMs = Number(params.timeout) || DEFAULT_TIMEOUT_MS;
+		return navigateTab({
+			tabId,
+			url: params.url,
+			preNavigationUrl,
+			waitUntil: params.waitUntil,
+			timeoutMs,
+			traceId,
+			logPrefix: "tab_goto",
+		});
+	},
+	paramTypes: [
+		{
+			name: "tabId",
+			type: "number",
+			required: true,
+			description: "Tab ID to navigate (literal)",
+		},
+		{
+			name: "url",
+			type: "string",
+			required: true,
+			description: "URL to navigate to (url)",
+		},
+		{
+			name: "waitUntil",
+			type: '"load" | "networkidle"',
+			required: false,
+			description:
+				"When to consider navigation complete. 'load' waits for tab status complete (default). 'networkidle' waits until no in-flight requests for 500ms.",
+		},
+	],
+	returnDoc: "Updated tab",
+	errorCode: "E_NAVIGATION",
+	errorCategory: "navigation",
+	example: 'web.tab.goto({ tabId: 42, url: "https://example.com" })',
 });

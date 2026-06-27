@@ -12,20 +12,17 @@ import {
 	dispatchTool,
 	registerJsCall,
 } from "../../../shared/main/tool-registry.js";
-import { NetworkTracker } from "../lib/network-tracker.js";
 import {
-	CONTENT_SCRIPT_GRACE_MS,
 	CS_FAST_PING_MS,
 	DEFAULT_TIMEOUT_MS,
 	extractTabId,
 	makeError,
-	NETWORK_IDLE_QUIET_MS,
+	navigateTab,
 	pingTabContentScript,
 	preflightDomTab,
 	resolveActiveTabId,
 	throwAgentError,
 	unwrapResult,
-	waitForTabLoad,
 } from "../runtime.js";
 
 async function requireActiveTab(action: string): Promise<number> {
@@ -112,10 +109,13 @@ registerJsCall({
 			);
 		}
 		const preNavResult = await dispatchTool("chrome_tabs_get", [activeTab]);
-		const preNavigationUrl =
+		const preNavTab =
 			preNavResult.ok && preNavResult.value
-				? (preNavResult.value as { url?: string }).url
+				? schemas.ChromeTabSchema.safeParse(preNavResult.value)
 				: undefined;
+		const preNavigationUrl = preNavTab?.success
+			? preNavTab.data.url
+			: undefined;
 		// Never navigate the Browsergent side panel or other chrome-extension:// pages.
 		// page.goto targets the runner's active tab, which in side-panel contexts is
 		// the extension page itself — navigating it destroys the UI and breaks the
@@ -131,95 +131,16 @@ registerJsCall({
 				"navigation",
 			);
 		}
-		const chromeApi = window.chrome;
-		let navSawLoading = false;
-		const navListener = (tabId: number, changeInfo: { status?: string }) => {
-			if (tabId !== activeTab) return;
-			if (changeInfo.status === "loading") {
-				navSawLoading = true;
-			}
-		};
 		const timeoutMs = Number(params.timeout) || DEFAULT_TIMEOUT_MS;
-		chromeApi?.tabs?.onUpdated?.addListener(navListener);
-		try {
-			const updateResult = await dispatchTool("chrome_tabs_update", [
-				activeTab,
-				{ url: params.url },
-			]);
-			if (!updateResult.ok) {
-				return unwrapResult(updateResult);
-			}
-			const loadResult = await waitForTabLoad(activeTab, timeoutMs, {
-				preNavigationUrl,
-				getNavSawLoading: () => navSawLoading,
-				runId: traceId,
-			});
-			if (!loadResult.ok) {
-				return unwrapResult(loadResult);
-			}
-			logger.debug("page_goto_tab_load_complete", { traceId });
-		} finally {
-			chromeApi?.tabs?.onUpdated?.removeListener(navListener);
-		}
-		const tabCheck = await dispatchTool("chrome_tabs_get", [activeTab]);
-		if (tabCheck.ok && tabCheck.value) {
-			const tab = tabCheck.value as { url?: string; status?: string };
-			const currentUrl = tab.url ?? "";
-			if (
-				currentUrl &&
-				!currentUrl.startsWith("http:") &&
-				!currentUrl.startsWith("https:")
-			) {
-				throw makeError(
-					`Navigation blocked: cannot script ${currentUrl}`,
-					"E_NAVIGATION",
-					"navigation",
-				);
-			}
-			if (
-				preNavigationUrl &&
-				tab.status === "complete" &&
-				currentUrl === preNavigationUrl &&
-				currentUrl !== params.url
-			) {
-				throw makeError(
-					`Navigation did not start for ${params.url}`,
-					"E_NAVIGATION",
-					"navigation",
-				);
-			}
-		}
-		if (params.waitUntil === "networkidle") {
-			const tracker = new NetworkTracker(activeTab);
-			try {
-				logger.debug("page_goto_network_idle_start", { traceId });
-				tracker.start();
-				const networkTimeout = Math.max(NETWORK_IDLE_QUIET_MS * 2, timeoutMs);
-				await tracker.waitForIdle(networkTimeout, traceId);
-			} catch (idleErr) {
-				logger.debug("page_goto_network_idle_timeout", {
-					traceId,
-					error: idleErr instanceof Error ? idleErr.message : String(idleErr),
-				});
-				throw makeError(
-					idleErr instanceof Error ? idleErr.message : String(idleErr),
-					"E_NAVIGATION",
-					"navigation",
-				);
-			} finally {
-				tracker.dispose();
-				logger.debug("page_goto_network_idle_done", { traceId });
-			}
-		}
-		const pingResult = await pingTabContentScript(activeTab, timeoutMs);
-		if (!pingResult.ok) {
-			return unwrapResult(pingResult);
-		}
-		await new Promise((resolve) =>
-			setTimeout(resolve, CONTENT_SCRIPT_GRACE_MS),
-		);
-		const freshTab = await dispatchTool("chrome_tabs_get", [activeTab]);
-		return unwrapResult(freshTab);
+		return navigateTab({
+			tabId: activeTab,
+			url: params.url,
+			preNavigationUrl,
+			waitUntil: params.waitUntil,
+			timeoutMs,
+			traceId,
+			logPrefix: "page_goto",
+		});
 	},
 	paramTypes: [
 		{

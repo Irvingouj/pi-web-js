@@ -59,6 +59,7 @@ export type {
 export { makeError, throwAgentError } from "./lib/types.js";
 export { extractRefId, getElementByRefId } from "./sidepanel/dom.js";
 export {
+	navigateTab,
 	pingTabContentScript,
 	preflightDomTab,
 	waitForTabLoad,

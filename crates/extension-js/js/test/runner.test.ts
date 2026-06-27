@@ -1953,6 +1953,289 @@ describe("page actions", () => {
 	});
 });
 
+// ─── tab_goto tests ─────────────────────────────────────────────
+
+describe("tab_goto", () => {
+	beforeEach(async () => {
+		vi.clearAllMocks();
+		await stubChromeWithGrantedPermissions();
+	});
+
+	it("tab_goto navigates a specific tabId and awaits load", async () => {
+		mockChrome.tabs.get
+			.mockResolvedValueOnce({
+				id: 42,
+				status: "complete",
+				url: "https://old.example",
+			})
+			.mockResolvedValue({
+				id: 42,
+				status: "complete",
+				url: "https://target.example",
+			});
+		mockChrome.tabs.sendMessage.mockResolvedValue({ ok: true });
+		const onUpdatedListeners: Array<
+			(tabId: number, changeInfo: { status?: string }) => void
+		> = [];
+		mockChrome.tabs.onUpdated.addListener.mockImplementation((fn: any) => {
+			onUpdatedListeners.push(fn);
+		});
+		mockChrome.tabs.onUpdated.removeListener.mockImplementation((fn: any) => {
+			const idx = onUpdatedListeners.indexOf(fn);
+			if (idx !== -1) onUpdatedListeners.splice(idx, 1);
+		});
+
+		const dispatchPromise = dispatchTool("tab_goto", {
+			tabId: 42,
+			url: "https://target.example",
+		});
+
+		setTimeout(() => {
+			for (const listener of onUpdatedListeners) {
+				listener(42, { status: "loading" });
+				listener(42, { status: "complete" });
+			}
+		}, 150);
+
+		const result = await dispatchPromise;
+		expect(result.ok).toBe(true);
+		expect(mockChrome.tabs.update).toHaveBeenCalledWith(42, {
+			url: "https://target.example",
+		});
+		expect(mockChrome.tabs.sendMessage).toHaveBeenCalledWith(42, {
+			action: "ping",
+		});
+		expect(mockChrome.tabs.onUpdated.removeListener).toHaveBeenCalled();
+	}, 10_000);
+
+	it("tab_goto returns E_PERMISSION when target tab is chrome-extension or chrome://", async () => {
+		mockChrome.tabs.get.mockResolvedValueOnce({
+			id: 42,
+			url: "chrome-extension://abc/sidepanel.html",
+		});
+
+		const result = await dispatchTool("tab_goto", {
+			tabId: 42,
+			url: "https://example.com",
+		});
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_PERMISSION");
+			expect(result.error.category).toBe("navigation");
+			expect(result.error.message).toContain("chrome-extension://");
+			expect(result.error.message).toContain("http(s)");
+		}
+		expect(mockChrome.tabs.update).not.toHaveBeenCalled();
+	});
+
+	it("tab_goto returns E_NAVIGATION for non-http(s) URLs", async () => {
+		mockChrome.tabs.get.mockResolvedValueOnce({
+			id: 42,
+			url: "https://old.example",
+		});
+
+		const result = await dispatchTool("tab_goto", {
+			tabId: 42,
+			url: "chrome://settings",
+		});
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_NAVIGATION");
+			expect(result.error.category).toBe("navigation");
+			expect(result.error.message).toContain("Navigation blocked");
+			expect(result.error.message).toContain("URL scheme not supported");
+			expect(result.error.message).toContain("chrome://settings");
+		}
+	});
+
+	it("tab_goto returns E_NAVIGATION on tab load timeout", async () => {
+		mockChrome.tabs.get
+			.mockResolvedValueOnce({
+				id: 42,
+				status: "complete",
+				url: "https://old.example",
+			})
+			.mockResolvedValue({ id: 42, status: "loading" });
+		mockChrome.tabs.onUpdated.addListener.mockImplementation(() => {});
+		mockChrome.tabs.onUpdated.removeListener.mockImplementation(() => {});
+
+		const result = await dispatchTool("tab_goto", {
+			tabId: 42,
+			url: "https://example.com",
+			timeout: 100n,
+		});
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_NAVIGATION");
+			expect(result.error.category).toBe("navigation");
+			expect(result.error.message).toContain("timeout");
+			expect(result.error.message).toContain("42");
+		}
+	});
+
+	it("tab_goto succeeds when final URL differs after redirect", async () => {
+		mockChrome.tabs.get
+			.mockResolvedValueOnce({
+				id: 42,
+				status: "complete",
+				url: "https://old.example",
+			})
+			.mockResolvedValue({
+				id: 42,
+				status: "complete",
+				url: "https://redirected.example/",
+			});
+		mockChrome.tabs.sendMessage.mockResolvedValue({ ok: true });
+		const onUpdatedListeners: Array<
+			(tabId: number, changeInfo: { status?: string }) => void
+		> = [];
+		mockChrome.tabs.onUpdated.addListener.mockImplementation((fn: any) => {
+			onUpdatedListeners.push(fn);
+		});
+		mockChrome.tabs.onUpdated.removeListener.mockImplementation((fn: any) => {
+			const idx = onUpdatedListeners.indexOf(fn);
+			if (idx !== -1) onUpdatedListeners.splice(idx, 1);
+		});
+
+		const dispatchPromise = dispatchTool("tab_goto", {
+			tabId: 42,
+			url: "https://example.com",
+			timeout: 2000n,
+		});
+
+		setTimeout(() => {
+			for (const listener of onUpdatedListeners) {
+				listener(42, { status: "loading" });
+				listener(42, { status: "complete" });
+			}
+		}, 150);
+
+		const result = await dispatchPromise;
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.value).toMatchObject({
+				url: "https://redirected.example/",
+			});
+		}
+	}, 10_000);
+
+	it("tab_goto returns E_MISSING_PARAM when tabId is missing", async () => {
+		const result = await dispatchTool("tab_goto", {
+			url: "https://example.com",
+		});
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_MISSING_PARAM");
+		}
+		expect(mockChrome.tabs.update).not.toHaveBeenCalled();
+	});
+
+	it("tab_goto returns E_PERMISSION when target tab is chrome://", async () => {
+		mockChrome.tabs.get.mockResolvedValueOnce({
+			id: 42,
+			url: "chrome://settings",
+		});
+
+		const result = await dispatchTool("tab_goto", {
+			tabId: 42,
+			url: "https://example.com",
+		});
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_PERMISSION");
+			expect(result.error.message).toContain("chrome://settings");
+			expect(result.error.message).toContain("http(s)");
+		}
+		expect(mockChrome.tabs.update).not.toHaveBeenCalled();
+	});
+
+	it("tab_goto returns E_NO_TAB when tabId does not exist", async () => {
+		// chrome_tabs_get returns ok:false for a nonexistent tab — surfaced as E_NO_TAB
+		// because the handler validates existence before delegating to navigateTab.
+		mockChrome.tabs.get.mockRejectedValueOnce(new Error("No tab with id: 999"));
+
+		const result = await dispatchTool("tab_goto", {
+			tabId: 999,
+			url: "https://example.com",
+		});
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_NO_TAB");
+		}
+		expect(mockChrome.tabs.update).not.toHaveBeenCalled();
+	});
+
+	it("tab_goto removes navListener even when navigation times out", async () => {
+		mockChrome.tabs.get
+			.mockResolvedValueOnce({
+				id: 42,
+				status: "complete",
+				url: "https://old.example",
+			})
+			.mockResolvedValue({ id: 42, status: "loading" });
+		const removeListenerSpy = vi.fn();
+		mockChrome.tabs.onUpdated.addListener.mockImplementation(() => {});
+		mockChrome.tabs.onUpdated.removeListener.mockImplementation(
+			removeListenerSpy,
+		);
+
+		const result = await dispatchTool("tab_goto", {
+			tabId: 42,
+			url: "https://example.com",
+			timeout: 100n,
+		});
+		expect(result.ok).toBe(false);
+		// Listener MUST be removed on the error path — no leak under repeated nav.
+		expect(removeListenerSpy).toHaveBeenCalled();
+	});
+
+	it("tab_goto returns E_NAVIGATION when navigation did not start (URL unchanged)", async () => {
+		// pre-nav and post-nav both report the same URL while status is complete and
+		// the requested URL differs — navigateTab's "Navigation did not start" guard.
+		mockChrome.tabs.get.mockResolvedValue({
+			id: 42,
+			status: "complete",
+			url: "https://old.example",
+		});
+		mockChrome.tabs.sendMessage.mockResolvedValue({ ok: true });
+		const onUpdatedListeners: Array<
+			(tabId: number, changeInfo: { status?: string }) => void
+		> = [];
+		mockChrome.tabs.onUpdated.addListener.mockImplementation(
+			(fn: (tabId: number, changeInfo: { status?: string }) => void) => {
+				onUpdatedListeners.push(fn);
+			},
+		);
+		mockChrome.tabs.onUpdated.removeListener.mockImplementation(
+			(fn: (tabId: number, changeInfo: { status?: string }) => void) => {
+				const idx = onUpdatedListeners.indexOf(fn);
+				if (idx !== -1) onUpdatedListeners.splice(idx, 1);
+			},
+		);
+
+		const dispatchPromise = dispatchTool("tab_goto", {
+			tabId: 42,
+			url: "https://new.example",
+			timeout: 2000n,
+		});
+		// setTimeout (not fake timers): the listener must fire AFTER both
+		// navigateTab's navListener and waitForTabLoad's internal listener register
+		// on the dispatch promise's first await — queueMicrotask fires too early.
+		setTimeout(() => {
+			for (const listener of onUpdatedListeners) {
+				listener(42, { status: "loading" });
+				listener(42, { status: "complete" });
+			}
+		}, 150);
+
+		const result = await dispatchPromise;
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_NAVIGATION");
+			expect(result.error.message).toContain("did not start");
+		}
+	}, 10_000);
+});
+
 // ─── 12. Tab action tests ────────────────────────────────────────
 
 describe("tab actions", () => {
