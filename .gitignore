@@ -64,3 +64,6 @@ crates/extension-js/js/test-results/
 # Claude worktrees and backups
 .claude/
 *.bak
+
+# Large exported conversation traces (local-only, never commit)
+browsergent-conversation-*.json
