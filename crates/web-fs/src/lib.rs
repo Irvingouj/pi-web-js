@@ -1,5 +1,6 @@
 pub mod error;
 pub mod metadata;
+pub mod parse;
 pub mod path_util;
 
 #[cfg(target_family = "wasm")]
@@ -103,4 +104,24 @@ pub async fn update(
 
 pub async fn hash(path: impl AsRef<std::path::Path>, algo: &str) -> Result<String> {
     imp::hash(path, algo).await
+}
+
+pub async fn parse_csv(path: impl AsRef<std::path::Path>) -> Result<String> {
+    let bytes = imp::read(path).await?;
+    parse::parse_csv_bytes(&bytes)
+}
+
+pub async fn parse_zip(path: impl AsRef<std::path::Path>) -> Result<String> {
+    let bytes = imp::read(path).await?;
+    parse::parse_zip_bytes(&bytes)
+}
+
+pub async fn parse_xlsx(path: impl AsRef<std::path::Path>) -> Result<String> {
+    let bytes = imp::read(path).await?;
+    parse::parse_xlsx_bytes(&bytes)
+}
+
+pub async fn parse_pdf(path: impl AsRef<std::path::Path>) -> Result<String> {
+    let bytes = imp::read(path).await?;
+    parse::parse_pdf_bytes(&bytes)
 }

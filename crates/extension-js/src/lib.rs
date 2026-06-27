@@ -1,8 +1,12 @@
 pub mod browser_api;
+pub mod csv;
 pub mod fs;
 pub mod log;
+pub mod pdf;
 pub mod session;
 pub mod vfs_write_cache;
+pub mod xlsx;
+pub mod zip;
 
 pub use log::set_log_level;
 pub use session::ExtensionSession;

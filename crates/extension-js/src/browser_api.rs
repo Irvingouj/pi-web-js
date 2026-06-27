@@ -702,3 +702,164 @@ pub fn init_fs_registry() {
             .expect("Failed to re-freeze manifest after browser API registration");
     }
 }
+
+
+// ─── csv.* helpers ──────────────────────────────────────────────
+
+pub async fn execute_csv_parse(params: FsPathParams) -> AsyncResponse {
+    match web_fs::parse_csv(&params.path).await {
+        Ok(json) => AsyncResponse {
+            ok: true,
+            value: Some(serde_json::Value::String(json)),
+            error: None,
+        },
+        Err(e) => AsyncResponse {
+            ok: false,
+            value: None,
+            error: Some(fs_err_to_async(e)),
+        },
+    }
+}
+
+/// Register all csv.* APIs in the handler registry. Idempotent (see init_fs_registry).
+pub fn init_csv_registry() {
+    use web_js_core::web_api;
+    if web_js_core::api_docs::has_handler("csv_parse") {
+        return;
+    }
+    let was_frozen = web_js_core::api_docs::is_manifest_frozen();
+    if was_frozen {
+        web_js_core::api_docs::unfreeze_manifest();
+    }
+    web_api! {
+        action: "csv_parse", namespace: "csv", name: "parse",
+        doc: "Parse a CSV file into an array of rows (each row = array of string cells).",
+        params: [path: "string", "required", "File path"],
+        returns: "string" => "JSON string: array of rows",
+        param_struct: FsPathParams, handler: execute_csv_parse, fields: ["path"],
+    }
+    if was_frozen {
+        web_js_core::api_docs::freeze_manifest()
+            .expect("Failed to re-freeze manifest after csv API registration");
+    }
+}
+
+// ─── zip.* helpers ──────────────────────────────────────────────
+
+pub async fn execute_zip_list(params: FsPathParams) -> AsyncResponse {
+    match web_fs::parse_zip(&params.path).await {
+        Ok(json) => AsyncResponse {
+            ok: true,
+            value: Some(serde_json::Value::String(json)),
+            error: None,
+        },
+        Err(e) => AsyncResponse {
+            ok: false,
+            value: None,
+            error: Some(fs_err_to_async(e)),
+        },
+    }
+}
+
+/// Register all zip.* APIs in the handler registry. Idempotent (see init_fs_registry).
+pub fn init_zip_registry() {
+    use web_js_core::web_api;
+    if web_js_core::api_docs::has_handler("zip_list") {
+        return;
+    }
+    let was_frozen = web_js_core::api_docs::is_manifest_frozen();
+    if was_frozen {
+        web_js_core::api_docs::unfreeze_manifest();
+    }
+    web_api! {
+        action: "zip_list", namespace: "zip", name: "list",
+        doc: "List entries in a ZIP archive (name, size, compressed_size). Does not extract content.",
+        params: [path: "string", "required", "File path"],
+        returns: "string" => "JSON string: { entries: [{ name, size, compressed_size }] }",
+        param_struct: FsPathParams, handler: execute_zip_list, fields: ["path"],
+    }
+    if was_frozen {
+        web_js_core::api_docs::freeze_manifest()
+            .expect("Failed to re-freeze manifest after zip API registration");
+    }
+}
+
+// ─── xlsx.* helpers ─────────────────────────────────────────────
+
+pub async fn execute_xlsx_read(params: FsPathParams) -> AsyncResponse {
+    match web_fs::parse_xlsx(&params.path).await {
+        Ok(json) => AsyncResponse {
+            ok: true,
+            value: Some(serde_json::Value::String(json)),
+            error: None,
+        },
+        Err(e) => AsyncResponse {
+            ok: false,
+            value: None,
+            error: Some(fs_err_to_async(e)),
+        },
+    }
+}
+
+/// Register all xlsx.* APIs in the handler registry. Idempotent (see init_fs_registry).
+pub fn init_xlsx_registry() {
+    use web_js_core::web_api;
+    if web_js_core::api_docs::has_handler("xlsx_read") {
+        return;
+    }
+    let was_frozen = web_js_core::api_docs::is_manifest_frozen();
+    if was_frozen {
+        web_js_core::api_docs::unfreeze_manifest();
+    }
+    web_api! {
+        action: "xlsx_read", namespace: "xlsx", name: "read",
+        doc: "Read an XLSX workbook into JSON: { sheets: { <name>: [[cell,...],...] } }. Numbers stay numbers, strings stay strings, empty cells are null.",
+        params: [path: "string", "required", "File path"],
+        returns: "string" => "JSON string: { sheets: { <name>: rows } }",
+        param_struct: FsPathParams, handler: execute_xlsx_read, fields: ["path"],
+    }
+    if was_frozen {
+        web_js_core::api_docs::freeze_manifest()
+            .expect("Failed to re-freeze manifest after xlsx API registration");
+    }
+}
+
+// ─── pdf.* helpers ──────────────────────────────────────────────
+
+pub async fn execute_pdf_text(params: FsPathParams) -> AsyncResponse {
+    match web_fs::parse_pdf(&params.path).await {
+        Ok(json) => AsyncResponse {
+            ok: true,
+            value: Some(serde_json::Value::String(json)),
+            error: None,
+        },
+        Err(e) => AsyncResponse {
+            ok: false,
+            value: None,
+            error: Some(fs_err_to_async(e)),
+        },
+    }
+}
+
+/// Register all pdf.* APIs in the handler registry. Idempotent (see init_fs_registry).
+pub fn init_pdf_registry() {
+    use web_js_core::web_api;
+    if web_js_core::api_docs::has_handler("pdf_text") {
+        return;
+    }
+    let was_frozen = web_js_core::api_docs::is_manifest_frozen();
+    if was_frozen {
+        web_js_core::api_docs::unfreeze_manifest();
+    }
+    web_api! {
+        action: "pdf_text", namespace: "pdf", name: "text",
+        doc: "Extract text from a PDF: { pages: [\"\",...], text: \"<concatenated>\" }. Per-page failures yield empty strings (not fatal).",
+        params: [path: "string", "required", "File path"],
+        returns: "string" => "JSON string: { pages: [...], text: \"...\" }",
+        param_struct: FsPathParams, handler: execute_pdf_text, fields: ["path"],
+    }
+    if was_frozen {
+        web_js_core::api_docs::freeze_manifest()
+            .expect("Failed to re-freeze manifest after pdf API registration");
+    }
+}

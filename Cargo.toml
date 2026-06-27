@@ -38,6 +38,10 @@ hmac = "0.12"
 thiserror = "1"
 tracing = "0.1"
 tracing-wasm = "0.2"
+csv = "1"
+calamine = "0.26"
+pdfplumber = { version = "0.1", default-features = false }
+zip = { version = "2", default-features = false, features = ["deflate"] }
 
 [profile.release]
 # Size-optimized for WASM. Strip is safe for tracing: file!/line! are

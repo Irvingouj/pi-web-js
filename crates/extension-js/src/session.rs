@@ -1,4 +1,7 @@
-use crate::browser_api::init_fs_registry;
+use crate::browser_api::{
+    init_csv_registry, init_fs_registry, init_pdf_registry, init_xlsx_registry,
+    init_zip_registry,
+};
 use std::sync::atomic::{AtomicU64, Ordering};
 use wasm_bindgen::prelude::*;
 use web_js_base::types::*;
@@ -30,6 +33,10 @@ impl ExtensionSession {
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
         init_fs_registry();
+        init_csv_registry();
+        init_zip_registry();
+        init_xlsx_registry();
+        init_pdf_registry();
         let session_id = format!("sess_{}", SESSION_COUNTER.fetch_add(1, Ordering::Relaxed));
         let session = Self {
             base: BaseSession::new_extension(),
@@ -46,6 +53,10 @@ impl ExtensionSession {
         // the new context, not the old one that will be discarded.
         self.base.reset_now();
         init_fs_registry();
+        init_csv_registry();
+        init_zip_registry();
+        init_xlsx_registry();
+        init_pdf_registry();
         self.inject_registry_bindings();
         tracing::info!(session_id = %self.session_id, "session_reset");
     }

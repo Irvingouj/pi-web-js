@@ -26,6 +26,11 @@ pub enum FsError {
     OutOfQuota,
     #[error("E_IO: {0}")]
     Io(String),
+    #[error("E_PARSE")]
+    Parse {
+        format: &'static str,
+        detail: String,
+    },
 }
 
 impl FsError {
@@ -42,6 +47,7 @@ impl FsError {
             FsError::PermissionDenied => "E_PERMISSION_DENIED",
             FsError::OutOfQuota => "E_OUT_OF_QUOTA",
             FsError::Io(_) => "E_IO",
+            FsError::Parse { .. } => "EPARSE",
         }
     }
 
@@ -49,7 +55,9 @@ impl FsError {
     pub fn wire_message(&self) -> String {
         match self {
             FsError::Io(msg) => msg.clone(),
-            FsError::InvalidPath(ctx) => format!("E_INVALID_PATH: {}", ctx),
+            FsError::Parse { format, detail } => {
+                format!("E_PARSE: {} parse failed: {}", format, detail)
+            }
             _ => self.wire_code().to_string(),
         }
     }

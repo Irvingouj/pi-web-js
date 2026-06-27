@@ -11,6 +11,20 @@ import type {
 	WasmGlobalsSnapshot,
 } from "../../../pkg/extension_js.js";
 import type { InlineSnapshotResult } from "../../shared/cross/collect-inline-snapshot.js";
+import type {
+	CsvAction,
+	CsvActionMap,
+	CsvCallMessage,
+	PdfAction,
+	PdfActionMap,
+	PdfCallMessage,
+	XlsxAction,
+	XlsxActionMap,
+	XlsxCallMessage,
+	ZipAction,
+	ZipActionMap,
+	ZipCallMessage,
+} from "../../shared/cross/format-types.js";
 import type { FsAction, FsActionMap } from "../../shared/cross/fs-types.js";
 import type { Command } from "../../shared/cross/manifest.js";
 import { normalizeAgentError } from "../../shared/cross/normalize-agent-error.js";
@@ -53,7 +67,10 @@ type WorkerRequest =
 	| { type: "setLogLevel"; level: number }
 	| { type: "asyncRelayResult"; id: string; result: unknown; callId?: number }
 	| { type: "registerWorkerPort"; owner: string }
-	| { type: "fsCall"; id: string; action: string; params: unknown };
+	| CsvCallMessage
+	| ZipCallMessage
+	| XlsxCallMessage
+	| PdfCallMessage;
 
 type WorkerResponse =
 	| {
@@ -736,7 +753,59 @@ export class ExtensionSession {
 			id,
 			action,
 			params,
-		} as WorkerRequest & { id: string });
+		} as unknown as WorkerRequest & { id: string });
+	}
+
+	private async safePostCsv<K extends CsvAction>(
+		action: K,
+		params: CsvActionMap[K]["params"],
+	): Promise<CsvActionMap[K]["result"]> {
+		const id = this.generateId();
+		return this.postAndWait({
+			type: "csvCall",
+			id,
+			action,
+			params,
+		});
+	}
+
+	private async safePostZip<K extends ZipAction>(
+		action: K,
+		params: ZipActionMap[K]["params"],
+	): Promise<ZipActionMap[K]["result"]> {
+		const id = this.generateId();
+		return this.postAndWait({
+			type: "zipCall",
+			id,
+			action,
+			params,
+		});
+	}
+
+	private async safePostXlsx<K extends XlsxAction>(
+		action: K,
+		params: XlsxActionMap[K]["params"],
+	): Promise<XlsxActionMap[K]["result"]> {
+		const id = this.generateId();
+		return this.postAndWait({
+			type: "xlsxCall",
+			id,
+			action,
+			params,
+		});
+	}
+
+	private async safePostPdf<K extends PdfAction>(
+		action: K,
+		params: PdfActionMap[K]["params"],
+	): Promise<PdfActionMap[K]["result"]> {
+		const id = this.generateId();
+		return this.postAndWait({
+			type: "pdfCall",
+			id,
+			action,
+			params,
+		});
 	}
 
 	get fs() {
@@ -765,6 +834,30 @@ export class ExtensionSession {
 			update: (params: FsReadRangeDataParams) =>
 				this.safePost("update", params),
 			hash: (params: FsHashParams) => this.safePost("hash", params),
+		};
+	}
+
+	get csv() {
+		return {
+			parse: (params: FsPathParams) => this.safePostCsv("parse", params),
+		};
+	}
+
+	get zip() {
+		return {
+			list: (params: FsPathParams) => this.safePostZip("list", params),
+		};
+	}
+
+	get xlsx() {
+		return {
+			read: (params: FsPathParams) => this.safePostXlsx("read", params),
+		};
+	}
+
+	get pdf() {
+		return {
+			text: (params: FsPathParams) => this.safePostPdf("text", params),
 		};
 	}
 

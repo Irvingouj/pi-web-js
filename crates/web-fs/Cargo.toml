@@ -16,6 +16,11 @@ thiserror = { workspace = true }
 data-encoding = { workspace = true }
 sha2 = "0.10"
 sha1 = "0.10"
+serde_json.workspace = true
+csv.workspace = true
+calamine.workspace = true
+pdfplumber.workspace = true
+zip.workspace = true
 
 [dependencies.web-sys]
 version = "0.3"
@@ -32,3 +37,7 @@ features = [
   "FileSystemHandleKind",
   "File",
 ]
+
+[dev-dependencies]
+zip = { workspace = true }
+rust_xlsxwriter = "0.79"

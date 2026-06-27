@@ -3,6 +3,16 @@
 
 import type { z } from "zod";
 import { formatValidationError } from "../shared/cross/dispatch.js";
+import type {
+	CsvActionMap,
+	CsvCallMessage,
+	PdfActionMap,
+	PdfCallMessage,
+	XlsxActionMap,
+	XlsxCallMessage,
+	ZipActionMap,
+	ZipCallMessage,
+} from "../shared/cross/format-types.js";
 import type { FsActionMap } from "../shared/cross/fs-types.js";
 import * as schemas from "../shared/cross/schemas.js";
 import type { DispatchContext } from "../shared/cross/types.js";
@@ -98,11 +108,15 @@ export function settleAllPendingRelays(code: string, message: string): void {
 	}
 }
 
-// Worker-local registry for handlers that execute in the same worker as the VM
-const workerHandlerRegistry = new Map<
-	string,
-	(params: unknown, context?: unknown) => Promise<unknown>
->();
+// Worker-local registries for handlers that execute in the same worker as the VM.
+// Per-namespace Maps avoid action-key collisions across namespaces
+// (e.g. fs "read" vs a future xlsx "read").
+type WorkerHandler = (params: unknown, context?: unknown) => Promise<unknown>;
+const workerHandlerRegistry = new Map<string, WorkerHandler>();
+const csvHandlerRegistry = new Map<string, WorkerHandler>();
+const zipHandlerRegistry = new Map<string, WorkerHandler>();
+const xlsxHandlerRegistry = new Map<string, WorkerHandler>();
+const pdfHandlerRegistry = new Map<string, WorkerHandler>();
 const runAbortControllers = new Map<string, AbortController>();
 let sessionQueue: Promise<void> = Promise.resolve();
 let activeRunCell: { id: string; runId?: string } | null = null;
@@ -155,31 +169,37 @@ self.addEventListener("unhandledrejection", (event) => {
 
 export function registerWorkerHandler(
 	action: string,
-	handler: (params: unknown, context?: unknown) => Promise<unknown>,
+	handler: WorkerHandler,
+	registry: Map<string, WorkerHandler> = workerHandlerRegistry,
 ): void {
-	workerHandlerRegistry.set(action, handler);
+	registry.set(action, handler);
 }
 
 export function registerWorkerHandlerValidated<P>(
 	action: string,
 	paramsSchema: z.ZodSchema<P>,
 	handler: (params: P, context?: unknown) => Promise<unknown>,
+	registry: Map<string, WorkerHandler> = workerHandlerRegistry,
 ): void {
-	registerWorkerHandler(action, async (params, context) => {
-		const parseResult = paramsSchema.safeParse(coerceWasmParams(params));
-		if (!parseResult.success) {
-			const message = formatValidationError(
-				action,
-				paramsSchema,
-				parseResult.error.issues,
-				params,
-			);
-			const err = new Error(message) as Error & { code: string };
-			err.code = "E_INVALID_PARAMS";
-			throw err;
-		}
-		return await handler(parseResult.data, context);
-	});
+	registerWorkerHandler(
+		action,
+		async (params, context) => {
+			const parseResult = paramsSchema.safeParse(coerceWasmParams(params));
+			if (!parseResult.success) {
+				const message = formatValidationError(
+					action,
+					paramsSchema,
+					parseResult.error.issues,
+					params,
+				);
+				const err = new Error(message) as Error & { code: string };
+				err.code = "E_INVALID_PARAMS";
+				throw err;
+			}
+			return await handler(parseResult.data, context);
+		},
+		registry,
+	);
 }
 
 function generateId(): string {
@@ -798,6 +818,39 @@ function initFsRegistry(s: ExtensionSession) {
 		s.fsHash(p as FsActionMap["hash"]["params"]),
 	);
 }
+function initCsvRegistry(s: ExtensionSession) {
+	registerWorkerHandlerValidated(
+		"parse",
+		schemas.FsPathParamsSchema,
+		(p) => s.csvParse(p as CsvActionMap["parse"]["params"]),
+		csvHandlerRegistry,
+	);
+}
+function initZipRegistry(s: ExtensionSession) {
+	registerWorkerHandlerValidated(
+		"list",
+		schemas.FsPathParamsSchema,
+		(p) => s.zipList(p as ZipActionMap["list"]["params"]),
+		zipHandlerRegistry,
+	);
+}
+function initXlsxRegistry(s: ExtensionSession) {
+	registerWorkerHandlerValidated(
+		"read",
+		schemas.FsPathParamsSchema,
+		(p) => s.xlsxRead(p as XlsxActionMap["read"]["params"]),
+		xlsxHandlerRegistry,
+	);
+}
+
+function initPdfRegistry(s: ExtensionSession) {
+	registerWorkerHandlerValidated(
+		"text",
+		schemas.FsPathParamsSchema,
+		(p) => s.pdfText(p as PdfActionMap["text"]["params"]),
+		pdfHandlerRegistry,
+	);
+}
 
 async function initWasm(
 	manifest: SerializableJsCallManifestEntry[],
@@ -811,7 +864,11 @@ async function initWasm(
 	registerWasmSetLogLevel(setWasmLogLevel);
 	logger.trace("initWasm_start");
 	initFsRegistry(session);
+	initCsvRegistry(session);
+	initPdfRegistry(session);
+	initZipRegistry(session);
 
+	initXlsxRegistry(session);
 	populateRoutesFromManifest(manifest);
 
 	const batch = manifest.map((entry) => ({
@@ -854,6 +911,9 @@ export type WorkerMessage =
 			manifest: SerializableJsCallManifestEntry[];
 			extensionId?: string;
 	  }
+	| ZipCallMessage
+	| XlsxCallMessage
+	| PdfCallMessage
 	| { type: "runCell"; id: string; code: string; stdin: string; runId?: string }
 	| { type: "reset"; id?: string }
 	| { type: "stop"; id: string }
@@ -862,6 +922,7 @@ export type WorkerMessage =
 	| { type: "apiDocs"; id: string; format: string }
 	| { type: "loadLibrary"; id: string; source: string }
 	| { type: "fsCall"; id: string; action: string; params: unknown }
+	| CsvCallMessage
 	| { type: "setLogLevel"; level: number }
 	| { type: "asyncRelayResult"; id: string; result: unknown; callId?: number }
 	| { type: "registerWorkerPort"; owner: string };
@@ -1070,6 +1131,82 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
 						type: "error",
 						id: msg.id,
 						error: `Unknown fs action: ${msg.action}`,
+					});
+					break;
+				}
+				try {
+					const result = await handler(msg.params);
+					self.postMessage({ type: "result", id: msg.id, data: result });
+				} catch (err: unknown) {
+					const message = err instanceof Error ? err.message : String(err);
+					self.postMessage({ type: "error", id: msg.id, error: message });
+				}
+				break;
+			}
+			case "csvCall": {
+				const handler = csvHandlerRegistry.get(msg.action);
+				if (!handler) {
+					self.postMessage({
+						type: "error",
+						id: msg.id,
+						error: `Unknown csv action: ${msg.action}`,
+					});
+					break;
+				}
+				try {
+					const result = await handler(msg.params);
+					self.postMessage({ type: "result", id: msg.id, data: result });
+				} catch (err: unknown) {
+					const message = err instanceof Error ? err.message : String(err);
+					self.postMessage({ type: "error", id: msg.id, error: message });
+				}
+				break;
+			}
+			case "zipCall": {
+				const handler = zipHandlerRegistry.get(msg.action);
+				if (!handler) {
+					self.postMessage({
+						type: "error",
+						id: msg.id,
+						error: `Unknown zip action: ${msg.action}`,
+					});
+					break;
+				}
+				try {
+					const result = await handler(msg.params);
+					self.postMessage({ type: "result", id: msg.id, data: result });
+				} catch (err: unknown) {
+					const message = err instanceof Error ? err.message : String(err);
+					self.postMessage({ type: "error", id: msg.id, error: message });
+				}
+				break;
+			}
+			case "xlsxCall": {
+				const handler = xlsxHandlerRegistry.get(msg.action);
+				if (!handler) {
+					self.postMessage({
+						type: "error",
+						id: msg.id,
+						error: `Unknown xlsx action: ${msg.action}`,
+					});
+					break;
+				}
+				try {
+					const result = await handler(msg.params);
+					self.postMessage({ type: "result", id: msg.id, data: result });
+				} catch (err: unknown) {
+					const message = err instanceof Error ? err.message : String(err);
+					self.postMessage({ type: "error", id: msg.id, error: message });
+				}
+				break;
+			}
+			case "pdfCall": {
+				const handler = pdfHandlerRegistry.get(msg.action);
+				if (!handler) {
+					self.postMessage({
+						type: "error",
+						id: msg.id,
+						error: `Unknown pdf action: ${msg.action}`,
 					});
 					break;
 				}
