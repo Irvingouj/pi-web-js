@@ -1,6 +1,7 @@
 // TypeScript type mirrors for web-js-core command params and result types.
 // Manually maintained — keep in sync with web-js-core/src/command_params.rs
 // and web-js-base/src/types.rs.
+import type { SnapshotFormat } from "@pi-oxide/dom-semantic-tree";
 
 export type TreeSnapshot = {
 	version: string;
@@ -131,7 +132,7 @@ export type DomSnapshotParams = {
 	max_nodes: bigint;
 };
 
-export type DomFormatParams = { snapshot: TreeSnapshot; format?: string };
+export type DomFormatParams = { snapshot: TreeSnapshot; format?: SnapshotFormat };
 
 export type FetchParams = {
 	url: string;
