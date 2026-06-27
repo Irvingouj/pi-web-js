@@ -3773,6 +3773,175 @@ describe("select_option handler", () => {
 			expect(details.targetName).toContain("Degree");
 		}
 	});
+	it("Greenhouse regression: select_option matches option whose label carries a suffix (Canada vs 'Canada +1')", async () => {
+		// Greenhouse form: agent asked select_option(country, "Canada") but
+		// react-select's option text is "Canada +1" (label + dial code suffix).
+		// Exact-match failed with E_NOT_FOUND even though the right listbox
+		// resolved and the option was visible. Match must accept a value that
+		// is a prefix of the option label.
+		document.body.innerHTML = "";
+		const control = document.createElement("input");
+		control.setAttribute("role", "combobox");
+		control.setAttribute("aria-label", "Country");
+		const listbox = document.createElement("div");
+		listbox.id = "react-select-country-listbox";
+		listbox.setAttribute("role", "listbox");
+		for (const t of ["United States +1", "Canada +1", "Afghanistan +93"]) {
+			const o = document.createElement("div");
+			o.setAttribute("role", "option");
+			o.textContent = t;
+			listbox.appendChild(o);
+		}
+		control.setAttribute("aria-controls", listbox.id);
+		document.body.append(control, listbox);
+
+		const snap = await dispatchContentScriptCall(
+			"page_snapshot_data",
+			"snapshot",
+			handlers.snapshot,
+			{},
+		);
+		const refId = (
+			snap.value as { nodes: Array<{ refId: string; role?: string; name?: string }> }
+		).nodes.find((n) => n.name === "Country")!.refId;
+
+		let clicked = "";
+		document.addEventListener(
+			"click",
+			(e) => {
+				const t = e.target as HTMLElement;
+				if (t.getAttribute("role") === "option") clicked = t.textContent || "";
+			},
+			true,
+		);
+
+		const result = await dispatchContentScriptCall(
+			"page_select_option",
+			"select_option",
+			handlers.select_option,
+			{ refId, value: "Canada" },
+		);
+		expect(result.ok).toBe(true);
+		expect(clicked).toBe("Canada +1");
+	});
+	it("Greenhouse regression: select_option waits for async listbox options before declaring not-found", async () => {
+		// Greenhouse form: react-select mounts the listbox SHELL synchronously
+		// on activation but renders its [role=option] children a tick later
+		// (virtualized / async menu). waitForRoots returned as soon as the shell
+		// existed, so options was [] and select_option threw E_NOT_FOUND
+		// Candidates: none — even though the option would have appeared ~1 frame
+		// later.
+		document.body.innerHTML = "";
+		const control = document.createElement("input");
+		control.setAttribute("role", "combobox");
+		control.setAttribute("aria-label", "Location");
+		const listbox = document.createElement("div");
+		listbox.id = "react-select-candidate-location-listbox";
+		listbox.setAttribute("role", "listbox");
+		// Options render one animation frame AFTER the shell is attached —
+		// mirrors react-select's async menu population.
+		control.addEventListener("click", () => {
+			document.body.appendChild(listbox);
+			requestAnimationFrame(() => {
+				const o = document.createElement("div");
+				o.setAttribute("role", "option");
+				o.textContent = "Ottawa, Ontario, Canada";
+				listbox.appendChild(o);
+			});
+		});
+		document.body.appendChild(control);
+
+		const snap = await dispatchContentScriptCall(
+			"page_snapshot_data",
+			"snapshot",
+			handlers.snapshot,
+			{},
+		);
+		const refId = (
+			snap.value as { nodes: Array<{ refId: string; role?: string; name?: string }> }
+		).nodes.find((n) => n.name === "Location")!.refId;
+
+		let clicked = "";
+		document.addEventListener(
+			"click",
+			(e) => {
+				const t = e.target as HTMLElement;
+				if (t.getAttribute("role") === "option") clicked = t.textContent || "";
+			},
+			true,
+		);
+
+		const result = await dispatchContentScriptCall(
+			"page_select_option",
+			"select_option",
+			handlers.select_option,
+			{ refId, value: "Ottawa, Ontario, Canada" },
+		);
+		expect(result.ok).toBe(true);
+		expect(clicked).toBe("Ottawa, Ontario, Canada");
+	});
+	it("prefix fallback refuses to guess when two options share the value-prefix (Greenhouse Country vs Country Mobile)", async () => {
+		// Greenhouse phone-country dropdowns render per-line "Country" and
+		// "Country Mobile" variants (e.g. "Canada +1" and "Canada Mobile +1").
+		// A prefix match on "Canada" is ambiguous; silently picking the first
+		// DOM hit would select the wrong line and report ok:true. Refuse to
+		// guess — return E_NOT_FOUND with both candidates so the agent can
+		// disambiguate with a more specific value.
+		document.body.innerHTML = "";
+		const control = document.createElement("input");
+		control.setAttribute("role", "combobox");
+		control.setAttribute("aria-label", "Country");
+		const listbox = document.createElement("div");
+		listbox.id = "react-select-country-listbox";
+		listbox.setAttribute("role", "listbox");
+		for (const t of ["Canada Mobile +1", "Canada +1"]) {
+			const o = document.createElement("div");
+			o.setAttribute("role", "option");
+			o.textContent = t;
+			listbox.appendChild(o);
+		}
+		control.setAttribute("aria-controls", listbox.id);
+		document.body.append(control, listbox);
+
+		const snap = await dispatchContentScriptCall(
+			"page_snapshot_data",
+			"snapshot",
+			handlers.snapshot,
+			{},
+		);
+		const refId = (
+			snap.value as { nodes: Array<{ refId: string; role?: string; name?: string }> }
+		).nodes.find((n) => n.name === "Country")!.refId;
+
+		let clickedOption = "";
+		document.addEventListener(
+			"click",
+			(e) => {
+				const t = e.target as HTMLElement;
+				if (t.getAttribute("role") === "option") clickedOption = t.textContent || "";
+			},
+			true,
+		);
+
+		const result = await dispatchContentScriptCall(
+			"page_select_option",
+			"select_option",
+			handlers.select_option,
+			{ refId, value: "Canada" },
+		);
+		// Must NOT silently select — no option clicked.
+		expect(clickedOption).toBe("");
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_NOT_FOUND");
+			const candidates = (
+				result.error.details as { candidates?: Array<{ name?: string }> }
+			).candidates || [];
+			const names = candidates.map((c) => c.name || "");
+			expect(names).toContain("Canada +1");
+			expect(names).toContain("Canada Mobile +1");
+		}
+	});
 });
 
 describe("submit handler validation receipts", () => {

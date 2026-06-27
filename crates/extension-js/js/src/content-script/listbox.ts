@@ -145,15 +145,20 @@ const resolveListboxRoots = (
 	};
 };
 
-// ponytail: bounded wait — React flushes within a microtask; one frame is
-// enough for the common case, ~10 frames (~160ms@60Hz) covers a two-pass
-// concurrent render or a CSS-transition-gated flyout without open-ended polling.
+// ponytail: bounded wait — React mounts the listbox shell within a microtask,
+// but its [role=option] children can lag a frame or two (virtualized / async
+// menu). ~10 frames (~160ms@60Hz) covers shell + option paint plus a two-pass
+// concurrent render without open-ended polling. We wait for a root that
+// actually carries options, not just the shell — waiting on the shell alone
+// returned an empty options array and a false E_NOT_FOUND.
 const waitForRoots = async (
 	control: HTMLElement,
 	beforeMap: ListboxBefore,
 ): Promise<{ roots: HTMLElement[]; allListboxes: HTMLElement[] }> => {
 	let resolved = resolveListboxRoots(control, beforeMap);
-	for (let i = 0; i < 10 && resolved.roots.length === 0; i++) {
+	const hasOptions = (r: HTMLElement[]) =>
+		r.some((lb) => lb.querySelector('[role="option"]'));
+	for (let i = 0; i < 10 && !hasOptions(resolved.roots); i++) {
 		await nextFrame();
 		resolved = resolveListboxRoots(control, beforeMap);
 	}

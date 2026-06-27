@@ -446,11 +446,26 @@ export const handlers = {
 			),
 		];
 		const normalizedValue = value.trim().toLowerCase();
+		const optionText = (o: HTMLElement) => (o.textContent || "").trim();
+		// Matching ladder (strictest first): exact → case-insensitive exact →
+		// unique prefix. react-select labels often carry extra context the agent
+		// won't repeat, so the prefix fallback lets "Canada" land on "Canada +1"
+		// and "Ottawa" on "Ottawa, Ontario, Canada". Only the 3 separators below
+		// are accepted (space+dialcode, comma+hierarchy, +dialcode) so "Canada"
+		// can't match "Canada Mobile +1" without an exact hit on the separator.
+		// When two+ options share the prefix, refuse to guess — fall through to
+		// E_NOT_FOUND with the candidates so the agent disambiguates.
+		const isPrefixLabel = (label: string): boolean =>
+			label.startsWith(`${normalizedValue} `) ||
+			label.startsWith(`${normalizedValue},`) ||
+			label.startsWith(`${normalizedValue}+`);
+		const prefixMatches = options.filter((o) =>
+			isPrefixLabel(optionText(o).toLowerCase()),
+		);
 		const match =
-			options.find((o) => (o.textContent || "").trim() === value.trim()) ||
-			options.find(
-				(o) => (o.textContent || "").trim().toLowerCase() === normalizedValue,
-			);
+			options.find((o) => optionText(o) === value.trim()) ||
+			options.find((o) => optionText(o).toLowerCase() === normalizedValue) ||
+			(prefixMatches.length === 1 ? prefixMatches[0] : undefined);
 		if (!match) {
 			const candidates: StaleRefCandidate[] = options.map((o, i) => ({
 				refId: o.getAttribute("data-ref-id") || `opt${i}`,
