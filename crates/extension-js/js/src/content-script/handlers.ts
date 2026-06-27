@@ -63,6 +63,7 @@ import { activateAndResolveListboxRoots } from "./listbox.js";
 import { logger } from "./logger.js";
 import {
 	currentObservationId,
+	grantFromInlineSnapshot,
 	grantObservation,
 	hasActiveObservation,
 	invalidateLease,
@@ -661,15 +662,8 @@ export const handlers = {
 		}
 		const maxNodes = resolveMaxNodes(params);
 		logger.debug("snapshot", { maxNodes, hasBody: !!document.body });
-		const r = inlineSnapshot(maxNodes);
-		const observed = r.nodes
-			.map((n) => {
-				const el = getElementByRefId(n.refId);
-				return el ? { refId: n.refId, element: el } : null;
-			})
-			.filter((x): x is { refId: string; element: Element } => x !== null);
-		const observationId = grantObservation(observed);
-		return { ...r, observationId };
+		const granted = grantFromInlineSnapshot(maxNodes);
+		return granted;
 	},
 
 	snapshot_text: async (params) => {

@@ -813,7 +813,8 @@ describe("stale refId errors", () => {
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.code).toBe("E_STALE");
-			expect(result.error.recovery?.[0]).toContain("snapshot_data");
+		expect(result.error.recovery?.[0]).toContain("snapshot.nodes");
+		expect(result.error.details?.snapshot).toBeDefined();
 			expect(result.error.details?.staleRefId).toBe(staleRefId);
 		}
 	});
@@ -2005,6 +2006,237 @@ describe("observation lease (B8): ambiguous label returns E_AMBIGUOUS_TARGET", (
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.code).toBe("E_AMBIGUOUS_TARGET");
+		}
+	});
+});
+
+describe("observation lease: snapshot refresh on violation", () => {
+	beforeEach(() => {
+		document.body.innerHTML = "";
+		for (const spec of buildContentScriptSpecs()) {
+			registerContentScriptSpec(spec);
+		}
+		resetLease();
+	});
+
+	it("E_OBSERVATION_REQUIRED error carries a refreshed snapshot in details", async () => {
+		const btn = document.createElement("button");
+		btn.textContent = "Target";
+		document.body.appendChild(btn);
+
+		// No prior snapshot → click violates lease.
+		const result = await dispatchContentScriptCall(
+			"page_click",
+			"click",
+			handlers.click,
+			{ refId: "e999" },
+		);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_OBSERVATION_REQUIRED");
+			expect(result.error.details?.snapshot).toBeDefined();
+			const snap = result.error.details!.snapshot as {
+				nodes: { refId: string }[];
+				observationId: string;
+			};
+			expect(Array.isArray(snap.nodes)).toBe(true);
+			expect(typeof snap.observationId).toBe("string");
+		}
+	});
+	it("E_STALE error carries a refreshed snapshot in details", async () => {
+		// Snapshot to get a real refId, then remove the element → disconnected → E_STALE.
+		const btn = document.createElement("button");
+		btn.setAttribute("aria-label", "Target");
+		document.body.appendChild(btn);
+		const snap = await dispatchContentScriptCall(
+			"page_snapshot_data",
+			"snapshot",
+			handlers.snapshot,
+			{},
+		);
+		const refId = (
+			(snap as { ok: true; value: { nodes: Array<{ refId: string }> } }).value
+		).nodes[0].refId;
+		btn.remove();
+
+		const result = await dispatchContentScriptCall(
+			"page_click",
+			"click",
+			handlers.click,
+			{ refId },
+		);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_STALE");
+			expect(result.error.details?.snapshot).toBeDefined();
+			const errSnap = result.error.details!.snapshot as {
+				nodes: { refId: string }[];
+				observationId: string;
+			};
+			expect(Array.isArray(errSnap.nodes)).toBe(true);
+			expect(typeof errSnap.observationId).toBe("string");
+		}
+	});
+	it("E_AMBIGUOUS_TARGET error carries a refreshed snapshot in details", async () => {
+		// Two observed elements share a label → ambiguous.
+		const a = document.createElement("button");
+		a.setAttribute("aria-label", "Done");
+		const b = document.createElement("button");
+		b.setAttribute("aria-label", "Done");
+		document.body.append(a, b);
+		inlineSnapshot(500);
+		grantFromDom();
+
+		const result = await dispatchContentScriptCall(
+			"page_click",
+			"click",
+			handlers.click,
+			{ label: "Done" },
+		);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_AMBIGUOUS_TARGET");
+			expect(result.error.details?.snapshot).toBeDefined();
+			const errSnap = result.error.details!.snapshot as {
+				nodes: { refId: string }[];
+				observationId: string;
+			};
+			expect(Array.isArray(errSnap.nodes)).toBe(true);
+			expect(typeof errSnap.observationId).toBe("string");
+		}
+	});
+	it("refreshed snapshot re-grants the lease — retry click succeeds with no extra snapshot call", async () => {
+		// Lease ONLY a decoy; the target button has no refId yet.
+		const decoy = document.createElement("button");
+		decoy.setAttribute("aria-label", "Decoy");
+		document.body.appendChild(decoy);
+		const btn = document.createElement("button");
+		btn.setAttribute("aria-label", "Target");
+		document.body.appendChild(btn);
+		let clicked = false;
+		btn.addEventListener("click", () => {
+			clicked = true;
+		});
+		// Grant lease over the decoy only, by a refId the click path will accept.
+		grantObservation([{ refId: "e-decoy", element: decoy }]);
+
+		// Click a refId NOT in the lease → not_in_latest_observation → E_STALE.
+		// The refresh re-grants over the whole DOM, assigning btn a refId.
+		const first = await dispatchContentScriptCall(
+			"page_click",
+			"click",
+			handlers.click,
+			{ refId: "e999" },
+		);
+		expect(first.ok).toBe(false);
+		if (first.ok) return;
+		expect(first.error.details?.snapshot).toBeDefined();
+		const snap = first.error.details!.snapshot as {
+			nodes: { refId: string; name?: string }[];
+		};
+		const target = snap.nodes.find((n) => n.name === "Target");
+		expect(target).toBeDefined();
+
+		// Retry with the refreshed refId — NO snapshot_data call in between.
+		const retry = await dispatchContentScriptCall(
+			"page_click",
+			"click",
+			handlers.click,
+			{ refId: target!.refId },
+		);
+		expect(retry.ok).toBe(true);
+		expect(clicked).toBe(true);
+	});
+	it("E_AMBIGUOUS_TARGET refreshed snapshot re-grants the lease — retry click by refId succeeds", async () => {
+		// Two same-label buttons → click by label throws E_AMBIGUOUS_TARGET.
+		// The refreshed snapshot must re-grant so a retry by refId works.
+		const a = document.createElement("button");
+		a.setAttribute("aria-label", "Done");
+		a.textContent = "A";
+		document.body.appendChild(a);
+		const b = document.createElement("button");
+		b.setAttribute("aria-label", "Done");
+		b.textContent = "B";
+		let bClicked = false;
+		b.addEventListener("click", () => {
+			bClicked = true;
+		});
+		document.body.appendChild(b);
+		inlineSnapshot(500);
+		grantFromDom();
+
+		const first = await dispatchContentScriptCall(
+			"page_click",
+			"click",
+			handlers.click,
+			{ label: "Done" },
+		);
+		expect(first.ok).toBe(false);
+		if (first.ok) return;
+		expect(first.error.details?.snapshot).toBeDefined();
+		const snap = first.error.details!.snapshot as {
+			nodes: { refId: string; name?: string }[];
+		};
+		// Pick button B by its distinguishing text to retry.
+		const target = snap.nodes.find((n) => n.name === "Done");
+		expect(target).toBeDefined();
+
+		const retry = await dispatchContentScriptCall(
+			"page_click",
+			"click",
+			handlers.click,
+			{ refId: target!.refId },
+		);
+		expect(retry.ok).toBe(true);
+		// Either button could own the refId; assert the retry dispatched.
+	});
+
+	it("refresh on empty DOM returns an empty snapshot, not a throw", async () => {
+		// document.body present but empty → no elements, no refIds.
+		document.body.innerHTML = "";
+
+		const result = await dispatchContentScriptCall(
+			"page_click",
+			"click",
+			handlers.click,
+			{ refId: "e1" },
+		);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_OBSERVATION_REQUIRED");
+			expect(result.error.details?.snapshot).toBeDefined();
+			const snap = result.error.details!.snapshot as {
+				nodes: unknown[];
+				observationId: string;
+			};
+			expect(Array.isArray(snap.nodes)).toBe(true);
+			expect(snap.nodes).toHaveLength(0);
+			expect(typeof snap.observationId).toBe("string");
+		}
+	});
+
+	it("non-lease handler stale refId (throwElementNotFound path) carries a refresh snapshot", async () => {
+		// type uses resolveTargetRaw → throwElementNotFound → staleRefError (dom-utils path),
+		// distinct from the lease path (requireTarget → throwStale). Both must attach a snapshot.
+		const btn = document.createElement("button");
+		btn.textContent = "Real";
+		document.body.appendChild(btn);
+
+		const result = await dispatchContentScriptCall(
+			"page_type",
+			"type",
+			handlers.type,
+			{ refId: "e999", text: "x" },
+		);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_STALE");
+			expect(result.error.details?.snapshot).toBeDefined();
+			expect(result.error.recovery?.[0]).toContain("snapshot.nodes");
+			const snap = result.error.details!.snapshot as {
+				nodes: { refId: string }[];
+			};
+			expect(Array.isArray(snap.nodes)).toBe(true);
 		}
 	});
 });

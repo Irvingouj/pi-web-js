@@ -4,6 +4,7 @@ import {
 	staleRefError,
 	throwStructuredAgentError,
 } from "../shared/cross/normalize-agent-error.js";
+import { grantFromInlineSnapshot } from "./observation-lease.js";
 import {
 	enrichFormNode,
 	getAccessibleName,
@@ -191,14 +192,25 @@ export function findCandidatesByRefId(refId: string): SemanticCandidate[] {
 	return matches;
 }
 
+function safeRefreshSnapshot(): unknown {
+	try {
+		return grantFromInlineSnapshot(Number.MAX_SAFE_INTEGER);
+	} catch {
+		return undefined;
+	}
+}
+
 export function throwElementNotFound(
 	refId: string | undefined,
 	label: string | undefined,
 	includeCandidates = false,
 ): never {
+	const snapshot = safeRefreshSnapshot();
 	if (refId) {
 		const candidates = includeCandidates ? findCandidatesByRefId(refId) : [];
-		throwStructuredAgentError(staleRefError(refId, { candidates }));
+		throwStructuredAgentError(
+			staleRefError(refId, { candidates, snapshot }),
+		);
 	}
 	if (label) {
 		const candidates = includeCandidates ? findSemanticCandidates(label) : [];

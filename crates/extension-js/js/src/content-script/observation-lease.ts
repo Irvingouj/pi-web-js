@@ -18,6 +18,11 @@
  */
 
 import {
+	collectInlineSnapshot,
+	type InlineSnapshotNode,
+	type InlineSnapshotResult,
+} from "../shared/cross/collect-inline-snapshot.js";
+import {
 	getAccessibleName,
 	getAccessibleRole,
 } from "../shared/cs/snapshot-dom.js";
@@ -146,6 +151,7 @@ function refindByFingerprint(target: ObservedTarget): Element | null {
 }
 
 function throwObservedRequired(action: string): never {
+	const snapshot = refreshObservation();
 	const err = new Error(
 		`${action} requires a fresh observation before acting.`,
 	) as Error & {
@@ -158,16 +164,17 @@ function throwObservedRequired(action: string): never {
 	err.code = "E_OBSERVATION_REQUIRED";
 	err.category = "observation";
 	err.hint =
-		"Element refIds are only valid after a snapshot. Take a fresh observation and select a refId from its returned nodes.";
+		"Element refIds are only valid after a snapshot. A fresh snapshot is attached — use a refId from error.details.snapshot.nodes and retry.";
 	err.recovery = [
-		"const d = await page.snapshot_data(); find the target in d.nodes",
-		"Use a refId from that snapshot only",
+		"Read error.details.snapshot.nodes, pick the target refId, and retry the action",
+		"No separate snapshot_data call needed — the attached snapshot already refreshes the lease",
 	];
-	err.details = { action };
+	err.details = { action, ...(snapshot ? { snapshot } : {}) };
 	throw err;
 }
 
 function throwStale(refId: string, reason: string): never {
+	const snapshot = refreshObservation();
 	const err = new Error(
 		`Element refId "${refId}" is stale (${reason}).`,
 	) as Error & {
@@ -179,12 +186,13 @@ function throwStale(refId: string, reason: string): never {
 	};
 	err.code = "E_STALE";
 	err.category = "observation";
-	err.hint = "The element changed or was removed after the last observation.";
+	err.hint =
+		"The element changed or was removed after the last observation. A fresh snapshot is attached — re-resolve the target refId and retry.";
 	err.recovery = [
-		"const d = await page.snapshot_data(); find the target in d.nodes",
-		"Use a fresh refId from that snapshot only",
+		"Read error.details.snapshot.nodes, find the element by role/name, and retry with the new refId",
+		"No separate snapshot_data call needed — the attached snapshot already refreshes the lease",
 	];
-	err.details = { staleRefId: refId, reason };
+	err.details = { staleRefId: refId, reason, ...(snapshot ? { snapshot } : {}) };
 	throw err;
 }
 
@@ -217,6 +225,7 @@ export function requireTargetByLabel(label: string, action: string): Element {
 }
 
 function throwAmbiguous(label: string): never {
+	const snapshot = refreshObservation();
 	const err = new Error(
 		`Multiple elements match label "${label}". The target is ambiguous.`,
 	) as Error & {
@@ -229,11 +238,79 @@ function throwAmbiguous(label: string): never {
 	err.code = "E_AMBIGUOUS_TARGET";
 	err.category = "observation";
 	err.hint =
-		"Use a refId from the latest snapshot_data instead of a label, or narrow the label.";
+		"Use a refId from error.details.snapshot.nodes instead of a label, or narrow the label.";
 	err.recovery = [
-		"const d = await page.snapshot_data(); find the target in d.nodes",
-		"Use the refId from that snapshot",
+		"Read error.details.snapshot.nodes, pick the intended target by refId, and retry",
+		"No separate snapshot_data call needed — the attached snapshot already refreshes the lease",
 	];
-	err.details = { label };
+	err.details = { label, ...(snapshot ? { snapshot } : {}) };
 	throw err;
+}
+
+/** Re-grant snapshot attached to lease-violation errors. */
+export interface RefreshSnapshot {
+	nodes: InlineSnapshotNode[];
+	observationId: string;
+	url: string;
+	title: string;
+}
+
+/**
+ * Resolve a snapshot node's refId back to its live element using the same
+ * CSS.escape'd lookup as getElementByRefId — inlined to match that helper
+ * without dom-utils depending on this module's internals.
+ */
+function elementByRefId(refId: string): Element | null {
+	return document.querySelector(
+		`[data-ref-id='${CSS.escape(refId)}']`,
+	);
+}
+
+/**
+ * Collect an inline snapshot and grant the lease over every refId-bearing
+ * element it produced. Shared logic for snapshot-time grant and error-path
+ * refresh so the collect→resolve→grant sequence has one definition.
+ */
+export function grantFromInlineSnapshot(
+	maxNodes: number,
+): InlineSnapshotResult & { observationId: string } {
+	const r = collectInlineSnapshot(maxNodes);
+	const observed = r.nodes
+		.map((n) => {
+			const el = elementByRefId(n.refId);
+			return el ? { refId: n.refId, element: el } : null;
+		})
+		.filter(
+			(x): x is { refId: string; element: Element } => x !== null,
+		);
+	const observationId = grantObservation(observed);
+	return { ...r, observationId };
+}
+
+/**
+ * Build a fresh inline snapshot and re-grant the lease on it, so the returned
+ * refIds are immediately usable for a retry action. Attached to lease-violation
+ * errors so the browsergent can re-resolve the target and retry in one step —
+ * no separate snapshot_data round-trip.
+ *
+ * Returns undefined if collection itself throws (e.g. the mutation guard fires
+ * mid-walk) so the caller still emits the original lease-violation error rather
+ * than masking it with E_SNAPSHOT.
+ *
+ * ponytail: builds a full snapshot on every lease-violation throw. If this
+ * profiles hot on a churning SPA that fails every click, gate behind an opt-in
+ * flag and fall back to the recovery-string-only error.
+ */
+function refreshObservation(): RefreshSnapshot | undefined {
+	try {
+		const r = grantFromInlineSnapshot(Number.MAX_SAFE_INTEGER);
+		return {
+			nodes: r.nodes,
+			observationId: r.observationId,
+			url: r.url,
+			title: r.title,
+		};
+	} catch {
+		return undefined;
+	}
 }

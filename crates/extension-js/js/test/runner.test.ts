@@ -191,6 +191,14 @@ const ALL_MANIFEST_PERMISSIONS = [
 ];
 
 function chromeWithGrantedPermissions() {
+	// Restore default mock implementations — vi.clearAllMocks() in each
+	// describe's beforeEach clears call history but does NOT reset
+	// mockResolvedValue overrides set by individual tests (e.g. the
+	// "page_tabs adds tabId from chrome tab id" test that sets
+	// tabs.query.mockResolvedValue([{ id: 11 }])).  Re-applying the
+	// defaults here prevents mock state from leaking between describes.
+	mockChrome.tabs.query.mockResolvedValue([{ id: 1 }]);
+	mockChrome.tabs.get.mockResolvedValue({ id: 1, status: "complete" });
 	return {
 		...mockChrome,
 		permissions: {

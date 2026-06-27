@@ -53,7 +53,11 @@ export type StaleRefCandidate = {
 
 export function staleRefError(
 	refId: string,
-	options?: { label?: string; candidates?: StaleRefCandidate[] },
+	options?: {
+		label?: string;
+		candidates?: StaleRefCandidate[];
+		snapshot?: unknown;
+	},
 ): AsyncError {
 	const mode = refId ? "refId" : options?.label ? "label" : null;
 	const query = refId || options?.label || "";
@@ -69,20 +73,31 @@ export function staleRefError(
 			message += ". Candidates: none";
 		}
 	}
+	const hasSnapshot = options?.snapshot !== undefined;
 	const error: AsyncError = {
 		message,
 		code: "E_STALE",
 		category: "resource",
-		hint: "RefIds are ephemeral. They are assigned at snapshot time and invalidated when the DOM is replaced (navigation, SPA rerender, autocomplete).",
-		recovery: [
-			"const d = await page.snapshot_data(); find the target in d.nodes",
-			"Use a fresh refId from that snapshot only",
-			"Do not reuse refIds from before press/click/navigation",
-		],
+		hint: hasSnapshot
+			? "The element changed or was removed after the last observation. A fresh snapshot is attached — re-resolve the target refId and retry."
+			: "RefIds are ephemeral. They are assigned at snapshot time and invalidated when the DOM is replaced (navigation, SPA rerender, autocomplete).",
+		recovery: hasSnapshot
+			? [
+					"Read error.details.snapshot.nodes, find the element by role/name, and retry with the new refId",
+					"No separate snapshot_data call needed — the attached snapshot already refreshes the lease",
+				]
+			: [
+					"const d = await page.snapshot_data(); find the target in d.nodes",
+					"Use a fresh refId from that snapshot only",
+					"Do not reuse refIds from before press/click/navigation",
+				],
 		details: { staleRefId: refId || undefined },
 	};
 	if (options?.candidates?.length) {
 		error.details = { ...error.details, candidates: options.candidates };
+	}
+	if (hasSnapshot) {
+		error.details = { ...error.details, snapshot: options!.snapshot };
 	}
 	return error;
 }
