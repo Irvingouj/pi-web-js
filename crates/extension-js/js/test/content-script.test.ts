@@ -2690,6 +2690,60 @@ describe("select_option handler", () => {
 		expect(optionClicked).toBe("Yes");
 	});
 
+	it("combobox renders listbox asynchronously (queueMicrotask): select_option still finds the option", async () => {
+		const control = document.createElement("div");
+		control.setAttribute("role", "combobox");
+		control.setAttribute("aria-label", "Country");
+		control.setAttribute("aria-expanded", "false");
+		control.addEventListener("click", () => {
+			control.setAttribute("aria-expanded", "true");
+			queueMicrotask(() => {
+				const listbox = document.createElement("div");
+				listbox.setAttribute("role", "listbox");
+				const optYes = document.createElement("div");
+				optYes.setAttribute("role", "option");
+				optYes.textContent = "Yes";
+				const optNo = document.createElement("div");
+				optNo.setAttribute("role", "option");
+				optNo.textContent = "No";
+				listbox.append(optYes, optNo);
+				document.body.appendChild(listbox);
+			});
+		});
+		document.body.appendChild(control);
+
+		const snap = await dispatchContentScriptCall(
+			"page_snapshot_data",
+			"snapshot",
+			handlers.snapshot,
+			{},
+		);
+		const refId = (
+			snap.value as { nodes: Array<{ refId: string }> }
+		).nodes.find((n) => n.role === "combobox")!.refId;
+
+		let optionClicked = "";
+		document.addEventListener(
+			"click",
+			(e) => {
+				const target = e.target as HTMLElement;
+				if (target.getAttribute("role") === "option") {
+					optionClicked = target.textContent || "";
+				}
+			},
+			true,
+		);
+
+		const result = await dispatchContentScriptCall(
+			"page_select_option",
+			"select_option",
+			handlers.select_option,
+			{ refId, value: "Yes" },
+		);
+		expect(result.ok).toBe(true);
+		expect(optionClicked).toBe("Yes");
+	});
+
 	it("combobox opened by mousedown ignores an unrelated listbox", async () => {
 		const staleListbox = document.createElement("div");
 		staleListbox.setAttribute("role", "listbox");
@@ -2912,6 +2966,106 @@ describe("select_option handler", () => {
 		);
 		expect(result.ok).toBe(true);
 		expect(clicked).toBe(true);
+	});
+
+	it("nearby popup trigger renders listbox asynchronously (queueMicrotask): select_option still finds the option", async () => {
+		document.body.innerHTML = `
+			<div>
+				<label for="choice">Choice</label>
+				<input id="choice" role="combobox" aria-labelledby="choice-label">
+				<button type="button" aria-haspopup="listbox" aria-label="Open options">v</button>
+			</div>
+		`;
+		const button = document.querySelector("button")!;
+		button.addEventListener("click", () => {
+			queueMicrotask(() => {
+				const listbox = document.createElement("div");
+				listbox.id = "choice-listbox";
+				listbox.setAttribute("role", "listbox");
+				listbox.innerHTML = '<div role="option" data-target>Wanted</div>';
+				document.body.appendChild(listbox);
+			});
+		});
+		const snap = await dispatchContentScriptCall(
+			"page_snapshot_data",
+			"snapshot",
+			handlers.snapshot,
+			{},
+		);
+		const refId = (
+			snap.value as { nodes: Array<{ refId: string; role?: string }> }
+		).nodes.find((n) => n.role === "combobox")!.refId;
+		let clicked = false;
+		document.addEventListener(
+			"click",
+			(event) => {
+				const target = event.target as HTMLElement;
+				if (target.matches('[role="option"][data-target]')) clicked = true;
+			},
+			true,
+		);
+
+		const result = await dispatchContentScriptCall(
+			"page_select_option",
+			"select_option",
+			handlers.select_option,
+			{ refId, value: "Wanted" },
+		);
+		expect(result.ok).toBe(true);
+		expect(clicked).toBe(true);
+	});
+
+	it("combobox renders listbox after two animation frames: select_option waits and finds the option", async () => {
+		const control = document.createElement("div");
+		control.setAttribute("role", "combobox");
+		control.setAttribute("aria-label", "Country");
+		control.setAttribute("aria-expanded", "false");
+		control.addEventListener("click", () => {
+			control.setAttribute("aria-expanded", "true");
+			requestAnimationFrame(() =>
+				requestAnimationFrame(() => {
+					const listbox = document.createElement("div");
+					listbox.setAttribute("role", "listbox");
+					const opt = document.createElement("div");
+					opt.setAttribute("role", "option");
+					opt.textContent = "Yes";
+					listbox.appendChild(opt);
+					document.body.appendChild(listbox);
+				}),
+			);
+		});
+		document.body.appendChild(control);
+
+		const snap = await dispatchContentScriptCall(
+			"page_snapshot_data",
+			"snapshot",
+			handlers.snapshot,
+			{},
+		);
+		const refId = (
+			snap.value as { nodes: Array<{ refId: string }> }
+		).nodes.find((n) => n.role === "combobox")!.refId;
+
+		let optionClicked = "";
+		document.addEventListener(
+			"click",
+			(e) => {
+				const target = e.target as HTMLElement;
+				if (target.getAttribute("role") === "option") {
+					optionClicked = target.textContent || "";
+				}
+			},
+			true,
+		);
+
+		const result = await dispatchContentScriptCall(
+			"page_select_option",
+			"select_option",
+			handlers.select_option,
+			{ refId, value: "Yes" },
+		);
+		expect(result.ok).toBe(true);
+		expect(optionClicked).toBe("Yes");
 	});
 
 	it("unknown option value returns E_NOT_FOUND with candidates", async () => {

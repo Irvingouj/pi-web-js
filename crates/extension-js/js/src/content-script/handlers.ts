@@ -402,7 +402,7 @@ export const handlers = {
 		throw new Error("Element is not a select");
 	},
 
-	select_option: (params: PageSelectOptionParams) => {
+	select_option: async (params: PageSelectOptionParams) => {
 		const value = params.value;
 		const el = resolveTargetRaw(params.refId, params.label);
 		assertInteractable(el, "select_option");
@@ -436,7 +436,7 @@ export const handlers = {
 			allListboxes,
 			ariaControlsBefore,
 			ariaControlsAfter,
-		} = activateAndResolveListboxRoots(control);
+		} = await activateAndResolveListboxRoots(control);
 		const options = [
 			...new Set(
 				roots.flatMap((root) =>

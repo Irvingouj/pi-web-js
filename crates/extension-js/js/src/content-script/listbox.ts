@@ -126,6 +126,9 @@ const activateElement = (target: HTMLElement): void => {
 	target.click();
 };
 
+const nextFrame = (): Promise<void> =>
+	new Promise((resolve) => requestAnimationFrame(() => resolve()));
+
 const resolveListboxRoots = (
 	control: HTMLElement,
 	beforeMap: ListboxBefore,
@@ -142,23 +145,38 @@ const resolveListboxRoots = (
 	};
 };
 
-export function activateAndResolveListboxRoots(control: HTMLElement): {
+// ponytail: bounded wait — React flushes within a microtask; one frame is
+// enough for the common case, ~10 frames (~160ms@60Hz) covers a two-pass
+// concurrent render or a CSS-transition-gated flyout without open-ended polling.
+const waitForRoots = async (
+	control: HTMLElement,
+	beforeMap: ListboxBefore,
+): Promise<{ roots: HTMLElement[]; allListboxes: HTMLElement[] }> => {
+	let resolved = resolveListboxRoots(control, beforeMap);
+	for (let i = 0; i < 10 && resolved.roots.length === 0; i++) {
+		await nextFrame();
+		resolved = resolveListboxRoots(control, beforeMap);
+	}
+	return resolved;
+};
+
+export async function activateAndResolveListboxRoots(control: HTMLElement): Promise<{
 	roots: HTMLElement[];
 	searchedIds: string[];
 	allListboxes: HTMLElement[];
 	ariaControlsBefore: string | null;
 	ariaControlsAfter: string | null;
-} {
+}> {
 	const ariaControlsBefore = control.getAttribute("aria-controls");
 	const beforeMap = snapshotListboxes();
 
 	activateElement(control);
-	let { roots, allListboxes } = resolveListboxRoots(control, beforeMap);
+	let { roots, allListboxes } = await waitForRoots(control, beforeMap);
 	if (roots.length === 0) {
 		const trigger = findNearbyPopupTrigger(control);
 		if (trigger) {
 			activateElement(trigger);
-			({ roots, allListboxes } = resolveListboxRoots(control, beforeMap));
+			({ roots, allListboxes } = await waitForRoots(control, beforeMap));
 		}
 	}
 	const ariaControlsAfter = control.getAttribute("aria-controls");
