@@ -1,5 +1,4 @@
 import type { StaleRefCandidate } from "../shared/cross/agent-errors.js";
-import { collectInlineSnapshot as inlineSnapshot } from "../shared/cross/collect-inline-snapshot.js";
 import { encodeFetchResponse } from "../shared/cross/fetch-response.js";
 import type {
 	FetchParams,
@@ -48,7 +47,6 @@ import {
 	asRecord,
 	assertInteractable,
 	findElementByLabel,
-	getElementByRefId,
 	resolveTargetRaw,
 	throwElementNotFound,
 } from "./dom-utils.js";
@@ -692,7 +690,7 @@ export const handlers = {
 			});
 		}
 		const maxNodes = resolveMaxNodes(params);
-		const r = inlineSnapshot(maxNodes);
+		const r = grantFromInlineSnapshot(maxNodes);
 		return r.text;
 	},
 
@@ -707,7 +705,7 @@ export const handlers = {
 			});
 		}
 		const maxNodes = resolveMaxNodes(params);
-		const r = inlineSnapshot(maxNodes);
+		const r = grantFromInlineSnapshot(maxNodes);
 		const filter = (params.filter ?? {}) as SnapshotFilter;
 		const filtered = filterNodes(r.nodes, filter);
 		return {

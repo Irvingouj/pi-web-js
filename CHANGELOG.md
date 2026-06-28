@@ -5,6 +5,19 @@ is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
 
+## [0.13.3] — 2026-06-28
+
+### Fixed — inactive tab readiness
+
+- **`web.tab.create({ url, active: false })` now waits for page load and content-script readiness before returning for http(s) URLs.** Agents can create an inactive tab and immediately call `web.tab.snapshot({ tabId })` without activating the tab.
+- **Added `waitForReady: false` to `web.tab.create`** for callers that need raw immediate `chrome.tabs.create` behavior.
+- **`web.tab.wait_for_load({ tabId })` now waits for the content script too**, matching the real prerequisite for `web.tab.snapshot/click/fill`.
+
+### Tests
+
+- Added extension E2E coverage for creating an inactive tab, waiting for load, and reading snapshot text by `tabId`.
+
+
 ## [0.13.2] — 2026-06-27
 
 ### Added — `web.tab.goto` (tab-scoped navigation)
@@ -174,6 +187,7 @@ is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Added `problems.md` E2E fixtures and tests.
 - Fixed `web-js` `WasmAsyncError` compile.
 
+[0.13.3]: https://www.npmjs.com/package/@pi-oxide/extension-js/v/0.13.3
 [0.13.2]: https://www.npmjs.com/package/@pi-oxide/extension-js/v/0.13.2
 [0.12.3]: https://www.npmjs.com/package/@pi-oxide/extension-js/v/0.12.3
 [0.12.2]: https://www.npmjs.com/package/@pi-oxide/extension-js/v/0.12.2

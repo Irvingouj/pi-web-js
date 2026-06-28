@@ -2240,13 +2240,37 @@ describe("tab_goto", () => {
 
 describe("tab actions", () => {
 	beforeEach(async () => {
+		vi.clearAllMocks();
 		await stubChromeWithGrantedPermissions();
 		for (const spec of buildContentScriptSpecs()) {
 			registerContentScriptSpec(spec);
 		}
 	});
 
-	it("tab_create accepts positional url string", async () => {
+	it("tab_create accepts raw no-wait creation", async () => {
+		const result = await dispatchTool("tab_create", {
+			url: "https://extension-js.test/fixture",
+			waitForReady: false,
+		});
+		expect(result.ok).toBe(true);
+		expect(mockChrome.tabs.create).toHaveBeenCalledWith({
+			url: "https://extension-js.test/fixture",
+		});
+		expect(mockChrome.tabs.update).not.toHaveBeenCalled();
+	});
+
+	it("tab_create positional url waits for readiness by default", async () => {
+		mockChrome.tabs.create.mockResolvedValue({
+			id: 2,
+			url: "chrome://newtab/",
+			status: "complete",
+		});
+		mockChrome.tabs.get.mockResolvedValue({
+			id: 2,
+			url: "https://extension-js.test/fixture",
+			status: "complete",
+		});
+
 		const result = await dispatchTool(
 			"tab_create",
 			"https://extension-js.test/fixture",
@@ -2254,6 +2278,12 @@ describe("tab actions", () => {
 		expect(result.ok).toBe(true);
 		expect(mockChrome.tabs.create).toHaveBeenCalledWith({
 			url: "https://extension-js.test/fixture",
+		});
+		expect(mockChrome.tabs.update).toHaveBeenCalledWith(2, {
+			url: "https://extension-js.test/fixture",
+		});
+		expect(mockChrome.tabs.sendMessage).toHaveBeenCalledWith(2, {
+			action: "ping",
 		});
 	});
 

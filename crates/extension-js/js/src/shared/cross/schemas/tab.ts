@@ -26,6 +26,10 @@ export const TabCreateParamsSchema = z.preprocess(
 	z.object({
 		url: z.string().optional().describe("URL to open in the new tab"),
 		active: z.boolean().optional().describe("Whether to focus the new tab"),
+		waitForReady: z
+			.boolean()
+			.optional()
+			.describe("Wait for page load and content-script readiness"),
 	}),
 );
 const tabIdScalarOrObject = z.union([

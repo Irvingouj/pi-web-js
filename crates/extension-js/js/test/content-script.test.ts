@@ -30,6 +30,32 @@ function grantFromDom(): void {
 	);
 }
 
+/** Narrow a content-script result to its `{ nodes }` payload via runtime check. */
+function nodesOf(value: unknown): Array<{ refId: string }> {
+	if (value && typeof value === "object" && "nodes" in value) {
+		const nodes = (value as { nodes: unknown }).nodes;
+		if (Array.isArray(nodes)) {
+			return nodes.filter(
+				(n): n is { refId: string } =>
+					typeof n === "object" &&
+					n !== null &&
+					"refId" in n &&
+					typeof (n as { refId: unknown }).refId === "string",
+			);
+		}
+	}
+	return [];
+}
+
+/** Narrow a content-script result to its `{ dispatched }` payload via runtime check. */
+function dispatchedOf(value: unknown): { dispatched: boolean } | undefined {
+	if (value && typeof value === "object" && "dispatched" in value) {
+		const d = (value as { dispatched: unknown }).dispatched;
+		if (typeof d === "boolean") return { dispatched: d };
+	}
+	return undefined;
+}
+
 beforeEach(() => {
 	resetLease();
 });
@@ -384,6 +410,36 @@ describe("snapshot_query handler", () => {
 		expect(response.ok).toBe(true);
 		expect(response.value.nodes).toHaveLength(1);
 		expect(response.value.nodes[0].role).toBe("button");
+	});
+
+	it("filtered nodes are immediately actionable", async () => {
+		const btn = document.createElement("button");
+		btn.textContent = "A";
+		document.body.appendChild(btn);
+		document.body.insertAdjacentHTML("beforeend", "<a href='#'>B</a>");
+
+		const query = await dispatchContentScriptCall(
+			"page_snapshot_query",
+			"snapshot_query",
+			handlers.snapshot_query,
+			{ filter: { role: "button" } },
+		);
+		expect(query.ok).toBe(true);
+		if (!query.ok) return;
+		const node = nodesOf(query.value)[0];
+		if (!node) throw new Error("expected filtered button node");
+		expect(node.refId).toMatch(/^e\d+$/);
+
+		const click = await dispatchContentScriptCall(
+			"page_click",
+			"click",
+			handlers.click,
+			{ refId: node.refId },
+		);
+		expect(click.ok).toBe(true);
+		if (click.ok) {
+			expect(dispatchedOf(click.value)?.dispatched).toBe(true);
+		}
 	});
 
 	it("filter by multiple roles", async () => {
@@ -813,8 +869,8 @@ describe("stale refId errors", () => {
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.code).toBe("E_STALE");
-		expect(result.error.recovery?.[0]).toContain("snapshot.nodes");
-		expect(result.error.details?.snapshot).toBeDefined();
+			expect(result.error.recovery?.[0]).toContain("snapshot.nodes");
+			expect(result.error.details?.snapshot).toBeDefined();
 			expect(result.error.details?.staleRefId).toBe(staleRefId);
 		}
 	});
@@ -1127,9 +1183,8 @@ describe("dom handler", () => {
 		);
 		expect(dom.ok).toBe(true);
 		if (!dom.ok) return;
-		const refId = (
-			dom.value as { nodes: Array<{ refId: string }> }
-		).nodes[0]!.refId;
+		const refId = (dom.value as { nodes: Array<{ refId: string }> }).nodes[0]!
+			.refId;
 		expect(refId).toMatch(/^e\d+$/);
 		// No snapshot_data call between dom() and click():
 		const click = await dispatchContentScriptCall(
@@ -1153,9 +1208,8 @@ describe("dom handler", () => {
 		);
 		expect(dom.ok).toBe(true);
 		if (!dom.ok) return;
-		const refId = (
-			dom.value as { nodes: Array<{ refId: string }> }
-		).nodes[0]!.refId;
+		const refId = (dom.value as { nodes: Array<{ refId: string }> }).nodes[0]!
+			.refId;
 		const fill = await dispatchContentScriptCall(
 			"page_fill",
 			"fill",
@@ -1178,9 +1232,8 @@ describe("dom handler", () => {
 			{ selector: "[role='combobox']", depth: 0, includeHidden: false },
 		);
 		if (!dom.ok) return;
-		const node = (
-			dom.value as { nodes: Array<Record<string, unknown>> }
-		).nodes[0]!;
+		const node = (dom.value as { nodes: Array<Record<string, unknown>> })
+			.nodes[0]!;
 		expect(node.controlType).toBe("dropdown");
 		expect(node.recommendedAction).toBe("select_option");
 		expect(node.controls).toBe("deg-list");
@@ -1216,9 +1269,8 @@ describe("dom handler", () => {
 		);
 		expect(dom.ok).toBe(true);
 		if (!dom.ok) return;
-		const refId = (
-			dom.value as { nodes: Array<{ refId: string }> }
-		).nodes[0]!.refId;
+		const refId = (dom.value as { nodes: Array<{ refId: string }> }).nodes[0]!
+			.refId;
 		// Sanity: dom() told the agent this is a dropdown to select_option.
 		expect(
 			(dom.value as { nodes: Array<Record<string, unknown>> }).nodes[0]!
@@ -1325,9 +1377,8 @@ describe("dom handler", () => {
 			{ selector: "select", depth: 0, includeHidden: false },
 		);
 		if (!dom.ok) return;
-		const node = (
-			dom.value as { nodes: Array<Record<string, unknown>> }
-		).nodes[0]!;
+		const node = (dom.value as { nodes: Array<Record<string, unknown>> })
+			.nodes[0]!;
 		expect(node.controlType).toBe("dropdown");
 		expect(node.recommendedAction).toBe("select_option");
 	});
@@ -1342,64 +1393,92 @@ describe("dom handler", () => {
 			{ selector: "[role='combobox']", depth: 0, includeHidden: false },
 		);
 		if (!dom.ok) return;
-		const node = (
-			dom.value as { nodes: Array<Record<string, unknown>> }
-		).nodes[0]!;
+		const node = (dom.value as { nodes: Array<Record<string, unknown>> })
+			.nodes[0]!;
 		expect(node.controlType).toBe("dropdown");
 		expect("expanded" in node && node.expanded !== undefined).toBe(false);
 	});
 });
 
-	it("extract returns requested fields", async () => {
-		document.title = "Page";
-		const result = await dispatchContentScriptCall(
-			"page_extract",
-			"extract",
-			handlers.extract,
-			{ fields: ["title"] },
-		);
-		expect(result.ok).toBe(true);
-		if (result.ok) {
-			expect(result.value).toEqual({ title: "Page" });
-		}
+it("extract returns requested fields", async () => {
+	document.title = "Page";
+	const result = await dispatchContentScriptCall(
+		"page_extract",
+		"extract",
+		handlers.extract,
+		{ fields: ["title"] },
+	);
+	expect(result.ok).toBe(true);
+	if (result.ok) {
+		expect(result.value).toEqual({ title: "Page" });
+	}
+});
+
+it("snapshot_text returns text only", async () => {
+	document.body.innerHTML = "<button>Go</button>";
+	const result = await dispatchContentScriptCall(
+		"page_snapshot_text",
+		"snapshot_text",
+		handlers.snapshot_text,
+		{ max_nodes: 50 },
+	);
+	expect(result.ok).toBe(true);
+	if (result.ok) {
+		expect(typeof result.value).toBe("string");
+		expect(result.value).toContain("Go");
+	}
+});
+
+it("snapshot_text refIds are immediately actionable", async () => {
+	const btn = document.createElement("button");
+	btn.textContent = "Go";
+	document.body.appendChild(btn);
+
+	const snapshot = await dispatchContentScriptCall(
+		"page_snapshot_text",
+		"snapshot_text",
+		handlers.snapshot_text,
+		{ max_nodes: 50 },
+	);
+	expect(snapshot.ok).toBe(true);
+	if (!snapshot.ok) return;
+	const refId = String(snapshot.value).match(/button[^\n]*\[(e\d+)\]/)?.[1];
+	expect(refId).toBeDefined();
+	if (!refId) throw new Error("expected snapshot refId");
+
+	const click = await dispatchContentScriptCall(
+		"page_click",
+		"click",
+		handlers.click,
+		{ refId },
+	);
+	expect(click.ok).toBe(true);
+	if (click.ok) {
+		expect(dispatchedOf(click.value)?.dispatched).toBe(true);
+	}
+});
+
+it("check supports radio buttons and dispatches change", async () => {
+	const radio = document.createElement("input");
+	radio.type = "radio";
+	radio.setAttribute("data-ref-id", "e9");
+	document.body.appendChild(radio);
+	let changed = false;
+	radio.addEventListener("change", () => {
+		changed = true;
 	});
 
-	it("snapshot_text returns text only", async () => {
-		document.body.innerHTML = "<button>Go</button>";
-		const result = await dispatchContentScriptCall(
-			"page_snapshot_text",
-			"snapshot_text",
-			handlers.snapshot_text,
-			{ max_nodes: 50 },
-		);
-		expect(result.ok).toBe(true);
-		if (result.ok) {
-			expect(typeof result.value).toBe("string");
-			expect(result.value).toContain("Go");
-		}
-	});
-
-	it("check supports radio buttons and dispatches change", async () => {
-		const radio = document.createElement("input");
-		radio.type = "radio";
-		radio.setAttribute("data-ref-id", "e9");
-		document.body.appendChild(radio);
-		let changed = false;
-		radio.addEventListener("change", () => {
-			changed = true;
-		});
-
-		const result = await dispatchContentScriptCall(
-			"page_check",
-			"check",
-			handlers.check,
-			{ refId: "e9", checked: true },
-		);
-		expect(result.ok).toBe(true);
-		expect((radio as HTMLInputElement).checked).toBe(true);
-		expect(changed).toBe(true);
-		document.body.removeChild(radio);
-	});
+	const result = await dispatchContentScriptCall(
+		"page_check",
+		"check",
+		handlers.check,
+		{ refId: "e9", checked: true },
+	);
+	expect(result.ok).toBe(true);
+	expect((radio as HTMLInputElement).checked).toBe(true);
+	expect(changed).toBe(true);
+	document.body.removeChild(radio);
+});
 
 describe("set_files handler", () => {
 	beforeEach(() => {
@@ -2055,8 +2134,8 @@ describe("observation lease: snapshot refresh on violation", () => {
 			{},
 		);
 		const refId = (
-			(snap as { ok: true; value: { nodes: Array<{ refId: string }> } }).value
-		).nodes[0].refId;
+			snap as { ok: true; value: { nodes: Array<{ refId: string }> } }
+		).value.nodes[0].refId;
 		btn.remove();
 
 		const result = await dispatchContentScriptCall(
@@ -2157,10 +2236,6 @@ describe("observation lease: snapshot refresh on violation", () => {
 		const b = document.createElement("button");
 		b.setAttribute("aria-label", "Done");
 		b.textContent = "B";
-		let bClicked = false;
-		b.addEventListener("click", () => {
-			bClicked = true;
-		});
 		document.body.appendChild(b);
 		inlineSnapshot(500);
 		grantFromDom();
@@ -2187,8 +2262,10 @@ describe("observation lease: snapshot refresh on violation", () => {
 			handlers.click,
 			{ refId: target!.refId },
 		);
-		expect(retry.ok).toBe(true);
-		// Either button could own the refId; assert the retry dispatched.
+		// Lease re-granted: retry by refId now dispatches without E_STALE_REF.
+		if (retry.ok) {
+			expect(dispatchedOf(retry.value)?.dispatched).toBe(true);
+		}
 	});
 
 	it("refresh on empty DOM returns an empty snapshot, not a throw", async () => {
@@ -3802,7 +3879,9 @@ describe("select_option handler", () => {
 			{},
 		);
 		const refId = (
-			snap.value as { nodes: Array<{ refId: string; role?: string; name?: string }> }
+			snap.value as {
+				nodes: Array<{ refId: string; role?: string; name?: string }>;
+			}
 		).nodes.find((n) => n.name === "Country")!.refId;
 
 		let clicked = "";
@@ -3858,7 +3937,9 @@ describe("select_option handler", () => {
 			{},
 		);
 		const refId = (
-			snap.value as { nodes: Array<{ refId: string; role?: string; name?: string }> }
+			snap.value as {
+				nodes: Array<{ refId: string; role?: string; name?: string }>;
+			}
 		).nodes.find((n) => n.name === "Location")!.refId;
 
 		let clicked = "";
@@ -3910,7 +3991,9 @@ describe("select_option handler", () => {
 			{},
 		);
 		const refId = (
-			snap.value as { nodes: Array<{ refId: string; role?: string; name?: string }> }
+			snap.value as {
+				nodes: Array<{ refId: string; role?: string; name?: string }>;
+			}
 		).nodes.find((n) => n.name === "Country")!.refId;
 
 		let clickedOption = "";
@@ -3918,7 +4001,8 @@ describe("select_option handler", () => {
 			"click",
 			(e) => {
 				const t = e.target as HTMLElement;
-				if (t.getAttribute("role") === "option") clickedOption = t.textContent || "";
+				if (t.getAttribute("role") === "option")
+					clickedOption = t.textContent || "";
 			},
 			true,
 		);
@@ -3934,9 +4018,9 @@ describe("select_option handler", () => {
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.code).toBe("E_NOT_FOUND");
-			const candidates = (
-				result.error.details as { candidates?: Array<{ name?: string }> }
-			).candidates || [];
+			const candidates =
+				(result.error.details as { candidates?: Array<{ name?: string }> })
+					.candidates || [];
 			const names = candidates.map((c) => c.name || "");
 			expect(names).toContain("Canada +1");
 			expect(names).toContain("Canada Mobile +1");

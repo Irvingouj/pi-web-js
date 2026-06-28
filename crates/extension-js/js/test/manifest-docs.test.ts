@@ -163,6 +163,7 @@ describe("manifest documentation export", () => {
 		expect(tabCreate?.aliases).toEqual([
 			{ namespace: "tab", name: "create", fields: ["url"] },
 		]);
+		expect(tabCreate?.notes?.join(" ")).toContain("content-script readiness");
 		const pageNewTab = manifest.find(
 			(entry) => entry.action === "page_new_tab",
 		);

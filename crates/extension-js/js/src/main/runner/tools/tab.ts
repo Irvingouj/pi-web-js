@@ -14,6 +14,7 @@ import {
 	extractTabId,
 	makeError,
 	navigateTab,
+	pingTabContentScript,
 	resolveActiveTabId,
 	unwrapResult,
 	waitForTabLoad,
@@ -166,8 +167,32 @@ registerJsCall({
 	fields: ["url"],
 	aliases: [{ namespace: "tab", name: "create", fields: ["url"] }],
 	owner: "main-thread",
-	handler: async (params, _ctx) => {
-		return unwrapResult(await dispatchTool("chrome_tabs_create", [params]));
+	handler: async (params, ctx) => {
+		const createParams = params as z.infer<
+			typeof schemas.TabCreateParamsSchema
+		>;
+		const { waitForReady: _waitForReady, ...chromeCreateParams } = createParams;
+		const created = unwrapResult(
+			await dispatchTool("chrome_tabs_create", [chromeCreateParams]),
+		) as z.infer<typeof schemas.ChromeTabSchema>;
+		const tabId = created.tabId ?? created.id;
+		if (
+			typeof tabId === "number" &&
+			createParams.url &&
+			createParams.waitForReady !== false &&
+			(createParams.url.startsWith("http:") ||
+				createParams.url.startsWith("https:"))
+		) {
+			return navigateTab({
+				tabId,
+				url: createParams.url,
+				preNavigationUrl: created.url,
+				timeoutMs: DEFAULT_TIMEOUT_MS,
+				traceId: ctx.runId ?? "?",
+				logPrefix: "tab_create",
+			});
+		}
+		return created;
 	},
 	paramTypes: [
 		{
@@ -182,11 +207,24 @@ registerJsCall({
 			required: false,
 			description: "Whether to focus the new tab (literal)",
 		},
+		{
+			name: "waitForReady",
+			type: "boolean",
+			required: false,
+			description:
+				"Wait for page load and content-script readiness before returning. Defaults to true for http(s) URLs; set false for raw immediate tab creation.",
+		},
 	],
 	returnDoc: "Created tab",
 	errorCode: "ECHROME",
 	errorCategory: "extension",
 	example: 'web.tab.create("https://example.com")',
+	agentMeta: {
+		notes: [
+			"For http(s) URLs, web.tab.create waits for page load/content-script readiness by default. Set waitForReady: false for raw immediate tab creation; call web.tab.goto({ tabId, url }) before snapshot/click/fill if Chrome has not committed the inactive tab URL.",
+		],
+		relatedApis: ["web.tab.goto", "web.tab.wait_for_load", "web.tab.snapshot"],
+	},
 });
 
 registerJsCall({
@@ -265,7 +303,12 @@ registerJsCall({
 		const obj = asRecord(params);
 		const tabId = extractTabId(params);
 		const timeout = typeof obj.timeout === "number" ? obj.timeout : 30000;
-		return unwrapResult(await waitForTabLoad(tabId, timeout));
+		if (tabId === null) {
+			throw makeError("tab_wait_for_load requires a tabId", "E_MISSING_PARAM");
+		}
+		unwrapResult(await waitForTabLoad(tabId, timeout));
+		unwrapResult(await pingTabContentScript(tabId, timeout));
+		return true;
 	},
 	paramTypes: [
 		{

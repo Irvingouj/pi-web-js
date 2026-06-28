@@ -10,7 +10,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.13.2"
+version = "0.13.3"
 edition = "2021"
 authors = ["Irving Ou"]
 license = "LicenseRef-PiccoloNotebook-Fair-BYOK-1.0"
