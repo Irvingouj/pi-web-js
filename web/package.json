@@ -2,7 +2,7 @@
 	"name": "js-notebook",
 	"version": "0.1.0",
 	"private": true,
-	"license": "LicenseRef-PiccoloNotebook-Fair-BYOK-1.0",
+	"license": "MIT OR Apache-2.0",
 	"type": "module",
 	"scripts": {
 		"copy-ext-assets": "node scripts/copy-ext-assets.js",

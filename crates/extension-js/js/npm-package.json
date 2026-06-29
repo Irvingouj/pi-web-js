@@ -2,7 +2,7 @@
 	"name": "@pi-oxide/extension-js",
 	"type": "module",
 	"version": "0.13.3",
-	"license": "LicenseRef-PiccoloNotebook-Fair-BYOK-1.0",
+	"license": "MIT OR Apache-2.0",
 	"main": "index.js",
 	"types": "index.d.ts",
 	"files": [

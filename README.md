@@ -88,5 +88,4 @@ manifest typing, cold-tab recovery, and more).
 
 ## License
 
-See [`LICENSE`](./LICENSE). Workspace license:
-`LicenseRef-PiccoloNotebook-Fair-BYOK-1.0`.
+Dual licensed under MIT or Apache-2.0 — see [`LICENSE`](./LICENSE).
