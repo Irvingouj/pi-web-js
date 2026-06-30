@@ -22,6 +22,11 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    env:
+      # wasi-sdk clang + sysroot, installed below. Required for rquickjs-sys
+      # (QuickJS C source) targeting wasm32-unknown-unknown.
+      CC: /opt/wasi-sdk-24.0/bin/clang
+      CFLAGS: --sysroot=/opt/wasi-sdk-24.0/share/wasi-sysroot
     steps:
       - uses: actions/checkout@v4
 
@@ -33,7 +38,12 @@ jobs:
         with:
           node-version: 20
           registry-url: https://registry.npmjs.org
-
+      # rquickjs-sys needs a libc sysroot for wasm32-unknown-unknown (QuickJS
+      # C source #includes <stdlib.h>). wasi-sdk provides clang + sysroot.
+      - name: Install wasi-sdk (libc sysroot for the WASM build)
+        run: |
+          curl -sSL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-24/wasi-sdk-24.0-x86_64-linux.tar.gz -o /tmp/wasi-sdk.tar.gz
+          tar -xzf /tmp/wasi-sdk.tar.gz -C /opt/
       - name: Resolve target from tag
         id: target
         run: |
