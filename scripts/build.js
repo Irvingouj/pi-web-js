@@ -25,8 +25,24 @@ try {
 } catch {
   // rustup not available — rely on cargo/rustc already in PATH
 }
+// WASM builds need a C toolchain that cargo does not pick up automatically on
+// macOS (Homebrew llvm + wasi-libc). .cargo/config.toml deliberately omits these
+// so Linux CI works unmodified; detect them here instead. Falls through silently
+// on Linux CI where the default clang is correct.
+const wasmEnv = {};
+try {
+  const llvmClang = "/opt/homebrew/opt/llvm/bin/clang";
+  const wasiSysroot = "/opt/homebrew/Cellar/wasi-libc/32/share/wasi-sysroot";
+  fs.accessSync(llvmClang, fs.constants.X_OK);
+  fs.accessSync(wasiSysroot);
+  wasmEnv.CC = llvmClang;
+  wasmEnv.CFLAGS = `--sysroot=${wasiSysroot}`;
+} catch {
+  // Not on macOS-with-homebrew — rely on the default toolchain.
+}
 const env = {
   ...process.env,
+  ...wasmEnv,
   PATH: rustBinDir ? `${rustBinDir}:${process.env.PATH}` : process.env.PATH,
   ...(rustBinDir ? { RUSTC: path.join(rustBinDir, "rustc") } : {}),
 };

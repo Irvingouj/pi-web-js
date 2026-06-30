@@ -1,6 +1,9 @@
 [target.wasm32-unknown-unknown]
 rustflags = '-C link-arg=--allow-undefined --cfg getrandom_backend="wasm_js"'
 
-[env]
-CC = "/opt/homebrew/opt/llvm/bin/clang"
-CFLAGS = "--sysroot=/opt/homebrew/Cellar/wasi-libc/32/share/wasi-sysroot"
+# CC / CFLAGS for the WASM build are intentionally NOT set here — they are
+# machine-specific (Homebrew llvm + wasi-libc path on macOS) and break Linux CI.
+# Set them locally via one of:
+#   1. A gitignored `.cargo/config.local.toml` with an [env] block, or
+#   2. Exporting CC / CFLAGS in your shell before `node scripts/build.js`.
+# The default toolchain works on Linux CI without overrides.
