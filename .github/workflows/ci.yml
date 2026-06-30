@@ -50,6 +50,13 @@ jobs:
         run: |
           curl -sSL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-24/wasi-sdk-24.0-x86_64-linux.tar.gz -o /tmp/wasi-sdk.tar.gz
           tar -xzf /tmp/wasi-sdk.tar.gz -C /opt/
+      - name: Debug — inspect rquickjs-sys bindings
+        run: |
+          find ~/.cargo/registry/src -path "*rquickjs-sys-0.11.0/src/bindings*" -name "*.rs" 2>/dev/null | head
+          echo "--- wasm32-unknown-unknown.rs exists? ---"
+          find ~/.cargo/registry/src -name "wasm32-unknown-unknown.rs" 2>/dev/null
+          echo "--- crate root ---"
+          ls -la ~/.cargo/registry/src/*/rquickjs-sys-0.11.0/src/bindings/ 2>/dev/null | head -20
       - name: Build extension WASM
         run: node scripts/build.js extension
       - name: extension-js unit tests
