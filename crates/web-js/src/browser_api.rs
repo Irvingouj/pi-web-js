@@ -1314,17 +1314,20 @@ pub async fn execute_page_press(params: PagePressParams) -> WasmAsyncResponse {
             }
         }
     };
-    let target: web_sys::EventTarget = if let Some(ref_id) = optional_str(&params.ref_id) {
-        let empty_selector: Option<String> = None;
-        match resolve_ref_id_or_selector(&document, ref_id, &empty_selector).await {
-            Ok(rid) => match document.query_selector(&format!("[data-ref-id='{}']", rid)) {
-                Ok(Some(el)) => el.into(),
-                _ => document.into(),
-            },
-            Err(resp) => return resp,
+    let target: web_sys::EventTarget = {
+        let ref_id = optional_str(&params.ref_id);
+        if !ref_id.is_empty() {
+            let empty_selector: Option<String> = None;
+            match resolve_ref_id_or_selector(&document, ref_id, &empty_selector).await {
+                Ok(rid) => match document.query_selector(&format!("[data-ref-id='{}']", rid)) {
+                    Ok(Some(el)) => el.into(),
+                    _ => document.into(),
+                },
+                Err(resp) => return resp,
+            }
+        } else {
+            document.into()
         }
-    } else {
-        document.into()
     };
     let _ = target.dispatch_event(&event);
     WasmAsyncResponse {
@@ -1378,23 +1381,17 @@ pub async fn execute_page_select(params: PageSelectParams) -> WasmAsyncResponse 
     if let Some(select) = element.dyn_ref::<web_sys::HtmlSelectElement>() {
         let values = params.value.into_vec();
         if select.multiple() && values.len() > 1 {
-            let opts = select.options();
             let wanted: std::collections::HashSet<String> = values.iter().cloned().collect();
-            for i in 0..opts.length() {
-                if let Some(opt) = opts.get_with_index(i) {
-                    let opt_val = opt.value();
-                    _ = opt.set_selected(wanted.contains(&opt_val));
+            for i in 0..select.length() {
+                if let Some(opt_el) = select.item(i) {
+                    if let Some(opt) = opt_el.dyn_ref::<web_sys::HtmlOptionElement>() {
+                        _ = opt.set_selected(wanted.contains(&opt.value()));
+                    }
                 }
             }
         } else {
-            select.set_value(values.first().unwrap_or(""));
+            select.set_value(values.first().map(|v| v.as_str()).unwrap_or(""));
         }
-    } else {
-        return WasmAsyncResponse {
-            ok: false,
-            value: None,
-            error: Some(WasmAsyncError::new("Element is not a select", "E_AGENT")),
-        };
     }
     WasmAsyncResponse {
         ok: true,
