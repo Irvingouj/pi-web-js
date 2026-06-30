@@ -42,8 +42,9 @@ jobs:
           wasi_root=$(dirname $(find /opt/wasi-sdk-*/bin/clang -maxdepth 1 | head -1))
           sysroot="$(cd $wasi_root/../share/wasi-sysroot && pwd)"
           echo "WASI_CLANG=$wasi_root/clang" >> "$GITHUB_ENV"
-          # wasm32-unknown-unknown doesn't auto-add the sysroot include dir.
-          echo "WASI_CFLAGS=--sysroot=$sysroot -I$sysroot/include" >> "$GITHUB_ENV"
+          # wasi-sdk-24 has no top-level include/stdlib.h (only per-target
+          # subdirs); point at wasm32-wasi which matches the unknown-unknown ABI.
+          echo "WASI_CFLAGS=--sysroot=$sysroot -I$sysroot/include/wasm32-wasi" >> "$GITHUB_ENV"
       - name: Resolve target from tag
         id: target
         run: |
