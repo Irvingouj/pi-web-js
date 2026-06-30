@@ -50,6 +50,8 @@ if (homebrewOk) {
   wasmEnv.CFLAGS = `--sysroot=${homebrewSysroot}`;
   // bindgen-rs (libclang) needs the same sysroot for header parsing.
   wasmEnv.BINDGEN_EXTRA_CLANG_ARGS = `--sysroot=${homebrewSysroot} -D__wasi__`;
+  // Homebrew llvm ships libclang.dylib; bindgen-rs finds it via LIBCLANG_PATH.
+  wasmEnv.LIBCLANG_PATH = "/opt/homebrew/opt/llvm/lib";
 } else {
   const sdkDir = fs.readdirSync("/opt").find((d) => d.startsWith("wasi-sdk-"));
   if (sdkDir) {
@@ -60,8 +62,8 @@ if (homebrewOk) {
     // wasm32-wasi and define __wasi__ so the headers' guard compiles.
     wasmEnv.CFLAGS = `--sysroot=${sysroot} -I${sysroot}/include/wasm32-wasi -D__wasi__`;
     wasmEnv.BINDGEN_EXTRA_CLANG_ARGS = `--sysroot=${sysroot} -I${sysroot}/include/wasm32-wasi -D__wasi__`;
-    // bindgen-rs finds libclang via LIBCLANG_PATH.
-    wasmEnv.LIBCLANG_PATH = path.join(root, "lib");
+    // LIBCLANG_PATH is set by CI (apt libclang-dev); build.js does NOT override
+    // it — wasi-sdk ships libclang-cpp.so, not the libclang.so bindgen-rs needs.
   }
 }
 const env = {
