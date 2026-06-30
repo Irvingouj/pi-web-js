@@ -50,15 +50,22 @@ jobs:
         run: |
           curl -sSL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-24/wasi-sdk-24.0-x86_64-linux.tar.gz -o /tmp/wasi-sdk.tar.gz
           tar -xzf /tmp/wasi-sdk.tar.gz -C /opt/
-      - name: Debug — inspect rquickjs-sys bindings
-        run: |
-          find ~/.cargo/registry/src -path "*rquickjs-sys-0.11.0/src/bindings*" -name "*.rs" 2>/dev/null | head
-          echo "--- wasm32-unknown-unknown.rs exists? ---"
-          find ~/.cargo/registry/src -name "wasm32-unknown-unknown.rs" 2>/dev/null
-          echo "--- crate root ---"
-          ls -la ~/.cargo/registry/src/*/rquickjs-sys-0.11.0/src/bindings/ 2>/dev/null | head -20
       - name: Build extension WASM
+        id: build
+        continue-on-error: true
         run: node scripts/build.js extension
+      - name: Debug — inspect rquickjs-sys bindings after build attempt
+        if: always()
+        run: |
+          echo "--- bindings dir ---"
+          ls -la ~/.cargo/registry/src/*/rquickjs-sys-0.11.0/src/bindings/ 2>/dev/null | head -20
+          echo "--- wasm32-unknown-unknown.rs readable? ---"
+          find ~/.cargo/registry/src -name "wasm32-unknown-unknown.rs" -exec head -3 {} \; 2>/dev/null
+          echo "--- CWD that build.rs sees (rerun a probe) ---"
+          cd ~/.cargo/registry/src/*/rquickjs-sys-0.11.0 && pwd && test -f src/bindings/wasm32-unknown-unknown.rs && echo "FILE EXISTS RELATIVE" || echo "FILE MISSING RELATIVE"
+      - name: Fail if build failed
+        if: steps.build.outcome != 'success'
+        run: exit 1
       - name: extension-js unit tests
         working-directory: crates/extension-js/js
         run: |
