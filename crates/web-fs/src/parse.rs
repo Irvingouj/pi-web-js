@@ -190,10 +190,10 @@ mod tests {
         let congo = rows
             .iter()
             .find(|r| {
-                r.as_array().map_or(false, |c| {
-                    c.first().map_or(false, |n| {
+                r.as_array().is_some_and(|c| {
+                    c.first().is_some_and(|n| {
                         n.as_str()
-                            .map_or(false, |s| s.contains("Democratic Republic"))
+                            .is_some_and(|s| s.contains("Democratic Republic"))
                     })
                 })
             })
