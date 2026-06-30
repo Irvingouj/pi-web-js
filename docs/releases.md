@@ -80,6 +80,20 @@ cd crates/extension-js/js && npm ci && npm run build
 cd pkg && npm publish --dry-run
 ```
 
+## WASM build toolchain (why CI needs wasi-sdk + libclang)
+
+`rquickjs-sys` compiles QuickJS's C source, which `#include`s `<stdlib.h>`. The `wasm32-unknown-unknown` target (correct for `wasm-bindgen --target web`) ships no libc, so the build needs an external sysroot:
+
+- **macOS dev**: Homebrew `llvm` + `wasi-libc`. `scripts/build.js` auto-detects these.
+- **Linux CI**: `wasi-sdk` (installed to `/opt` by the workflow) + `libclang-dev` (apt).
+
+Two non-obvious requirements, both handled by `build.js` + the workflow:
+
+1. **`rquickjs` `bindgen` feature.** The published `rquickjs-sys 0.11.0` ships pre-generated FFI binding files for `wasm32-wasip1`/`wasip2` but **not** `wasm32-unknown-unknown`. The `bindgen` feature generates bindings at build time via `libclang` (hence `libclang-dev` + `LIBCLANG_PATH`), sidestepping the missing file.
+2. **`-D__wasi__`.** `wasi-sdk-24`'s `wasi/api.h` guards its declarations behind `#ifndef __wasi__`. The `wasm32-unknown-unknown` target doesn't define `__wasi__` (only the wasi targets do), so `CFLAGS`/`BINDGEN_EXTRA_CLANG_ARGS` define it explicitly to satisfy the guard while keeping the OS-less target.
+
+If a fresh `cargo build --target wasm32-unknown-unknown -p extension-js` fails with `couldn't read .../bindings/wasm32-unknown-unknown.rs` or `stdlib.h not found`, the toolchain setup above is the cause.
+
 ## Known metadata note
 
 `@pi-oxide/dom-semantic-tree@0.2.0` was published with `"license": "LicenseRef-PiccoloNotebook-Fair-BYOK-1.0"` — a stale string from another project. The source `crates/dom-semantic-tree/js/package.json` correctly says `MIT OR Apache-2.0`; the next provenance publish will correct it.
