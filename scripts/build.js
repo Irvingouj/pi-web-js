@@ -25,13 +25,14 @@ try {
 } catch {
   // rustup not available — rely on cargo/rustc already in PATH
 }
-// rquickjs-sys compiles QuickJS C, which needs a libc. We target wasm32-wasip1
-// (not wasm32-unknown-unknown): rquickjs-sys ships pre-generated FFI bindings
-// only for wasi targets, and wasip1 has a real libc sysroot (wasi-sdk) so the
-// wasi headers' #ifndef __wasi__ guard is satisfied natively — no -D hack.
-//  - macOS dev: Homebrew llvm + wasi-libc.
-//  - Linux CI:  wasi-sdk under /opt.
-// Detection runs here so `node scripts/build.js` and CI behave identically.
+// rquickjs-sys compiles QuickJS C, which needs a libc. wasm32-unknown-unknown
+// is OS-less (correct for wasm-bindgen --target web), so it has no libc — we
+// provide wasi-libc and define __wasi__ to satisfy its header guard.
+// We also enable rquickjs's `bindgen` feature (see Cargo.toml) so FFI bindings
+// are generated at build time via libclang — the published rquickjs-sys 0.11.0
+// does NOT ship a wasm32-unknown-unknown.rs pre-generated binding file.
+//  - macOS dev: Homebrew llvm + wasi-libc (flat include layout).
+//  - Linux CI:  wasi-sdk under /opt (per-target include subdir + needs -D__wasi__).
 const wasmEnv = {};
 const homebrewClang = "/opt/homebrew/opt/llvm/bin/clang";
 const homebrewSysroot = "/opt/homebrew/Cellar/wasi-libc/32/share/wasi-sysroot";
@@ -46,15 +47,21 @@ const homebrewOk = (() => {
 })();
 if (homebrewOk) {
   wasmEnv.CC = homebrewClang;
-  wasmEnv.CFLAGS = `--sysroot=${homebrewSysroot} -I${homebrewSysroot}/include/wasm32-wasip1`;
+  wasmEnv.CFLAGS = `--sysroot=${homebrewSysroot}`;
+  // bindgen-rs (libclang) needs the same sysroot for header parsing.
+  wasmEnv.BINDGEN_EXTRA_CLANG_ARGS = `--sysroot=${homebrewSysroot} -D__wasi__`;
 } else {
-  // Linux CI installs wasi-sdk under /opt/wasi-sdk-*. wasip1 finds its headers
-  // natively via the sysroot (no -I/-D__wasi__ needed, unlike unknown-unknown).
   const sdkDir = fs.readdirSync("/opt").find((d) => d.startsWith("wasi-sdk-"));
   if (sdkDir) {
     const root = path.join("/opt", sdkDir);
+    const sysroot = path.join(root, "share/wasi-sysroot");
     wasmEnv.CC = path.join(root, "bin/clang");
-    wasmEnv.CFLAGS = `--sysroot=${path.join(root, "share/wasi-sysroot")} -I${path.join(root, "share/wasi-sysroot/include/wasm32-wasip1")}`;
+    // wasi-sdk-24 ships stdlib.h only under per-target subdirs; point -I at
+    // wasm32-wasi and define __wasi__ so the headers' guard compiles.
+    wasmEnv.CFLAGS = `--sysroot=${sysroot} -I${sysroot}/include/wasm32-wasi -D__wasi__`;
+    wasmEnv.BINDGEN_EXTRA_CLANG_ARGS = `--sysroot=${sysroot} -I${sysroot}/include/wasm32-wasi -D__wasi__`;
+    // bindgen-rs finds libclang via LIBCLANG_PATH.
+    wasmEnv.LIBCLANG_PATH = path.join(root, "lib");
   }
 }
 const env = {
@@ -103,7 +110,7 @@ async function buildTarget(target, release = false) {
 
   const wasmPath = path.join(
     rootDir,
-    `target/wasm32-wasip1/${profile}`,
+    `target/wasm32-unknown-unknown/${profile}`,
     target.wasm,
   );
   const outDir = path.join(rootDir, target.outDir);
@@ -112,9 +119,9 @@ async function buildTarget(target, release = false) {
     const buildSub = release ? "build --release" : "build";
     try {
       execSync("rustup run stable cargo --version", { stdio: "ignore", env });
-      return `rustup run stable cargo ${buildSub} --target wasm32-wasip1 -p ${target.crate}`;
+      return `rustup run stable cargo ${buildSub} --target wasm32-unknown-unknown -p ${target.crate}`;
     } catch {
-      return `cargo ${buildSub} --target wasm32-wasip1 -p ${target.crate}`;
+      return `cargo ${buildSub} --target wasm32-unknown-unknown -p ${target.crate}`;
     }
   })();
   run(cargoCmd);

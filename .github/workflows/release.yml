@@ -27,13 +27,13 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: wasm32-wasip1
+          targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           registry-url: https://registry.npmjs.org
-      # rquickjs-sys compiles QuickJS C, which needs a libc for wasm32-wasip1.
+      # rquickjs-sys compiles QuickJS C, which needs a libc for wasm32-unknown-unknown.
       # build.js detects wasi-sdk under /opt and sets CC/CFLAGS; just install it.
       - name: Install wasi-sdk (libc sysroot for the WASM build)
         run: |

@@ -1,10 +1,8 @@
-[target.wasm32-wasip1]
-rustflags = '-C link-arg=--allow-undefined'
+[target.wasm32-unknown-unknown]
+rustflags = '-C link-arg=--allow-undefined --cfg getrandom_backend="wasm_js"'
 
-# We target wasm32-wasip1 (not wasm32-unknown-unknown) because rquickjs-sys
-# ships pre-generated FFI bindings only for the wasi targets, and the wasi
-# target has a real libc sysroot (wasi-sdk) so QuickJS's C compiles cleanly.
-# wasm-bindgen consumes the .wasm identically regardless of which wasm32-* target.
-#
-# CC/CFLAGS for the C compile are machine-specific (Homebrew on macOS, wasi-sdk
-# on Linux CI) and are set by scripts/build.js, not here.
+# We target wasm32-unknown-unknown (OS-less) for wasm-bindgen --target web.
+# rquickjs-sys needs a libc to compile QuickJS's C; build.js sets CC/CFLAGS
+# pointing at wasi-libc (Homebrew on macOS, wasi-sdk on Linux CI), with
+# -D__wasi__ to satisfy wasi-libc's header guard on the unknown-unknown target.
+# CC/CFLAGS are machine-specific and live in scripts/build.js, not here.
