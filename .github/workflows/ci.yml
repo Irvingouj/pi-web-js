@@ -54,13 +54,15 @@ jobs:
           tar -xzf /tmp/wasi-sdk.tar.gz -C /opt/
           # Resolve the extracted directory name (may be wasi-sdk-24.0 or similar).
           wasi_root=$(dirname $(find /opt/wasi-sdk-*/bin/clang -maxdepth 1 | head -1))
-          sysroot="$wasi_root/../share/wasi-sysroot"
+          sysroot="$(cd $wasi_root/../share/wasi-sysroot && pwd)"
+          # wasm32-unknown-unknown doesn't auto-add the sysroot include dir;
+          # point CFLAGS at it explicitly so cc-rs finds stdlib.h.
           echo "clang=$wasi_root/clang" >> "$GITHUB_OUTPUT"
-          echo "sysroot=$(cd $sysroot && pwd)" >> "$GITHUB_OUTPUT"
+          echo "cflags=--sysroot=$sysroot -I$sysroot/include" >> "$GITHUB_OUTPUT"
       - name: Build extension WASM
         env:
           CC: ${{ steps.wasi.outputs.clang }}
-          CFLAGS: --sysroot=${{ steps.wasi.outputs.sysroot }}
+          CFLAGS: ${{ steps.wasi.outputs.cflags }}
         run: node scripts/build.js extension
       - name: extension-js unit tests
         working-directory: crates/extension-js/js

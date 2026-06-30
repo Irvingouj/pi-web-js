@@ -40,8 +40,10 @@ jobs:
           curl -sSL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-24/wasi-sdk-24.0-x86_64-linux.tar.gz -o /tmp/wasi-sdk.tar.gz
           tar -xzf /tmp/wasi-sdk.tar.gz -C /opt/
           wasi_root=$(dirname $(find /opt/wasi-sdk-*/bin/clang -maxdepth 1 | head -1))
+          sysroot="$(cd $wasi_root/../share/wasi-sysroot && pwd)"
           echo "WASI_CLANG=$wasi_root/clang" >> "$GITHUB_ENV"
-          echo "WASI_SYSROOT=$(cd $wasi_root/../share/wasi-sysroot && pwd)" >> "$GITHUB_ENV"
+          # wasm32-unknown-unknown doesn't auto-add the sysroot include dir.
+          echo "WASI_CFLAGS=--sysroot=$sysroot -I$sysroot/include" >> "$GITHUB_ENV"
       - name: Resolve target from tag
         id: target
         run: |
@@ -78,7 +80,7 @@ jobs:
         if: steps.target.outputs.name == 'extension-js'
         env:
           CC: ${{ env.WASI_CLANG }}
-          CFLAGS: --sysroot=${{ env.WASI_SYSROOT }}
+          CFLAGS: ${{ env.WASI_CFLAGS }}
         run: |
           node scripts/build.js extension
           cd crates/extension-js/js && npm ci && npm run build
@@ -92,7 +94,7 @@ jobs:
         if: steps.target.outputs.name == 'dom-semantic-tree'
         env:
           CC: ${{ env.WASI_CLANG }}
-          CFLAGS: --sysroot=${{ env.WASI_SYSROOT }}
+          CFLAGS: ${{ env.WASI_CFLAGS }}
         run: |
           node scripts/build.js dom
           cd crates/dom-semantic-tree/js && npm ci && npm run build
