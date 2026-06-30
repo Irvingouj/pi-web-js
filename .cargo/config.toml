@@ -1,5 +1,5 @@
 [target.wasm32-wasip1]
-rustflags = '-C link-arg=--allow-undefined --cfg getrandom_backend="wasm_js"'
+rustflags = '-C link-arg=--allow-undefined'
 
 # We target wasm32-wasip1 (not wasm32-unknown-unknown) because rquickjs-sys
 # ships pre-generated FFI bindings only for the wasi targets, and the wasi
