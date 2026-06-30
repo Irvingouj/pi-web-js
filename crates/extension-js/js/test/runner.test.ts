@@ -315,7 +315,21 @@ function createMockLocalStorage(): Storage {
 	} as Storage;
 }
 
-if (typeof globalThis.localStorage === "undefined") {
+function hasUsableLocalStorage(): boolean {
+	try {
+		const key = "__extension_js_local_storage_probe__";
+		globalThis.localStorage.setItem(key, "1");
+		globalThis.localStorage.removeItem(key);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+if (
+	typeof globalThis.localStorage === "undefined" ||
+	!hasUsableLocalStorage()
+) {
 	Object.defineProperty(globalThis, "localStorage", {
 		value: createMockLocalStorage(),
 		writable: true,
