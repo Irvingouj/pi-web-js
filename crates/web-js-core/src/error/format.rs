@@ -59,6 +59,7 @@ pub fn format_cell_error_text(err: &CellError) -> String {
             action,
             code,
             stack,
+            ..
         } => {
             if action.is_some() || code.is_some() {
                 let action = action.as_deref().unwrap_or("unknown");
@@ -123,6 +124,7 @@ mod tests {
                 "await page.goto(url)".into(),
                 "refresh the tab".into(),
             ]),
+            details: None,
             stack: None,
         };
         let text = format_js_exception(&exc);
@@ -150,6 +152,9 @@ mod tests {
             action: None,
             code: None,
             stack: None,
+            hint: None,
+            recovery: None,
+            details: None,
         });
         assert_eq!(text, "TypeError: x is not defined");
     }
@@ -163,6 +168,9 @@ mod tests {
             action: Some("tab_snapshot".into()),
             code: Some("E_SCRIPTING".into()),
             stack: None,
+            hint: None,
+            recovery: None,
+            details: None,
         });
         assert_eq!(text, "[tab_snapshot] (E_SCRIPTING): Cannot execute script");
     }
@@ -176,6 +184,9 @@ mod tests {
             action: Some("tab_snapshot".into()),
             code: Some("E_SCRIPTING".into()),
             stack: None,
+            hint: None,
+            recovery: None,
+            details: None,
         });
         assert_eq!(
             text,
@@ -192,6 +203,9 @@ mod tests {
             action: None,
             code: None,
             stack: Some("    at foo (eval:1:5)\n    at bar (eval:2:10)".into()),
+            hint: None,
+            recovery: None,
+            details: None,
         });
         assert!(text.contains("TypeError"));
         assert!(text.contains("Stack:"));

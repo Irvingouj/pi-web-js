@@ -72,6 +72,44 @@ import {
 export const DEFAULT_FETCH_TIMEOUT_MS = 30_000;
 const DEFAULT_POLL_INTERVAL_MS = 100;
 
+function fetchError(url: string, err: unknown): never {
+	const message = err instanceof Error ? err.message : String(err);
+	const name = err instanceof Error ? err.name : undefined;
+	let scheme = "unknown";
+	try {
+		scheme = new URL(url, location.href).protocol.replace(/:$/, "");
+	} catch {
+		// Keep "unknown"; the failed fetch message below is still useful.
+	}
+	if (scheme === "blob") {
+		throwStructuredAgentError({
+			message: `fetch failed for blob URL ${url}: ${name ? `${name}: ` : ""}${message}. Blob URLs are only fetchable in the document context that created them, and can expire after the page hands them to Chrome downloads.`,
+			code: "E_FETCH_BLOB_URL",
+			category: "network",
+			hint: "Do not use page.fetch on chrome.downloads finalUrl blob URLs. Capture the blob bytes before download, or fetch the underlying HTTP export endpoint directly, then write those bytes with fs.writeBase64.",
+			details: {
+				url,
+				scheme,
+				pageUrl: location.href,
+				errorName: name,
+				errorMessage: message,
+			},
+		});
+	}
+	throwStructuredAgentError({
+		message: `fetch failed for ${url}: ${name ? `${name}: ` : ""}${message}`,
+		code: "E_FETCH",
+		category: "network",
+		details: {
+			url,
+			scheme,
+			pageUrl: location.href,
+			errorName: name,
+			errorMessage: message,
+		},
+	});
+}
+
 function resolveMaxNodes(params: unknown): number {
 	const obj = asRecord(params);
 	const opts = asRecord(obj.options ?? obj);
@@ -916,7 +954,12 @@ export const handlers = {
 			if (body !== null) {
 				fetchOpts.body = body;
 			}
-			const resp = await fetch(url, fetchOpts);
+			let resp: Response;
+			try {
+				resp = await fetch(url, fetchOpts);
+			} catch (err) {
+				fetchError(url, err);
+			}
 			return encodeFetchResponse(resp);
 		} finally {
 			clearTimeout(timeoutId);

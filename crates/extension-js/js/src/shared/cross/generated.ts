@@ -121,6 +121,9 @@ export type CellError =
 			action: string | null;
 			code: string | null;
 			stack: string | null;
+			hint: string | null;
+			recovery: Array<string> | null;
+			details: unknown | null;
 	  }
 	| { kind: "fuel_exhausted" }
 	| { kind: "internal"; message: string };

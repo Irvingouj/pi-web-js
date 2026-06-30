@@ -1,4 +1,4 @@
-use crate::js_value::format_js_value;
+use crate::js_value::{format_js_value, js_value_to_json};
 use rquickjs::Value;
 
 /// Parsed fields from a JavaScript exception value.
@@ -11,6 +11,7 @@ pub(crate) struct JsException {
     pub code: Option<String>,
     pub hint: Option<String>,
     pub recovery: Option<Vec<String>>,
+    pub details: Option<serde_json::Value>,
     pub stack: Option<String>,
 }
 
@@ -156,6 +157,7 @@ pub(crate) fn parse_js_exception<'js>(value: &Value<'js>) -> JsException {
             code: None,
             hint: None,
             recovery: None,
+            details: None,
             stack: None,
         };
     };
@@ -190,6 +192,11 @@ pub(crate) fn parse_js_exception<'js>(value: &Value<'js>) -> JsException {
                 None
             }
         });
+    let details = obj
+        .get::<_, rquickjs::Value>("details")
+        .ok()
+        .and_then(|val| js_value_to_json(value.ctx().clone(), &val).ok())
+        .filter(|val| !val.is_null());
 
     if is_artifact_message(&message) {
         message = resolve_message_fallback(value, obj, &name, &stack);
@@ -224,6 +231,7 @@ pub(crate) fn parse_js_exception<'js>(value: &Value<'js>) -> JsException {
         code,
         hint,
         recovery,
+        details,
         stack,
     }
 }

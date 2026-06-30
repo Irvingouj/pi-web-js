@@ -983,6 +983,7 @@ export const PAGE_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 				AWAIT_PROMISE_NOTE,
 				"Runtime binary globals available: Uint8Array, ArrayBuffer, TextEncoder, TextDecoder, atob, btoa",
 				"For binary responses bodyEncoding is 'base64'; use atob() or fs.writeBase64 to handle bytes",
+				"Only fetchable URLs can be saved this way. chrome.downloads entries do not expose bytes, and blob: URLs are only fetchable in the document context that created them.",
 			],
 			tags: ["read"],
 		},

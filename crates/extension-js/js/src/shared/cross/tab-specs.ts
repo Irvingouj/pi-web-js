@@ -835,6 +835,13 @@ export const TAB_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		errorCode: "E_NO_TAB",
 		example:
 			'web.tab.fetch({ tabId: 123, url: "https://api.example.com/data" })',
+		agentMeta: {
+			notes: [
+				"Only fetchable URLs can be saved to OPFS via fetch + fs.writeBase64. chrome.downloads entries do not expose bytes, and blob: URLs are only fetchable in the document context that created them.",
+			],
+			tags: ["read"],
+			relatedApis: ["page.fetch", "fs.writeBase64", "chrome.downloads"],
+		},
 		handlerKey: "fetch",
 	},
 	{
