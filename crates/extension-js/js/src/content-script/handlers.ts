@@ -570,8 +570,14 @@ export const handlers = {
 			el instanceof HTMLInputElement &&
 			(el.type === "checkbox" || el.type === "radio")
 		) {
-			el.checked = checked;
-			el.dispatchEvent(new Event("change", { bubbles: true }));
+			if (el.type === "checkbox") {
+				if (el.checked !== checked) el.click();
+			} else if (checked && !el.checked) {
+				el.click();
+			} else if (!checked) {
+				el.checked = false;
+				el.dispatchEvent(new Event("change", { bubbles: true }));
+			}
 			return makeActionResult("check", el, { checked: el.checked });
 		}
 		throw new Error("Element is not a checkbox or radio");

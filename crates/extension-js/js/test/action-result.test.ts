@@ -175,6 +175,41 @@ describe("T-015: mutation handlers return PageActionResult", () => {
 		});
 	});
 
+	it("check uses the page click path so controlled checkboxes keep state", () => {
+		let appChecked = false;
+		const checkbox = document.createElement("input");
+		checkbox.type = "checkbox";
+		checkbox.setAttribute("data-ref-id", "e1");
+		checkbox.addEventListener("click", () => {
+			appChecked = checkbox.checked;
+		});
+		document.body.appendChild(checkbox);
+
+		const result = handlers.check({ refId: "e1", checked: true });
+		checkbox.checked = appChecked;
+
+		expect(result).toMatchObject({ ok: true, action: "check", checked: true });
+		expect(checkbox.checked).toBe(true);
+	});
+
+	it("check uses the page click path so controlled checkboxes can uncheck", () => {
+		let appChecked = true;
+		const checkbox = document.createElement("input");
+		checkbox.type = "checkbox";
+		checkbox.checked = true;
+		checkbox.setAttribute("data-ref-id", "e1");
+		checkbox.addEventListener("click", () => {
+			appChecked = checkbox.checked;
+		});
+		document.body.appendChild(checkbox);
+
+		const result = handlers.check({ refId: "e1", checked: false });
+		checkbox.checked = appChecked;
+
+		expect(result).toMatchObject({ ok: true, action: "check", checked: false });
+		expect(checkbox.checked).toBe(false);
+	});
+
 	it("hover returns PageActionResult with ok, action, refId", () => {
 		const btn = document.createElement("button");
 		btn.setAttribute("data-ref-id", "e1");
