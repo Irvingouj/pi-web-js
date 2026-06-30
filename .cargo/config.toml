@@ -1,9 +1,10 @@
-[target.wasm32-unknown-unknown]
+[target.wasm32-wasip1]
 rustflags = '-C link-arg=--allow-undefined --cfg getrandom_backend="wasm_js"'
 
-# CC / CFLAGS for the WASM build are intentionally NOT set here — they are
-# machine-specific (Homebrew llvm + wasi-libc path on macOS) and break Linux CI.
-# Set them locally via one of:
-#   1. A gitignored `.cargo/config.local.toml` with an [env] block, or
-#   2. Exporting CC / CFLAGS in your shell before `node scripts/build.js`.
-# The default toolchain works on Linux CI without overrides.
+# We target wasm32-wasip1 (not wasm32-unknown-unknown) because rquickjs-sys
+# ships pre-generated FFI bindings only for the wasi targets, and the wasi
+# target has a real libc sysroot (wasi-sdk) so QuickJS's C compiles cleanly.
+# wasm-bindgen consumes the .wasm identically regardless of which wasm32-* target.
+#
+# CC/CFLAGS for the C compile are machine-specific (Homebrew on macOS, wasi-sdk
+# on Linux CI) and are set by scripts/build.js, not here.

@@ -12,7 +12,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: wasm32-unknown-unknown
+          targets: wasm32-wasip1
       - uses: Swatinem/rust-cache@v2
       - name: Format check
         run: cargo fmt --all -- --check
@@ -38,12 +38,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: wasm32-unknown-unknown
+          targets: wasm32-wasip1
       - uses: Swatinem/rust-cache@v2
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      # rquickjs-sys compiles QuickJS C, which needs a libc for wasm32-unknown-unknown.
+      # rquickjs-sys compiles QuickJS C, which needs a libc for wasm32-wasip1.
       # build.js detects Homebrew (macOS) or wasi-sdk (Linux CI) and sets CC/CFLAGS.
       # We just install wasi-sdk to /opt where build.js looks for it.
       - name: Install wasi-sdk (libc sysroot for the WASM build)
@@ -51,21 +51,7 @@ jobs:
           curl -sSL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-24/wasi-sdk-24.0-x86_64-linux.tar.gz -o /tmp/wasi-sdk.tar.gz
           tar -xzf /tmp/wasi-sdk.tar.gz -C /opt/
       - name: Build extension WASM
-        id: build
-        continue-on-error: true
         run: node scripts/build.js extension
-      - name: Debug — inspect rquickjs-sys bindings after build attempt
-        if: always()
-        run: |
-          echo "--- bindings dir ---"
-          ls -la ~/.cargo/registry/src/*/rquickjs-sys-0.11.0/src/bindings/ 2>/dev/null | head -20
-          echo "--- wasm32-unknown-unknown.rs readable? ---"
-          find ~/.cargo/registry/src -name "wasm32-unknown-unknown.rs" -exec head -3 {} \; 2>/dev/null
-          echo "--- CWD that build.rs sees (rerun a probe) ---"
-          cd ~/.cargo/registry/src/*/rquickjs-sys-0.11.0 && pwd && test -f src/bindings/wasm32-unknown-unknown.rs && echo "FILE EXISTS RELATIVE" || echo "FILE MISSING RELATIVE"
-      - name: Fail if build failed
-        if: steps.build.outcome != 'success'
-        run: exit 1
       - name: extension-js unit tests
         working-directory: crates/extension-js/js
         run: |
