@@ -1,0 +1,100 @@
+name: Release
+
+# Publishes @pi-oxide/* npm packages with provenance. Two tag prefixes:
+#   extension-js-vX.Y.Z        → @pi-oxide/extension-js
+#   dom-semantic-tree-vX.Y.Z   → @pi-oxide/dom-semantic-tree
+# The tag version MUST match the publish manifest version.
+#
+# Provenance: OIDC, no long-lived npm token. Requires the package to be linked
+# to this repo (Irvingouj/pi-web-js) under npm → Settings → publishing access.
+# Until linked, `npm publish --provenance` fails loudly.
+
+on:
+  push:
+    tags:
+      - "extension-js-v*"
+      - "dom-semantic-tree-v*"
+
+permissions:
+  contents: write
+  id-token: write  # npm provenance (OIDC)
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+
+      - name: Resolve target from tag
+        id: target
+        run: |
+          tag="${GITHUB_REF#refs/tags/}"
+          case "$tag" in
+            extension-js-v*)
+              echo "name=extension-js" >> "$GITHUB_OUTPUT"
+              echo "version=${tag#extension-js-v}" >> "$GITHUB_OUTPUT" ;;
+            dom-semantic-tree-v*)
+              echo "name=dom-semantic-tree" >> "$GITHUB_OUTPUT"
+              echo "version=${tag#dom-semantic-tree-v}" >> "$GITHUB_OUTPUT" ;;
+            *) echo "unknown tag prefix: $tag"; exit 1 ;;
+          esac
+
+      - name: Verify tag matches source version
+        run: |
+          tag_version="${{ steps.target.outputs.version }}"
+          case "${{ steps.target.outputs.name }}" in
+            extension-js)
+              src_version=$(node -p "require('./crates/extension-js/js/npm-package.json').version") ;;
+            dom-semantic-tree)
+              src_version=$(node -p "require('./crates/dom-semantic-tree/js/package.json').version") ;;
+          esac
+          if [ "$tag_version" != "$src_version" ]; then
+            echo "tag ($tag_version) ≠ source ($src_version)"
+            exit 1
+          fi
+
+      # extension-js: WASM (Rust → wasm-bindgen) + TS bundle (vite) → pkg/*.js
+      # vite emits JS + .d.ts into pkg/ but NOT package.json — stage it from
+      # npm-package.json (mirrors scripts/publish-npm.js, which would otherwise
+      # call `npm publish` without --provenance).
+      - name: Build extension-js
+        if: steps.target.outputs.name == 'extension-js'
+        run: |
+          node scripts/build.js extension
+          cd crates/extension-js/js && npm ci && npm run build
+          # Stage publish manifest into pkg/
+          node -e "const fs=require('fs');const m=require('./npm-package.json');delete m.sideEffects;fs.writeFileSync('pkg/package.json',JSON.stringify(m,null,'\t')+'\n')"
+          # Verify every declared file exists (publish-npm.js safety check)
+          node -e "const fs=require('fs');const m=require('./npm-package.json');const miss=(m.files||[]).filter(f=>f.includes('*')?!fs.readdirSync('pkg').some(e=>e.endsWith(f.slice(1))):!fs.existsSync('pkg/'+f));if(miss.length){console.error('Missing:',miss);process.exit(1)}"
+
+      # dom-semantic-tree: WASM + TS (tsc) → dist/ + package.json already in place
+      - name: Build dom-semantic-tree
+        if: steps.target.outputs.name == 'dom-semantic-tree'
+        run: |
+          node scripts/build.js dom
+          cd crates/dom-semantic-tree/js && npm ci && npm run build
+          test -f dist/index.js || { echo "dist/index.js missing after build"; exit 1; }
+
+      - name: Publish with provenance
+        run: |
+          case "${{ steps.target.outputs.name }}" in
+            extension-js)        cd crates/extension-js/js/pkg ;;
+            dom-semantic-tree)   cd crates/dom-semantic-tree/js ;;
+          esac
+          npm publish --provenance --access public
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          generate_release_notes: true

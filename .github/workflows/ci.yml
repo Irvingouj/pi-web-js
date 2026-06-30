@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - name: Format + clippy
+        run: |
+          cargo fmt --all -- --check
+          cargo clippy --workspace --lib --tests -- -D warnings
+      - name: Workspace lib tests
+        run: cargo test --workspace --lib
+
+  extension-js-unit:
+    runs-on: ubuntu-latest
+    needs: rust
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build extension WASM
+        run: node scripts/build.js extension
+      - name: extension-js unit tests
+        working-directory: crates/extension-js/js
+        run: |
+          npm ci
+          npm test
