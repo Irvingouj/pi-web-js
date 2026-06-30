@@ -1855,6 +1855,9 @@ console.log(result)"#;
                     action: None,
                     code: None,
                     stack: None,
+                    hint: None,
+                    recovery: None,
+                    details: None,
                 });
                 assert_eq!(display, "TypeError: x is not a function");
             }

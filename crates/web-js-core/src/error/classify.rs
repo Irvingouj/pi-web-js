@@ -97,6 +97,9 @@ pub(crate) fn cell_error_from_js_exception(exc: JsException) -> CellError {
             action: exc.action,
             code: exc.code,
             stack: exc.stack,
+            hint: exc.hint,
+            recovery: exc.recovery,
+            details: exc.details,
         }
     }
 }
@@ -122,6 +125,7 @@ pub(crate) fn cell_error_from_text(msg: &str) -> CellError {
         code: None,
         hint: None,
         recovery: None,
+        details: None,
         stack: None,
     })
 }
@@ -154,6 +158,7 @@ mod tests {
             code: None,
             hint: None,
             recovery: None,
+            details: None,
             stack: None,
         }
     }
@@ -205,6 +210,7 @@ mod tests {
             code: Some("E_SCRIPTING".into()),
             hint: None,
             recovery: None,
+            details: None,
             stack: None,
         };
         let err = cell_error_from_js_exception(exc);
@@ -221,6 +227,47 @@ mod tests {
                 );
                 assert_eq!(action.as_deref(), Some("tab_snapshot"));
                 assert_eq!(code.as_deref(), Some("E_SCRIPTING"));
+            }
+            other => panic!("expected Runtime, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn js_exc_preserves_structured_error_metadata() {
+        let exc = JsException {
+            name: Some("TypeError".into()),
+            message: "Failed to fetch".into(),
+            line: None,
+            action: Some("page_fetch".into()),
+            code: Some("E_FETCH_BLOB_URL".into()),
+            hint: Some("capture bytes before download".into()),
+            recovery: Some(vec!["fetch the underlying endpoint".into()]),
+            details: Some(serde_json::json!({
+                "url": "blob:https://example.com/id",
+                "errorName": "TypeError",
+                "errorMessage": "Failed to fetch"
+            })),
+            stack: None,
+        };
+        match cell_error_from_js_exception(exc) {
+            CellError::Runtime {
+                hint,
+                recovery,
+                details,
+                ..
+            } => {
+                assert_eq!(hint.as_deref(), Some("capture bytes before download"));
+                assert_eq!(
+                    recovery.as_deref(),
+                    Some(["fetch the underlying endpoint".to_string()].as_slice())
+                );
+                assert_eq!(
+                    details
+                        .as_ref()
+                        .and_then(|d| d.get("errorMessage"))
+                        .and_then(|v| v.as_str()),
+                    Some("Failed to fetch")
+                );
             }
             other => panic!("expected Runtime, got {other:?}"),
         }
@@ -258,6 +305,7 @@ mod tests {
             code: None,
             hint: None,
             recovery: None,
+            details: None,
             stack: None,
         };
         let err = cell_error_from_js_exception(exc);
@@ -288,6 +336,7 @@ mod tests {
             code: None,
             hint: None,
             recovery: None,
+            details: None,
             stack: Some("    at foo (eval:1:5)\n    at bar (eval:2:10)".into()),
         };
         match cell_error_from_js_exception(exc) {

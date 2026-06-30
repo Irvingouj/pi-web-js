@@ -22,6 +22,10 @@ pub enum CellError {
         action: Option<String>,
         code: Option<String>,
         stack: Option<String>,
+        hint: Option<String>,
+        recovery: Option<Vec<String>>,
+        #[ts(type = "unknown")]
+        details: Option<serde_json::Value>,
     },
     /// Execution exceeded the time limit (likely an infinite loop).
     FuelExhausted,
