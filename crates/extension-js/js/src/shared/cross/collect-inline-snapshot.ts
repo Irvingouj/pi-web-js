@@ -1,9 +1,13 @@
 import { allocateRefId, syncRefIdCounterFromDom } from "../cs/ref-id.js";
+import { assessClickability, deduplicateWrappers } from "./clickability.js";
+import type { ClickabilityConfidence } from "./clickability.js";
 import {
 	enrichFormNode,
 	getAccessibleName,
 	getAccessibleRole,
 	getOwnVisibleText,
+	isProbablyClickable,
+	isReachableClickTarget,
 	isValidationProxyInput,
 	resolveAbsoluteUrl,
 	resolveContainerRefId,
@@ -21,6 +25,7 @@ export type InlineSnapshotNode = {
 	actionable?: boolean;
 	forControl?: string;
 	recommendedAction?: string;
+	confidence?: "high" | "low";
 	controls?: string;
 	expanded?: boolean;
 	name?: string;
@@ -111,6 +116,22 @@ export const enrichDropdown = (
 		expanded === "true" ? true : expanded === "false" ? false : undefined;
 };
 
+const enrichClickAction: Enricher = (el, node) => {
+	if (node.controlType) return;
+	if (!isProbablyClickable(el)) return;
+	if (
+		el instanceof HTMLInputElement ||
+		el instanceof HTMLTextAreaElement ||
+		el instanceof HTMLSelectElement
+	) {
+		return;
+	}
+	if (!isReachableClickTarget(el)) return;
+	node.actionable = true;
+	node.recommendedAction = "click";
+	node.confidence = assessClickability(el).confidence;
+};
+
 const enrichLink: Enricher = (el, node) => {
 	if (node.tag !== "a") return;
 	node.href = resolveAbsoluteUrl(el.getAttribute("href"));
@@ -162,6 +183,7 @@ const enrich = (el: Element, node: InlineSnapshotNode): void =>
 		enrichFormFields,
 		enrichValidationProxy,
 		enrichDropdown,
+		enrichClickAction,
 		enrichLink,
 		enrichImage,
 		enrichInput,
@@ -219,6 +241,7 @@ const renderNodeLine = (node: InlineSnapshotNode, depth: number): string => {
 		[node.expanded !== undefined, `expanded=${node.expanded}`],
 		[node.controls, `opens="${node.controls?.replace(/"/g, '\\"')}"`],
 		[node.recommendedAction, `use="${node.recommendedAction}"`],
+		[node.confidence === "low", "confidence=low"],
 		[node.actionable === false, "actionable=false"],
 		[node.forControl, `forControl="${node.forControl}"`],
 		[node.errorMessage, `error="${node.errorMessage?.replace(/"/g, '\\"')}"`],
@@ -283,7 +306,6 @@ type Reject = {
 type Emit = {
 	kind: "emit";
 	node: InlineSnapshotNode;
-	line: string;
 	children: Element[];
 	childDepth: number;
 	childRefId: string;
@@ -323,13 +345,12 @@ const rejectAtCapacity =
 			? { kind: "reject", el: frame.el, depth: frame.depth }
 			: frame;
 
-/** Transform an Enter frame into an Emit frame: build node, render line. */
+/** Transform an Enter frame into an Emit frame: build node. */
 const toEmit = (frame: Enter): Emit => {
 	const node = buildNode(frame.el, frame.depth, frame.parentRefId);
 	return {
 		kind: "emit",
 		node,
-		line: renderNodeLine(node, frame.depth),
 		children: Array.from(frame.el.children),
 		childDepth: frame.depth + 1,
 		childRefId: node.refId,
@@ -338,7 +359,7 @@ const toEmit = (frame: Enter): Emit => {
 
 /** Resolve a frame into walk instructions: emit (if Emit) or passthrough. */
 type WalkOutcome = {
-	emitted: { node: InlineSnapshotNode; line: string } | null;
+	emitted: { node: InlineSnapshotNode } | null;
 	children: Element[];
 	childDepth: number;
 	childRefId: string;
@@ -347,7 +368,7 @@ type WalkOutcome = {
 const resolveOutcome = (frame: Frame): WalkOutcome =>
 	frame.kind === "emit"
 		? {
-				emitted: { node: frame.node, line: frame.line },
+				emitted: { node: frame.node },
 				children: frame.children,
 				childDepth: frame.childDepth,
 				childRefId: frame.childRefId,
@@ -362,7 +383,8 @@ const resolveOutcome = (frame: Frame): WalkOutcome =>
 /** Walk the DOM tree applying the guard pipeline to each element. */
 const walkTree = (root: Element, maxNodes: number) => {
 	const nodes: InlineSnapshotNode[] = [];
-	const lines: string[] = [];
+	const els: Element[] = [];
+	const depths: number[] = [];
 
 	const walk = (el: Element, depth: number, parentRefId: string): void => {
 		const guard = pipe(
@@ -377,7 +399,8 @@ const walkTree = (root: Element, maxNodes: number) => {
 
 		if (outcome.emitted) {
 			nodes.push(outcome.emitted.node);
-			lines.push(outcome.emitted.line);
+			els.push(el);
+			depths.push(depth);
 		}
 
 		for (const child of outcome.children) {
@@ -387,7 +410,7 @@ const walkTree = (root: Element, maxNodes: number) => {
 	};
 
 	walk(root, 0, "");
-	return { nodes, lines };
+	return { nodes, els, depths };
 };
 
 // ---------------------------------------------------------------------------
@@ -436,9 +459,35 @@ export function collectInlineSnapshot(maxNodes: number): InlineSnapshotResult {
 	syncRefIdCounterFromDom();
 
 	return withMutationGuard(() => {
-		const { nodes, lines } = document.body
+		const { nodes, els, depths } = document.body
 			? walkTree(document.body, maxNodes)
-			: { nodes: [], lines: [] };
+			: { nodes: [] as InlineSnapshotNode[], els: [] as Element[], depths: [] as number[] };
+
+		// Dedup: remove low-confidence wrappers that contain clickable descendants.
+		// Adapted from Vimium link_hints.js:1362-1386.
+		const actionableItems: Array<{
+			el: Element;
+			confidence: ClickabilityConfidence;
+		}> = [];
+		for (let i = 0; i < nodes.length; i++) {
+			if (nodes[i].actionable) {
+				actionableItems.push({
+					el: els[i],
+					confidence: nodes[i].confidence ?? "high",
+				});
+			}
+		}
+		const toRemove = deduplicateWrappers(actionableItems);
+		for (let i = 0; i < nodes.length; i++) {
+			if (nodes[i].actionable && toRemove.has(els[i])) {
+				nodes[i].actionable = false;
+				delete nodes[i].recommendedAction;
+				delete nodes[i].confidence;
+			}
+		}
+
+		// Render lines after dedup so actionable=false is reflected in text.
+		const lines = nodes.map((node, i) => renderNodeLine(node, depths[i]));
 
 		return {
 			text: [

@@ -176,6 +176,65 @@ function resolveEvaluateCode(params: unknown): string {
 	return code;
 }
 
+// Click activation sequence adapted from Vimium (https://github.com/philc/vimium)
+// Copyright (c) Phil Crosby, Ilya Sukhar. MIT License.
+// See: lib/dom_utils.js (simulateClick). Agent-scenario adaptation: we call
+// HTMLElement.click() at the end to preserve native activation behavior
+// (checkbox toggle, form submit, link nav) which synthetic events omit.
+function dispatchActivationClick(el: Element): void {
+	const eventWindow = el.ownerDocument.defaultView ?? window;
+	// 6-event synthetic sequence (no synthetic "click" — we use el.click() below
+	// to trigger native activation). Adapted from Vimium simulateClick.
+	for (const eventName of [
+		"pointerover",
+		"mouseover",
+		"pointerdown",
+		"mousedown",
+		"pointerup",
+		"mouseup",
+	]) {
+		if (
+			eventName.startsWith("pointer") &&
+			typeof eventWindow.PointerEvent === "function"
+		) {
+			el.dispatchEvent(
+				new eventWindow.PointerEvent(eventName, {
+					bubbles: true,
+					cancelable: true,
+					composed: true,
+					pointerId: 1,
+					pointerType: "mouse",
+					isPrimary: true,
+				}),
+			);
+			continue;
+		}
+		el.dispatchEvent(
+			new eventWindow.MouseEvent(eventName, {
+				bubbles: true,
+				cancelable: true,
+				composed: true,
+				detail: 1,
+			}),
+		);
+	}
+	// Native activation: triggers browser built-in default actions
+	// (checkbox toggle, form submit, <a> navigation) that synthetic
+	// MouseEvent("click") dispatched via dispatchEvent does not.
+	if (el instanceof HTMLElement) {
+		el.click();
+	} else {
+		el.dispatchEvent(
+			new eventWindow.MouseEvent("click", {
+				bubbles: true,
+				cancelable: true,
+				composed: true,
+				detail: 1,
+			}),
+		);
+	}
+}
+
 export type Handler<T = unknown, R = unknown> = (
 	params: T,
 	signal?: AbortSignal,
@@ -194,7 +253,7 @@ export const handlers = {
 			throwElementNotFound(refId, label, true);
 		}
 		assertInteractable(el, "click");
-		(el as HTMLElement).click();
+		dispatchActivationClick(el);
 		return makeActionResult("click", el, {
 			observationId: currentObservationId(),
 			dispatched: true,

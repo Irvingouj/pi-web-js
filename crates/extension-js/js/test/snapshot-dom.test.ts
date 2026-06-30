@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { collectInlineSnapshot } from "../src/shared/cross/collect-inline-snapshot.js";
 import {
+	getAccessibleRole,
 	getOwnVisibleText,
 	hasDirectTextContent,
 	isMarkdownVisible,
+	isReachableClickTarget,
 	shouldInclude,
 } from "../src/shared/cs/snapshot-dom.js";
 
@@ -123,6 +125,58 @@ describe("snapshot-dom markdown visibility", () => {
 		document.body.appendChild(div);
 
 		expect(getOwnVisibleText(div)).toBe("deep");
+	});
+
+	it("inline snapshot includes Gmail-style jsaction controls by aria-label", () => {
+		const archive = document.createElement("div");
+		archive.setAttribute("jsaction", "click:mail.archive");
+		archive.setAttribute("aria-label", "Archive");
+		document.body.appendChild(archive);
+
+		const result = collectInlineSnapshot(100);
+		const node = result.nodes.find((n) => n.name === "Archive");
+		expect(node).toMatchObject({
+			role: "generic",
+			tag: "div",
+			actionable: true,
+			recommendedAction: "click",
+		});
+		expect(node?.refId).toMatch(/^e\d+$/);
+	});
+
+	it("inline snapshot includes icon-only tabindex controls by aria-label", () => {
+		const button = document.createElement("span");
+		button.setAttribute("tabindex", "0");
+		button.setAttribute("aria-label", "More");
+		document.body.appendChild(button);
+
+		const result = collectInlineSnapshot(100);
+		const node = result.nodes.find((n) => n.name === "More");
+		expect(node).toMatchObject({
+			role: "generic",
+			tag: "span",
+			actionable: true,
+			recommendedAction: "click",
+		});
+	});
+
+	it("inline snapshot includes ARIA menu and tab controls", () => {
+		document.body.innerHTML = `
+			<div role="menuitem" aria-label="Mark as read"></div>
+			<div role="tab" aria-label="Promotions"></div>
+		`;
+
+		const result = collectInlineSnapshot(100);
+		expect(result.nodes.find((n) => n.name === "Mark as read")).toMatchObject({
+			role: "menuitem",
+			actionable: true,
+			recommendedAction: "click",
+		});
+		expect(result.nodes.find((n) => n.name === "Promotions")).toMatchObject({
+			role: "tab",
+			actionable: true,
+			recommendedAction: "click",
+		});
 	});
 });
 
@@ -293,5 +347,107 @@ describe("role=presentation visible text", () => {
 			'<div role="presentation"><span>Error: pick a value</span></div>';
 		const result = collectInlineSnapshot(100);
 		expect(result.text).toContain("Error: pick a value");
+	});
+});
+
+describe("getAccessibleRole decoupled from clickability", () => {
+	beforeEach(() => {
+		document.body.innerHTML = "";
+	});
+
+	it("contenteditable is not labeled button", () => {
+		document.body.innerHTML = `<div contenteditable data-ref-id="e1">edit me</div>`;
+		const el = document.querySelector("div")!;
+		expect(getAccessibleRole(el)).not.toBe("button");
+	});
+
+	it("tabindex element is not labeled button", () => {
+		document.body.innerHTML = `<div tabindex="0" data-ref-id="e1">focusable</div>`;
+		const el = document.querySelector("div")!;
+		expect(getAccessibleRole(el)).not.toBe("button");
+	});
+});
+
+describe("enrichClickAction confidence and dropdown (WU5)", () => {
+	beforeEach(() => {
+		document.body.innerHTML = "";
+	});
+
+	it("combobox recommendedAction stays select_option", () => {
+		document.body.innerHTML = `<div role="combobox" aria-expanded="false" tabindex="0">x</div>`;
+		const snap = collectInlineSnapshot(100);
+		const node = snap.nodes.find((n) => n.role === "combobox")!;
+		expect(node).toBeDefined();
+		expect(node.controlType).toBe("dropdown");
+		expect(node.recommendedAction).toBe("select_option");
+	});
+
+	it("native button with btn class stays actionable (not deduped)", () => {
+		// Regression: <button class="btn"> must be native high-confidence,
+		// not downgraded to buttonClass low — otherwise dedup could drop it.
+		document.body.innerHTML = `<span class="btn-group"><button class="btn primary-btn" data-ref-id="b">Go</button></span>`;
+		const snap = collectInlineSnapshot(100);
+		const btn = snap.nodes.find((n) => n.tag === "button")!;
+		expect(btn).toBeDefined();
+		expect(btn.actionable).toBe(true);
+		expect(btn.recommendedAction).toBe("click");
+	});
+	it("deduplicated wrapper does not render use=click (no contradicting signal)", () => {
+		// A wrapper marked actionable=false must not also advertise use="click";
+		// the contradictory signal misleads any consumer that keys off use=.
+		document.body.innerHTML = `<span class="btn-group"><a href="/x" data-ref-id="a">link</a></span>`;
+		const snap = collectInlineSnapshot(100);
+		const wrapper = snap.nodes.find((n) => n.tag === "span");
+		expect(wrapper).toBeDefined();
+		expect(wrapper!.actionable).toBe(false);
+		expect(wrapper!.recommendedAction).toBeUndefined();
+		// Rendered line must not carry use="click" alongside actionable=false
+		const wrapperLine = snap.text.split("\n").find((l) => l.includes(wrapper!.refId));
+		expect(wrapperLine).toBeDefined();
+		expect(wrapperLine!).not.toContain("use=");
+		expect(wrapperLine!).toContain("actionable=false");
+	});
+});
+
+describe("isReachableClickTarget (WU7)", () => {
+	beforeEach(() => {
+		document.body.innerHTML = "";
+	});
+
+	it("off-screen element is reachable (agent will scroll)", () => {
+		// Rect fully outside the jsdom viewport (innerWidth=1024/innerHeight=768):
+		// every sample point fails the viewport bounds check, hadOnScreenPoint
+		// stays false, and isReachableClickTarget returns true — the agent is
+		// expected to scroll into view before acting. No elementFromPoint stub
+		// is needed: the viewport-bounds branch decides before it would be called.
+		document.body.innerHTML = `<button data-ref-id="e1">x</button>`;
+		const btn = document.querySelector("button")!;
+		btn.getClientRects = () => [
+			{
+				left: 9999,
+				top: 9999,
+				width: 10,
+				height: 10,
+				right: 10009,
+				bottom: 10009,
+			} as DOMRect,
+		];
+		expect(isReachableClickTarget(btn)).toBe(true);
+	});
+
+	it("occluded on-screen element is not reachable", () => {
+		document.body.innerHTML = `
+			<button data-ref-id="e1" style="position:absolute;left:10px;top:10px;width:20px;height:20px;">x</button>
+			<div style="position:absolute;left:0;top:0;width:100px;height:100px;z-index:9;">cover</div>`;
+		const btn = document.querySelector("button")!;
+		btn.getClientRects = () => [{left:10,top:10,width:20,height:20,right:30,bottom:30} as DOMRect];
+		const cover = document.querySelector("div")!;
+		const orig = document.elementFromPoint;
+		document.elementFromPoint = (() => cover) as typeof document.elementFromPoint;
+		try {
+			expect(isReachableClickTarget(btn)).toBe(false);
+		} finally {
+			document.elementFromPoint = orig;
+		}
 	});
 });

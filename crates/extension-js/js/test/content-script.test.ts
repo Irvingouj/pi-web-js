@@ -1788,6 +1788,125 @@ describe("observation lease (B2): snapshot_data grants lease", () => {
 			expect(typeof receipt.observationId).toBe("string");
 		}
 	});
+
+	it("page_click dispatches mouse activation events before click", async () => {
+		const target = document.createElement("div");
+		target.setAttribute("jsaction", "click:mail.archive");
+		target.setAttribute("aria-label", "Archive");
+		const events: string[] = [];
+		for (const eventName of [
+			"pointerover",
+			"mouseover",
+			"pointerdown",
+			"mousedown",
+			"pointerup",
+			"mouseup",
+			"click",
+		]) {
+			target.addEventListener(eventName, () => {
+				events.push(eventName);
+			});
+		}
+		document.body.appendChild(target);
+
+		const snap = await dispatchContentScriptCall(
+			"page_snapshot_data",
+			"snapshot",
+			handlers.snapshot,
+			{},
+		);
+		expect(snap.ok).toBe(true);
+		const refId = (
+			snap.value as { nodes: Array<{ name?: string; refId: string }> }
+		).nodes.find((n) => n.name === "Archive")?.refId;
+		if (!refId) throw new Error("expected Archive refId");
+
+		const result = await dispatchContentScriptCall(
+			"page_click",
+			"click",
+			handlers.click,
+			{ refId },
+		);
+		expect(result.ok, result.ok ? "" : JSON.stringify(result.error)).toBe(true);
+		expect(events).toEqual([
+			"pointerover",
+			"mouseover",
+			"pointerdown",
+			"mousedown",
+			"pointerup",
+			"mouseup",
+			"click",
+		]);
+	});
+});
+
+describe("dispatchActivationClick: native activation", () => {
+	beforeEach(() => {
+		document.body.innerHTML = "";
+		for (const spec of buildContentScriptSpecs()) {
+			registerContentScriptSpec(spec);
+		}
+		resetLease();
+	});
+
+	it("click toggles a checkbox via native activation", async () => {
+		document.body.innerHTML = `<input type="checkbox" data-ref-id="e1">`;
+		grantFromDom();
+		const input = document.querySelector("input") as HTMLInputElement;
+		const before = input.checked;
+		// Spy on the real click() to verify native activation is called.
+		// jsdom's dispatchEvent(new MouseEvent("click")) spuriously triggers
+		// default actions, so we can't rely on checked-flip alone for RED.
+		const clickSpy = vi.spyOn(HTMLInputElement.prototype, "click");
+		await dispatchContentScriptCall("page_click", "click", handlers.click, {
+			refId: "e1",
+		});
+		const after = input.checked;
+		expect(after).toBe(!before);
+		expect(clickSpy).toHaveBeenCalled();
+		clickSpy.mockRestore();
+	});
+
+	it("click on submit button fires form submit", async () => {
+		document.body.innerHTML = `<form data-ref-id="f"><button type="submit" data-ref-id="e1">Go</button></form>`;
+		let submitted = false;
+		document
+			.querySelector("form")!
+			.addEventListener("submit", (e) => {
+				e.preventDefault();
+				submitted = true;
+			});
+		grantFromDom();
+		await dispatchContentScriptCall("page_click", "click", handlers.click, {
+			refId: "e1",
+		});
+		expect(submitted).toBe(true);
+	});
+
+	it("click on anchor dispatches activation without error", async () => {
+		document.body.innerHTML = `<a href="#" data-ref-id="e1">link</a>`;
+		grantFromDom();
+		const result = await dispatchContentScriptCall(
+			"page_click",
+			"click",
+			handlers.click,
+			{ refId: "e1" },
+		);
+		expect(result.ok).toBe(true);
+	});
+
+	it("click on SVG role button dispatches final click", async () => {
+		document.body.innerHTML = `<svg role="button" data-ref-id="e1"></svg>`;
+		let clicked = false;
+		document.querySelector("svg")!.addEventListener("click", () => {
+			clicked = true;
+		});
+		grantFromDom();
+		await dispatchContentScriptCall("page_click", "click", handlers.click, {
+			refId: "e1",
+		});
+		expect(clicked).toBe(true);
+	});
 });
 
 describe("observation lease (B4): form scenario survives multiple fills", () => {

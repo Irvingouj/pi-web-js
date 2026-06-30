@@ -1,6 +1,7 @@
 /** Shared DOM helpers for inline snapshots (content script + MAIN-world injection). */
 
 import { allocateRefId } from "./ref-id.js";
+import { assessClickability } from "../cross/clickability.js";
 
 export {
 	allocateRefId,
@@ -262,8 +263,6 @@ export function getAccessibleRole(el: Element): string {
 	if (tag === "dialog" || tag === "modal") return "dialog";
 	if (tag === "figure") return "figure";
 	if (tag === "figcaption") return "caption";
-	if (el.getAttribute("onclick") || (el as HTMLElement).onclick)
-		return "button";
 	return "generic";
 }
 
@@ -379,8 +378,50 @@ export function shouldInclude(el: Element): boolean {
 	if (el instanceof HTMLInputElement && el.type === "file") return true;
 	if (isInvalidFormControl(el)) return true;
 	if (isValidationProxyInput(el)) return true;
+	if (isProbablyClickable(el)) return true;
 	return isMarkdownVisible(el);
 }
+
+export function isProbablyClickable(el: Element): boolean {
+	return assessClickability(el).clickable;
+}
+
+// Reachability hit-test adapted from Vimium (https://github.com/philc/vimium)
+// Copyright (c) Phil Crosby, Ilya Sukhar. MIT License.
+// See: content_scripts/link_hints.js (getLocalHints). Agent-scenario
+// adaptation: pure off-screen elements are reachable (agent will scroll);
+// only on-screen-but-occluded elements are unreachable.
+export function isReachableClickTarget(el: Element): boolean {
+	if (!isProbablyClickable(el)) return false;
+	const doc = el.ownerDocument;
+	if (typeof doc.elementFromPoint !== "function") return true;
+	const win = doc.defaultView;
+	const rects = Array.from(el.getClientRects()).filter(
+		(rect) => rect.width > 0 && rect.height > 0,
+	);
+	if (rects.length === 0) return true;
+	let hadOnScreenPoint = false;
+	for (const rect of rects) {
+		const points = [
+			[rect.left + rect.width / 2, rect.top + rect.height / 2],
+			[rect.left + 0.1, rect.top + 0.1],
+			[rect.right - 0.1, rect.top + 0.1],
+			[rect.left + 0.1, rect.bottom - 0.1],
+			[rect.right - 0.1, rect.bottom - 0.1],
+		];
+		for (const [x, y] of points) {
+			if (win && (x < 0 || y < 0 || x > win.innerWidth || y > win.innerHeight)) {
+				continue;
+			}
+			hadOnScreenPoint = true;
+			const hit = doc.elementFromPoint(x, y);
+			if (hit && (el.contains(hit) || hit.contains(el))) return true;
+		}
+	}
+	if (!hadOnScreenPoint) return true;
+	return false;
+}
+
 
 function isInvalidFormControl(el: Element): boolean {
 	if (
