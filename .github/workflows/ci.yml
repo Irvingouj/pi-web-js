@@ -63,7 +63,25 @@ jobs:
         working-directory: crates/extension-js/js
         run: npm ci
       - name: Build extension WASM
+        id: wasmbuild
+        continue-on-error: true
         run: node scripts/build.js extension
+      - name: Inspect wasm-bindgen output (debug)
+        if: always()
+        run: |
+          echo "--- pkg/ contents ---"
+          ls -la crates/extension-js/js/pkg/ 2>/dev/null
+          echo "--- extension_js.d.ts export count ---"
+          grep -c "^export" crates/extension-js/js/pkg/extension_js.d.ts 2>/dev/null
+          echo "--- first 5 exports ---"
+          grep "^export" crates/extension-js/js/pkg/extension_js.d.ts 2>/dev/null | head -5
+          echo "--- extension_js.js size ---"
+          wc -c crates/extension-js/js/pkg/extension_js.js 2>/dev/null
+          echo "--- wasm size before bundle (check target dir) ---"
+          ls -la target/wasm32-wasip1/debug/extension_js.wasm 2>/dev/null
+      - name: Fail if build failed
+        if: steps.wasmbuild.outcome != 'success'
+        run: exit 1
       - name: extension-js unit tests
         working-directory: crates/extension-js/js
         run: |
