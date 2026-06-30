@@ -25,20 +25,37 @@ try {
 } catch {
   // rustup not available — rely on cargo/rustc already in PATH
 }
-// WASM builds need a C toolchain that cargo does not pick up automatically on
-// macOS (Homebrew llvm + wasi-libc). .cargo/config.toml deliberately omits these
-// so Linux CI works unmodified; detect them here instead. Falls through silently
-// on Linux CI where the default clang is correct.
+// rquickjs-sys compiles QuickJS C source, which needs a libc. The bare
+// wasm32-unknown-unknown target ships none, so we provide one:
+//  - macOS dev: Homebrew llvm + wasi-libc (flat include layout, no __wasi__ guard).
+//  - Linux CI:  wasi-sdk (per-target include layout + needs -D__wasi__).
+// Detection runs here so both `node scripts/build.js` and CI behave identically;
+// .cargo/config.toml stays machine-neutral.
 const wasmEnv = {};
-try {
-  const llvmClang = "/opt/homebrew/opt/llvm/bin/clang";
-  const wasiSysroot = "/opt/homebrew/Cellar/wasi-libc/32/share/wasi-sysroot";
-  fs.accessSync(llvmClang, fs.constants.X_OK);
-  fs.accessSync(wasiSysroot);
-  wasmEnv.CC = llvmClang;
-  wasmEnv.CFLAGS = `--sysroot=${wasiSysroot}`;
-} catch {
-  // Not on macOS-with-homebrew — rely on the default toolchain.
+const homebrewClang = "/opt/homebrew/opt/llvm/bin/clang";
+const homebrewSysroot = "/opt/homebrew/Cellar/wasi-libc/32/share/wasi-sysroot";
+const homebrewOk = (() => {
+  try {
+    fs.accessSync(homebrewClang, fs.constants.X_OK);
+    fs.accessSync(homebrewSysroot);
+    return true;
+  } catch {
+    return false;
+  }
+})();
+if (homebrewOk) {
+  wasmEnv.CC = homebrewClang;
+  wasmEnv.CFLAGS = `--sysroot=${homebrewSysroot}`;
+} else {
+  // Linux CI installs wasi-sdk under /opt/wasi-sdk-*. Its headers live under
+  // per-target subdirs and guard on __wasi__, so point at wasm32-wasi + define it.
+  const sdkDir = fs.readdirSync("/opt").find((d) => d.startsWith("wasi-sdk-"));
+  if (sdkDir) {
+    const root = path.join("/opt", sdkDir);
+    const sysroot = path.join(root, "share/wasi-sysroot");
+    wasmEnv.CC = path.join(root, "bin/clang");
+    wasmEnv.CFLAGS = `--sysroot=${sysroot} -I${sysroot}/include/wasm32-wasi -D__wasi__`;
+  }
 }
 const env = {
   ...process.env,

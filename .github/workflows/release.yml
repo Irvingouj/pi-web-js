@@ -33,18 +33,12 @@ jobs:
         with:
           node-version: 20
           registry-url: https://registry.npmjs.org
-      # rquickjs-sys needs a libc sysroot for wasm32-unknown-unknown (QuickJS
-      # C source #includes <stdlib.h>). wasi-sdk provides clang + sysroot.
+      # rquickjs-sys compiles QuickJS C, which needs a libc for wasm32-unknown-unknown.
+      # build.js detects wasi-sdk under /opt and sets CC/CFLAGS; just install it.
       - name: Install wasi-sdk (libc sysroot for the WASM build)
         run: |
           curl -sSL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-24/wasi-sdk-24.0-x86_64-linux.tar.gz -o /tmp/wasi-sdk.tar.gz
           tar -xzf /tmp/wasi-sdk.tar.gz -C /opt/
-          wasi_root=$(dirname $(find /opt/wasi-sdk-*/bin/clang -maxdepth 1 | head -1))
-          sysroot="$(cd $wasi_root/../share/wasi-sysroot && pwd)"
-          echo "WASI_CLANG=$wasi_root/clang" >> "$GITHUB_ENV"
-          # wasi-sdk-24 has no top-level include/stdlib.h (only per-target
-          # subdirs); point at wasm32-wasi which matches the unknown-unknown ABI.
-          echo "WASI_CFLAGS=--sysroot=$sysroot -I$sysroot/include/wasm32-wasi -D__wasi__" >> "$GITHUB_ENV"
       - name: Resolve target from tag
         id: target
         run: |
@@ -75,27 +69,18 @@ jobs:
 
       # extension-js: WASM (Rust → wasm-bindgen) + TS bundle (vite) → pkg/*.js
       # vite emits JS + .d.ts into pkg/ but NOT package.json — stage it from
-      # npm-package.json (mirrors scripts/publish-npm.js, which would otherwise
-      # call `npm publish` without --provenance).
+      # npm-package.json (mirrors scripts/publish-npm.js). build.js sets CC/CFLAGS.
       - name: Build extension-js
         if: steps.target.outputs.name == 'extension-js'
-        env:
-          CC: ${{ env.WASI_CLANG }}
-          CFLAGS: ${{ env.WASI_CFLAGS }}
         run: |
           node scripts/build.js extension
           cd crates/extension-js/js && npm ci && npm run build
-          # Stage publish manifest into pkg/
           node -e "const fs=require('fs');const m=require('./npm-package.json');delete m.sideEffects;fs.writeFileSync('pkg/package.json',JSON.stringify(m,null,'\t')+'\n')"
-          # Verify every declared file exists (publish-npm.js safety check)
           node -e "const fs=require('fs');const m=require('./npm-package.json');const miss=(m.files||[]).filter(f=>f.includes('*')?!fs.readdirSync('pkg').some(e=>e.endsWith(f.slice(1))):!fs.existsSync('pkg/'+f));if(miss.length){console.error('Missing:',miss);process.exit(1)}"
 
       # dom-semantic-tree: WASM + TS (tsc) → dist/ + package.json already in place
       - name: Build dom-semantic-tree
         if: steps.target.outputs.name == 'dom-semantic-tree'
-        env:
-          CC: ${{ env.WASI_CLANG }}
-          CFLAGS: ${{ env.WASI_CFLAGS }}
         run: |
           node scripts/build.js dom
           cd crates/dom-semantic-tree/js && npm ci && npm run build
