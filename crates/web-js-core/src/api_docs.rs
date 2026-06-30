@@ -1430,8 +1430,14 @@ mod tests {
             aliases: vec![],
             permission: None,
             example: None,
-            prerequisites: Some(vec!["User must be authenticated".into(), "Active session required".into()]),
-            notes: Some(vec!["This API is idempotent".into(), "Results are cached for 5 minutes".into()]),
+            prerequisites: Some(vec![
+                "User must be authenticated".into(),
+                "Active session required".into(),
+            ]),
+            notes: Some(vec![
+                "This API is idempotent".into(),
+                "Results are cached for 5 minutes".into(),
+            ]),
             tags: Some(vec!["planning".into(), "agent".into(), "core".into()]),
             related_apis: Some(vec!["agent.execute".into(), "agent.review".into()]),
         });

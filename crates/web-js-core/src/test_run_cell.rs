@@ -181,7 +181,10 @@ mod tests {
         assert!(resumed.error.is_some());
         let err = resumed.error.unwrap();
         let display = crate::format_cell_error_text(&err);
-        assert!(display.contains("Hint: Use page.snapshot() first."), "{display}");
+        assert!(
+            display.contains("Hint: Use page.snapshot() first."),
+            "{display}"
+        );
         assert!(display.contains("Recovery:"), "{display}");
         assert!(display.contains("page.goto"), "{display}");
     }
@@ -1575,7 +1578,12 @@ console.log(result)"#;
         let result = session.run_cell("throw new Error(\"boom\")", "");
         assert!(result.error.is_some(), "{:?}", result.error);
         match result.error.as_ref().unwrap() {
-            crate::types::CellError::Runtime { name, message, stack, .. } => {
+            crate::types::CellError::Runtime {
+                name,
+                message,
+                stack,
+                ..
+            } => {
                 assert_eq!(name.as_deref(), Some("Error"));
                 assert_eq!(message, "boom");
                 assert!(
@@ -1840,16 +1848,14 @@ console.log(result)"#;
                 assert_eq!(name.as_deref(), Some("TypeError"));
                 assert_eq!(message, "x is not a function");
                 // Display should include the name prefix
-                let display = crate::format_cell_error_text(
-                    &crate::types::CellError::Runtime {
-                        name: name.clone(),
-                        message: message.clone(),
-                        line: None,
-                        action: None,
-                        code: None,
-                        stack: None,
-                    },
-                );
+                let display = crate::format_cell_error_text(&crate::types::CellError::Runtime {
+                    name: name.clone(),
+                    message: message.clone(),
+                    line: None,
+                    action: None,
+                    code: None,
+                    stack: None,
+                });
                 assert_eq!(display, "TypeError: x is not a function");
             }
             other => panic!("expected runtime error, got {other:?}"),
@@ -1882,8 +1888,14 @@ console.log(result)"#;
             let result = session.run_cell(code, "");
             assert!(result.error.is_some(), "expected error for: {code}");
             let msg = format!("{}", result.error.unwrap());
-            assert!(!msg.contains("<no message>"), "artifact '<no message>' in: {msg} (from: {code})");
-            assert!(!msg.contains("<no details available>"), "artifact '<no details>' in: {msg} (from: {code})");
+            assert!(
+                !msg.contains("<no message>"),
+                "artifact '<no message>' in: {msg} (from: {code})"
+            );
+            assert!(
+                !msg.contains("<no details available>"),
+                "artifact '<no details>' in: {msg} (from: {code})"
+            );
         }
     }
 
@@ -1896,7 +1908,10 @@ console.log(result)"#;
             crate::types::CellError::Runtime { name, message, .. } => {
                 assert_eq!(name.as_deref(), Some("TypeError"));
                 // Should have some diagnostic info, not just "TypeError"
-                assert!(!message.is_empty(), "message should not be empty: {message}");
+                assert!(
+                    !message.is_empty(),
+                    "message should not be empty: {message}"
+                );
             }
             other => panic!("expected runtime error, got {other:?}"),
         }
@@ -1947,7 +1962,11 @@ console.log(result)"#;
             "",
         );
 
-        assert!(result.error.is_none(), "cell should not error: {:?}", result.error);
+        assert!(
+            result.error.is_none(),
+            "cell should not error: {:?}",
+            result.error
+        );
         assert_eq!(result.status, CellStatus::AsyncPending);
         assert_eq!(result.pending_commands.len(), 1);
         assert_eq!(result.pending_commands[0].action, "sleep");

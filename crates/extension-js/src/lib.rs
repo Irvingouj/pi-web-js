@@ -122,5 +122,7 @@ pub fn clear_vfs_write_cache() {
 /// held by runCellAsync; this free function reads OPFS without touching any session object.
 #[wasm_bindgen(js_name = webFsReadBase64)]
 pub async fn web_fs_read_base64(path: String) -> Result<String, String> {
-    web_fs::read_base64(&path).await.map_err(|e| e.wire_message())
+    web_fs::read_base64(&path)
+        .await
+        .map_err(|e| e.wire_message())
 }

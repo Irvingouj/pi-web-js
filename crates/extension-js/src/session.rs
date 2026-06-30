@@ -1,6 +1,5 @@
 use crate::browser_api::{
-    init_csv_registry, init_fs_registry, init_pdf_registry, init_xlsx_registry,
-    init_zip_registry,
+    init_csv_registry, init_fs_registry, init_pdf_registry, init_xlsx_registry, init_zip_registry,
 };
 use std::sync::atomic::{AtomicU64, Ordering};
 use wasm_bindgen::prelude::*;
@@ -526,10 +525,10 @@ mod tests {
                 aliases: vec![],
                 permission: None,
                 example: None,
-            prerequisites: None,
-            notes: None,
-            tags: None,
-            related_apis: None,
+                prerequisites: None,
+                notes: None,
+                tags: None,
+                related_apis: None,
             },
         );
 
@@ -614,10 +613,10 @@ mod tests {
                 aliases: vec![],
                 permission: None,
                 example: None,
-            prerequisites: None,
-            notes: None,
-            tags: None,
-            related_apis: None,
+                prerequisites: None,
+                notes: None,
+                tags: None,
+                related_apis: None,
             },
         );
 

@@ -73,7 +73,10 @@ fn no_window_response() -> WasmAsyncResponse {
     WasmAsyncResponse {
         ok: false,
         value: None,
-        error: Some(WasmAsyncError::new("DOM APIs not available in this context", "E_NO_WINDOW")),
+        error: Some(WasmAsyncError::new(
+            "DOM APIs not available in this context",
+            "E_NO_WINDOW",
+        )),
     }
 }
 
@@ -127,7 +130,10 @@ async fn resolve_ref_id_or_selector(
         return Err(WasmAsyncResponse {
             ok: false,
             value: None,
-            error: Some(WasmAsyncError::new(format!("No element matching: {}", sel_str), "E_AGENT")),
+            error: Some(WasmAsyncError::new(
+                format!("No element matching: {}", sel_str),
+                "E_AGENT",
+            )),
         });
     }
     Ok(ref_id.to_string())
@@ -176,7 +182,10 @@ pub async fn execute_fetch(params: FetchParams) -> WasmAsyncResponse {
                 return WasmAsyncResponse {
                     ok: false,
                     value: None,
-                    error: Some(WasmAsyncError::new("Failed to create Headers object", "E_HEADERS")),
+                    error: Some(WasmAsyncError::new(
+                        "Failed to create Headers object",
+                        "E_HEADERS",
+                    )),
                 }
             }
         };
@@ -225,7 +234,10 @@ pub async fn execute_fetch(params: FetchParams) -> WasmAsyncResponse {
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError::new(format!("Invalid request: {:?}", e), "E_BAD_REQUEST")),
+                error: Some(WasmAsyncError::new(
+                    format!("Invalid request: {:?}", e),
+                    "E_BAD_REQUEST",
+                )),
             };
         }
     };
@@ -244,11 +256,7 @@ pub async fn execute_fetch(params: FetchParams) -> WasmAsyncResponse {
                 value: None,
                 error: Some(WasmAsyncError::new(
                     msg,
-                    if is_timeout {
-                        "ETIMEDOUT"
-                    } else {
-                        "ENETWORK"
-                    },
+                    if is_timeout { "ETIMEDOUT" } else { "ENETWORK" },
                 )),
             };
         }
@@ -260,7 +268,10 @@ pub async fn execute_fetch(params: FetchParams) -> WasmAsyncResponse {
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError::new("Invalid response from fetch", "E_RESPONSE")),
+                error: Some(WasmAsyncError::new(
+                    "Invalid response from fetch",
+                    "E_RESPONSE",
+                )),
             };
         }
     };
@@ -417,7 +428,10 @@ pub async fn execute_host_call(_action: &str, params: serde_json::Value) -> Wasm
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError::new("host.call requires an action name", "E_HOST_NO_ACTION")),
+                error: Some(WasmAsyncError::new(
+                    "host.call requires an action name",
+                    "E_HOST_NO_ACTION",
+                )),
             };
         }
     };
@@ -443,7 +457,10 @@ pub async fn execute_host_call(_action: &str, params: serde_json::Value) -> Wasm
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError::new(format!("No handler registered for '{}'", handler_name), "E_HOST_NO_HANDLER")),
+                error: Some(WasmAsyncError::new(
+                    format!("No handler registered for '{}'", handler_name),
+                    "E_HOST_NO_HANDLER",
+                )),
             }
         }
     };
@@ -453,7 +470,10 @@ pub async fn execute_host_call(_action: &str, params: serde_json::Value) -> Wasm
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError::new(format!("No handler registered for '{}'", handler_name), "E_HOST_NO_HANDLER")),
+                error: Some(WasmAsyncError::new(
+                    format!("No handler registered for '{}'", handler_name),
+                    "E_HOST_NO_HANDLER",
+                )),
             }
         }
     };
@@ -466,7 +486,10 @@ pub async fn execute_host_call(_action: &str, params: serde_json::Value) -> Wasm
         return WasmAsyncResponse {
             ok: false,
             value: None,
-            error: Some(WasmAsyncError::new(format!("Action '{}' is not whitelisted", handler_name), "E_NOT_WHITELISTED")),
+            error: Some(WasmAsyncError::new(
+                format!("Action '{}' is not whitelisted", handler_name),
+                "E_NOT_WHITELISTED",
+            )),
         };
     }
 
@@ -476,7 +499,10 @@ pub async fn execute_host_call(_action: &str, params: serde_json::Value) -> Wasm
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError::new(format!("No handler registered for '{}'", handler_name), "E_HOST_NO_HANDLER")),
+                error: Some(WasmAsyncError::new(
+                    format!("No handler registered for '{}'", handler_name),
+                    "E_HOST_NO_HANDLER",
+                )),
             }
         }
     };
@@ -489,7 +515,10 @@ pub async fn execute_host_call(_action: &str, params: serde_json::Value) -> Wasm
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError::new(format!("Failed to serialize params: {}", e), "E_HOST")),
+                error: Some(WasmAsyncError::new(
+                    format!("Failed to serialize params: {}", e),
+                    "E_HOST",
+                )),
             }
         }
     };
@@ -499,7 +528,10 @@ pub async fn execute_host_call(_action: &str, params: serde_json::Value) -> Wasm
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError::new(format!("Failed to parse params JSON: {:?}", e), "E_HOST")),
+                error: Some(WasmAsyncError::new(
+                    format!("Failed to parse params JSON: {:?}", e),
+                    "E_HOST",
+                )),
             }
         }
     };
@@ -579,7 +611,10 @@ pub fn execute_dom_snapshot(params: DomSnapshotParams) -> WasmAsyncResponse {
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError::new("Failed to serialize snapshot data", "E_SNAPSHOT")),
+                error: Some(WasmAsyncError::new(
+                    "Failed to serialize snapshot data",
+                    "E_SNAPSHOT",
+                )),
             }
         }
     };
@@ -605,7 +640,10 @@ pub fn execute_dom_format(params: DomFormatParams) -> WasmAsyncResponse {
                 return WasmAsyncResponse {
                     ok: false,
                     value: None,
-                    error: Some(WasmAsyncError::new("Failed to parse snapshot for formatting", "E_FORMAT")),
+                    error: Some(WasmAsyncError::new(
+                        "Failed to parse snapshot for formatting",
+                        "E_FORMAT",
+                    )),
                 }
             }
         };
@@ -782,7 +820,10 @@ pub async fn execute_page_click(params: PageClickParams) -> WasmAsyncResponse {
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError::new(format!("Element with ref_id '{}' not found", ref_id), "E_AGENT")),
+                error: Some(WasmAsyncError::new(
+                    format!("Element with ref_id '{}' not found", ref_id),
+                    "E_AGENT",
+                )),
             }
         }
     };
@@ -839,7 +880,10 @@ pub async fn execute_page_fill(params: PageFillParams) -> WasmAsyncResponse {
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError::new(format!("Element with ref_id '{}' not found", ref_id), "E_AGENT")),
+                error: Some(WasmAsyncError::new(
+                    format!("Element with ref_id '{}' not found", ref_id),
+                    "E_AGENT",
+                )),
             }
         }
     };
@@ -905,7 +949,10 @@ pub async fn execute_page_append(params: PageAppendParams) -> WasmAsyncResponse 
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError::new(format!("Element with ref_id '{}' not found", ref_id), "E_AGENT")),
+                error: Some(WasmAsyncError::new(
+                    format!("Element with ref_id '{}' not found", ref_id),
+                    "E_AGENT",
+                )),
             }
         }
     };
@@ -970,7 +1017,10 @@ pub async fn execute_page_hover(params: PageHoverParams) -> WasmAsyncResponse {
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError::new(format!("Element with ref_id '{}' not found", ref_id), "E_AGENT")),
+                error: Some(WasmAsyncError::new(
+                    format!("Element with ref_id '{}' not found", ref_id),
+                    "E_AGENT",
+                )),
             }
         }
     };
@@ -1100,7 +1150,10 @@ pub async fn execute_page_scroll_to(params: PageScrollToParams) -> WasmAsyncResp
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError::new(format!("Element with ref_id '{}' not found", ref_id), "E_AGENT")),
+                error: Some(WasmAsyncError::new(
+                    format!("Element with ref_id '{}' not found", ref_id),
+                    "E_AGENT",
+                )),
             }
         }
     };
@@ -1146,7 +1199,10 @@ pub async fn execute_page_dblclick(params: PageDblClickParams) -> WasmAsyncRespo
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError::new(format!("Element with ref_id '{}' not found", ref_id), "E_AGENT")),
+                error: Some(WasmAsyncError::new(
+                    format!("Element with ref_id '{}' not found", ref_id),
+                    "E_AGENT",
+                )),
             }
         }
     };
@@ -1205,7 +1261,10 @@ pub async fn execute_page_type(params: PageTypeParams) -> WasmAsyncResponse {
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError::new(format!("Element with ref_id '{}' not found", ref_id), "E_AGENT")),
+                error: Some(WasmAsyncError::new(
+                    format!("Element with ref_id '{}' not found", ref_id),
+                    "E_AGENT",
+                )),
             }
         }
     };
@@ -1219,7 +1278,10 @@ pub async fn execute_page_type(params: PageTypeParams) -> WasmAsyncResponse {
         return WasmAsyncResponse {
             ok: false,
             value: None,
-            error: Some(WasmAsyncError::new("Element is not a text input", "E_AGENT")),
+            error: Some(WasmAsyncError::new(
+                "Element is not a text input",
+                "E_AGENT",
+            )),
         };
     }
     WasmAsyncResponse {
@@ -1306,31 +1368,34 @@ pub async fn execute_page_select(params: PageSelectParams) -> WasmAsyncResponse 
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError::new(format!("Element with ref_id '{}' not found", ref_id), "E_AGENT")),
+                error: Some(WasmAsyncError::new(
+                    format!("Element with ref_id '{}' not found", ref_id),
+                    "E_AGENT",
+                )),
             }
         }
     };
-	if let Some(select) = element.dyn_ref::<web_sys::HtmlSelectElement>() {
-		let values = params.value.into_vec();
-		if select.multiple() && values.len() > 1 {
-			let opts = select.options();
-			let wanted: std::collections::HashSet<String> = values.iter().cloned().collect();
-			for i in 0..opts.length() {
-				if let Some(opt) = opts.get_with_index(i) {
-					let opt_val = opt.value();
-					_ = opt.set_selected(wanted.contains(&opt_val));
-				}
-			}
-		} else {
-			select.set_value(values.first().unwrap_or(""));
-		}
-	} else {
-		return WasmAsyncResponse {
-			ok: false,
-			value: None,
-			error: Some(WasmAsyncError::new("Element is not a select", "E_AGENT")),
-		};
-	}
+    if let Some(select) = element.dyn_ref::<web_sys::HtmlSelectElement>() {
+        let values = params.value.into_vec();
+        if select.multiple() && values.len() > 1 {
+            let opts = select.options();
+            let wanted: std::collections::HashSet<String> = values.iter().cloned().collect();
+            for i in 0..opts.length() {
+                if let Some(opt) = opts.get_with_index(i) {
+                    let opt_val = opt.value();
+                    _ = opt.set_selected(wanted.contains(&opt_val));
+                }
+            }
+        } else {
+            select.set_value(values.first().unwrap_or(""));
+        }
+    } else {
+        return WasmAsyncResponse {
+            ok: false,
+            value: None,
+            error: Some(WasmAsyncError::new("Element is not a select", "E_AGENT")),
+        };
+    }
     WasmAsyncResponse {
         ok: true,
         value: Some(serde_json::Value::Bool(true)),
@@ -1372,7 +1437,10 @@ pub async fn execute_page_check(params: PageCheckParams) -> WasmAsyncResponse {
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError::new(format!("Element with ref_id '{}' not found", ref_id), "E_AGENT")),
+                error: Some(WasmAsyncError::new(
+                    format!("Element with ref_id '{}' not found", ref_id),
+                    "E_AGENT",
+                )),
             }
         }
     };
@@ -1446,7 +1514,10 @@ pub async fn execute_fs_stat(
             Err(e) => WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError::new(format!("Failed to serialize metadata: {}", e), "E_IO")),
+                error: Some(WasmAsyncError::new(
+                    format!("Failed to serialize metadata: {}", e),
+                    "E_IO",
+                )),
             },
         },
         Err(e) => WasmAsyncResponse {
@@ -1470,7 +1541,10 @@ pub async fn execute_fs_list(
             Err(e) => WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError::new(format!("Failed to serialize entries: {}", e), "E_IO")),
+                error: Some(WasmAsyncError::new(
+                    format!("Failed to serialize entries: {}", e),
+                    "E_IO",
+                )),
             },
         },
         Err(e) => WasmAsyncResponse {
@@ -1630,7 +1704,10 @@ pub async fn execute_fs_write(
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError::new("Invalid base64 data", "E_INVALID_ENCODING")),
+                error: Some(WasmAsyncError::new(
+                    "Invalid base64 data",
+                    "E_INVALID_ENCODING",
+                )),
             };
         }
     };
@@ -1691,7 +1768,10 @@ pub async fn execute_fs_append(
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError::new("Invalid base64 data", "E_INVALID_ENCODING")),
+                error: Some(WasmAsyncError::new(
+                    "Invalid base64 data",
+                    "E_INVALID_ENCODING",
+                )),
             };
         }
     };
@@ -1752,7 +1832,10 @@ pub async fn execute_fs_update(
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError::new("Invalid base64 data", "E_INVALID_ENCODING")),
+                error: Some(WasmAsyncError::new(
+                    "Invalid base64 data",
+                    "E_INVALID_ENCODING",
+                )),
             };
         }
     };
@@ -1881,7 +1964,10 @@ pub async fn execute_page_wait_for(params: PageWaitForParams) -> WasmAsyncRespon
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(WasmAsyncError::new(format!("Timeout waiting for selector: {}", params.selector), "E_TIMEOUT")),
+                error: Some(WasmAsyncError::new(
+                    format!("Timeout waiting for selector: {}", params.selector),
+                    "E_TIMEOUT",
+                )),
             };
         }
         let promise = js_sys::Promise::new(
@@ -2003,7 +2089,10 @@ pub async fn execute_page_screenshot(_params: EmptyParams) -> WasmAsyncResponse 
     WasmAsyncResponse {
         ok: false,
         value: None,
-        error: Some(WasmAsyncError::new("screenshot not yet implemented in web-js", "E_NOT_IMPLEMENTED")),
+        error: Some(WasmAsyncError::new(
+            "screenshot not yet implemented in web-js",
+            "E_NOT_IMPLEMENTED",
+        )),
     }
 }
 
@@ -3320,7 +3409,9 @@ pub async fn dispatch_command(
     Ok(web_js_base::types::WasmAsyncResponse {
         ok: core_resp.ok,
         value: core_resp.value,
-        error: core_resp.error.map(|e| web_js_base::types::WasmAsyncError::new(e.message, e.code)),
+        error: core_resp
+            .error
+            .map(|e| web_js_base::types::WasmAsyncError::new(e.message, e.code)),
     })
 }
 

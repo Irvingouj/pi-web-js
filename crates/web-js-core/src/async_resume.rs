@@ -72,11 +72,14 @@ pub(crate) fn resume_async_pending<'js>(
             rquickjs::Error::new_from_js_message("json", "stringify", e.to_string())
         })?;
         let hint_json = serde_json::to_string(err.and_then(|e| e.hint.as_deref()).unwrap_or(""))
-            .map_err(|e| rquickjs::Error::new_from_js_message("json", "stringify", e.to_string()))?;
-        let recovery_json = serde_json::to_string(
-            err.and_then(|e| e.recovery.as_ref()).unwrap_or(&Vec::new()),
-        )
-        .map_err(|e| rquickjs::Error::new_from_js_message("json", "stringify", e.to_string()))?;
+            .map_err(|e| {
+                rquickjs::Error::new_from_js_message("json", "stringify", e.to_string())
+            })?;
+        let recovery_json =
+            serde_json::to_string(err.and_then(|e| e.recovery.as_ref()).unwrap_or(&Vec::new()))
+                .map_err(|e| {
+                    rquickjs::Error::new_from_js_message("json", "stringify", e.to_string())
+                })?;
         let category_json = serde_json::to_string(
             err.and_then(|e| e.category.as_deref()).unwrap_or(""),
         )

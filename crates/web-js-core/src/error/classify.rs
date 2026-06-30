@@ -1,5 +1,7 @@
 use crate::error::format::format_js_exception;
-use crate::error::js_exception::{extract_line_number, parse_js_exception, split_name_message, JsException};
+use crate::error::js_exception::{
+    extract_line_number, parse_js_exception, split_name_message, JsException,
+};
 use crate::types::CellError;
 use rquickjs::{Ctx, Value};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -207,8 +209,16 @@ mod tests {
         };
         let err = cell_error_from_js_exception(exc);
         match err {
-            CellError::Runtime { message, action, code, .. } => {
-                assert_eq!(message, "[tab_snapshot] (E_SCRIPTING): Cannot execute script");
+            CellError::Runtime {
+                message,
+                action,
+                code,
+                ..
+            } => {
+                assert_eq!(
+                    message,
+                    "[tab_snapshot] (E_SCRIPTING): Cannot execute script"
+                );
                 assert_eq!(action.as_deref(), Some("tab_snapshot"));
                 assert_eq!(code.as_deref(), Some("E_SCRIPTING"));
             }
@@ -219,7 +229,10 @@ mod tests {
     #[test]
     fn js_exc_fuel_exhausted() {
         let exc = js_exc(Some("Error"), "interrupted");
-        assert!(matches!(cell_error_from_js_exception(exc), CellError::FuelExhausted));
+        assert!(matches!(
+            cell_error_from_js_exception(exc),
+            CellError::FuelExhausted
+        ));
     }
 
     #[test]
@@ -249,7 +262,11 @@ mod tests {
         };
         let err = cell_error_from_js_exception(exc);
         match err {
-            CellError::Runtime { ref name, ref message, .. } => {
+            CellError::Runtime {
+                ref name,
+                ref message,
+                ..
+            } => {
                 assert_eq!(name.as_deref(), Some("TypeError"));
                 assert_eq!(message, "");
                 // Display should produce "TypeError" without duplication
@@ -302,7 +319,10 @@ mod tests {
 
     #[test]
     fn text_interrupted() {
-        assert!(matches!(cell_error_from_text("interrupted"), CellError::FuelExhausted));
+        assert!(matches!(
+            cell_error_from_text("interrupted"),
+            CellError::FuelExhausted
+        ));
     }
 
     #[test]

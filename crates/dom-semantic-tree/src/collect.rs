@@ -1,12 +1,12 @@
 use wasm_bindgen::JsCast;
 use web_sys::{Document, Element, HtmlElement, Node, Window};
 
+use crate::markdown_visible::is_markdown_visible_element;
 use crate::model::{CollectOptions, OutlineNode, SemanticNode, TreeSnapshot, Viewport};
 use crate::name::{compute_name, NameContext};
 use crate::refs::RefAllocator;
 use crate::role::{infer_role, is_interactive_role};
 use crate::state::{extract_states, StateInput};
-use crate::markdown_visible::is_markdown_visible_element;
 use crate::visibility::{is_display_none, is_visibility_hidden, is_zero_size};
 
 use crate::geometry::dom_rect_to_rect;

@@ -13,10 +13,7 @@ pub fn cache_write(path: &str, data: &str) {
 }
 
 pub fn take_write(path: &str) -> Option<String> {
-    cache()
-        .lock()
-        .ok()
-        .and_then(|mut guard| guard.remove(path))
+    cache().lock().ok().and_then(|mut guard| guard.remove(path))
 }
 
 pub fn clear() {

@@ -197,10 +197,7 @@ pub async fn execute_fs_write(params: FsWriteParams) -> AsyncResponse {
             return AsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(AsyncError::new(
-                    "Invalid base64 data",
-                    "E_INVALID_ENCODING",
-                )),
+                error: Some(AsyncError::new("Invalid base64 data", "E_INVALID_ENCODING")),
             };
         }
     };
@@ -247,10 +244,7 @@ pub async fn execute_fs_write_base64(params: FsWriteParams) -> AsyncResponse {
             return AsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(AsyncError::new(
-                    "Invalid base64 data",
-                    "E_INVALID_ENCODING",
-                )),
+                error: Some(AsyncError::new("Invalid base64 data", "E_INVALID_ENCODING")),
             };
         }
     };
@@ -278,10 +272,7 @@ pub async fn execute_fs_append(params: FsWriteParams) -> AsyncResponse {
             return AsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(AsyncError::new(
-                    "Invalid base64 data",
-                    "E_INVALID_ENCODING",
-                )),
+                error: Some(AsyncError::new("Invalid base64 data", "E_INVALID_ENCODING")),
             };
         }
     };
@@ -327,10 +318,7 @@ pub async fn execute_fs_append_base64(params: FsWriteParams) -> AsyncResponse {
             return AsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(AsyncError::new(
-                    "Invalid base64 data",
-                    "E_INVALID_ENCODING",
-                )),
+                error: Some(AsyncError::new("Invalid base64 data", "E_INVALID_ENCODING")),
             };
         }
     };
@@ -358,10 +346,7 @@ pub async fn execute_fs_update(params: FsUpdateParams) -> AsyncResponse {
             return AsyncResponse {
                 ok: false,
                 value: None,
-                error: Some(AsyncError::new(
-                    "Invalid base64 data",
-                    "E_INVALID_ENCODING",
-                )),
+                error: Some(AsyncError::new("Invalid base64 data", "E_INVALID_ENCODING")),
             };
         }
     };
@@ -702,7 +687,6 @@ pub fn init_fs_registry() {
             .expect("Failed to re-freeze manifest after browser API registration");
     }
 }
-
 
 // ─── csv.* helpers ──────────────────────────────────────────────
 

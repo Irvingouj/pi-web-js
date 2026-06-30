@@ -218,7 +218,11 @@ pub(crate) fn register_host_globals<'js>(
         "setTimeout",
         Func::new(
             move |ctx: Ctx<'js>, args: Rest<Value<'js>>| -> rquickjs::Result<u32> {
-                let cb = args.0.first().cloned().unwrap_or_else(|| Value::new_undefined(ctx.clone()));
+                let cb = args
+                    .0
+                    .first()
+                    .cloned()
+                    .unwrap_or_else(|| Value::new_undefined(ctx.clone()));
                 if cb.is_undefined() || cb.as_function().is_none() {
                     return Err(rquickjs::Error::new_from_js_message(
                         "setTimeout",
@@ -226,7 +230,12 @@ pub(crate) fn register_host_globals<'js>(
                         "first argument must be a function",
                     ));
                 }
-                let ms = args.0.get(1).and_then(|v| v.as_float()).unwrap_or(0.0).max(0.0);
+                let ms = args
+                    .0
+                    .get(1)
+                    .and_then(|v| v.as_float())
+                    .unwrap_or(0.0)
+                    .max(0.0);
 
                 let mut hs = hs.borrow_mut();
                 hs.async_call_counter += 1;
@@ -248,9 +257,7 @@ pub(crate) fn register_host_globals<'js>(
                 )?;
                 let bound = factory.call::<_, Value>((cb,))?;
                 entry.set("resolve", bound)?;
-                let noop = ctx.eval::<rquickjs::function::Function<'js>, _>(
-                    "(function() {})",
-                )?;
+                let noop = ctx.eval::<rquickjs::function::Function<'js>, _>("(function() {})")?;
                 entry.set("reject", noop)?;
                 entry.set("action", "sleep")?;
                 pending.set(call_id.to_string(), entry)?;
@@ -269,10 +276,16 @@ pub(crate) fn register_host_globals<'js>(
                     if let Some(id) = id_val.as_int() {
                         let pending = ctx.globals().get::<_, Object>("__webJsPending")?;
                         let id_str = id.to_string();
-                        if pending.get::<_, Value>(id_str.as_str()).map(|v| !v.is_undefined()).unwrap_or(false) {
+                        if pending
+                            .get::<_, Value>(id_str.as_str())
+                            .map(|v| !v.is_undefined())
+                            .unwrap_or(false)
+                        {
                             let _ = pending.remove(id_str.as_str());
                         }
-                        hs.borrow_mut().pending_async_commands.retain(|c| c.call_id != id as u32);
+                        hs.borrow_mut()
+                            .pending_async_commands
+                            .retain(|c| c.call_id != id as u32);
                     }
                 }
                 Ok(())
@@ -344,10 +357,16 @@ pub(crate) fn register_host_globals<'js>(
                     if let Some(id) = id_val.as_int() {
                         let pending = ctx.globals().get::<_, Object>("__webJsPending")?;
                         let id_str = id.to_string();
-                        if pending.get::<_, Value>(id_str.as_str()).map(|v| !v.is_undefined()).unwrap_or(false) {
+                        if pending
+                            .get::<_, Value>(id_str.as_str())
+                            .map(|v| !v.is_undefined())
+                            .unwrap_or(false)
+                        {
                             let _ = pending.remove(id_str.as_str());
                         }
-                        hs.borrow_mut().pending_async_commands.retain(|c| c.call_id != id as u32);
+                        hs.borrow_mut()
+                            .pending_async_commands
+                            .retain(|c| c.call_id != id as u32);
                     }
                 }
                 Ok(())

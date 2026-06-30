@@ -123,7 +123,8 @@ fn resolve_message_fallback<'js>(
 
     // Try stack trace lines for richer context than just the error name.
     if let Some(stack) = stack {
-        let stack_lines: Vec<&str> = stack.lines()
+        let stack_lines: Vec<&str> = stack
+            .lines()
             .map(|l| l.trim())
             .filter(|l| !l.is_empty() && !is_artifact_message(l))
             .take(3)
@@ -245,10 +246,7 @@ mod tests {
 
     #[test]
     fn extract_line_number_mid_sentence() {
-        assert_eq!(
-            extract_line_number("something at line 3 and more"),
-            Some(3)
-        );
+        assert_eq!(extract_line_number("something at line 3 and more"), Some(3));
     }
 
     #[test]
