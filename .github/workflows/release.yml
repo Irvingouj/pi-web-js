@@ -22,11 +22,6 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
-    env:
-      # wasi-sdk clang + sysroot, installed below. Required for rquickjs-sys
-      # (QuickJS C source) targeting wasm32-unknown-unknown.
-      CC: /opt/wasi-sdk-24.0/bin/clang
-      CFLAGS: --sysroot=/opt/wasi-sdk-24.0/share/wasi-sysroot
     steps:
       - uses: actions/checkout@v4
 
@@ -44,6 +39,9 @@ jobs:
         run: |
           curl -sSL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-24/wasi-sdk-24.0-x86_64-linux.tar.gz -o /tmp/wasi-sdk.tar.gz
           tar -xzf /tmp/wasi-sdk.tar.gz -C /opt/
+          wasi_root=$(dirname $(find /opt/wasi-sdk-*/bin/clang -maxdepth 1 | head -1))
+          echo "WASI_CLANG=$wasi_root/clang" >> "$GITHUB_ENV"
+          echo "WASI_SYSROOT=$(cd $wasi_root/../share/wasi-sysroot && pwd)" >> "$GITHUB_ENV"
       - name: Resolve target from tag
         id: target
         run: |
@@ -78,6 +76,9 @@ jobs:
       # call `npm publish` without --provenance).
       - name: Build extension-js
         if: steps.target.outputs.name == 'extension-js'
+        env:
+          CC: ${{ env.WASI_CLANG }}
+          CFLAGS: --sysroot=${{ env.WASI_SYSROOT }}
         run: |
           node scripts/build.js extension
           cd crates/extension-js/js && npm ci && npm run build
@@ -89,6 +90,9 @@ jobs:
       # dom-semantic-tree: WASM + TS (tsc) → dist/ + package.json already in place
       - name: Build dom-semantic-tree
         if: steps.target.outputs.name == 'dom-semantic-tree'
+        env:
+          CC: ${{ env.WASI_CLANG }}
+          CFLAGS: --sysroot=${{ env.WASI_SYSROOT }}
         run: |
           node scripts/build.js dom
           cd crates/dom-semantic-tree/js && npm ci && npm run build

@@ -48,14 +48,19 @@ jobs:
       # on Linux CI we install wasi-sdk and point CC/CFLAGS at its sysroot.
       # build.js auto-detects Homebrew; here we set the env explicitly.
       - name: Install wasi-sdk (libc sysroot for the WASM build)
+        id: wasi
         run: |
           curl -sSL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-24/wasi-sdk-24.0-x86_64-linux.tar.gz -o /tmp/wasi-sdk.tar.gz
           tar -xzf /tmp/wasi-sdk.tar.gz -C /opt/
-          echo "WASI_SYSROOT=/opt/wasi-sdk-24.0/share/wasi-sysroot" >> "$GITHUB_ENV"
+          # Resolve the extracted directory name (may be wasi-sdk-24.0 or similar).
+          wasi_root=$(dirname $(find /opt/wasi-sdk-*/bin/clang -maxdepth 1 | head -1))
+          sysroot="$wasi_root/../share/wasi-sysroot"
+          echo "clang=$wasi_root/clang" >> "$GITHUB_OUTPUT"
+          echo "sysroot=$(cd $sysroot && pwd)" >> "$GITHUB_OUTPUT"
       - name: Build extension WASM
         env:
-          CC: /opt/wasi-sdk-24.0/bin/clang
-          CFLAGS: --sysroot=/opt/wasi-sdk-24.0/share/wasi-sysroot
+          CC: ${{ steps.wasi.outputs.clang }}
+          CFLAGS: --sysroot=${{ steps.wasi.outputs.sysroot }}
         run: node scripts/build.js extension
       - name: extension-js unit tests
         working-directory: crates/extension-js/js
