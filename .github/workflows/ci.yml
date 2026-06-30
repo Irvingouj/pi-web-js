@@ -61,7 +61,7 @@ jobs:
         run: |
           wb_version=$(grep -A1 '^name = "wasm-bindgen"' Cargo.lock | grep version | head -1 | sed 's/.*"\(.*\)".*/\1/')
           cargo install wasm-bindgen-cli --version "$wb_version" --locked
-      - name: Install extension-js JS deps (for tsc @types/chrome)
+      - name: Install extension-js JS deps (for tsc @types/chrome + vitest)
         working-directory: crates/extension-js/js
         run: npm ci
       - name: Build extension WASM
@@ -69,5 +69,5 @@ jobs:
       - name: extension-js unit tests
         working-directory: crates/extension-js/js
         run: |
-          npm ci
+          npm run build
           npm test
