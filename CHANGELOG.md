@@ -5,10 +5,29 @@ is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
 
+## [0.14.0] — 2026-06-30
+
+### Added — clickability assessment + robust click activation
+
+- **`clickability.ts` (new, shared/cross).** Detects elements that are clickable in practice but invisible to ARIA-role heuristics: Gmail-style `jsaction` controls, `onclick`/`.onclick` handlers, native controls, `contenteditable`, non-negative `tabindex`, and common `*-button`/`button` class heuristics. Returns a typed `{ clickable, confidence, reason }` assessment instead of Vimium's internal booleans, where `confidence: "low"` flags weak signals (class heuristics, bare `<span>`) that may produce false positives.
+- **Snapshot now surfaces clickable controls.** `shouldInclude` and the inline-snapshot enricher consult `assessClickability`, so jsaction/button-class elements appear in both the structured snapshot and the text snapshot with a `confidence=low` marker on weak hits. `getAccessibleRole` no longer force-promotes `onclick` elements to `button` (that heuristic moved to clickability, where confidence is tracked).
+- **Wrapper deduplication (`deduplicateWrappers`).** Forward-scan over DFS pre-order nodes drops low-confidence wrappers that only contain a higher-confidence clickable descendant, adapting Vimium's reversed-scan descendant dedup to our ancestor-first ordering.
+- **Robust click activation (`dispatchActivationClick`).** `page.click` now dispatches a full `mouseover → mousedown → focus → mouseup` sequence before `HTMLElement.click()`, adapted from Vimium's `simulateClick`. Preserves native activation behavior (checkbox toggle, form submit, link nav) on frameworks that gate handlers on those events and would no-op a bare `.click()`.
+
+### Fixed — test environment
+
+- **`runner.test.ts` localStorage probe.** Some jsdom/test runtimes expose a non-undefined `localStorage` that throws on access; the polyfill assignment is now gated behind a write probe.
+
+### Tests
+
+- New `clickability.test.ts` (21 cases): role/onclick/jsaction/native/contenteditable/tabindex/buttonClass/span reasons, confidence levels, hidden-ancestor suppression, and `deduplicateWrappers` forward-scan dedup.
+- `snapshot-dom.test.ts`: jsaction control inclusion in inline snapshots, `isProbablyClickable`/`isReachableClickTarget`, and `getAccessibleRole` decoupling from clickability.
+- `content-script.test.ts`: `page_click` dispatches the mouse activation sequence before `HTMLElement.click()`.
+- Full suite: 835/835 passing.
+
 ## [0.13.3] — 2026-06-28
 
 ### Fixed — inactive tab readiness
-
 - **`web.tab.create({ url, active: false })` now waits for page load and content-script readiness before returning for http(s) URLs.** Agents can create an inactive tab and immediately call `web.tab.snapshot({ tabId })` without activating the tab.
 - **Added `waitForReady: false` to `web.tab.create`** for callers that need raw immediate `chrome.tabs.create` behavior.
 - **`web.tab.wait_for_load({ tabId })` now waits for the content script too**, matching the real prerequisite for `web.tab.snapshot/click/fill`.
@@ -188,6 +207,7 @@ is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Fixed `web-js` `WasmAsyncError` compile.
 
 [0.13.3]: https://www.npmjs.com/package/@pi-oxide/extension-js/v/0.13.3
+[0.14.0]: https://www.npmjs.com/package/@pi-oxide/extension-js/v/0.14.0
 [0.13.2]: https://www.npmjs.com/package/@pi-oxide/extension-js/v/0.13.2
 [0.12.3]: https://www.npmjs.com/package/@pi-oxide/extension-js/v/0.12.3
 [0.12.2]: https://www.npmjs.com/package/@pi-oxide/extension-js/v/0.12.2
