@@ -156,7 +156,7 @@ function copyExtensionAssets() {
       generatedCopied = true;
     }
     try {
-      execSync("tsc", { cwd: srcDir, stdio: "pipe" });
+      execSync("tsc", { cwd: srcDir, stdio: "inherit" });
       console.log("  Compiled TypeScript sources");
       // Strip ESM marker from content-script.js so it works as a classic MV3 script
       function stripEsmMarker(filePath) {
