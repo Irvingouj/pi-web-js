@@ -77,8 +77,9 @@ jobs:
       - name: Build extension-js
         if: steps.target.outputs.name == 'extension-js'
         run: |
-          node scripts/build.js extension
-          cd crates/extension-js/js && npm ci && npm run build
+          cd crates/extension-js/js && npm ci
+          cd "$GITHUB_WORKSPACE" && node scripts/build.js extension
+          cd crates/extension-js/js && npm run build
           node -e "const fs=require('fs');const m=require('./npm-package.json');delete m.sideEffects;fs.writeFileSync('pkg/package.json',JSON.stringify(m,null,'\t')+'\n')"
           node -e "const fs=require('fs');const m=require('./npm-package.json');const miss=(m.files||[]).filter(f=>f.includes('*')?!fs.readdirSync('pkg').some(e=>e.endsWith(f.slice(1))):!fs.existsSync('pkg/'+f));if(miss.length){console.error('Missing:',miss);process.exit(1)}"
 
