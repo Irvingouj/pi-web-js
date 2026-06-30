@@ -39,6 +39,10 @@ jobs:
         run: |
           curl -sSL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-24/wasi-sdk-24.0-x86_64-linux.tar.gz -o /tmp/wasi-sdk.tar.gz
           tar -xzf /tmp/wasi-sdk.tar.gz -C /opt/
+      - name: Install wasm-bindgen-cli (matched to Cargo.lock)
+        run: |
+          wb_version=$(grep -A1 '^name = "wasm-bindgen"' Cargo.lock | grep version | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          cargo install wasm-bindgen-cli --version "$wb_version" --locked
       - name: Resolve target from tag
         id: target
         run: |
