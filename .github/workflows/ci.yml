@@ -59,7 +59,7 @@ jobs:
           # wasi-sdk-24 has no top-level include/stdlib.h (only per-target
           # subdirs); point at wasm32-wasi which matches the unknown-unknown ABI.
           echo "clang=$wasi_root/clang" >> "$GITHUB_OUTPUT"
-          echo "cflags=--sysroot=$sysroot -I$sysroot/include/wasm32-wasi" >> "$GITHUB_OUTPUT"
+          echo "cflags=--sysroot=$sysroot -I$sysroot/include/wasm32-wasi -D__wasi__" >> "$GITHUB_OUTPUT"
       - name: Build extension WASM
         env:
           CC: ${{ steps.wasi.outputs.clang }}
