@@ -138,6 +138,10 @@ export class ExtensionSession {
 				"../runner/tools/chrome/capability.js"
 			);
 			await initCapabilities();
+			const { initNetworkLogSession } = await import(
+				"../runner/lib/network-log-store.js"
+			);
+			initNetworkLogSession();
 		}
 
 		// 2. Freeze registry
