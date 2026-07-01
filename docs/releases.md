@@ -74,7 +74,7 @@ A `pkg/package.json` is produced by the build step (`scripts/build.js` + `npm ru
 
 ```bash
 # Build WASM + JS for extension-js
-node scripts/build.js extension
+node scripts/build.js extension --release
 cd crates/extension-js/js && npm ci && npm run build
 # pkg/ now contains the publishable bundle; npm publish from there (without --provenance for a dry run)
 cd pkg && npm publish --dry-run
