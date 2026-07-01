@@ -35,7 +35,7 @@ if (missing.length > 0) {
 		`✘ Refusing to publish: missing declared files in pkg/: ${missing.join(", ")}`,
 	);
 	console.error(
-		`  Run \`node scripts/build.js extension\` then \`cd crates/extension-js/js && npm run build\` first.`,
+		`  Run \`node scripts/build.js extension --release\` then \`cd crates/extension-js/js && npm run build\` first.`,
 	);
 	process.exit(1);
 }
