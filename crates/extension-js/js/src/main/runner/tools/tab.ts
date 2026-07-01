@@ -19,6 +19,11 @@ import {
 	unwrapResult,
 	waitForTabLoad,
 } from "../runtime.js";
+import {
+	clearNetworkEntries,
+	getNetworkEntry,
+	listNetworkEntries,
+} from "../lib/network-log-store.js";
 
 // ─── Tab actions ─────────────────────────────────────────────────
 
@@ -327,6 +332,120 @@ registerJsCall({
 	returnDoc: "true",
 	errorCode: "E_NO_TAB",
 	example: "web.tab.wait_for_load({ tabId: 123, timeout: 5000 })",
+});
+
+const TabNetworkListParamsSchema = z.object({
+	tabId: z.number().describe("Target tab ID"),
+	all: z
+		.boolean()
+		.optional()
+		.describe("Include every captured request type, not just backend calls"),
+});
+
+const TabNetworkGetParamsSchema = z.object({
+	tabId: z.number().describe("Target tab ID"),
+	id: z.string().min(1).describe("Network log entry id from list()"),
+});
+
+const TabNetworkClearParamsSchema = z.object({
+	tabId: z.number().describe("Target tab ID"),
+});
+
+registerJsCall({
+	action: "tab_network_list",
+	namespace: "web.tab.network",
+	name: "list",
+	description:
+		"List captured network requests for a tab. Defaults to backend-looking requests; pass { all: true } for all captured page-tab traffic.",
+	params: TabNetworkListParamsSchema,
+	returns: z.array(z.record(z.unknown())),
+	returnType: "NetworkSummary[]",
+	owner: "main-thread",
+	handler: async (params, _ctx) => {
+		return listNetworkEntries(params.tabId, params);
+	},
+	paramTypes: [
+		{
+			name: "tabId",
+			type: "number",
+			required: true,
+			description: "Target tab ID",
+		},
+		{
+			name: "all",
+			type: "boolean",
+			required: false,
+			description: "Include static/document requests as well as backend calls",
+		},
+	],
+	returnDoc: "Compact network request summaries",
+	errorCode: "E_NO_TAB",
+	example: "web.tab.network.list({ tabId: 123, all: true })",
+});
+
+registerJsCall({
+	action: "tab_network_get",
+	namespace: "web.tab.network",
+	name: "get",
+	description: "Get the full raw captured network entry for a tab",
+	params: TabNetworkGetParamsSchema,
+	returns: z.unknown(),
+	returnType: "NetworkEntry",
+	owner: "main-thread",
+	handler: async (params, _ctx) => {
+		const entry = getNetworkEntry(params.tabId, params.id);
+		if (!entry) {
+			throw makeError(
+				`Network entry not found for tab ${params.tabId}: ${params.id}`,
+				"E_NOT_FOUND",
+				"network",
+			);
+		}
+		return entry;
+	},
+	paramTypes: [
+		{
+			name: "tabId",
+			type: "number",
+			required: true,
+			description: "Target tab ID",
+		},
+		{
+			name: "id",
+			type: "string",
+			required: true,
+			description: "Network log entry id from web.tab.network.list()",
+		},
+	],
+	returnDoc: "Full raw network request entry",
+	errorCode: "E_NOT_FOUND",
+	errorCategory: "network",
+	example: 'web.tab.network.get({ tabId: 123, id: "n1" })',
+});
+
+registerJsCall({
+	action: "tab_network_clear",
+	namespace: "web.tab.network",
+	name: "clear",
+	description: "Clear captured network requests for a tab",
+	params: TabNetworkClearParamsSchema,
+	returns: z.null(),
+	owner: "main-thread",
+	handler: async (params, _ctx) => {
+		clearNetworkEntries(params.tabId);
+		return null;
+	},
+	paramTypes: [
+		{
+			name: "tabId",
+			type: "number",
+			required: true,
+			description: "Target tab ID",
+		},
+	],
+	returnDoc: "null",
+	errorCode: "E_NO_TAB",
+	example: "web.tab.network.clear({ tabId: 123 })",
 });
 
 registerJsCall({
