@@ -236,6 +236,7 @@ const renderNodeLine = (node: InlineSnapshotNode, depth: number): string => {
 			`text="${node.text?.replace(/"/g, '\\"')}"`,
 		],
 		[node.value, `value="${node.value?.replace(/"/g, '\\"')}"`],
+		[node.checked !== undefined, `checked=${node.checked}`],
 		[node.required, "required"],
 		[node.invalid, "invalid"],
 		[node.expanded !== undefined, `expanded=${node.expanded}`],

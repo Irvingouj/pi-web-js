@@ -373,6 +373,18 @@ describe("enrichClickAction confidence and dropdown (WU5)", () => {
 		document.body.innerHTML = "";
 	});
 
+	it("renders checkbox checked state in snapshot text", () => {
+		document.body.innerHTML = `
+			<label><input type="checkbox" checked />Allow npm publish</label>
+			<label><input type="checkbox" />Allow npm stage publish</label>
+		`;
+		const snap = collectInlineSnapshot(100);
+
+		expect(snap.text).toContain("checkbox");
+		expect(snap.text).toContain("checked=true");
+		expect(snap.text).toContain("checked=false");
+	});
+
 	it("combobox recommendedAction stays select_option", () => {
 		document.body.innerHTML = `<div role="combobox" aria-expanded="false" tabindex="0">x</div>`;
 		const snap = collectInlineSnapshot(100);
