@@ -9,6 +9,11 @@
 		"dist",
 		"README.md"
 	],
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/Irvingouj/pi-web-js.git",
+		"directory": "crates/dom-semantic-tree/js"
+	},
 	"scripts": {
 		"build": "node ../../../scripts/build-npm.js dom",
 		"prepublishOnly": "npm run build && cd ../../../ && node scripts/build.js dom"

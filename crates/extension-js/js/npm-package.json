@@ -3,6 +3,11 @@
 	"type": "module",
 	"version": "0.15.0",
 	"license": "MIT OR Apache-2.0",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/Irvingouj/pi-web-js.git",
+		"directory": "crates/extension-js/js"
+	},
 	"main": "index.js",
 	"types": "index.d.ts",
 	"files": [

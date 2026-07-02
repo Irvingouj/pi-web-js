@@ -31,7 +31,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           registry-url: https://registry.npmjs.org
       # rquickjs-sys compiles QuickJS C, which needs a libc for wasm32-unknown-unknown.
       # build.js detects wasi-sdk under /opt and sets CC/CFLAGS; just install it.
@@ -45,6 +45,9 @@ jobs:
           echo "LIBCLANG_PATH=$(dirname $(find /usr/lib/llvm-*/lib/libclang.so | head -1))" >> "$GITHUB_ENV"
       - name: Install wasm-bindgen-cli (matched to Cargo.lock)
         run: |
+          npm install -g npm@latest
+          node --version
+          npm --version
           wb_version=$(grep -A1 '^name = "wasm-bindgen"' Cargo.lock | grep version | head -1 | sed 's/.*"\(.*\)".*/\1/')
           cargo install wasm-bindgen-cli --version "$wb_version" --locked
       - name: Resolve target from tag
