@@ -45,6 +45,14 @@
 - `chrome.scripting.executeScript` is only for explicit user/agent code in QuickJS cells (opt-in MAIN-world scripting)
 - There is no `web.tab.execute_script` — use `chrome.scripting.executeScript` from a cell when MAIN-world access is required
 
+### Extension-JS Type Boundary Rules
+- No visible `unknown` in extension-js public API, runner, worker, content-script, or test-facing types.
+- External data must be narrowed at the first boundary with zod or a named type guard, then passed deeper as named types.
+- Do not use `z.unknown()` or `Record<string, unknown>` for project-owned APIs. Use exact zod schemas with useful validation messages.
+- Native Chrome parity may carry opaque `NativeArgs` only at the Chrome boundary; project-owned APIs (`page.*`, `web.tab.*`, `dom.*`, `host.*`) must not.
+- Error responses must name the public function, parameter path, expected shape, received value type, and script line when available.
+- Bare `[runtime error] TypeError:` is a bug. Fix the shared boundary that lost the message, not the caller.
+
 ### When Fixing Bugs
 1. Check if bug reproduces in extension context
 2. Fix extension-js runner (`crates/extension-js/js/src/main/runner/` — `runtime.ts` + `tools/`)

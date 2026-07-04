@@ -2,7 +2,11 @@
 // Loads extension-js WASM and communicates with main thread.
 
 import type { z } from "zod";
-import { formatValidationError } from "../shared/cross/dispatch.js";
+import {
+	displayActionName,
+	formatValidationError,
+	type ParamDetail,
+} from "../shared/cross/dispatch.js";
 import type {
 	CsvActionMap,
 	CsvCallMessage,
@@ -62,6 +66,42 @@ const pendingRelays = new Map<
 	}
 >();
 
+type ApiCallbackContext = {
+	callId?: number;
+	runId?: string;
+	sourceStack?: string;
+	signal?: AbortSignal;
+};
+
+function sourceLineFromStack(stack: string | undefined): number | undefined {
+	const match = stack?.match(/line (\d+)|:(\d+):\d+\)?/);
+	return match ? Number(match[1] ?? match[2]) : undefined;
+}
+
+function withSourceLine<T>(result: T, sourceStack: string | undefined): T {
+	if (
+		typeof result !== "object" ||
+		result === null ||
+		!("ok" in result) ||
+		(result as { ok: boolean }).ok
+	) {
+		return result;
+	}
+	const line = sourceLineFromStack(sourceStack);
+	if (!line) return result;
+	const error = (result as { error?: { message?: string; line?: number } })
+		.error;
+	if (!error) return result;
+	if (!error.line) error.line = line;
+	if (error.message && !/\(line \d+\)/.test(error.message)) {
+		error.message += ` (line ${line})`;
+	}
+	return result;
+}
+
+function contextSourceStack(context: ApiCallbackContext | undefined): string {
+	return context?.sourceStack ?? "line 1";
+}
 type RelayPort = {
 	postMessage(message: unknown): void;
 	addEventListener: (
@@ -186,14 +226,23 @@ export function registerWorkerHandlerValidated<P>(
 		async (params, context) => {
 			const parseResult = paramsSchema.safeParse(coerceWasmParams(params));
 			if (!parseResult.success) {
-				const message = formatValidationError(
+				const fields = formatValidationError(
 					action,
 					paramsSchema,
 					parseResult.error.issues,
 					params,
 				);
-				const err = new Error(message) as Error & { code: string };
+				const publicName = displayActionName(action);
+				const err = new Error(fields.message) as Error & {
+					code: string;
+					category: string;
+					publicName?: string;
+					param?: ParamDetail;
+				};
 				err.code = "E_INVALID_PARAMS";
+				err.category = "validation";
+				err.publicName = publicName;
+				if (fields.param) err.param = fields.param;
 				throw err;
 			}
 			return await handler(parseResult.data, context);
@@ -333,10 +382,7 @@ export function safePostAsCall(options: {
 	timeoutMs?: number;
 	resolveTimeoutMs?: (params: unknown) => number;
 	tabPolicy?: string;
-}): (
-	params: unknown,
-	context?: { callId?: number; runId?: string; signal?: AbortSignal },
-) => Promise<unknown> {
+}): (params: unknown, context?: ApiCallbackContext) => Promise<unknown> {
 	const { owner, action, tabPolicy, resolveTimeoutMs } = options;
 	const baseTimeoutMs = options.timeoutMs ?? DEFAULT_RELAY_TIMEOUT_MS;
 	return (params: unknown, context?) => {
@@ -645,10 +691,7 @@ export function extensionDispatch(
 
 export function createExecutableCallback(
 	entry: SerializableJsCallManifestEntry,
-): (
-	params: unknown,
-	context?: { callId?: number; runId?: string; signal?: AbortSignal },
-) => Promise<unknown> {
+): (params: unknown, context?: ApiCallbackContext) => Promise<unknown> {
 	if (entry.owner === WORKER_CONTEXT_ID) {
 		// Same worker - look up handler from worker-local registry
 		const handler = workerHandlerRegistry.get(entry.action);
@@ -673,14 +716,31 @@ export function createExecutableCallback(
 				return { ok: true, value };
 			} catch (error: unknown) {
 				const message = error instanceof Error ? error.message : String(error);
+				const codedErr =
+					typeof error === "object" && error !== null
+						? (error as Record<string, unknown>)
+						: null;
 				const code =
-					typeof error === "object" &&
-					error !== null &&
-					"code" in error &&
-					typeof error.code === "string"
-						? error.code
+					codedErr && typeof codedErr.code === "string"
+						? codedErr.code
 						: entry.errorCode;
-				return { ok: false, error: { message, code } };
+				const structured: Record<string, unknown> = { message, code };
+				// Propagate structured fields set by registerWorkerHandlerValidated.
+				for (const key of [
+					"category",
+					"publicName",
+					"param",
+					"hint",
+					"recovery",
+				]) {
+					if (codedErr && codedErr[key] !== undefined) {
+						structured[key] = codedErr[key];
+					}
+				}
+				return withSourceLine(
+					{ ok: false, error: structured },
+					contextSourceStack(context),
+				);
 			}
 		};
 	} else {
@@ -699,7 +759,7 @@ export function createExecutableCallback(
 				context?.runId,
 			);
 			if (!prepared.ok) {
-				return prepared;
+				return withSourceLine(prepared, contextSourceStack(context));
 			}
 			try {
 				const result = await remoteCall(prepared.params, {
@@ -727,17 +787,33 @@ export function createExecutableCallback(
 						),
 					};
 				}
-				return result;
+				return withSourceLine(result, contextSourceStack(context));
 			} catch (error: unknown) {
 				const message = error instanceof Error ? error.message : String(error);
+				const codedErr =
+					typeof error === "object" && error !== null
+						? (error as Record<string, unknown>)
+						: null;
 				const code =
-					typeof error === "object" &&
-					error !== null &&
-					"code" in error &&
-					typeof (error as { code?: unknown }).code === "string"
-						? (error as { code: string }).code
+					codedErr && typeof codedErr.code === "string"
+						? codedErr.code
 						: entry.errorCode || "E_RELAY";
-				return { ok: false, error: { message, code } };
+				const structured: Record<string, unknown> = { message, code };
+				for (const key of [
+					"category",
+					"publicName",
+					"param",
+					"hint",
+					"recovery",
+				]) {
+					if (codedErr && codedErr[key] !== undefined) {
+						structured[key] = codedErr[key];
+					}
+				}
+				return withSourceLine(
+					{ ok: false, error: structured },
+					contextSourceStack(context),
+				);
 			}
 		};
 	}

@@ -2,6 +2,7 @@ import type { z } from "zod";
 import { dispatchValidated } from "../shared/cross/dispatch.js";
 import { coerceWasmParams } from "../shared/cross/manifest.js";
 
+// ponytail: content-script registry is genuinely polymorphic across all tools; params/returns are narrowed per-spec by zod
 export type ContentScriptHandler = (
 	params: unknown,
 	signal?: AbortSignal,

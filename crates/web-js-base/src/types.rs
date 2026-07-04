@@ -5,6 +5,19 @@ use tsify::Tsify;
 // These mirror the core types but derive Tsify so wasm-bindgen
 // emits proper TypeScript interfaces in the .d.ts output.
 
+/// Grouped param detail for validation/transport errors (WASM-compatible mirror).
+#[derive(Debug, Clone, Deserialize, Serialize, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct WasmParamDetail {
+    pub path: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expected: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub received_type: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub received_preview: Option<String>,
+}
+
 /// Status of a cell execution.
 #[derive(Debug, Clone, PartialEq, Serialize, Tsify)]
 #[tsify(into_wasm_abi)]
@@ -28,6 +41,12 @@ pub struct WasmAsyncError {
     pub recovery: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub details: Option<serde_json::Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub action: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub public_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub param: Option<WasmParamDetail>,
 }
 
 impl WasmAsyncError {
@@ -39,6 +58,9 @@ impl WasmAsyncError {
             hint: None,
             recovery: None,
             details: None,
+            action: None,
+            public_name: None,
+            param: None,
         }
     }
 }
@@ -62,16 +84,33 @@ pub enum WasmCellError {
         message: String,
         line: Option<u32>,
     },
-    Runtime {
+    /// Bare JS throw — no code, no action, no structured param detail.
+    JsRuntime {
         name: Option<String>,
         message: String,
         line: Option<u32>,
-        action: Option<String>,
-        code: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         stack: Option<String>,
+    },
+    /// Structured API error — code/action/public_name ALWAYS present.
+    ApiError {
+        code: String,
+        message: String,
+        action: String,
+        public_name: String,
+        line: Option<u32>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        param: Option<WasmParamDetail>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        category: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         hint: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         recovery: Option<Vec<String>>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         details: Option<serde_json::Value>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        stack: Option<String>,
     },
     FuelExhausted,
     Internal {
@@ -107,6 +146,8 @@ pub struct WasmAsyncCommand {
     #[tsify(type = "CommandParams")]
     pub params: serde_json::Value,
     pub run_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_stack: Option<String>,
 }
 
 impl WasmAsyncCommand {
@@ -178,6 +219,17 @@ impl WasmRunResult {
 
 // ─── From impls ────────────────────────────────────────────────
 
+impl From<web_js_core::ParamDetail> for WasmParamDetail {
+    fn from(p: web_js_core::ParamDetail) -> Self {
+        WasmParamDetail {
+            path: p.path,
+            expected: p.expected,
+            received_type: p.received_type,
+            received_preview: p.received_preview,
+        }
+    }
+}
+
 impl From<web_js_core::CellError> for WasmCellError {
     fn from(e: web_js_core::CellError) -> Self {
         match e {
@@ -190,26 +242,41 @@ impl From<web_js_core::CellError> for WasmCellError {
                 message,
                 line,
             },
-            web_js_core::CellError::Runtime {
+            web_js_core::CellError::JsRuntime {
                 name,
                 message,
                 line,
-                action,
-                code,
                 stack,
-                hint,
-                recovery,
-                details,
-            } => WasmCellError::Runtime {
+            } => WasmCellError::JsRuntime {
                 name,
                 message,
                 line,
-                action,
-                code,
                 stack,
+            },
+            web_js_core::CellError::ApiError {
+                code,
+                message,
+                action,
+                public_name,
+                line,
+                param,
+                category,
                 hint,
                 recovery,
                 details,
+                stack,
+            } => WasmCellError::ApiError {
+                code,
+                message,
+                action,
+                public_name,
+                line,
+                param: param.map(Into::into),
+                category,
+                hint,
+                recovery,
+                details,
+                stack,
             },
             web_js_core::CellError::FuelExhausted => WasmCellError::FuelExhausted,
             web_js_core::CellError::Internal { message } => WasmCellError::Internal { message },
@@ -244,6 +311,7 @@ impl From<web_js_core::AsyncCommand> for WasmAsyncCommand {
             action: c.action,
             params: c.params,
             run_id: c.run_id,
+            source_stack: c.source_stack,
         }
     }
 }
@@ -270,31 +338,28 @@ impl From<web_js_core::RunResult> for CellResult {
 
 impl From<web_js_core::RunResult> for WasmRunResult {
     fn from(r: web_js_core::RunResult) -> Self {
-        match r.status {
-            web_js_core::CellStatus::AsyncPending => WasmRunResult::Pending {
+        if r.status == web_js_core::CellStatus::AsyncPending {
+            WasmRunResult::Pending {
                 stdout: r.stdout,
                 stderr: r.stderr,
                 commands: r.commands,
                 fuel_exhausted: r.fuel_exhausted,
                 execution_count: r.execution_count,
                 pending_commands: r.pending_commands.into_iter().map(Into::into).collect(),
-            },
-            web_js_core::CellStatus::Done => {
-                if let Some(error) = r.error {
-                    WasmRunResult::Err {
-                        stdout: r.stdout,
-                        stderr: r.stderr,
-                        error: error.into(),
-                        execution_count: r.execution_count,
-                    }
-                } else {
-                    WasmRunResult::Ok {
-                        stdout: r.stdout,
-                        stderr: r.stderr,
-                        result: r.result,
-                        execution_count: r.execution_count,
-                    }
-                }
+            }
+        } else if let Some(error) = r.error {
+            WasmRunResult::Err {
+                stdout: r.stdout,
+                stderr: r.stderr,
+                error: error.into(),
+                execution_count: r.execution_count,
+            }
+        } else {
+            WasmRunResult::Ok {
+                stdout: r.stdout,
+                stderr: r.stderr,
+                result: r.result,
+                execution_count: r.execution_count,
             }
         }
     }
@@ -334,7 +399,7 @@ impl From<WasmRunResult> for CellResult {
                 stdout,
                 stderr,
                 error: WasmCellError::Internal {
-                    message: "Pending result converted to CellResult".into(),
+                    message: "CellResult does not support AsyncPending".into(),
                 },
                 execution_count,
             },

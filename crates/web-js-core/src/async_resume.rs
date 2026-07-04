@@ -1,5 +1,7 @@
 use rquickjs::{Ctx, Function, Object, String as JsString, Value};
 
+use crate::error::js_exception::extract_line_number;
+
 fn append_agent_guidance(message: &str, error: &crate::types::AsyncError) -> String {
     let mut out = message.to_string();
     if let Some(hint) = &error.hint {
@@ -40,6 +42,10 @@ pub(crate) fn resume_async_pending<'js>(
         .ok()
         .and_then(|s| s.to_string().ok())
         .unwrap_or_else(|| "unknown".to_string());
+    let stack = entry
+        .get::<_, JsString>("stack")
+        .ok()
+        .and_then(|s| s.to_string().ok());
 
     let resolve: Function = entry.get("resolve")?;
     let reject: Function = entry.get("reject")?;
@@ -58,9 +64,12 @@ pub(crate) fn resume_async_pending<'js>(
         let (code, message) = err
             .map(|e| (e.code.as_str(), e.message.as_str()))
             .unwrap_or(("E_UNKNOWN", "unknown async error"));
-        let display_message = err
+        let mut display_message = err
             .map(|e| append_agent_guidance(message, e))
             .unwrap_or_else(|| message.to_string());
+        if let Some(line) = stack.as_deref().and_then(extract_line_number) {
+            display_message.push_str(&format!(" (line {line})"));
+        }
         tracing::error!(call_id, action = %action, code = %code, message = %message, "async_pending_rejected");
         let msg_json = serde_json::to_string(&display_message).map_err(|e| {
             rquickjs::Error::new_from_js_message("json", "stringify", e.to_string())
@@ -89,8 +98,31 @@ pub(crate) fn resume_async_pending<'js>(
                 .unwrap_or(&serde_json::Value::Null),
         )
         .map_err(|e| rquickjs::Error::new_from_js_message("json", "stringify", e.to_string()))?;
+        let public_name_json = serde_json::to_string(
+            err.and_then(|e| e.public_name.as_deref()).unwrap_or(""),
+        )
+        .map_err(|e| rquickjs::Error::new_from_js_message("json", "stringify", e.to_string()))?;
+        let param_path_json = serde_json::to_string(
+            err.and_then(|e| e.param.as_ref().map(|p| p.path.as_str())).unwrap_or(""),
+        )
+        .map_err(|e| rquickjs::Error::new_from_js_message("json", "stringify", e.to_string()))?;
+        let expected_json = serde_json::to_string(
+            err.and_then(|e| e.param.as_ref().and_then(|p| p.expected.as_deref())).unwrap_or(""),
+        )
+        .map_err(|e| rquickjs::Error::new_from_js_message("json", "stringify", e.to_string()))?;
+        let received_type_json = serde_json::to_string(
+            err.and_then(|e| e.param.as_ref().and_then(|p| p.received_type.as_deref())).unwrap_or(""),
+        )
+        .map_err(|e| rquickjs::Error::new_from_js_message("json", "stringify", e.to_string()))?;
+        let received_preview_json = serde_json::to_string(
+            err.and_then(|e| e.param.as_ref().and_then(|p| p.received_preview.as_deref())).unwrap_or(""),
+        )
+        .map_err(|e| rquickjs::Error::new_from_js_message("json", "stringify", e.to_string()))?;
+        let stack_json = serde_json::to_string(stack.as_deref().unwrap_or("")).map_err(|e| {
+            rquickjs::Error::new_from_js_message("json", "stringify", e.to_string())
+        })?;
         let error_obj = ctx.eval::<Value, _>(format!(
-            "(function() {{ var e = new Error({msg_json}); e.action = {action_json}; e.code = {code_json}; e.hint = {hint_json}; e.recovery = {recovery_json}; var cat = {category_json}; if (cat) e.category = cat; var det = {details_json}; if (det !== null) e.details = det; return e; }})()"
+            "(function() {{ var e = new Error({msg_json}); e.action = {action_json}; e.code = {code_json}; e.hint = {hint_json}; e.recovery = {recovery_json}; var cat = {category_json}; if (cat) e.category = cat; var det = {details_json}; if (det !== null) e.details = det; var pn = {public_name_json}; if (pn) e.publicName = pn; var pp = {param_path_json}; if (pp) e.paramPath = pp; var exp = {expected_json}; if (exp) e.expected = exp; var rt = {received_type_json}; if (rt) e.receivedType = rt; var rp = {received_preview_json}; if (rp) e.receivedPreview = rp; var stack = {stack_json}; if (stack) e.stack = stack; return e; }})()"
         ))?;
         reject.call::<_, ()>((error_obj,))
     };

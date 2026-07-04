@@ -54,7 +54,7 @@ mod tests {
             r#"
             function myAsync() {
                 return new Promise((resolve, reject) => {
-                    __webJsTriggerAsync("tab_snapshot", {tabId: 1}, resolve, reject);
+                    __webJsTriggerAsync("tab_snapshot", {tabId: 1}, resolve, reject, (new Error()).stack);
                 });
             }
         "#,
@@ -110,6 +110,9 @@ mod tests {
                 hint: None,
                 recovery: None,
                 details: None,
+                action: None,
+                public_name: None,
+                param: None,
             }),
         };
         let json = serde_json::to_string(&response).unwrap();
@@ -117,15 +120,19 @@ mod tests {
         assert!(resumed.error.is_some());
         let err = resumed.error.unwrap();
         match &err {
-            crate::types::CellError::Runtime {
-                name,
+            crate::types::CellError::ApiError {
                 message,
                 action,
                 code,
+                line,
                 ..
             } => {
-                assert_eq!(action.as_deref(), Some("tab_snapshot"), "{err:?}");
-                assert_eq!(code.as_deref(), Some("E_SCRIPTING"), "{err:?}");
+                assert_eq!(action, "tab_snapshot", "{err:?}");
+                assert_eq!(code, "E_SCRIPTING", "{err:?}");
+                assert!(
+                    line.is_some(),
+                    "async reject should include caller line: {err:?}"
+                );
                 assert!(message.contains("Cannot execute script"), "{message}");
                 assert!(!message.contains("<no message>"), "{message}");
                 assert!(!message.contains("<no details available>"), "{message}");
@@ -135,12 +142,8 @@ mod tests {
                     "{display}"
                 );
                 assert!(display.contains("Cannot execute script"), "{display}");
-                assert!(
-                    name.is_none() || name.as_deref() == Some("Error"),
-                    "{name:?}"
-                );
             }
-            other => panic!("expected runtime error, got {other:?}"),
+            other => panic!("expected error, got {other:?}"),
         }
     }
 
@@ -174,6 +177,9 @@ mod tests {
                 hint: Some("Use page.snapshot() first.".into()),
                 recovery: Some(vec!["await page.goto(url)".into()]),
                 details: Some(serde_json::json!({"tabId": 1})),
+                action: None,
+                public_name: None,
+                param: None,
             }),
         };
         let json = serde_json::to_string(&response).unwrap();
@@ -457,6 +463,9 @@ mod tests {
                 hint: None,
                 recovery: None,
                 details: None,
+                action: None,
+                public_name: None,
+                param: None,
             }),
         };
         let _r1 = session.resume_cell(id1, &serde_json::to_string(&resp1).unwrap());
@@ -474,7 +483,7 @@ mod tests {
             "print(__caught + '|' + __caughtAction + '|' + __caughtCode)",
             "",
         );
-        assert_eq!(check.stdout[0], "boom|test_action|E_TEST");
+        assert_eq!(check.stdout[0], "boom (line 10)|test_action|E_TEST");
     }
 
     /// String-based action dispatch works (registry path)
@@ -544,22 +553,25 @@ mod tests {
                 hint: None,
                 recovery: None,
                 details: None,
+                action: None,
+                public_name: None,
+                param: None,
             }),
         };
         let resumed = session.resume_cell(call_id, &serde_json::to_string(&response).unwrap());
         assert!(resumed.error.is_some(), "{:?}", resumed.error);
         match resumed.error.unwrap() {
-            crate::types::CellError::Runtime {
+            crate::types::CellError::ApiError {
                 action,
                 code,
                 message,
                 ..
             } => {
-                assert_eq!(action.as_deref(), Some("__proto__"));
-                assert_eq!(code.as_deref(), Some("E_BLOCKED_ACTION"));
+                assert_eq!(action, "__proto__");
+                assert_eq!(code, "E_BLOCKED_ACTION");
                 assert!(message.contains("not allowed"), "{message}");
             }
-            other => panic!("expected runtime error, got {other:?}"),
+            other => panic!("expected error, got {other:?}"),
         }
     }
 
@@ -592,22 +604,25 @@ mod tests {
                 hint: None,
                 recovery: None,
                 details: None,
+                action: None,
+                public_name: None,
+                param: None,
             }),
         };
         let resumed = session.resume_cell(call_id, &serde_json::to_string(&response).unwrap());
         assert!(resumed.error.is_some(), "{:?}", resumed.error);
         match resumed.error.unwrap() {
-            crate::types::CellError::Runtime {
+            crate::types::CellError::ApiError {
                 action,
                 code,
                 message,
                 ..
             } => {
-                assert_eq!(action.as_deref(), Some("nonexistent_api"));
-                assert_eq!(code.as_deref(), Some("E_UNKNOWN_ACTION"));
+                assert_eq!(action, "nonexistent_api");
+                assert_eq!(code, "E_UNKNOWN_ACTION");
                 assert!(message.contains("Unknown action"), "{message}");
             }
-            other => panic!("expected runtime error, got {other:?}"),
+            other => panic!("expected error, got {other:?}"),
         }
     }
 
@@ -976,6 +991,9 @@ console.log(result)"#;
                 hint: None,
                 recovery: None,
                 details: None,
+                action: None,
+                public_name: None,
+                param: None,
             }),
         };
         let resumed = session.resume_cell(
@@ -1131,12 +1149,235 @@ console.log(result)"#;
             serde_json::json!({ "fields": ["title", "url"] }),
             "page.extract array positional call must map to fields array"
         );
+        let response = crate::types::AsyncResponse {
+            ok: false,
+            value: None,
+            error: Some(crate::types::AsyncError {
+                message: "bad fields".into(),
+                code: "E_INVALID_PARAMS".into(),
+                category: None,
+                hint: None,
+                recovery: None,
+                details: None,
+                action: None,
+                public_name: None,
+                param: None,
+            }),
+        };
+        let resumed = session.resume_cell(
+            result.pending_commands[0].call_id,
+            &serde_json::to_string(&response).unwrap(),
+        );
+        match resumed.error.as_ref().unwrap() {
+            crate::types::CellError::ApiError { line, stack, .. } => {
+                assert!(
+                    line.is_some(),
+                    "generated async API rejection should include source line: {stack:?}"
+                );
+            }
+            other => panic!("expected error, got {other:?}"),
+        }
 
         let invalid = session.run_cell(r#"await page.extract(["title", 1])"#, "");
         assert!(
             invalid.error.is_some(),
             "mixed-type fields array must reject: {:?}",
             invalid
+        );
+
+        clear_handlers();
+        clear_docs();
+    }
+    #[test]
+    fn test_async_error_renders_structured_param_detail() {
+        let mut session = JsSession::new();
+
+        let setup = session.run_cell_unwrapped(
+            r#"
+            function badCall() {
+                return new Promise((resolve, reject) => {
+                    __webJsTriggerAsync("mock_async", {}, resolve, reject);
+                });
+            }
+            "#,
+            "",
+        );
+        assert!(setup.error.is_none(), "{:?}", setup.error);
+
+        let result = session.run_cell("await badCall()", "");
+        assert_eq!(result.pending_commands.len(), 1);
+        let call_id = result.pending_commands[0].call_id;
+
+        let response = crate::types::AsyncResponse {
+            ok: false,
+            value: None,
+            error: Some(crate::types::AsyncError {
+                message: "Invalid parameters for web.tab.dom".into(),
+                code: "E_INVALID_PARAMS".into(),
+                category: Some("validation".into()),
+                hint: None,
+                recovery: None,
+                details: None,
+                action: Some("tab_dom".into()),
+                public_name: Some("web.tab.dom".into()),
+                param: Some(crate::types::ParamDetail {
+                    path: "tabId".into(),
+                    expected: Some("number".into()),
+                    received_type: Some("string".into()),
+                    received_preview: Some("\"x\"".into()),
+                }),
+            }),
+        };
+        let resumed = session.resume_cell(call_id, &serde_json::to_string(&response).unwrap());
+        let err = resumed.error.expect("rejection must produce an error");
+        let display = crate::format_cell_error_text(&err);
+        assert!(
+            display.contains("[web.tab.dom] (E_INVALID_PARAMS)"),
+            "missing bracket/code: {display}"
+        );
+        assert!(
+            display.contains("at 'tabId': expected number, received string (\"x\")"),
+            "missing structured detail: {display}"
+        );
+    }
+    #[test]
+    fn test_missing_api_throws_unknown_api_error() {
+        use crate::api_docs::{
+            clear_docs, clear_handlers, generate_js_bindings_code, register, register_handler,
+            ApiHandler, JsApiDoc, ReturnDoc, ToolSource, ToolTransport,
+        };
+        use std::future::Future;
+        use std::pin::Pin;
+        use std::rc::Rc;
+
+        clear_docs();
+        clear_handlers();
+
+        register(JsApiDoc {
+            namespace: "web.tab".into(),
+            name: "get".into(),
+            action: Some("tab_get".into()),
+            description: "Get a tab.".into(),
+            params: vec![],
+            returns: ReturnDoc {
+                js_type: "object".into(),
+                description: "Tab.".into(),
+            },
+            public_name: "web.tab.get".into(),
+            local_name: None,
+            transport: ToolTransport::Async,
+            tool_source: ToolSource::Extension,
+            fields: Some(vec!["tabId".into()]),
+            aliases: vec![],
+            permission: None,
+            example: None,
+            prerequisites: None,
+            notes: None,
+            tags: None,
+            related_apis: None,
+        });
+        let _ = register_handler(
+            "tab_get",
+            ApiHandler::Rust(Rc::new(|_cmd| {
+                Box::pin(async move {
+                    Ok(crate::types::AsyncResponse {
+                        ok: true,
+                        value: None,
+                        error: None,
+                    })
+                })
+                    as Pin<Box<dyn Future<Output = Result<crate::types::AsyncResponse, String>>>>
+            })),
+        );
+
+        let mut session = JsSession::new();
+        let setup = session.run_cell_unwrapped(&generate_js_bindings_code(), "");
+        assert!(setup.error.is_none(), "{:?}", setup.error);
+
+        let result = session.run_cell(
+            "try { await web.tab.missing(); } catch (e) { print(e.code + '|' + e.publicName); }",
+            "",
+        );
+        let stdout = result.stdout.join("\n");
+        assert!(
+            stdout.contains("E_UNKNOWN_API"),
+            "missing API must produce E_UNKNOWN_API, got: {stdout}"
+        );
+        assert!(
+            stdout.contains("web.tab.missing"),
+            "missing API must name the public path, got: {stdout}"
+        );
+
+        clear_handlers();
+        clear_docs();
+    }
+
+    #[test]
+    fn test_missing_api_error_includes_available_siblings() {
+        use crate::api_docs::{
+            clear_docs, clear_handlers, generate_js_bindings_code, register, register_handler,
+            ApiHandler, JsApiDoc, ReturnDoc, ToolSource, ToolTransport,
+        };
+        use std::future::Future;
+        use std::pin::Pin;
+        use std::rc::Rc;
+
+        clear_docs();
+        clear_handlers();
+
+        register(JsApiDoc {
+            namespace: "page".into(),
+            name: "snapshot".into(),
+            action: Some("page_snapshot".into()),
+            description: "Snapshot.".into(),
+            params: vec![],
+            returns: ReturnDoc {
+                js_type: "object".into(),
+                description: "Snapshot.".into(),
+            },
+            public_name: "page.snapshot".into(),
+            local_name: None,
+            transport: ToolTransport::Async,
+            tool_source: ToolSource::Extension,
+            fields: None,
+            aliases: vec![],
+            permission: None,
+            example: None,
+            prerequisites: None,
+            notes: None,
+            tags: None,
+            related_apis: None,
+        });
+        let _ = register_handler(
+            "page_snapshot",
+            ApiHandler::Rust(Rc::new(|_cmd| {
+                Box::pin(async move {
+                    Ok(crate::types::AsyncResponse {
+                        ok: true,
+                        value: None,
+                        error: None,
+                    })
+                })
+                    as Pin<Box<dyn Future<Output = Result<crate::types::AsyncResponse, String>>>>
+            })),
+        );
+
+        let mut session = JsSession::new();
+        let setup = session.run_cell_unwrapped(&generate_js_bindings_code(), "");
+        assert!(setup.error.is_none(), "{:?}", setup.error);
+
+        let result = session.run_cell(
+            "try { await page.nope(); } catch (e) { print(e.message); }",
+            "",
+        );
+        let stdout = result.stdout.join("\n");
+        assert!(
+            stdout.contains("Unknown API: page.nope"),
+            "must name the missing API: {stdout}"
+        );
+        assert!(
+            stdout.contains("Available:"),
+            "must list available siblings: {stdout}"
         );
 
         clear_handlers();
@@ -1546,7 +1787,7 @@ console.log(result)"#;
         let result = session.run_cell(r#"throw new SyntaxError("bad token")"#, "");
         assert!(result.error.is_some(), "{:?}", result.error);
         match result.error.unwrap() {
-            crate::types::CellError::Runtime { name, message, .. } => {
+            crate::types::CellError::JsRuntime { name, message, .. } => {
                 assert_eq!(name.as_deref(), Some("SyntaxError"));
                 assert_eq!(message, "bad token");
             }
@@ -1560,7 +1801,7 @@ console.log(result)"#;
         let result = session.run_cell("throw new TypeError()", "");
         assert!(result.error.is_some(), "{:?}", result.error);
         match result.error.unwrap() {
-            crate::types::CellError::Runtime { name, message, .. } => {
+            crate::types::CellError::JsRuntime { name, message, .. } => {
                 assert_eq!(name.as_deref(), Some("TypeError"));
                 // Must NOT produce "TypeError: TypeError" — the name should appear once.
                 assert!(
@@ -1578,7 +1819,7 @@ console.log(result)"#;
         let result = session.run_cell("throw new Error(\"boom\")", "");
         assert!(result.error.is_some(), "{:?}", result.error);
         match result.error.as_ref().unwrap() {
-            crate::types::CellError::Runtime {
+            crate::types::CellError::JsRuntime {
                 name,
                 message,
                 stack,
@@ -1827,7 +2068,7 @@ console.log(result)"#;
         let result = session.run_cell("nonexistent_var", "");
         assert!(result.error.is_some(), "{:?}", result.error);
         match result.error.unwrap() {
-            crate::types::CellError::Runtime { name, message, .. } => {
+            crate::types::CellError::JsRuntime { name, message, .. } => {
                 assert_eq!(name.as_deref(), Some("ReferenceError"));
                 assert!(
                     !message.contains("ReferenceError: ReferenceError"),
@@ -1844,24 +2085,19 @@ console.log(result)"#;
         let result = session.run_cell(r#"throw new TypeError("x is not a function")"#, "");
         assert!(result.error.is_some(), "{:?}", result.error);
         match result.error.unwrap() {
-            crate::types::CellError::Runtime { name, message, .. } => {
+            crate::types::CellError::JsRuntime { name, message, .. } => {
                 assert_eq!(name.as_deref(), Some("TypeError"));
                 assert_eq!(message, "x is not a function");
                 // Display should include the name prefix
-                let display = crate::format_cell_error_text(&crate::types::CellError::Runtime {
+                let display = crate::format_cell_error_text(&crate::types::CellError::JsRuntime {
                     name: name.clone(),
                     message: message.clone(),
                     line: None,
-                    action: None,
-                    code: None,
                     stack: None,
-                    hint: None,
-                    recovery: None,
-                    details: None,
                 });
                 assert_eq!(display, "TypeError: x is not a function");
             }
-            other => panic!("expected runtime error, got {other:?}"),
+            other => panic!("expected error, got {other:?}"),
         }
     }
 
@@ -1871,11 +2107,11 @@ console.log(result)"#;
         let result = session.run_cell(r#"throw new RangeError("out of bounds")"#, "");
         assert!(result.error.is_some(), "{:?}", result.error);
         match result.error.unwrap() {
-            crate::types::CellError::Runtime { name, message, .. } => {
+            crate::types::CellError::JsRuntime { name, message, .. } => {
                 assert_eq!(name.as_deref(), Some("RangeError"));
                 assert_eq!(message, "out of bounds");
             }
-            other => panic!("expected runtime error, got {other:?}"),
+            other => panic!("expected error, got {other:?}"),
         }
     }
 
@@ -1908,7 +2144,7 @@ console.log(result)"#;
         let result = session.run_cell("null.foo", "");
         assert!(result.error.is_some(), "{:?}", result.error);
         match result.error.unwrap() {
-            crate::types::CellError::Runtime { name, message, .. } => {
+            crate::types::CellError::JsRuntime { name, message, .. } => {
                 assert_eq!(name.as_deref(), Some("TypeError"));
                 // Should have some diagnostic info, not just "TypeError"
                 assert!(
@@ -1916,7 +2152,7 @@ console.log(result)"#;
                     "message should not be empty: {message}"
                 );
             }
-            other => panic!("expected runtime error, got {other:?}"),
+            other => panic!("expected error, got {other:?}"),
         }
     }
 

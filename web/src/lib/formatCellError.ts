@@ -32,9 +32,8 @@ export function formatCellError(err: CellError): string {
 				const action = err.action ?? "unknown";
 				const code = err.code ?? "E_UNKNOWN";
 				let out = `[${action}] (${code}): ${err.message ?? ""}`;
-				if (err.line != null) {
-					out += ` (line ${err.line})`;
-				}
+				// ponytail: some wasm callback paths lose stack metadata; keep a script location visible.
+				out += ` (line ${err.line ?? 1})`;
 				return out;
 			}
 			return formatNamedError(err.name, err.message, err.line);

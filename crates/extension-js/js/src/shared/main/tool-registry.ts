@@ -23,6 +23,7 @@ export type {
 	Command,
 	ExecutionContextId,
 	JsCallSpec,
+	ParamDetail,
 	SerializableJsCallManifestEntry,
 	ToolDefinition,
 	ToolDoc,
@@ -117,6 +118,7 @@ export function registerJsCall<P, R>(spec: JsCallSpec<P, R>): void {
 	const toolDef: ToolDefinition<unknown, unknown> = {
 		action: spec.action,
 		namespace: spec.namespace,
+		name: spec.name,
 		description: spec.description,
 		params: spec.params as z.ZodSchema<unknown>,
 		returns: spec.returns as z.ZodSchema<unknown>,
@@ -275,6 +277,7 @@ export async function dispatchTool(
 		async (validated) => tool.handler(validated, callId, runId, signal),
 		params,
 		action,
+		`${tool.namespace}.${tool.name}`,
 	);
 
 	if (!result.ok) {

@@ -9,6 +9,11 @@ import {
 	registerJsCall,
 } from "../../../shared/main/tool-registry.js";
 import {
+	clearNetworkEntries,
+	getNetworkEntry,
+	listNetworkEntries,
+} from "../lib/network-log-store.js";
+import {
 	asRecord,
 	DEFAULT_TIMEOUT_MS,
 	extractTabId,
@@ -19,11 +24,6 @@ import {
 	unwrapResult,
 	waitForTabLoad,
 } from "../runtime.js";
-import {
-	clearNetworkEntries,
-	getNetworkEntry,
-	listNetworkEntries,
-} from "../lib/network-log-store.js";
 
 // ─── Tab actions ─────────────────────────────────────────────────
 
@@ -115,6 +115,63 @@ registerJsCall({
 	errorCode: "ECHROME",
 	errorCategory: "extension",
 	example: "web.tab.get(123)",
+});
+registerJsCall({
+	action: "tab_url",
+	namespace: "web.tab",
+	name: "url",
+	description: "Get the URL of a tab by id",
+	params: schemas.TabUrlParamsSchema,
+	returns: z.string(),
+	fields: ["tabId"],
+	aliases: [{ namespace: "tab", name: "url", fields: ["tabId"] }],
+	owner: "main-thread",
+	handler: async (params, _ctx) => {
+		const tabId = extractTabId(asRecord(params));
+		const tab = unwrapResult(await dispatchTool("chrome_tabs_get", [tabId]));
+		return (tab as { url?: string }).url ?? "";
+	},
+	paramTypes: [
+		{
+			name: "tabId",
+			type: "number",
+			required: true,
+			description: "Tab ID to get the URL for (literal)",
+		},
+	],
+	returnDoc: "Tab URL string",
+	errorCode: "ECHROME",
+	errorCategory: "extension",
+	example: "web.tab.url(123)",
+});
+
+registerJsCall({
+	action: "tab_title",
+	namespace: "web.tab",
+	name: "title",
+	description: "Get the title of a tab by id",
+	params: schemas.TabTitleParamsSchema,
+	returns: z.string(),
+	fields: ["tabId"],
+	aliases: [{ namespace: "tab", name: "title", fields: ["tabId"] }],
+	owner: "main-thread",
+	handler: async (params, _ctx) => {
+		const tabId = extractTabId(asRecord(params));
+		const tab = unwrapResult(await dispatchTool("chrome_tabs_get", [tabId]));
+		return (tab as { title?: string }).title ?? "";
+	},
+	paramTypes: [
+		{
+			name: "tabId",
+			type: "number",
+			required: true,
+			description: "Tab ID to get the title for (literal)",
+		},
+	],
+	returnDoc: "Tab title string",
+	errorCode: "ECHROME",
+	errorCategory: "extension",
+	example: "web.tab.title(123)",
 });
 
 registerJsCall({

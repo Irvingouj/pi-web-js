@@ -12,6 +12,13 @@ export interface Command {
 	runId?: string;
 }
 
+export type ParamDetail = {
+	path: string;
+	expected?: string;
+	receivedType?: string;
+	receivedPreview?: string;
+};
+
 export type AsyncError = {
 	message: string;
 	code: string;
@@ -19,6 +26,10 @@ export type AsyncError = {
 	hint?: string;
 	recovery?: string[];
 	details?: Record<string, unknown>;
+	action?: string;
+	publicName?: string;
+	param?: ParamDetail;
+	line?: number | null;
 };
 
 export type AsyncResponse<T = unknown> =
@@ -56,6 +67,7 @@ export type ToolAgentMeta = {
 export interface ToolDefinition<P, R> {
 	action: string;
 	namespace: string;
+	name: string;
 	description: string;
 	params: z.ZodSchema<P>;
 	returns: z.ZodSchema<R>;

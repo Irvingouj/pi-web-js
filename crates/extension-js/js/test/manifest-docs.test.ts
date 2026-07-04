@@ -369,6 +369,20 @@ describe("manifest documentation export", () => {
 		expect(tabHover?.relatedApis).toEqual(["page.hover"]);
 	});
 
+	it("registers web.tab.dom in manifest with correct metadata", () => {
+		const manifest = getSerializableJsManifest();
+		const tabDom = manifest.find((e) => e.action === "tab_dom");
+		expect(tabDom).toBeDefined();
+		expect(tabDom?.publicName).toBe("web.tab.dom");
+		expect(tabDom?.owner).toBe("content-script");
+		expect(tabDom?.tags).toEqual(["read"]);
+		expect(tabDom?.relatedApis).toEqual([
+			"page.dom",
+			"web.tab.snapshot",
+			"web.tab.find",
+		]);
+	});
+
 	it("derives returnsDoc.type from Zod schema when returnType is missing", () => {
 		const manifest = getSerializableJsManifest();
 		const pageFind = manifest.find((entry) => entry.action === "page_find");

@@ -3,6 +3,19 @@ use ts_rs::TS;
 
 // ─── Error Types ────────────────────────────────────────────────
 
+/// Grouped param detail for validation/transport errors.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export_to = "web/src/types/generated.ts")]
+pub struct ParamDetail {
+    pub path: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expected: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub received_type: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub received_preview: Option<String>,
+}
+
 /// Structured error from running a cell.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -14,18 +27,34 @@ pub enum CellError {
         message: String,
         line: Option<u32>,
     },
-    /// JavaScript runtime error (type mismatch, undefined access, etc.)
-    Runtime {
+    /// Bare JS throw — no code, no action, no structured param detail.
+    JsRuntime {
         name: Option<String>,
         message: String,
         line: Option<u32>,
-        action: Option<String>,
-        code: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         stack: Option<String>,
+    },
+    /// Structured API error — code/action/public_name ALWAYS present.
+    ApiError {
+        code: String,
+        message: String,
+        action: String,
+        public_name: String,
+        line: Option<u32>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        param: Option<ParamDetail>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        category: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         hint: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         recovery: Option<Vec<String>>,
         #[ts(type = "unknown")]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         details: Option<serde_json::Value>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        stack: Option<String>,
     },
     /// Execution exceeded the time limit (likely an infinite loop).
     FuelExhausted,
@@ -72,6 +101,8 @@ pub struct AsyncCommand {
     #[ts(type = "CommandParams")]
     pub params: serde_json::Value,
     pub run_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_stack: Option<String>,
 }
 
 impl AsyncCommand {
@@ -100,6 +131,12 @@ pub struct AsyncError {
     pub recovery: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub details: Option<serde_json::Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub action: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub public_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub param: Option<ParamDetail>,
 }
 
 impl AsyncError {
@@ -111,6 +148,9 @@ impl AsyncError {
             hint: None,
             recovery: None,
             details: None,
+            action: None,
+            public_name: None,
+            param: None,
         }
     }
 }

@@ -1,5 +1,6 @@
 import { makeError } from "../lib/types.js";
 
+// ponytail: chrome native parity boundary — opaque NativeArgs, narrowed by each chrome.* handler after requireArgumentArray
 export type NativeArgs = readonly unknown[];
 
 /**
@@ -24,7 +25,7 @@ const NATIVE_PARITY_ALIASES = new Set([
 export function isNativeParityAction(action: string): boolean {
 	return action.startsWith("chrome_") || NATIVE_PARITY_ALIASES.has(action);
 }
-
+// ponytail: chrome native parity — method and return are opaque at the final Chrome invocation boundary
 export function invokeNative(
 	method: (...args: unknown[]) => unknown,
 	args: NativeArgs,

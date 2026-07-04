@@ -59,7 +59,7 @@ export function normalizeChromeError(err: unknown): {
 	};
 }
 
-function toPlainObject(value: unknown): unknown {
+export function toPlainObject(value: unknown): unknown {
 	if (value === null || typeof value !== "object") return value;
 	if (Array.isArray(value)) return value.map(toPlainObject);
 	// Chrome runtime/tabs Port objects expose postMessage; serialize a minimal stub.
