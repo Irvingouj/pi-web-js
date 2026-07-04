@@ -1,4 +1,49 @@
-# Agent Instructions
+# AGENTS.md
+
+Rules for agents working in this repository.
+
+## What This Repo Is
+
+`web-js` is the JavaScript/WASM execution runtime for browser agents, with the
+Chrome extension runtime as the product path.
+
+Current shape:
+- `crates/extension-js`: MV3 extension runtime, QuickJS runner, tool bridge,
+  content-script channel, and extension-facing tests.
+- `crates/web-js-core`: shared QuickJS runtime and prelude.
+- `crates/web-js`: plain web target for demo/playground use only.
+- `crates/web-fs`: OPFS-backed virtual filesystem.
+- `crates/dom-semantic-tree`: DOM-to-semantic-tree extraction.
+- `web`: sidepanel UI, extension packaging, and extension E2E tests.
+
+Core invariant: generated JavaScript runs inside the extension runner and
+browser/page side effects go through typed extension APIs. The model does not
+receive raw Chrome or DOM access except through explicit user code paths.
+
+Do not duplicate canonical types in this file. Source types are the truth in
+the crates and TypeScript modules that own them.
+
+## Priority Order
+
+The top three principles are:
+
+1. Readability.
+2. Maintainability.
+3. Correctness.
+
+Never sacrifice these for speed. A small patch is good only when it preserves
+the extension boundary and fixes the real cause.
+
+## Work Order
+
+TDD is the default for non-trivial work:
+
+1. Types first: model the real boundary and state.
+2. Test second: write one public-behavior test that fails.
+3. Implementation last: make that test pass.
+
+Use vertical slices: one test, one minimal implementation, repeat. Do not write
+a batch of speculative tests before the first implementation proves the path.
 
 ## Top Priority: Extension-JS Context ONLY
 
@@ -52,6 +97,13 @@
 - Native Chrome parity may carry opaque `NativeArgs` only at the Chrome boundary; project-owned APIs (`page.*`, `web.tab.*`, `dom.*`, `host.*`) must not.
 - Error responses must name the public function, parameter path, expected shape, received value type, and script line when available.
 - Bare `[runtime error] TypeError:` is a bug. Fix the shared boundary that lost the message, not the caller.
+
+### General Type Safety Rules
+- TypeScript: never use `any`. Every `unknown`, `Object`, or `Record<string, string>` must be justified by a short comment and narrowed immediately at the boundary.
+- TypeScript external data must be parsed declaratively with zod. Do not hand-roll shape parsing when a zod schema can express it.
+- Rust external data must be parsed declaratively with serde, serde-wasm-bindgen, wasm-bindgen, or an equivalent typed boundary. Do not manually walk raw values when a derive/schema boundary can express the shape.
+- Rust core code should receive concrete domain types, not raw `serde_json::Value` or `JsValue`.
+- Prefer exhaustive enums/discriminated unions for closed states.
 
 ### When Fixing Bugs
 1. Check if bug reproduces in extension context
