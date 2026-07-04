@@ -12,23 +12,6 @@ export type {
 	WasmGlobalsSnapshot as JsGlobalsSnapshot,
 };
 
-export interface JsApiDoc {
-	namespace: string;
-	name: string;
-	action: string | null;
-	description: string;
-	params: {
-		name: string;
-		js_type: string;
-		required: boolean;
-		description: string;
-	}[];
-	returns: {
-		js_type: string;
-		description: string;
-	};
-	source: string;
-}
 
 export class WebSession {
 	private raw: RawWebSession;

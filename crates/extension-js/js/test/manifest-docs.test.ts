@@ -5,7 +5,10 @@ import { z } from "zod";
 
 // Load the full runner tool registrations.
 import "../src/main/runner/index.js";
-import { manifestEntryToWasm } from "../src/shared/cross/manifest.js";
+import {
+	manifestEntryToWasm,
+	type SerializableJsCallManifestEntry,
+} from "../src/shared/cross/manifest.js";
 import {
 	clearRegistry,
 	freezeJsRegistry,
@@ -528,24 +531,23 @@ describe("manifest documentation export", () => {
 	});
 
 	it("manifestEntryToWasm handles empty agentMeta arrays correctly", () => {
-		const entry: import("../src/shared/cross/manifest.js").SerializableJsCallManifestEntry =
-			{
-				action: "empty_meta_test",
-				namespace: "test",
-				name: "empty",
-				publicName: "test.empty",
-				description: "Test empty arrays",
-				fields: null,
-				aliases: null,
-				owner: "main-thread",
-				paramsDoc: [],
-				returnsDoc: { type: "null", description: "null" },
-				errorCode: "ETEST",
-				prerequisites: [],
-				notes: [],
-				tags: [],
-				relatedApis: [],
-			};
+		const entry: SerializableJsCallManifestEntry = {
+			action: "empty_meta_test",
+			namespace: "test",
+			name: "empty",
+			publicName: "test.empty",
+			description: "Test empty arrays",
+			fields: null,
+			aliases: null,
+			owner: "main-thread",
+			paramsDoc: [],
+			returnsDoc: { type: "null", description: "null" },
+			errorCode: "ETEST",
+			prerequisites: [],
+			notes: [],
+			tags: [],
+			relatedApis: [],
+		};
 
 		const wasm = manifestEntryToWasm(entry);
 		expect(wasm.prerequisites).toEqual([]);
@@ -555,21 +557,20 @@ describe("manifest documentation export", () => {
 	});
 
 	it("manifestEntryToWasm handles partial agentMeta correctly", () => {
-		const entry: import("../src/shared/cross/manifest.js").SerializableJsCallManifestEntry =
-			{
-				action: "partial_meta_test",
-				namespace: "test",
-				name: "partial",
-				publicName: "test.partial",
-				description: "Test partial metadata",
-				fields: null,
-				aliases: null,
-				owner: "main-thread",
-				paramsDoc: [],
-				returnsDoc: { type: "null", description: "null" },
-				errorCode: "ETEST",
-				tags: ["read"],
-			};
+		const entry: SerializableJsCallManifestEntry = {
+			action: "partial_meta_test",
+			namespace: "test",
+			name: "partial",
+			publicName: "test.partial",
+			description: "Test partial metadata",
+			fields: null,
+			aliases: null,
+			owner: "main-thread",
+			paramsDoc: [],
+			returnsDoc: { type: "null", description: "null" },
+			errorCode: "ETEST",
+			tags: ["read"],
+		};
 
 		const wasm = manifestEntryToWasm(entry);
 		expect(wasm.prerequisites).toBeNull();
@@ -577,8 +578,85 @@ describe("manifest documentation export", () => {
 		expect(wasm.tags).toEqual(["read"]);
 		expect(wasm.relatedApis).toBeNull();
 	});
-});
 
+	it("manifestEntryToWasm passes through errorCategory when set", () => {
+		const entry: SerializableJsCallManifestEntry = {
+			action: "error_cat_test",
+			namespace: "test",
+			name: "errorCat",
+			publicName: "test.errorCat",
+			description: "Test errorCategory",
+			fields: null,
+			aliases: null,
+			owner: "main-thread",
+			paramsDoc: [],
+			returnsDoc: { type: "null", description: "null" },
+			errorCode: "ETEST",
+			errorCategory: "invalid_params",
+		};
+
+		const wasm = manifestEntryToWasm(entry);
+		expect(wasm.errorCategory).toBe("invalid_params");
+	});
+
+	it("manifestEntryToWasm normalizes undefined errorCategory to null", () => {
+		const entry: SerializableJsCallManifestEntry = {
+			action: "no_error_cat_test",
+			namespace: "test",
+			name: "noErrorCat",
+			publicName: "test.noErrorCat",
+			description: "Test missing errorCategory",
+			fields: null,
+			aliases: null,
+			owner: "main-thread",
+			paramsDoc: [],
+			returnsDoc: { type: "null", description: "null" },
+			errorCode: "ETEST",
+		};
+
+		const wasm = manifestEntryToWasm(entry);
+		expect(wasm.errorCategory).toBeNull();
+	});
+
+	it("manifestEntryToWasm passes through example when set", () => {
+		const entry: SerializableJsCallManifestEntry = {
+			action: "example_test",
+			namespace: "test",
+			name: "example",
+			publicName: "test.example",
+			description: "Test example",
+			fields: null,
+			aliases: null,
+			owner: "main-thread",
+			paramsDoc: [],
+			returnsDoc: { type: "null", description: "null" },
+			errorCode: "ETEST",
+			example: 'test.example({ foo: "bar" })',
+		};
+
+		const wasm = manifestEntryToWasm(entry);
+		expect(wasm.example).toBe('test.example({ foo: "bar" })');
+	});
+
+	it("manifestEntryToWasm normalizes undefined example to null", () => {
+		const entry: SerializableJsCallManifestEntry = {
+			action: "no_example_test",
+			namespace: "test",
+			name: "noExample",
+			publicName: "test.noExample",
+			description: "Test missing example",
+			fields: null,
+			aliases: null,
+			owner: "main-thread",
+			paramsDoc: [],
+			returnsDoc: { type: "null", description: "null" },
+			errorCode: "ETEST",
+		};
+
+		const wasm = manifestEntryToWasm(entry);
+		expect(wasm.example).toBeNull();
+	});
+});
 describe("manifest integrity", () => {
 	it("freezeJsRegistry passes when every manifest entry has a handler", () => {
 		// The full runner registration already loaded; freeze should succeed.
