@@ -5,6 +5,13 @@ name: Release
 #   dom-semantic-tree-vX.Y.Z   → @pi-oxide/dom-semantic-tree
 # The tag version MUST match the publish manifest version.
 #
+# Safety gates (in order):
+#   1. Tag must be reachable from origin/main (not just any branch/HEAD).
+#   2. CI workflow must have passed on the exact tagged commit (ci.yml is
+#      configured to run on release tags, so a status will exist).
+#   3. Tag version must match npm-package.json / package.json source version.
+#   4. WASM built with cargo --release (optimized bundle ships to npm).
+#
 # Provenance: OIDC, no long-lived npm token. Requires the package to be linked
 # to this repo (Irvingouj/pi-web-js) under npm → Settings → publishing access.
 # Until linked, `npm publish --provenance` fails loudly.
@@ -24,6 +31,61 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Fetch full history + main ref so we can verify the tag is on main
+          # and so merge-base ancestry checks work.
+          fetch-depth: 0
+
+      # Issue: release tags can be pushed from any branch / detached HEAD.
+      # Only tags reachable from origin/main should publish. A tag pushed from
+      # a feature branch or a stale main must fail fast.
+      - name: Verify tag is on main
+        run: |
+          git fetch origin main:refs/remotes/origin/main
+          if ! git merge-base --is-ancestor '${{ github.sha }}' origin/main; then
+            echo "::error::tag ${{ github.ref_name }} (commit ${{ github.sha }}) is not reachable from origin/main"
+            echo "Release tags must point at a commit on main."
+            exit 1
+          fi
+          echo "✓ ${{ github.ref_name }} is on main"
+
+      # Issue: release.yml runs independently of ci.yml. Without a gate, a tag
+      # pushed on a red-main commit would still publish. Require a successful
+      # CI run on the EXACT tagged commit before proceeding. ci.yml is
+      # configured to also trigger on release tags, so a status will exist.
+      - name: Require green CI on tagged commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          sha='${{ github.sha }}'
+          echo "Waiting for CI workflow run on commit $sha ..."
+          # CI may still be queued/running when the tag push lands. Poll up to
+          # ~10 minutes, then fail loudly if no completed CI run is found.
+          for i in $(seq 1 60); do
+            conclusion=$(gh run list \
+              --workflow=ci.yml \
+              --commit="$sha" \
+              --status=completed \
+              --limit=1 \
+              --json conclusion,status \
+              --jq '.[0].conclusion // empty')
+            if [ -n "$conclusion" ]; then
+              break
+            fi
+            echo "  ($i) CI not yet complete; sleeping 10s ..."
+            sleep 10
+          done
+          if [ -z "$conclusion" ]; then
+            echo "::error::No completed CI run found for $sha after ~10 minutes."
+            echo "Ensure ci.yml triggers on release tags (it must, to gate releases)."
+            exit 1
+          fi
+          if [ "$conclusion" != "success" ]; then
+            echo "::error::CI on $sha concluded with '$conclusion'. Refusing to publish."
+            echo "Fix CI on main and re-tag, or roll back the tag."
+            exit 1
+          fi
+          echo "✓ CI green on $sha"
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -78,23 +140,26 @@ jobs:
             exit 1
           fi
 
-      # extension-js: WASM (Rust → wasm-bindgen) + TS bundle (vite) → pkg/*.js
-      # vite emits JS + .d.ts into pkg/ but NOT package.json — stage it from
-      # npm-package.json (mirrors scripts/publish-npm.js). build.js sets CC/CFLAGS.
+      # extension-js: WASM (Rust → wasm-bindgen, release profile) + TS bundle
+      # (vite) → pkg/*.js. vite emits JS + .d.ts into pkg/ but NOT package.json
+      # — stage it from npm-package.json (mirrors scripts/publish-npm.js).
+      # build.js sets CC/CFLAGS. --release produces the optimized WASM bundle
+      # (smaller + faster than debug); this is what ships to npm consumers.
       - name: Build extension-js
         if: steps.target.outputs.name == 'extension-js'
         run: |
           cd crates/extension-js/js && npm ci
-          cd "$GITHUB_WORKSPACE" && node scripts/build.js extension
+          cd "$GITHUB_WORKSPACE" && node scripts/build.js extension --release
           cd crates/extension-js/js && npm run build
           node -e "const fs=require('fs');const m=require('./npm-package.json');delete m.sideEffects;fs.writeFileSync('pkg/package.json',JSON.stringify(m,null,'\t')+'\n')"
           node -e "const fs=require('fs');const m=require('./npm-package.json');const miss=(m.files||[]).filter(f=>f.includes('*')?!fs.readdirSync('pkg').some(e=>e.endsWith(f.slice(1))):!fs.existsSync('pkg/'+f));if(miss.length){console.error('Missing:',miss);process.exit(1)}"
 
-      # dom-semantic-tree: WASM + TS (tsc) → dist/ + package.json already in place
+      # dom-semantic-tree: WASM (release profile) + TS (tsc) → dist/ + package.json
+      # already in place
       - name: Build dom-semantic-tree
         if: steps.target.outputs.name == 'dom-semantic-tree'
         run: |
-          node scripts/build.js dom
+          node scripts/build.js dom --release
           cd crates/dom-semantic-tree/js && npm ci && npm run build
           test -f dist/index.js || { echo "dist/index.js missing after build"; exit 1; }
 

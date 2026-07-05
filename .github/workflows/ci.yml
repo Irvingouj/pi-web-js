@@ -3,6 +3,12 @@ name: CI
 on:
   push:
     branches: [main]
+    # Also run on release tags so release.yml can require a green CI run on
+    # the exact tagged commit (see release.yml's verify-ci gate). Without this,
+    # release tags have no CI status to gate against.
+    tags:
+      - "extension-js-v*"
+      - "dom-semantic-tree-v*"
   pull_request:
 
 jobs:
