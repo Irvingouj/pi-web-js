@@ -1,58 +1,12 @@
-import { allocateRefId, syncRefIdCounterFromDom } from "../cs/ref-id.js";
-import { assessClickability, deduplicateWrappers } from "./clickability.js";
+import { syncRefIdCounterFromDom } from "../cs/ref-id.js";
+import { deduplicateWrappers } from "./clickability.js";
 import type { ClickabilityConfidence } from "./clickability.js";
-import {
-	enrichFormNode,
-	getAccessibleName,
-	getAccessibleRole,
-	getOwnVisibleText,
-	hasVisibleTextContent,
-	isProbablyClickable,
-	isReachableClickTarget,
-	isValidationProxyInput,
-	resolveAbsoluteUrl,
-	resolveContainerRefId,
-	resolveFieldLabel,
-	resolvePermalinkLink,
-	shouldInclude,
-} from "../cs/snapshot-dom.js";
+import { resolveFieldLabel } from "../cs/snapshot-dom.js";
 import { throwStructuredAgentError } from "./agent-errors.js";
+import { runSnapshotWalk } from "../cs/snapshot-walker.js";
+import type { PipelineNode } from "../cs/dom-pipeline.js";
 
-export type InlineSnapshotNode = {
-	refId: string;
-	role: string;
-	tag: string;
-	controlType?: string;
-	actionable?: boolean;
-	mustKeep?: boolean;
-	forControl?: string;
-	recommendedAction?: string;
-	confidence?: "high" | "low";
-	controls?: string;
-	expanded?: boolean;
-	name?: string;
-	text?: string;
-	value?: string;
-	checked?: boolean;
-	disabled?: boolean;
-	readOnly?: boolean;
-	selected?: boolean;
-	required?: boolean;
-	valid?: boolean;
-	invalid?: boolean;
-	validationMessage?: string;
-	errorMessage?: string;
-	href?: string;
-	src?: string;
-	alt?: string;
-	title?: string;
-	parentRefId?: string;
-	postId?: string;
-	permalink?: string;
-	imageUrls?: string[];
-	accept?: string;
-	filesCount?: number;
-};
+export type InlineSnapshotNode = PipelineNode;
 
 export type FormErrorEntry = {
 	field: string;
@@ -67,161 +21,6 @@ export type InlineSnapshotResult = {
 	url: string;
 	title: string;
 	viewport: { width: number; height: number };
-};
-
-const EXCLUDED_TAGS: Record<string, true> = {
-	script: true,
-	style: true,
-	noscript: true,
-	template: true,
-};
-
-// ---------------------------------------------------------------------------
-// Enrichment: pure mutators (el, node) → void, composed via reduce.
-// ---------------------------------------------------------------------------
-
-type Enricher = (el: Element, node: InlineSnapshotNode) => void;
-
-const enrichFormFields: Enricher = (el, node) => enrichFormNode(el, node);
-
-const enrichValidationProxy: Enricher = (el, node) => {
-	if (!isValidationProxyInput(el)) return;
-	node.controlType = "validation-proxy";
-	node.actionable = false;
-	const forControl = el
-		.closest('[role="combobox"]')
-		?.getAttribute("data-ref-id");
-	if (forControl) node.forControl = forControl;
-};
-
-export const enrichDropdown = (
-	el: Element,
-	node: {
-		role?: string;
-		tag: string;
-		controlType?: string;
-		recommendedAction?: string;
-		controls?: string;
-		expanded?: boolean;
-	},
-) => {
-	if (node.controlType === "validation-proxy") return;
-	if (node.role !== "combobox" && node.tag !== "select") return;
-	node.controlType = "dropdown";
-	node.recommendedAction = "select_option";
-	node.controls =
-		el.getAttribute("aria-controls") ||
-		el.getAttribute("aria-owns") ||
-		undefined;
-	const expanded = el.getAttribute("aria-expanded");
-	node.expanded =
-		expanded === "true" ? true : expanded === "false" ? false : undefined;
-};
-
-const enrichClickAction: Enricher = (el, node) => {
-	if (node.controlType) return;
-	if (!isProbablyClickable(el)) return;
-	if (
-		el instanceof HTMLInputElement ||
-		el instanceof HTMLTextAreaElement ||
-		el instanceof HTMLSelectElement
-	) {
-		return;
-	}
-	if (!isReachableClickTarget(el)) return;
-	node.actionable = true;
-	node.recommendedAction = "click";
-	node.confidence = assessClickability(el).confidence;
-};
-
-const enrichLink: Enricher = (el, node) => {
-	if (node.tag !== "a") return;
-	node.href = resolveAbsoluteUrl(el.getAttribute("href"));
-};
-
-const enrichImage: Enricher = (el, node) => {
-	if (node.tag !== "img") return;
-	node.src = resolveAbsoluteUrl(el.getAttribute("src"));
-	node.alt = el.getAttribute("alt") || "";
-};
-
-const enrichInput: Enricher = (el, node) => {
-	if (node.tag !== "input") return;
-	const inputEl = el as HTMLInputElement;
-	node.title = el.getAttribute("title") || undefined;
-	if (inputEl.type === "file") {
-		node.accept = inputEl.getAttribute("accept") || undefined;
-		node.filesCount = inputEl.files?.length ?? 0;
-	}
-};
-
-const enrichContainerLink: Enricher = (el, node) => {
-	if (node.tag !== "img" && node.tag !== "a") return;
-	node.parentRefId = resolveContainerRefId(el) || node.parentRefId;
-};
-
-const enrichPostId: Enricher = (el, node) => {
-	node.postId = el.getAttribute("data-post-id") || undefined;
-};
-
-const enrichPermalink: Enricher = (el, node) => {
-	if (node.tag === "a") return;
-	const permalinkLink = resolvePermalinkLink(el);
-	if (permalinkLink)
-		node.permalink = resolveAbsoluteUrl(permalinkLink.getAttribute("href"));
-};
-
-const enrichChildImages: Enricher = (el, node) => {
-	if (node.tag === "img") return;
-	const urls = Array.from(el.querySelectorAll("img"))
-		.map((img) => resolveAbsoluteUrl(img.getAttribute("src")))
-		.filter((u): u is string => !!u);
-	if (urls.length > 0) node.imageUrls = urls;
-};
-
-/** Compose enrichers into a single function. */
-const enrich = (el: Element, node: InlineSnapshotNode): void =>
-	[
-		enrichFormFields,
-		enrichValidationProxy,
-		enrichDropdown,
-		enrichClickAction,
-		enrichLink,
-		enrichImage,
-		enrichInput,
-		enrichContainerLink,
-		enrichPostId,
-		enrichPermalink,
-		enrichChildImages,
-	].forEach((fn) => fn(el, node));
-
-// ---------------------------------------------------------------------------
-// Node construction: pure transform, element + context → fully-built node.
-// ---------------------------------------------------------------------------
-
-const buildNode = (
-	el: Element,
-	_depth: number,
-	parentRefId: string,
-): InlineSnapshotNode => {
-	const mustKeep = hasVisibleTextContent(el);
-	const node: InlineSnapshotNode = {
-		refId: allocateRefId(el),
-		role: getAccessibleRole(el),
-		tag: el.tagName.toLowerCase(),
-		text: getOwnVisibleText(el, 100),
-	};
-	if (mustKeep) {
-		// MUST_KEEP MEANS VISIBLE TEXT EXISTS. DO NOT DROP THIS NODE IN SNAPSHOT
-		// FILTERS, LIMITS, DEDUP, RENDERING, OR DOWNSTREAM DOM/SNAPSHOT PIPES.
-		node.mustKeep = true;
-	}
-	const name = getAccessibleName(el);
-	if (name) node.name = name;
-	if ((node.tag === "img" || node.tag === "a") && parentRefId)
-		node.parentRefId = parentRefId;
-	enrich(el, node);
-	return node;
 };
 
 // ---------------------------------------------------------------------------
@@ -289,139 +88,6 @@ const deriveFormErrors = (nodes: InlineSnapshotNode[]): FormErrorEntry[] =>
 		}));
 
 // ---------------------------------------------------------------------------
-// Tree walker: discriminated-union pipeline. No nulls, no optionals in frames.
-//
-// Enter  → the walker is visiting this element. Filters decide: accept or reject.
-// Emit   → element passed all filters, produce a node + line + child context.
-// Reject → element filtered out, children walk at same depth, no parentRefId.
-//
-// pipe() composes (Enter → Enter | Reject) guards. The final step maps
-// Enter → Emit. The result is always concrete — no ?? needed downstream.
-// ---------------------------------------------------------------------------
-
-type Enter = {
-	kind: "enter";
-	el: Element;
-	depth: number;
-	parentRefId: string;
-};
-
-type Reject = {
-	kind: "reject";
-	el: Element;
-	depth: number;
-};
-
-type Emit = {
-	kind: "emit";
-	node: InlineSnapshotNode;
-	children: Element[];
-	childDepth: number;
-	childRefId: string;
-};
-
-type Frame = Enter | Reject | Emit;
-
-/** Guards run before emit. Each takes Enter, returns Enter (pass) or Reject. */
-type Guard = (frame: Enter) => Enter | Reject;
-
-/** Compose guards left-to-right. First reject short-circuits. */
-const pipe =
-	(...guards: Guard[]): Guard =>
-	(frame) =>
-		guards.reduce<Enter | Reject>(
-			(acc, guard) => (acc.kind === "reject" ? acc : guard(acc as Enter)),
-			frame,
-		);
-
-/** Guard: reject excluded tags. */
-const rejectExcludedTags: Guard = (frame) =>
-	EXCLUDED_TAGS[frame.el.tagName.toLowerCase()]
-		? { kind: "reject", el: frame.el, depth: frame.depth }
-		: frame;
-
-/** Guard: reject elements that fail shouldInclude. */
-const rejectNotIncluded: Guard = (frame) =>
-	shouldInclude(frame.el)
-		? frame
-		: { kind: "reject", el: frame.el, depth: frame.depth };
-
-/** Guard: reject when capacity reached. */
-const rejectAtCapacity =
-	(count: number, maxNodes: number): Guard =>
-	(frame) =>
-		count >= maxNodes && !hasVisibleTextContent(frame.el)
-			? { kind: "reject", el: frame.el, depth: frame.depth }
-			: frame;
-
-/** Transform an Enter frame into an Emit frame: build node. */
-const toEmit = (frame: Enter): Emit => {
-	const node = buildNode(frame.el, frame.depth, frame.parentRefId);
-	return {
-		kind: "emit",
-		node,
-		children: Array.from(frame.el.children),
-		childDepth: frame.depth + 1,
-		childRefId: node.refId,
-	};
-};
-
-/** Resolve a frame into walk instructions: emit (if Emit) or passthrough. */
-type WalkOutcome = {
-	emitted: { node: InlineSnapshotNode } | null;
-	children: Element[];
-	childDepth: number;
-	childRefId: string;
-};
-
-const resolveOutcome = (frame: Frame): WalkOutcome =>
-	frame.kind === "emit"
-		? {
-				emitted: { node: frame.node },
-				children: frame.children,
-				childDepth: frame.childDepth,
-				childRefId: frame.childRefId,
-			}
-		: {
-				emitted: null,
-				children: Array.from(frame.el.children),
-				childDepth: frame.depth,
-				childRefId: "",
-			};
-
-/** Walk the DOM tree applying the guard pipeline to each element. */
-const walkTree = (root: Element, maxNodes: number) => {
-	const nodes: InlineSnapshotNode[] = [];
-	const els: Element[] = [];
-	const depths: number[] = [];
-
-	const walk = (el: Element, depth: number, parentRefId: string): void => {
-		const guard = pipe(
-			rejectExcludedTags,
-			rejectNotIncluded,
-			rejectAtCapacity(nodes.length, maxNodes),
-		);
-		const frame = guard({ kind: "enter", el, depth, parentRefId });
-		const outcome = resolveOutcome(
-			frame.kind === "reject" ? frame : toEmit(frame),
-		);
-
-		if (outcome.emitted) {
-			nodes.push(outcome.emitted.node);
-			els.push(el);
-			depths.push(depth);
-		}
-
-		for (const child of outcome.children) {
-			walk(child, outcome.childDepth, outcome.childRefId);
-		}
-	};
-
-	walk(root, 0, "");
-	return { nodes, els, depths };
-};
-
-// ---------------------------------------------------------------------------
 // Mutation guard: wraps a thunk, throws if DOM changed during execution.
 // ---------------------------------------------------------------------------
 
@@ -467,9 +133,13 @@ export function collectInlineSnapshot(maxNodes: number): InlineSnapshotResult {
 	syncRefIdCounterFromDom();
 
 	return withMutationGuard(() => {
-		const { nodes, els, depths } = document.body
-			? walkTree(document.body, maxNodes)
-			: { nodes: [] as InlineSnapshotNode[], els: [] as Element[], depths: [] as number[] };
+		const walked = document.body
+			? runSnapshotWalk(document.body, maxNodes)
+			: [];
+
+		const nodes = walked.map((x) => x.node);
+		const els = walked.map((x) => x.el);
+		const depths = walked.map((x) => x.depth);
 
 		// Dedup: remove low-confidence wrappers that contain clickable descendants.
 		// Adapted from Vimium link_hints.js:1362-1386.

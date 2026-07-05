@@ -794,24 +794,7 @@ export const PAGE_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 		name: "find",
 		description: "Find elements in the active tab using a CSS selector",
 		params: schemas.PageFindParamsSchema,
-		returns: z.array(
-			z.object({
-				refId: schemas.refIdString(),
-				role: z.string(),
-				tag: z.string(),
-				name: z.string().optional(),
-				text: z.string().optional(),
-				value: z.string().optional(),
-				checked: z.boolean().optional(),
-				disabled: z.boolean().optional(),
-				readOnly: z.boolean().optional(),
-				href: z.string().optional(),
-				src: z.string().optional(),
-				alt: z.string().optional(),
-				title: z.string().optional(),
-				parentRefId: schemas.refIdString().optional(),
-			}),
-		),
+		returns: z.array(schemas.FindNodeSchema),
 		aliases: [{ namespace: "page", name: "query" }],
 		fields: ["selector"],
 		paramTypes: [
@@ -823,7 +806,7 @@ export const PAGE_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 			},
 		],
 		returnDoc:
-			"Array of elements with refId, role, name, href/src, alt, and parentRefId",
+			"Array of elements enriched via the shared DOM pipeline: refId, tag, role, name, text, form state (value/checked/disabled/readOnly/required/valid/invalid), href/src/alt, parentRefId, postId, accept/filesCount for file inputs, controlType/recommendedAction/actionable for interactive controls",
 		errorCode: "E_NO_TAB",
 		example: 'page.find("h1")',
 		agentMeta: {
@@ -831,6 +814,7 @@ export const PAGE_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 				"Assigns data-ref-id on matched elements when missing so results include actionable refIds",
 				"Returned refIds are immediately actionable — call page.click/fill/select_option on them without an intermediate snapshot_data",
 				"For dropdowns found via find, use page.select_option — not fill/type",
+				"Find uses the same shared DOM pipeline as page.snapshot_data and page.dom, so form state, link/image URLs, postId, and clickability metadata stay in parity across surfaces",
 			],
 			tags: ["read"],
 		},

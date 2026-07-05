@@ -228,6 +228,20 @@ export const SnapshotNodeSchema = z.object({
 		.array(z.string())
 		.optional()
 		.describe("Image URLs contained within this element"),
+	accept: z
+		.string()
+		.optional()
+		.describe("For input[type=file]: accepted MIME types/extensions"),
+	filesCount: z
+		.number()
+		.optional()
+		.describe("For input[type=file]: selected file count"),
+	confidence: z
+		.enum(["high", "low"])
+		.optional()
+		.describe(
+			"Clickability confidence; low-confidence wrappers may be deduplicated away",
+		),
 });
 
 export const SnapshotResultSchema = z.object({
@@ -288,15 +302,28 @@ interface DomNode {
 	disabled?: boolean;
 	readOnly?: boolean;
 	selected?: boolean;
+	required?: boolean;
+	valid?: boolean;
+	invalid?: boolean;
+	validationMessage?: string;
+	errorMessage?: string;
 	href?: string;
 	src?: string;
 	alt?: string;
+	title?: string;
+	parentRefId?: string;
+	postId?: string;
+	permalink?: string;
+	imageUrls?: string[];
 	accept?: string;
 	filesCount?: number;
 	controlType?: string;
+	actionable?: boolean;
 	recommendedAction?: string;
+	confidence?: "high" | "low";
 	controls?: string;
 	expanded?: boolean;
+	forControl?: string;
 	children?: DomNode[];
 }
 
@@ -332,9 +359,36 @@ export const DomNodeSchema: z.ZodType<DomNode> = z.object({
 	disabled: z.boolean().optional(),
 	readOnly: z.boolean().optional(),
 	selected: z.boolean().optional().describe("For <option>: selected state"),
-	href: z.string().optional(),
-	src: z.string().optional(),
-	alt: z.string().optional(),
+	required: z.boolean().optional().describe("Whether the element is required"),
+	valid: z.boolean().optional().describe("Constraint validity state"),
+	invalid: z.boolean().optional().describe("Constraint invalidity state"),
+	validationMessage: z
+		.string()
+		.optional()
+		.describe("Browser constraint validation message"),
+	errorMessage: z
+		.string()
+		.optional()
+		.describe("Visible error text linked to the field"),
+	href: z.string().optional().describe("Absolute URL for link elements"),
+	src: z.string().optional().describe("Absolute URL for image elements"),
+	alt: z.string().optional().describe("Alternative text for image elements"),
+	title: z.string().optional().describe("Title attribute"),
+	parentRefId: refIdString()
+		.optional()
+		.describe("Reference ID of the parent container element"),
+	postId: z
+		.string()
+		.optional()
+		.describe("Stable post identifier from data-post-id attribute"),
+	permalink: z
+		.string()
+		.optional()
+		.describe("Stable permalink URL from anchor element"),
+	imageUrls: z
+		.array(z.string())
+		.optional()
+		.describe("Image URLs contained within this element"),
 	accept: z
 		.string()
 		.optional()
@@ -343,15 +397,118 @@ export const DomNodeSchema: z.ZodType<DomNode> = z.object({
 		.number()
 		.optional()
 		.describe("For input[type=file]: selected file count"),
-	controlType: z.string().optional(),
-	recommendedAction: z.string().optional(),
-	controls: z.string().optional(),
-	expanded: z.boolean().optional(),
+	controlType: z
+		.string()
+		.optional()
+		.describe(
+			'Plain-language control type, e.g. "dropdown" for combobox/select',
+		),
+	actionable: z
+		.boolean()
+		.optional()
+		.describe("Whether this node can be acted on directly"),
+	recommendedAction: z
+		.string()
+		.optional()
+		.describe("Recommended page.* action for this control"),
+	confidence: z
+		.enum(["high", "low"])
+		.optional()
+		.describe(
+			"Clickability confidence; low-confidence wrappers may be deduplicated away",
+		),
+	controls: z
+		.string()
+		.optional()
+		.describe("ID(s) of controlled popup/listbox elements, when exposed"),
+	expanded: z.boolean().optional().describe("Expanded state for popup controls"),
+	forControl: z
+		.string()
+		.optional()
+		.describe("refId of the dropdown this validation-proxy belongs to"),
 	children: z
 		.array(z.lazy(() => DomNodeSchema))
 		.optional()
 		.describe("Nested descendants up to `depth`"),
 });
+
+/**
+ * find() return element shape. Mirrors PipelineNode (no nested children):
+ * the shared DOM pipeline enriches each matched element with the same form,
+ * link, image, dropdown, clickability, and post/permalink metadata used by
+ * snapshot and dom, so find stays in parity with the other surfaces.
+ */
+export const FindNodeSchema = z.object({
+	refId: refIdString().describe("Element reference ID (e.g. e2)"),
+	tag: z.string().describe("HTML tag name"),
+	role: z.string().describe("ARIA role of the element"),
+	name: z.string().optional().describe("Accessible name of the element"),
+	text: z.string().optional().describe("Visible text content of the element"),
+	mustKeep: z
+		.boolean()
+		.optional()
+		.describe(
+			"Internal invariant marker: visible text exists and this node must not be dropped by snapshot pipes",
+		),
+	value: z.string().optional().describe("Element value"),
+	checked: z.boolean().optional().describe("Checked state"),
+	disabled: z.boolean().optional().describe("Whether the element is disabled"),
+	readOnly: z.boolean().optional().describe("Whether the element is read-only"),
+	selected: z.boolean().optional().describe("For <option>: selected state"),
+	required: z.boolean().optional().describe("Whether the element is required"),
+	valid: z.boolean().optional().describe("Constraint validity state"),
+	invalid: z.boolean().optional().describe("Constraint invalidity state"),
+	validationMessage: z
+		.string()
+		.optional()
+		.describe("Browser constraint validation message"),
+	errorMessage: z
+		.string()
+		.optional()
+		.describe("Visible error text linked to the field"),
+	href: z.string().optional().describe("Absolute URL for link elements"),
+	src: z.string().optional().describe("Absolute URL for image elements"),
+	alt: z.string().optional().describe("Alternative text for image elements"),
+	title: z.string().optional().describe("Title attribute"),
+	parentRefId: refIdString()
+		.optional()
+		.describe("Reference ID of the parent container element"),
+	postId: z
+		.string()
+		.optional()
+		.describe("Stable post identifier from data-post-id attribute"),
+	permalink: z
+		.string()
+		.optional()
+		.describe("Stable permalink URL from anchor element"),
+	imageUrls: z.array(z.string()).optional().describe("Image URLs contained within this element"),
+	accept: z
+		.string()
+		.optional()
+		.describe("For input[type=file]: accepted MIME/extensions"),
+	filesCount: z
+		.number()
+		.optional()
+		.describe("For input[type=file]: selected file count"),
+	controlType: z
+		.string()
+		.optional()
+		.describe('Plain-language control type, e.g. "dropdown" for combobox/select'),
+	actionable: z.boolean().optional().describe("Whether this node can be acted on directly"),
+	recommendedAction: z
+		.string()
+		.optional()
+		.describe("Recommended page.* action for this control"),
+	confidence: z.enum(["high", "low"]).optional().describe("Clickability confidence"),
+	controls: z.string().optional().describe("ID(s) of controlled popup/listbox elements"),
+	expanded: z.boolean().optional().describe("Expanded state for popup controls"),
+	forControl: z
+		.string()
+		.optional()
+		.describe("refId of the dropdown this validation-proxy belongs to"),
+});
+
+export type FindNode = z.infer<typeof FindNodeSchema>;
 
 export const PageDomResultSchema = z.object({
 	nodes: z.array(DomNodeSchema),

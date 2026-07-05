@@ -31,15 +31,9 @@ import {
 } from "../shared/cross/normalize-agent-error.js";
 import type { SnapshotFilter } from "../shared/cross/snapshot-filter.js";
 import { filterNodes } from "../shared/cross/snapshot-filter.js";
-import { allocateRefId, syncRefIdCounterFromDom } from "../shared/cs/ref-id.js";
-import {
-	getAccessibleName,
-	getAccessibleRole,
-	isSelfOrAncestorHidden,
-	readFormFields,
-	resolveAbsoluteUrl,
-	resolveContainerRefId,
-} from "../shared/cs/snapshot-dom.js";
+import { syncRefIdCounterFromDom } from "../shared/cs/ref-id.js";
+import { isSelfOrAncestorHidden } from "../shared/cs/snapshot-dom.js";
+import { buildFindNode } from "../shared/cs/dom-pipeline.js";
 import { assertFillEffect, makeActionResult } from "./action-result.js";
 import type { DomNode } from "./dom-tree.js";
 import { buildDomNode } from "./dom-tree.js";
@@ -272,11 +266,6 @@ function dispatchActivationClick(el: Element): void {
 		);
 	}
 }
-
-export type Handler<T = unknown, R = unknown> = (
-	params: T,
-	signal?: AbortSignal,
-) => R | Promise<R>;
 
 export const handlers = {
 	click: (params: PageClickParams) => {
@@ -827,44 +816,10 @@ export const handlers = {
 		const selector = params.selector;
 		const elements = Array.from(document.querySelectorAll(selector));
 		const observed: Array<{ refId: string; element: Element }> = [];
-		const nodes = elements.map((el) => {
-			const refId = allocateRefId(el);
-			observed.push({ refId, element: el });
-			const role = getAccessibleRole(el);
-			const name = getAccessibleName(el);
-			const node: Record<string, unknown> = {
-				tag: el.tagName.toLowerCase(),
-				refId,
-				role,
-				text: el.textContent?.slice(0, 100) || "",
-				...readFormFields(el),
-			};
-			if (name) node.name = name;
-
-			const tag = el.tagName.toLowerCase();
-			if (tag === "a") {
-				const href = resolveAbsoluteUrl(el.getAttribute("href"));
-				if (href) node.href = href;
-			}
-			if (tag === "img") {
-				const src = resolveAbsoluteUrl(el.getAttribute("src"));
-				if (src) node.src = src;
-				node.alt = el.getAttribute("alt") || "";
-			}
-			if (tag === "input") {
-				const title = el.getAttribute("title");
-				if (title) node.title = title;
-			}
-
-			if (tag === "img" || tag === "a") {
-				const containerRefId = resolveContainerRefId(el);
-				if (containerRefId) {
-					node.parentRefId = containerRefId;
-				}
-			}
-
-			return node;
-		});
+		// Shared DOM pipeline builds and enriches each matched element with the
+		// same form/link/image/dropdown/clickability/post metadata used by
+		// snapshot and dom, so find stays in parity with the other surfaces.
+		const nodes = elements.map((el) => buildFindNode(el, observed));
 		grantObservation(observed);
 		return nodes;
 	},
@@ -974,4 +929,4 @@ export const handlers = {
 			signal?.removeEventListener("abort", onRelayAbort);
 		}
 	},
-} as Record<string, (params: any, signal?: AbortSignal) => unknown>;
+} as Record<string, (params: unknown, signal?: AbortSignal) => unknown | Promise<unknown>>;

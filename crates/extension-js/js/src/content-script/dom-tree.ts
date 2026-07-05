@@ -1,75 +1,15 @@
 /**
  * Raw DOM tree introspection for the `dom` handler.
  *
- * Walks an element subtree to a bounded depth, emitting a serializable node
- * per element with tag/role/name/text/raw-attributes/form-state/hidden-reason.
- * Distinct from the inline-snapshot pipeline (`shared/cross/collect-inline-snapshot`),
- * which produces a ref-id-annotated markdown rendering for agent consumption.
+ * Thin adapter over the shared DOM pipeline (`shared/cs/dom-pipeline`),
+ * which owns traversal, enrichment, and base node construction. This module
+ * preserves the nested `children` shape that `page.dom` returns and re-exports
+ * the `DomNode` type alias for backward compatibility.
  */
-import { allocateRefId } from "../shared/cs/ref-id.js";
-import {
-	getAccessibleName,
-	getAccessibleRole,
-	getOwnVisibleText,
-	hasVisibleTextContent,
-	isSelfOrAncestorHidden,
-	readFormFields,
-	resolveAbsoluteUrl,
-} from "../shared/cs/snapshot-dom.js";
-import { enrichDropdown } from "../shared/cross/collect-inline-snapshot.js";
+import { buildDomTree } from "../shared/cs/dom-pipeline.js";
+import type { PipelineNode } from "../shared/cs/dom-pipeline.js";
 
-export type DomNode = {
-	refId?: string;
-	tag: string;
-	role?: string;
-	name?: string;
-	text?: string;
-	mustKeep?: boolean;
-	attributes?: Record<string, string>;
-	hidden?: boolean;
-	hiddenReason?:
-		| "display-none"
-		| "visibility-hidden"
-		| "aria-hidden"
-		| "opacity-zero"
-		| "hidden-attr"
-		| "inert";
-	value?: string;
-	checked?: boolean;
-	disabled?: boolean;
-	readOnly?: boolean;
-	href?: string;
-	src?: string;
-	alt?: string;
-	accept?: string;
-	filesCount?: number;
-	// Dropdown hints (parity with snapshot_data combobox nodes)
-	controlType?: string;
-	recommendedAction?: string;
-	controls?: string;
-	expanded?: boolean;
-	children?: DomNode[];
-};
-
-function hiddenReasonFor(
-	el: Element,
-):
-	| "display-none"
-	| "visibility-hidden"
-	| "aria-hidden"
-	| "opacity-zero"
-	| "hidden-attr"
-	| "inert"
-	| undefined {
-	if ((el as HTMLElement).hidden) return "hidden-attr";
-	if (el.getAttribute("aria-hidden") === "true") return "aria-hidden";
-	if ((el as HTMLElement).inert) return "inert";
-	const style = window.getComputedStyle(el);
-	if (style.display === "none") return "display-none";
-	if (style.visibility === "hidden") return "visibility-hidden";
-	if (style.opacity === "0") return "opacity-zero";
-	return undefined;
-}
+export type DomNode = PipelineNode;
 
 export function buildDomNode(
 	el: Element,
@@ -77,54 +17,5 @@ export function buildDomNode(
 	includeHidden: boolean,
 	observed?: Array<{ refId: string; element: Element }>,
 ): DomNode | null {
-	if (!includeHidden && isSelfOrAncestorHidden(el)) return null;
-	const tag = el.tagName.toLowerCase();
-	const refId = allocateRefId(el);
-	if (observed) observed.push({ refId, element: el });
-	const node: DomNode = {
-		tag,
-		refId,
-		role: getAccessibleRole(el),
-		name: getAccessibleName(el) || undefined,
-		text: getOwnVisibleText(el, 100) || undefined,
-	};
-	if (hasVisibleTextContent(el)) {
-		// MUST_KEEP MEANS VISIBLE TEXT EXISTS. DO NOT DROP THIS NODE IN SNAPSHOT
-		// FILTERS, LIMITS, DEDUP, RENDERING, OR DOWNSTREAM DOM/SNAPSHOT PIPES.
-		node.mustKeep = true;
-	}
-	// raw attributes
-	const attrs: Record<string, string> = {};
-	for (const attr of Array.from(el.attributes)) attrs[attr.name] = attr.value;
-	if (Object.keys(attrs).length) node.attributes = attrs;
-	const hr = hiddenReasonFor(el);
-	if (hr) {
-		node.hidden = true;
-		node.hiddenReason = hr;
-	}
-	Object.assign(node, readFormFields(el));
-	enrichDropdown(el, node);
-	if (el instanceof HTMLInputElement && el.type === "file") {
-		const accept = el.getAttribute("accept");
-		if (accept) node.accept = accept;
-		node.filesCount = el.files?.length ?? 0;
-	}
-	if (tag === "a") {
-		const href = resolveAbsoluteUrl(el.getAttribute("href"));
-		if (href) node.href = href;
-	}
-	if (tag === "img") {
-		const src = resolveAbsoluteUrl(el.getAttribute("src"));
-		if (src) node.src = src;
-		node.alt = el.getAttribute("alt") || undefined;
-	}
-	if (depth > 0) {
-		const kids: DomNode[] = [];
-		for (const child of Array.from(el.children)) {
-			const k = buildDomNode(child, depth - 1, includeHidden, observed);
-			if (k) kids.push(k);
-		}
-		if (kids.length) node.children = kids;
-	}
-	return node;
+	return buildDomTree(el, depth, includeHidden, observed);
 }
