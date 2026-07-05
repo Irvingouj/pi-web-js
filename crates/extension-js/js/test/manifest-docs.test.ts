@@ -360,6 +360,17 @@ describe("manifest documentation export", () => {
 		expect(tabSelect?.tags).toEqual(["mutation", "write"]);
 		expect(tabSelect?.relatedApis).toEqual(["page.select"]);
 
+		const tabSelectOption = manifest.find(
+			(e) => e.action === "tab_select_option",
+		);
+		expect(tabSelectOption?.notes?.join(" ")).toContain(
+			"NEVER web.tab.fill",
+		);
+		expect(tabSelectOption?.notes?.join(" ")).toContain(
+			"controlType='dropdown'",
+		);
+		expect(tabSelectOption?.relatedApis).toEqual(["page.select_option"]);
+
 		const tabCheck = manifest.find((e) => e.action === "tab_check");
 		expect(tabCheck?.tags).toEqual(["mutation", "write"]);
 		expect(tabCheck?.relatedApis).toEqual(["page.check"]);

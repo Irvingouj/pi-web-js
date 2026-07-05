@@ -64,6 +64,12 @@ export const PageActionResultSchema = z.object({
 		.string()
 		.optional()
 		.describe("Visible option text selected by select_option"),
+	controlValue: z
+		.union([z.string(), z.array(z.string())])
+		.optional()
+		.describe(
+			"Dropdown/input value after select_option, when different from selectedText",
+		),
 	key: z
 		.string()
 		.optional()
@@ -163,6 +169,12 @@ export const SnapshotNodeSchema = z.object({
 		.boolean()
 		.optional()
 		.describe("Whether this node can be acted on directly"),
+	mustKeep: z
+		.boolean()
+		.optional()
+		.describe(
+			"Internal invariant marker: visible text exists and this node must not be dropped by snapshot pipes",
+		),
 	forControl: z
 		.string()
 		.optional()
@@ -261,6 +273,7 @@ interface DomNode {
 	role?: string;
 	name?: string;
 	text?: string;
+	mustKeep?: boolean;
 	attributes?: Record<string, string>;
 	hidden?: boolean;
 	hiddenReason?:
@@ -293,6 +306,12 @@ export const DomNodeSchema: z.ZodType<DomNode> = z.object({
 	role: z.string().optional(),
 	name: z.string().optional(),
 	text: z.string().optional(),
+	mustKeep: z
+		.boolean()
+		.optional()
+		.describe(
+			"Internal invariant marker: visible text exists and this node must not be dropped by DOM/snapshot pipes",
+		),
 	attributes: z
 		.record(z.string())
 		.optional()

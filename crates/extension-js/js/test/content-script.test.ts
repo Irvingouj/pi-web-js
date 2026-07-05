@@ -381,6 +381,131 @@ describe("content-script onMessage handler", () => {
 		expect(Array.isArray(response.value.nodes)).toBe(true);
 		expect(response.value.text).toContain("[e1]");
 	});
+
+	it("keeps visible text across snapshot, query, dom, and find handlers", async () => {
+		document.body.innerHTML = `
+			<div id="snapshot-visible-root">
+				<div class="react-select__control" role="combobox" aria-label="Location" aria-expanded="false">
+					<div class="react-select__value-container">
+						<div class="react-select__single-value">CS_VISIBLE_OTTAWA_SELECTED_TEXT</div>
+						<div><input id="candidate-location" role="combobox" aria-label="Location" value=""></div>
+					</div>
+				</div>
+				<div data-wrapper><div><span>CS_VISIBLE_NESTED_STRUCTURAL_TEXT</span></div></div>
+				<section><main>CS_VISIBLE_MAIN_SECTION_TEXT</main></section>
+				<form><label>CS_VISIBLE_LABEL_TEXT</label></form>
+				<table><tbody><tr><td>CS_VISIBLE_TABLE_CELL_TEXT</td></tr></tbody></table>
+				<div role="presentation">CS_VISIBLE_PRESENTATION_TEXT</div>
+				<div role="none">CS_VISIBLE_NONE_ROLE_TEXT</div>
+				<details open><summary>CS_VISIBLE_SUMMARY_TEXT</summary><div>CS_VISIBLE_DETAILS_TEXT</div></details>
+				<svg><text>CS_VISIBLE_SVG_TEXT</text></svg>
+				<div style="display:none">CS_HIDDEN_DISPLAY_NONE_TEXT</div>
+				<div aria-hidden="true">CS_HIDDEN_ARIA_TEXT</div>
+			</div>
+		`;
+
+		const visibleSentinels = [
+			"CS_VISIBLE_OTTAWA_SELECTED_TEXT",
+			"CS_VISIBLE_NESTED_STRUCTURAL_TEXT",
+			"CS_VISIBLE_MAIN_SECTION_TEXT",
+			"CS_VISIBLE_LABEL_TEXT",
+			"CS_VISIBLE_TABLE_CELL_TEXT",
+			"CS_VISIBLE_PRESENTATION_TEXT",
+			"CS_VISIBLE_NONE_ROLE_TEXT",
+			"CS_VISIBLE_SUMMARY_TEXT",
+			"CS_VISIBLE_DETAILS_TEXT",
+			"CS_VISIBLE_SVG_TEXT",
+		];
+		const hiddenSentinels = [
+			"CS_HIDDEN_DISPLAY_NONE_TEXT",
+			"CS_HIDDEN_ARIA_TEXT",
+		];
+
+		const snapshot = await dispatchContentScriptCall(
+			"page_snapshot_data",
+			"snapshot",
+			handlers.snapshot,
+			{ max_nodes: 1 },
+		);
+		expect(snapshot.ok).toBe(true);
+		if (!snapshot.ok) return;
+		const snapshotValue = snapshot.value as {
+			text: string;
+			nodes: Array<{ text?: string; mustKeep?: boolean }>;
+		};
+		for (const sentinel of visibleSentinels) {
+			expect(snapshotValue.text, sentinel).toContain(sentinel);
+			const node = snapshotValue.nodes.find((n) => n.text?.includes(sentinel));
+			expect(node, sentinel).toBeDefined();
+			expect(node?.mustKeep, sentinel).toBe(true);
+		}
+		for (const sentinel of hiddenSentinels) {
+			expect(snapshotValue.text, sentinel).not.toContain(sentinel);
+		}
+
+		const snapshotText = await dispatchContentScriptCall(
+			"page_snapshot",
+			"snapshot_text",
+			handlers.snapshot_text,
+			{ max_nodes: 1 },
+		);
+		expect(snapshotText.ok).toBe(true);
+		if (snapshotText.ok) {
+			expect(String(snapshotText.value)).toContain(
+				"CS_VISIBLE_OTTAWA_SELECTED_TEXT",
+			);
+		}
+
+		const query = await dispatchContentScriptCall(
+			"page_snapshot_query",
+			"snapshot_query",
+			handlers.snapshot_query,
+			{ filter: { interactiveOnly: true, limit: 1 }, max_nodes: 1 },
+		);
+		expect(query.ok).toBe(true);
+		if (query.ok) {
+			const value = query.value as {
+				nodes: Array<{ text?: string; mustKeep?: boolean }>;
+			};
+			expect(
+				value.nodes.some(
+					(n) =>
+						n.mustKeep === true &&
+						n.text?.includes("CS_VISIBLE_OTTAWA_SELECTED_TEXT"),
+				),
+			).toBe(true);
+			expect(
+				value.nodes.some(
+					(n) =>
+						n.mustKeep === true &&
+						n.text?.includes("CS_VISIBLE_NESTED_STRUCTURAL_TEXT"),
+				),
+			).toBe(true);
+		}
+
+		const dom = await dispatchContentScriptCall(
+			"page_dom",
+			"dom",
+			handlers.dom,
+			{ selector: "#snapshot-visible-root", depth: 8, includeHidden: false },
+		);
+		expect(dom.ok).toBe(true);
+		if (dom.ok) {
+			const serialized = JSON.stringify(dom.value);
+			for (const sentinel of visibleSentinels) {
+				expect(serialized, sentinel).toContain(sentinel);
+			}
+			expect(serialized).toContain('"mustKeep":true');
+			for (const sentinel of hiddenSentinels) {
+				expect(serialized, sentinel).not.toContain(sentinel);
+			}
+		}
+
+		const found = handlers.find({
+			selector: ".react-select__single-value",
+		}) as Array<{ text?: string }>;
+		expect(found[0]?.text).toContain("CS_VISIBLE_OTTAWA_SELECTED_TEXT");
+	});
 });
 
 describe("snapshot_query handler", () => {
@@ -490,7 +615,7 @@ describe("snapshot_query handler", () => {
 		expect(response.value.nodes[0].tag).toBe("a");
 	});
 
-	it("filter by interactiveOnly excludes non-interactive", async () => {
+	it("filter by interactiveOnly preserves mustKeep visible text nodes", async () => {
 		document.body.innerHTML =
 			"<button>A</button><div>B</div><h1>C</h1><a href='#'>D</a>";
 		const sendResponse = vi.fn();
@@ -512,10 +637,10 @@ describe("snapshot_query handler", () => {
 		};
 		expect(response.ok).toBe(true);
 		const roles = response.value.nodes.map((n: { role: string }) => n.role);
-		expect(roles).not.toContain("heading");
-		expect(roles).not.toContain("generic");
 		expect(roles).toContain("button");
 		expect(roles).toContain("link");
+		expect(roles).toContain("generic");
+		expect(roles).toContain("heading");
 	});
 
 	it("filter by text substring (case-insensitive)", async () => {
@@ -733,7 +858,7 @@ describe("snapshot_query handler", () => {
 		if (parent && originalBody) parent.appendChild(originalBody);
 	});
 
-	it("limit caps results", async () => {
+	it("limit caps non-mustKeep results but preserves mustKeep visible text", async () => {
 		document.body.innerHTML = Array.from(
 			{ length: 10 },
 			(_, i) => `<button>Btn${i}</button>`,
@@ -753,10 +878,11 @@ describe("snapshot_query handler", () => {
 		await new Promise((resolve) => setTimeout(resolve, 10));
 		const response = sendResponse.mock.calls[0][0] as {
 			ok: boolean;
-			value: { nodes: unknown[] };
+			value: { nodes: Array<{ mustKeep?: boolean }> };
 		};
 		expect(response.ok).toBe(true);
-		expect(response.value.nodes).toHaveLength(3);
+		expect(response.value.nodes).toHaveLength(10);
+		expect(response.value.nodes.every((n) => n.mustKeep === true)).toBe(true);
 	});
 });
 
@@ -3057,10 +3183,15 @@ describe("select_option handler", () => {
 		expect(result.ok).toBe(true);
 		if (result.ok) {
 			expect(
-				result.value as { value?: string; selectedText?: string },
+				result.value as {
+					value?: string;
+					selectedText?: string;
+					controlValue?: string;
+				},
 			).toMatchObject({
 				value: "ca",
 				selectedText: "Canada",
+				controlValue: "ca",
 			});
 		}
 		expect(select.value).toBe("ca");
@@ -3967,6 +4098,12 @@ describe("select_option handler", () => {
 			expect(details.ariaControlsAfter).toBe("react-select-degree--0-listbox");
 			expect(details.isDropdown).toBe(true);
 			expect(details.targetName).toContain("Degree");
+			expect(result.error.recovery?.join(" ")).toContain(
+				"exact visible candidate text",
+			);
+			expect(result.error.recovery?.join(" ")).toContain(
+				"Do not use fill/type/click",
+			);
 		}
 	});
 	it("Greenhouse regression: select_option matches option whose label carries a suffix (Canada vs 'Canada +1')", async () => {

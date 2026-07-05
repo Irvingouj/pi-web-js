@@ -104,4 +104,16 @@ describe("normalizeAgentError", () => {
 		expect(err.details?.label).toBe("Search");
 		expect(err.details?.candidates).toHaveLength(1);
 	});
+
+	it("labelNotFoundError gives dropdown-specific recovery", () => {
+		const err = labelNotFoundError(
+			"Canada",
+			[{ refId: "e2", name: "Canada +1" }],
+			{ isDropdown: true, searchedIds: ["react-select-country-listbox"] },
+		);
+		const recovery = err.recovery?.join(" ") || "";
+		expect(err.hint).toContain("retry select_option with one exact candidate");
+		expect(recovery).toContain("exact visible candidate text");
+		expect(recovery).toContain("Do not use fill/type/click");
+	});
 });

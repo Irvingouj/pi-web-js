@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>Snapshot Visible Text Contract</title>
+		<style>
+			body {
+				font-family: system-ui, sans-serif;
+				margin: 24px;
+			}
+			.react-select__control {
+				border: 1px solid #777;
+				padding: 8px;
+				width: 360px;
+			}
+			.react-select__single-value {
+				font-weight: 600;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="snapshot-visible-root">
+			<div
+				class="react-select__control"
+				role="combobox"
+				aria-label="Location"
+				aria-expanded="false"
+			>
+				<div class="react-select__value-container">
+					<div class="react-select__single-value">
+						E2E_VISIBLE_OTTAWA_SELECTED_TEXT
+					</div>
+					<div>
+						<input
+							id="candidate-location"
+							role="combobox"
+							aria-label="Location"
+							value=""
+						/>
+					</div>
+				</div>
+			</div>
+			<div data-wrapper>
+				<div><span>E2E_VISIBLE_NESTED_STRUCTURAL_TEXT</span></div>
+			</div>
+			<section><main>E2E_VISIBLE_MAIN_SECTION_TEXT</main></section>
+			<form><label>E2E_VISIBLE_LABEL_TEXT</label></form>
+			<ul><li>E2E_VISIBLE_LIST_ITEM_TEXT</li></ul>
+			<table>
+				<tbody>
+					<tr><td>E2E_VISIBLE_TABLE_CELL_TEXT</td></tr>
+				</tbody>
+			</table>
+			<div role="presentation">E2E_VISIBLE_PRESENTATION_TEXT</div>
+			<div role="none">E2E_VISIBLE_NONE_ROLE_TEXT</div>
+			<div role="status">E2E_VISIBLE_STATUS_TEXT</div>
+			<div role="alert">E2E_VISIBLE_ALERT_TEXT</div>
+			<details open>
+				<summary>E2E_VISIBLE_SUMMARY_TEXT</summary>
+				<div>E2E_VISIBLE_DETAILS_TEXT</div>
+			</details>
+			<svg width="360" height="32" role="img" aria-label="SVG text sample">
+				<text x="0" y="20">E2E_VISIBLE_SVG_TEXT</text>
+			</svg>
+			<div style="display: none">E2E_HIDDEN_DISPLAY_NONE_TEXT</div>
+			<div aria-hidden="true">E2E_HIDDEN_ARIA_TEXT</div>
+			<div hidden>E2E_HIDDEN_ATTR_TEXT</div>
+			<div style="visibility: hidden">E2E_HIDDEN_VISIBILITY_TEXT</div>
+		</div>
+	</body>
+</html>

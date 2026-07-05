@@ -206,17 +206,30 @@ export function labelNotFoundError(
 		? `Searched listbox(es): ${extra.searchedIds.join(", ")}. Ignored: ${(extra.ignoredIds || []).join(", ") || "none"}.`
 		: "No element matched this label. Check candidates or snapshot for visible controls.";
 	if (extra?.isDropdown) {
-		hint = `Target is a dropdown (combobox). ${hint}`;
+		hint = [
+			`Target is a dropdown (combobox). ${hint}`,
+			"If candidates are present, retry select_option with one exact candidate text.",
+			"Do not fill/type hidden validation-proxy inputs.",
+		].join(" ");
 	}
+	const recovery = extra?.isDropdown
+		? [
+				"Re-snapshot the dropdown, then retry page.select_option/web.tab.select_option on the same control with one exact visible candidate text",
+				[
+					"Do not use fill/type/click on comboboxes,",
+					"react-select controls, or hidden validation-proxy inputs",
+				].join(" "),
+			]
+		: [
+				"const d = await page.snapshot_data(); find the target in d.nodes",
+				"Try a more specific label or use refId from snapshot",
+			];
 	return {
 		message,
 		code: "E_NOT_FOUND",
 		category: "resource",
 		hint,
-		recovery: [
-			"const d = await page.snapshot_data(); find the target in d.nodes",
-			"Try a more specific label or use refId from snapshot",
-		],
+		recovery,
 		details: {
 			label,
 			...(extra?.targetRefId ? { targetRefId: extra.targetRefId } : {}),

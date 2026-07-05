@@ -90,6 +90,10 @@ a batch of speculative tests before the first implementation proves the path.
 - `chrome.scripting.executeScript` is only for explicit user/agent code in QuickJS cells (opt-in MAIN-world scripting)
 - There is no `web.tab.execute_script` — use `chrome.scripting.executeScript` from a cell when MAIN-world access is required
 
+### Snapshot Text Rule
+- SNAPSHOT RULE: IF IT IS VISIBLE TEXT, EXPOSE IT. DO NOT FILTER OUT ANY TEXT NO MATTER WHAT ELEMENT IT IS.
+- SNAPSHOT RULE: DO NOT FILTER TEXT BY ELEMENT TYPE, ROLE, DIRECTNESS, STRUCTURAL WRAPPER STATUS, INTERACTIVITY, FILTER LIMITS, OR SNAPSHOT NODE LIMITS.
+
 ### Extension-JS Type Boundary Rules
 - No visible `unknown` in extension-js public API, runner, worker, content-script, or test-facing types.
 - External data must be narrowed at the first boundary with zod or a named type guard, then passed deeper as named types.

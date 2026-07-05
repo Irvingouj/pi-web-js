@@ -11,6 +11,7 @@ import {
 	getAccessibleName,
 	getAccessibleRole,
 	getOwnVisibleText,
+	hasVisibleTextContent,
 	isSelfOrAncestorHidden,
 	readFormFields,
 	resolveAbsoluteUrl,
@@ -23,6 +24,7 @@ export type DomNode = {
 	role?: string;
 	name?: string;
 	text?: string;
+	mustKeep?: boolean;
 	attributes?: Record<string, string>;
 	hidden?: boolean;
 	hiddenReason?:
@@ -86,6 +88,11 @@ export function buildDomNode(
 		name: getAccessibleName(el) || undefined,
 		text: getOwnVisibleText(el, 100) || undefined,
 	};
+	if (hasVisibleTextContent(el)) {
+		// MUST_KEEP MEANS VISIBLE TEXT EXISTS. DO NOT DROP THIS NODE IN SNAPSHOT
+		// FILTERS, LIMITS, DEDUP, RENDERING, OR DOWNSTREAM DOM/SNAPSHOT PIPES.
+		node.mustKeep = true;
+	}
 	// raw attributes
 	const attrs: Record<string, string> = {};
 	for (const attr of Array.from(el.attributes)) attrs[attr.name] = attr.value;

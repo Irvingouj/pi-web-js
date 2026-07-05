@@ -361,6 +361,15 @@ export const TAB_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 			],
 			notes: [
 				"Explicit tabId required; same handlers as page.*",
+				[
+					"RULE: every dropdown (combobox/select/listbox) MUST use",
+					"web.tab.select_option({tabId, refId, value}). NEVER web.tab.fill,",
+					"web.tab.type, or web.tab.click on a dropdown control or its validation-proxy input.",
+				].join(" "),
+				[
+					"Use this for snapshot nodes printed as dropdown or nodes",
+					"with controlType='dropdown'; do not use fill/type on those controls",
+				].join(" "),
 				"Drives react-select and other ARIA combobox patterns: clicks the control to open, then clicks the matching [role='option']",
 			],
 			tags: ["mutation", "write"],

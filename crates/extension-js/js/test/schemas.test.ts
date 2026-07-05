@@ -37,6 +37,7 @@ describe("PageActionResultSchema", () => {
 			tag: "button",
 			role: "button",
 			value: "clicked",
+			controlValue: "clicked",
 			checked: true,
 			key: "Enter",
 		});
@@ -47,6 +48,7 @@ describe("PageActionResultSchema", () => {
 			tag: "button",
 			role: "button",
 			value: "clicked",
+			controlValue: "clicked",
 			checked: true,
 			key: "Enter",
 		});
