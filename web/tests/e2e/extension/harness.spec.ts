@@ -59,6 +59,86 @@ print(RESULT_PREFIX + JSON.stringify({ ok: true, value: sum + __probe }));
 			}
 		});
 
+		test("validation errors show function, parameter, and source line", async ({
+			harness,
+		}) => {
+			const exec = await executeCell(
+				harness.sidepanel,
+				`
+const tabs = await chrome.tabs.query({ url: "https://extension-js.test/*" });
+const tabId = tabs[0].id;
+await web.tab.fetch({ tabId, url: 123 });
+`,
+			);
+			expect(exec.status).toBe("error");
+			expect(exec.stderr).toContain("[web.tab.fetch] (E_INVALID_PARAMS)");
+			expect(exec.stderr).toContain("Invalid parameters for web.tab.fetch");
+			expect(exec.stderr).toContain("url");
+			expect(exec.stderr).toMatch(/line \d+/);
+		});
+		test("web.tab.url returns URL string without TypeError", async ({
+			harness,
+		}) => {
+			const exec = await executeCell(
+				harness.sidepanel,
+				`
+const tabs = await chrome.tabs.query({ url: "https://extension-js.test/*" });
+const tabId = tabs[0].id;
+const url = await web.tab.url(tabId);
+print(RESULT_PREFIX + JSON.stringify({ ok: true, value: url }));
+`,
+			);
+			expect(exec.status, exec.stderr).toBe("success");
+			expect(exec.stderr).not.toContain("[runtime error] TypeError");
+			expect(exec.stdout).toContain("https://extension-js.test");
+		});
+
+		test("web.tab.url invalid tabId shows structured E_INVALID_PARAMS", async ({
+			harness,
+		}) => {
+			const exec = await executeCell(
+				harness.sidepanel,
+				`await web.tab.url("not-a-tab");`,
+			);
+			expect(exec.status).toBe("error");
+			expect(exec.stderr).toContain("[web.tab.url] (E_INVALID_PARAMS)");
+			expect(exec.stderr).toContain("at 'tabId'");
+			expect(exec.stderr).toMatch(/line \d+/);
+			expect(exec.stderr).not.toContain("[runtime error] TypeError");
+		});
+
+		test("missing web.tab.nope shows E_UNKNOWN_API with available siblings", async ({
+			harness,
+		}) => {
+			const exec = await executeCell(
+				harness.sidepanel,
+				`await web.tab.nope();`,
+			);
+			expect(exec.status).toBe("error");
+			expect(exec.stderr).toContain("[web.tab.nope] (E_UNKNOWN_API)");
+			expect(exec.stderr).toContain("Available:");
+			expect(exec.stderr).not.toContain("[runtime error] TypeError");
+		});
+
+		test("chrome.scripting.executeScript with func shows E_UNTRANSPORTABLE_PARAM", async ({
+			harness,
+		}) => {
+			const exec = await executeCell(
+				harness.sidepanel,
+				`
+const tabs = await chrome.tabs.query({ url: "https://extension-js.test/*" });
+const tabId = tabs[0].id;
+await chrome.scripting.executeScript({ target: { tabId }, func: () => 1 });
+`,
+			);
+			expect(exec.status).toBe("error");
+			expect(exec.stderr).toContain(
+				"[chrome.scripting.executeScript] (E_UNTRANSPORTABLE_PARAM)",
+			);
+			expect(exec.stderr).toContain("web.tab.evaluate");
+			expect(exec.stderr).not.toContain("[runtime error] TypeError");
+		});
+
 		test("kernel session survives restart and errors", async ({ harness }) => {
 			const store = await executeCell(
 				harness.sidepanel,

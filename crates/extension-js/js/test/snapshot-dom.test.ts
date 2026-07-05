@@ -3,6 +3,7 @@ import { collectInlineSnapshot } from "../src/shared/cross/collect-inline-snapsh
 import {
 	getAccessibleRole,
 	getOwnVisibleText,
+	hasVisibleTextContent,
 	hasDirectTextContent,
 	isMarkdownVisible,
 	isReachableClickTarget,
@@ -33,15 +34,78 @@ describe("snapshot-dom markdown visibility", () => {
 		expect(isMarkdownVisible(div)).toBe(true);
 	});
 
-	it("excludes empty generic containers", () => {
+	it("includes generic containers with nested visible text", () => {
 		const div = document.createElement("div");
 		const child = document.createElement("span");
 		child.textContent = "nested";
 		div.appendChild(child);
 		document.body.appendChild(div);
 
-		expect(isMarkdownVisible(div)).toBe(false);
+		expect(isMarkdownVisible(div)).toBe(true);
 		expect(isMarkdownVisible(child)).toBe(true);
+	});
+
+	it("marks every visible text element as mustKeep across structural markup", () => {
+		document.body.innerHTML = `
+			<div id="visible-text-matrix">
+				<div>TXT_MATRIX_DIV</div>
+				<span>TXT_MATRIX_SPAN</span>
+				<section><div><span>TXT_MATRIX_NESTED_STRUCTURAL</span></div></section>
+				<main>TXT_MATRIX_MAIN</main>
+				<form><label>TXT_MATRIX_LABEL</label></form>
+				<ul><li>TXT_MATRIX_LIST_ITEM</li></ul>
+				<table><tbody><tr><td>TXT_MATRIX_TABLE_CELL</td></tr></tbody></table>
+				<div role="presentation">TXT_MATRIX_PRESENTATION</div>
+				<div role="none">TXT_MATRIX_NONE_ROLE</div>
+				<div role="status">TXT_MATRIX_STATUS</div>
+				<div role="alert">TXT_MATRIX_ALERT</div>
+				<details open><summary>TXT_MATRIX_SUMMARY</summary><div>TXT_MATRIX_DETAILS_BODY</div></details>
+				<div class="react-select__single-value">TXT_MATRIX_REACT_SELECT_SINGLE_VALUE</div>
+				<svg><text>TXT_MATRIX_SVG_TEXT</text></svg>
+				<div style="display:none">TXT_MATRIX_DISPLAY_NONE</div>
+				<div aria-hidden="true">TXT_MATRIX_ARIA_HIDDEN</div>
+				<div hidden>TXT_MATRIX_HIDDEN_ATTR</div>
+				<div style="visibility:hidden">TXT_MATRIX_VISIBILITY_HIDDEN</div>
+			</div>
+		`;
+
+		const visibleSentinels = [
+			"TXT_MATRIX_DIV",
+			"TXT_MATRIX_SPAN",
+			"TXT_MATRIX_NESTED_STRUCTURAL",
+			"TXT_MATRIX_MAIN",
+			"TXT_MATRIX_LABEL",
+			"TXT_MATRIX_LIST_ITEM",
+			"TXT_MATRIX_TABLE_CELL",
+			"TXT_MATRIX_PRESENTATION",
+			"TXT_MATRIX_NONE_ROLE",
+			"TXT_MATRIX_STATUS",
+			"TXT_MATRIX_ALERT",
+			"TXT_MATRIX_SUMMARY",
+			"TXT_MATRIX_DETAILS_BODY",
+			"TXT_MATRIX_REACT_SELECT_SINGLE_VALUE",
+			"TXT_MATRIX_SVG_TEXT",
+		];
+		const hiddenSentinels = [
+			"TXT_MATRIX_DISPLAY_NONE",
+			"TXT_MATRIX_ARIA_HIDDEN",
+			"TXT_MATRIX_HIDDEN_ATTR",
+			"TXT_MATRIX_VISIBILITY_HIDDEN",
+		];
+
+		const result = collectInlineSnapshot(1);
+		for (const sentinel of visibleSentinels) {
+			expect(result.text, sentinel).toContain(sentinel);
+			const node = result.nodes.find((n) => n.text?.includes(sentinel));
+			expect(node, sentinel).toBeDefined();
+			expect(node?.mustKeep, sentinel).toBe(true);
+		}
+		for (const sentinel of hiddenSentinels) {
+			expect(result.text, sentinel).not.toContain(sentinel);
+		}
+		expect(result.nodes.some((n) => n.tag === "html" || n.tag === "body")).toBe(
+			false,
+		);
 	});
 
 	it("includes aria-live regions", () => {
@@ -60,6 +124,7 @@ describe("snapshot-dom markdown visibility", () => {
 		document.body.appendChild(hidden);
 
 		expect(isMarkdownVisible(hidden)).toBe(false);
+		expect(hasVisibleTextContent(hidden)).toBe(false);
 	});
 
 	it("uses own text for generic containers with mixed children", () => {

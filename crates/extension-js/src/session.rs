@@ -150,6 +150,10 @@ impl ExtensionSession {
             action: cmd.action.clone(),
             params: cmd.params.clone(),
             run_id: cmd.run_id.clone(),
+            source_stack: cmd
+                .source_stack
+                .clone()
+                .or_else(|| Some("line 1".to_string())),
         };
 
         match web_js_core::api_docs::dispatch_handler(&cmd.action, core_cmd) {
@@ -165,6 +169,14 @@ impl ExtensionSession {
                         hint: e.hint,
                         recovery: e.recovery,
                         details: e.details,
+                        action: e.action,
+                        public_name: e.public_name,
+                        param: e.param.map(|p| WasmParamDetail {
+                            path: p.path,
+                            expected: p.expected,
+                            received_type: p.received_type,
+                            received_preview: p.received_preview,
+                        }),
                     }),
                 };
                 tracing::trace!(call_id = cmd.call_id, action = %cmd.action, ok = wasm_resp.ok, "handle_command_exit");

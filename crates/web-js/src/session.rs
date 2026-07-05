@@ -390,6 +390,7 @@ impl WebSession {
             action: cmd.action.clone(),
             params: cmd.params.clone(),
             run_id: cmd.run_id.clone(),
+            source_stack: None,
         };
 
         let result = web_js_core::handler_registry::dispatch_command(&core_cmd).await;

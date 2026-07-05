@@ -70,11 +70,15 @@ test.describe
 			}
 		});
 
-		test("T-007: page.snapshot_data({ max_nodes: 50 }) returns ≤50 nodes", async ({
+		test("T-007: page.snapshot_data({ max_nodes: 50 }) preserves visible text beyond cap", async ({
 			harness,
 		}) => {
 			const exec = await executeCell<
-				ContractResult<{ nodeCount: number; success: boolean }>
+				ContractResult<{
+					nodeCount: number;
+					nonMustKeepCount: number;
+					hasLastNode: boolean;
+				}>
 			>(
 				harness.sidepanel,
 				cellSource(
@@ -83,7 +87,8 @@ test.describe
 					"const data = await page.snapshot_data({ max_nodes: 50 });",
 					"print(RESULT_PREFIX + JSON.stringify({ ok: true, value: {",
 					"  nodeCount: data.nodes.length,",
-					"  success: data.nodes.length <= 50",
+					"  nonMustKeepCount: data.nodes.filter(n => n.mustKeep !== true).length,",
+					"  hasLastNode: data.text.includes('Node 4999')",
 					"} }));",
 				),
 				20_000,
@@ -92,19 +97,22 @@ test.describe
 			expect(exec.status, `${exec.stderr}\n${exec.stdout}`).toBe("success");
 			expect(exec.result?.ok).toBe(true);
 			if (exec.result?.ok) {
-				expect(exec.result.value.nodeCount).toBeLessThanOrEqual(50);
-				expect(exec.result.value.success).toBe(true);
+				expect(exec.result.value.nodeCount).toBeGreaterThan(50);
+				expect(exec.result.value.nonMustKeepCount).toBeLessThanOrEqual(50);
+				expect(exec.result.value.hasLastNode).toBe(true);
 			}
 		});
 
-		test("T-007: page.snapshot_data({ max_nodes: 200 }) returns more nodes than 50", async ({
+		test("T-007: page.snapshot_data max_nodes bounds only non-mustKeep nodes", async ({
 			harness,
 		}) => {
 			const exec = await executeCell<
 				ContractResult<{
 					count50: number;
 					count200: number;
-					moreThan50: boolean;
+					nonMustKeep50: number;
+					nonMustKeep200: number;
+					bothHaveLastNode: boolean;
 				}>
 			>(
 				harness.sidepanel,
@@ -116,7 +124,9 @@ test.describe
 					"print(RESULT_PREFIX + JSON.stringify({ ok: true, value: {",
 					"  count50: data50.nodes.length,",
 					"  count200: data200.nodes.length,",
-					"  moreThan50: data200.nodes.length > data50.nodes.length",
+					"  nonMustKeep50: data50.nodes.filter(n => n.mustKeep !== true).length,",
+					"  nonMustKeep200: data200.nodes.filter(n => n.mustKeep !== true).length,",
+					"  bothHaveLastNode: data50.text.includes('Node 4999') && data200.text.includes('Node 4999')",
 					"} }));",
 				),
 				20_000,
@@ -125,9 +135,11 @@ test.describe
 			expect(exec.status, `${exec.stderr}\n${exec.stdout}`).toBe("success");
 			expect(exec.result?.ok).toBe(true);
 			if (exec.result?.ok) {
-				expect(exec.result.value.count50).toBeLessThanOrEqual(50);
-				expect(exec.result.value.count200).toBeLessThanOrEqual(200);
-				expect(exec.result.value.moreThan50).toBe(true);
+				expect(exec.result.value.count50).toBeGreaterThan(50);
+				expect(exec.result.value.count200).toBeGreaterThan(50);
+				expect(exec.result.value.nonMustKeep50).toBeLessThanOrEqual(50);
+				expect(exec.result.value.nonMustKeep200).toBeLessThanOrEqual(200);
+				expect(exec.result.value.bothHaveLastNode).toBe(true);
 			}
 		});
 

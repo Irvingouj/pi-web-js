@@ -157,13 +157,26 @@ export function filterNodes(
 	if (filter.interactiveOnly) {
 		result = result.filter(
 			(n) =>
+				n.mustKeep === true ||
 				INTERACTIVE_ROLES.has(n.role.toLowerCase()) ||
 				INTERACTIVE_TAGS.has(n.tag.toLowerCase()),
 		);
 	}
 
 	if (filter.limit !== undefined && filter.limit > 0) {
-		result = result.slice(0, filter.limit);
+		const limited: InlineSnapshotNode[] = [];
+		let nonMustKeepCount = 0;
+		for (const node of result) {
+			if (node.mustKeep === true) {
+				limited.push(node);
+				continue;
+			}
+			if (nonMustKeepCount < filter.limit) {
+				limited.push(node);
+				nonMustKeepCount++;
+			}
+		}
+		result = limited;
 	}
 
 	return result;

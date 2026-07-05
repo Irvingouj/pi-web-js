@@ -1,4 +1,9 @@
 import type { z } from "zod";
+import type {
+	JsApiAlias,
+	JsManifestEntry,
+	JsParamDoc,
+} from "../../../pkg/extension_js.js";
 
 export interface Command {
 	action: string;
@@ -7,6 +12,13 @@ export interface Command {
 	runId?: string;
 }
 
+export type ParamDetail = {
+	path: string;
+	expected?: string;
+	receivedType?: string;
+	receivedPreview?: string;
+};
+
 export type AsyncError = {
 	message: string;
 	code: string;
@@ -14,18 +26,20 @@ export type AsyncError = {
 	hint?: string;
 	recovery?: string[];
 	details?: Record<string, unknown>;
+	action?: string;
+	publicName?: string;
+	param?: ParamDetail;
+	line?: number | null;
 };
 
 export type AsyncResponse<T = unknown> =
 	| { ok: true; value: T }
 	| { ok: false; error: AsyncError };
 
-export interface ToolDocParam {
-	name: string;
-	type: string;
-	required: boolean;
-	description: string;
-}
+// JsParamDoc fields (name/type/required/description) match ToolDocParam exactly.
+// Re-export the generated type and keep the legacy name for existing callers.
+export type { JsParamDoc };
+export type ToolDocParam = JsParamDoc;
 
 export interface ToolDoc {
 	action: string;
@@ -53,6 +67,7 @@ export type ToolAgentMeta = {
 export interface ToolDefinition<P, R> {
 	action: string;
 	namespace: string;
+	name: string;
 	description: string;
 	params: z.ZodSchema<P>;
 	returns: z.ZodSchema<R>;
@@ -103,31 +118,30 @@ export type JsCallSpec<P, R> = {
 	agentMeta?: ToolAgentMeta;
 };
 
-export type SerializableJsCallManifestEntry = {
-	action: string;
-	namespace: string;
-	name: string;
-	publicName: string;
-	description: string;
-	fields: string[] | null;
-	aliases: Array<{
-		namespace: string;
-		name: string;
-		fields: string[] | null;
-	}> | null;
+/**
+ * Runtime manifest shape derived from the generated JsManifestEntry (wasm-bindgen).
+ *
+ * The Omit-plus-override pattern handles shape differences between the generated
+ * type and the runtime construction paths:
+ * - `aliases` is `JsApiAlias[] | null` (wasm-bindgen emits non-null, callers pass null).
+ * - `errorCategory`, `permission`, `example` are `string | undefined` (callers pass
+ *   optional strings; manifestEntryToWasm normalizes undefined → null for WASM).
+ * - `owner` is a runtime-only routing field, not sent to WASM.
+ * - The flat fields `prerequisites`, `notes`, `tags`, `relatedApis` come from
+ *   JsManifestEntry (optional `string[] | null`); callers may omit them.
+ */
+export type SerializableJsCallManifestEntry = Omit<
+	JsManifestEntry,
+	"aliases" | "errorCategory" | "permission" | "example"
+> & {
+	/** Aliases can be null when constructed from JsCallSpec (spec.aliases may be undefined). */
+	aliases: JsApiAlias[] | null;
+	/** Runtime routing owner; not part of the WASM manifest shape. */
 	owner: ExecutionContextId;
-	paramsDoc: ToolDocParam[];
-	returnsDoc: { type: string; description: string };
-	errorCode: string;
+	/** Callers pass string | undefined; manifestEntryToWasm normalizes to string | null. */
 	errorCategory?: string;
-	/** Chrome permission required to use this API (e.g. "notifications", "cookies"). */
 	permission?: string;
-	/** Runnable example string for this API. */
 	example?: string;
-	prerequisites?: string[];
-	notes?: string[];
-	tags?: string[];
-	relatedApis?: string[];
 };
 
 /** Rust/WASM often passes BTreeMap params as a JS Map; Zod object schemas need plain objects.
@@ -153,7 +167,7 @@ export function coerceWasmParams(params: unknown): unknown {
 /** Convert a serializable manifest entry to the shape expected by WASM registerJsCall/registerJsCallBatch. */
 export function manifestEntryToWasm(
 	entry: SerializableJsCallManifestEntry,
-): Record<string, unknown> {
+): JsManifestEntry {
 	return {
 		action: entry.action,
 		namespace: entry.namespace,

@@ -522,6 +522,7 @@ export const handlers = {
 			return makeActionResult("select_option", el, {
 				value: opt.value,
 				selectedText: (opt.text || "").trim(),
+				controlValue: el.value,
 				verification: "required",
 			});
 		}
@@ -594,6 +595,7 @@ export const handlers = {
 		return makeActionResult("select_option", el, {
 			value: el instanceof HTMLInputElement ? el.value : value,
 			selectedText: (match.textContent || "").trim(),
+			controlValue: el instanceof HTMLInputElement ? el.value : undefined,
 			verification: "required",
 		});
 	},

@@ -2,7 +2,7 @@ use crate::error::format::format_js_exception;
 use crate::error::js_exception::{
     extract_line_number, parse_js_exception, split_name_message, JsException,
 };
-use crate::types::CellError;
+use crate::types::{CellError, ParamDetail};
 use rquickjs::{Ctx, Value};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -80,26 +80,43 @@ pub(crate) fn cell_error_from_js_exception(exc: JsException) -> CellError {
             message: exc.message,
             line,
         }
-    } else {
-        let message = if exc.action.is_some()
-            || exc.code.is_some()
-            || exc.hint.is_some()
+    } else if let (Some(code), Some(action)) = (exc.code, exc.action) {
+        // Structured API error — code and action both present.
+        let public_name = exc.public_name.unwrap_or_else(|| action.clone());
+        let message = if exc.hint.is_some()
             || exc.recovery.as_ref().is_some_and(|r| !r.is_empty())
         {
             full_text
         } else {
             exc.message
         };
-        CellError::Runtime {
-            name: exc.name,
+        let param = exc.param_path.map(|path| ParamDetail {
+            path,
+            expected: exc.expected,
+            received_type: exc.received_type,
+            received_preview: exc.received_preview,
+        });
+        CellError::ApiError {
+            code,
             message,
+            action,
+            public_name,
             line,
-            action: exc.action,
-            code: exc.code,
-            stack: exc.stack,
+            param,
+            category: exc.category,
             hint: exc.hint,
             recovery: exc.recovery,
             details: exc.details,
+            stack: exc.stack,
+        }
+    } else {
+        // Bare JS throw — no code/action pair.
+        let message = exc.message;
+        CellError::JsRuntime {
+            name: exc.name,
+            message,
+            line,
+            stack: exc.stack,
         }
     }
 }
@@ -125,8 +142,14 @@ pub(crate) fn cell_error_from_text(msg: &str) -> CellError {
         code: None,
         hint: None,
         recovery: None,
+        category: None,
         details: None,
         stack: None,
+        public_name: None,
+        param_path: None,
+        expected: None,
+        received_type: None,
+        received_preview: None,
     })
 }
 
@@ -158,8 +181,14 @@ mod tests {
             code: None,
             hint: None,
             recovery: None,
+            category: None,
             details: None,
             stack: None,
+            public_name: None,
+            param_path: None,
+            expected: None,
+            received_type: None,
+            received_preview: None,
         }
     }
 
@@ -192,11 +221,13 @@ mod tests {
         let exc = js_exc(Some("TypeError"), "x is not a function");
         let err = cell_error_from_js_exception(exc);
         match err {
-            CellError::Runtime { name, message, .. } => {
+            CellError::JsRuntime {
+                name, message, ..
+            } => {
                 assert_eq!(name.as_deref(), Some("TypeError"));
                 assert_eq!(message, "x is not a function");
             }
-            other => panic!("expected Runtime, got {other:?}"),
+            other => panic!("expected JsRuntime, got {other:?}"),
         }
     }
 
@@ -210,25 +241,28 @@ mod tests {
             code: Some("E_SCRIPTING".into()),
             hint: None,
             recovery: None,
+            category: None,
             details: None,
             stack: None,
+            public_name: None,
+            param_path: None,
+            expected: None,
+            received_type: None,
+            received_preview: None,
         };
         let err = cell_error_from_js_exception(exc);
         match err {
-            CellError::Runtime {
+            CellError::ApiError {
                 message,
                 action,
                 code,
                 ..
             } => {
-                assert_eq!(
-                    message,
-                    "[tab_snapshot] (E_SCRIPTING): Cannot execute script"
-                );
-                assert_eq!(action.as_deref(), Some("tab_snapshot"));
-                assert_eq!(code.as_deref(), Some("E_SCRIPTING"));
+                assert_eq!(message, "Cannot execute script");
+                assert_eq!(action, "tab_snapshot");
+                assert_eq!(code, "E_SCRIPTING");
             }
-            other => panic!("expected Runtime, got {other:?}"),
+            other => panic!("expected ApiError, got {other:?}"),
         }
     }
 
@@ -242,15 +276,21 @@ mod tests {
             code: Some("E_FETCH_BLOB_URL".into()),
             hint: Some("capture bytes before download".into()),
             recovery: Some(vec!["fetch the underlying endpoint".into()]),
+            category: None,
             details: Some(serde_json::json!({
                 "url": "blob:https://example.com/id",
                 "errorName": "TypeError",
                 "errorMessage": "Failed to fetch"
             })),
             stack: None,
+            public_name: None,
+            param_path: None,
+            expected: None,
+            received_type: None,
+            received_preview: None,
         };
         match cell_error_from_js_exception(exc) {
-            CellError::Runtime {
+            CellError::ApiError {
                 hint,
                 recovery,
                 details,
@@ -269,7 +309,7 @@ mod tests {
                     Some("Failed to fetch")
                 );
             }
-            other => panic!("expected Runtime, got {other:?}"),
+            other => panic!("expected ApiError, got {other:?}"),
         }
     }
 
@@ -305,12 +345,18 @@ mod tests {
             code: None,
             hint: None,
             recovery: None,
+            category: None,
             details: None,
             stack: None,
+            public_name: None,
+            param_path: None,
+            expected: None,
+            received_type: None,
+            received_preview: None,
         };
         let err = cell_error_from_js_exception(exc);
         match err {
-            CellError::Runtime {
+            CellError::JsRuntime {
                 ref name,
                 ref message,
                 ..
@@ -322,7 +368,7 @@ mod tests {
                 assert_eq!(display, "TypeError");
                 assert!(!display.contains("TypeError: TypeError"));
             }
-            other => panic!("expected Runtime, got {other:?}"),
+            other => panic!("expected JsRuntime, got {other:?}"),
         }
     }
 
@@ -336,11 +382,17 @@ mod tests {
             code: None,
             hint: None,
             recovery: None,
+            category: None,
             details: None,
             stack: Some("    at foo (eval:1:5)\n    at bar (eval:2:10)".into()),
+            public_name: None,
+            param_path: None,
+            expected: None,
+            received_type: None,
+            received_preview: None,
         };
         match cell_error_from_js_exception(exc) {
-            CellError::Runtime { stack, .. } => {
+            CellError::JsRuntime { stack, .. } => {
                 assert!(
                     stack
                         .as_ref()
@@ -348,7 +400,7 @@ mod tests {
                     "stack should be forwarded: {stack:?}"
                 );
             }
-            other => panic!("expected Runtime, got {other:?}"),
+            other => panic!("expected JsRuntime, got {other:?}"),
         }
     }
 
@@ -358,11 +410,13 @@ mod tests {
     fn text_type_error() {
         let err = cell_error_from_text("TypeError: x is not a function");
         match err {
-            CellError::Runtime { name, message, .. } => {
+            CellError::JsRuntime {
+                name, message, ..
+            } => {
                 assert_eq!(name.as_deref(), Some("TypeError"));
                 assert_eq!(message, "x is not a function");
             }
-            other => panic!("expected Runtime, got {other:?}"),
+            other => panic!("expected JsRuntime, got {other:?}"),
         }
     }
 

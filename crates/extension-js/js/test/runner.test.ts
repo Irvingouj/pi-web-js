@@ -600,7 +600,7 @@ describe("schema validation", () => {
 			// The error message should mention the API name, field path, and issue,
 			// but should NOT contain the raw invalid value in a way that leaks sensitive data.
 			expect(result.error.message).toContain(
-				"Invalid parameters for storage_set",
+				"Invalid parameters for storage.set",
 			);
 			expect(result.error.message).toContain("at 'value'");
 			expect(result.error.message).toContain(
@@ -665,7 +665,7 @@ describe("WU-9: actionable validation errors", () => {
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.message).toContain(
-				"Invalid parameters for page_unhover",
+				"Invalid parameters for page.unhover",
 			);
 			expect(result.error.message).toContain("expected { } or no args");
 			expect(result.error.message).toContain("received string");
@@ -677,7 +677,7 @@ describe("WU-9: actionable validation errors", () => {
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.message).toContain(
-				"Invalid parameters for mock_async",
+				"Invalid parameters for util.mock_async",
 			);
 			expect(result.error.message).toContain(
 				"expected string or { label?: string }",
@@ -696,7 +696,7 @@ describe("WU-9: actionable validation errors", () => {
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.message).toContain(
-				"Invalid parameters for page_extract",
+				"Invalid parameters for page.extract",
 			);
 			expect(result.error.message).toContain("at 'fields.0'");
 			expect(result.error.message).toContain(
@@ -1194,6 +1194,47 @@ describe("chrome passthrough", () => {
 			"test-id",
 			options,
 		);
+	});
+	it("executeScript with func fails with E_UNTRANSPORTABLE_PARAM before Chrome", async () => {
+		mockChrome.scripting.executeScript.mockResolvedValue([
+			{ frameId: 0, result: 1 },
+		]);
+		const result = await dispatchTool("chrome_scripting_executeScript", [
+			{ target: { tabId: 1 }, func: () => 1 },
+		]);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_UNTRANSPORTABLE_PARAM");
+			expect(result.error.message).toContain("web.tab.evaluate");
+			expect(result.error.param?.path).toBe("func");
+		}
+		expect(mockChrome.scripting.executeScript).not.toHaveBeenCalled();
+	});
+
+	it("executeScript with /skills/ path fails with path explanation", async () => {
+		const result = await dispatchTool("chrome_scripting_executeScript", [
+			{ target: { tabId: 1 }, files: ["/skills/foo.js"] },
+		]);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_UNTRANSPORTABLE_PARAM");
+			expect(result.error.message).toContain("not extension-packaged");
+		}
+		expect(mockChrome.scripting.executeScript).not.toHaveBeenCalled();
+	});
+
+	it("executeScript with valid packaged files reaches Chrome", async () => {
+		mockChrome.scripting.executeScript.mockResolvedValue([
+			{ frameId: 0, result: "injected" },
+		]);
+		const result = await dispatchTool("chrome_scripting_executeScript", [
+			{ target: { tabId: 1 }, files: ["/assets/real.js"] },
+		]);
+		expect(result.ok).toBe(true);
+		expect(mockChrome.scripting.executeScript).toHaveBeenCalledWith({
+			target: { tabId: 1 },
+			files: ["/assets/real.js"],
+		});
 	});
 });
 
@@ -2418,6 +2459,52 @@ describe("tab actions", () => {
 		const manifest = getSerializableJsManifest();
 		expect(manifest.find((e) => e.action === "tab_back")?.owner).toBe(
 			"content-script",
+		);
+	});
+	it("tab_url returns the tab URL", async () => {
+		mockChrome.tabs.get.mockResolvedValue({
+			id: 123,
+			url: "https://example.com/page",
+			title: "Example",
+		});
+		const result = await dispatchTool("tab_url", { tabId: 123 });
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.value).toBe("https://example.com/page");
+		}
+		expect(mockChrome.tabs.get).toHaveBeenCalledWith(123);
+	});
+
+	it("tab_title returns the tab title", async () => {
+		mockChrome.tabs.get.mockResolvedValue({
+			id: 123,
+			url: "https://example.com/page",
+			title: "Example Page",
+		});
+		const result = await dispatchTool("tab_title", { tabId: 123 });
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.value).toBe("Example Page");
+		}
+	});
+
+	it("tab_url invalid tabId fails with E_INVALID_PARAMS", async () => {
+		const result = await dispatchTool("tab_url", { tabId: "not-a-number" });
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_INVALID_PARAMS");
+			expect(result.error.publicName).toBe("web.tab.url");
+			expect(result.error.param?.receivedType).toBe("string");
+		}
+	});
+
+	it("tab_url and tab_title appear in manifest as web.tab.url / web.tab.title", () => {
+		const manifest = getSerializableJsManifest();
+		expect(manifest.find((e) => e.action === "tab_url")?.publicName).toBe(
+			"web.tab.url",
+		);
+		expect(manifest.find((e) => e.action === "tab_title")?.publicName).toBe(
+			"web.tab.title",
 		);
 	});
 });

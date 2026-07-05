@@ -680,6 +680,14 @@ pub fn dispatch_handler(action: &str, cmd: AsyncCommand) -> Option<AsyncHandlerF
                     .map(|s| JsValue::from_str(s))
                     .unwrap_or(JsValue::NULL),
             );
+            let _ = js_sys::Reflect::set(
+                &context_js,
+                &"sourceStack".into(),
+                &cmd.source_stack
+                    .as_ref()
+                    .map(|s| JsValue::from_str(s))
+                    .unwrap_or(JsValue::NULL),
+            );
             let result_js = match cb.call2(&JsValue::NULL, &params_js, &context_js) {
                 Ok(v) => v,
                 Err(e) => {
@@ -2604,6 +2612,7 @@ mod tests {
             action: "dup_test".to_string(),
             params: serde_json::json!({}),
             run_id: None,
+            source_stack: None,
         };
         let fut = dispatch_handler("dup_test", cmd);
         assert!(fut.is_some());
@@ -2634,6 +2643,7 @@ mod tests {
             action: "rust_action".to_string(),
             params: serde_json::json!({}),
             run_id: None,
+            source_stack: None,
         };
 
         let fut = dispatch_handler("rust_action", cmd);
@@ -2661,6 +2671,7 @@ mod tests {
             action: "unknown".to_string(),
             params: serde_json::json!({}),
             run_id: None,
+            source_stack: None,
         };
 
         let fut = dispatch_handler("unknown", cmd);
@@ -2708,6 +2719,7 @@ mod tests {
             action: "js_success".to_string(),
             params: serde_json::json!({}),
             run_id: None,
+            source_stack: None,
         };
 
         let fut = dispatch_handler("js_success", cmd);
@@ -2739,6 +2751,7 @@ mod tests {
             action: "js_reject".to_string(),
             params: serde_json::json!({}),
             run_id: None,
+            source_stack: None,
         };
 
         let fut = dispatch_handler("js_reject", cmd);
@@ -2772,6 +2785,7 @@ mod tests {
             action: "js_timeout".to_string(),
             params: serde_json::json!({}),
             run_id: None,
+            source_stack: None,
         };
 
         let fut = dispatch_handler("js_timeout", cmd);
@@ -2820,6 +2834,7 @@ mod tests {
                 "name": "web_js_contract"
             }]),
             run_id: None,
+            source_stack: None,
         };
 
         let fut = dispatch_handler("js_params_shape", cmd);

@@ -312,6 +312,7 @@ function isHiddenElement(el: Element): boolean {
 export function isMarkdownVisible(el: Element): boolean {
 	const tag = el.tagName.toLowerCase();
 	if (EXCLUDED_TAGS.has(tag)) return false;
+	if (tag === "html" || tag === "body") return false;
 	if (isHiddenElement(el)) return false;
 
 	const role = getAccessibleRole(el);
@@ -325,10 +326,17 @@ export function isMarkdownVisible(el: Element): boolean {
 
 	const text = el.textContent?.trim() || "";
 	if (!text) return false;
-	if (MARKDOWN_TEXT_TAGS.has(tag)) return true;
-	if (hasDirectTextContent(el)) return true;
+	// SNAPSHOT RULE: IF IT IS VISIBLE TEXT, EXPOSE IT. DO NOT FILTER TEXT BY
+	// ELEMENT TYPE, ROLE, DIRECTNESS, OR WHETHER THE ELEMENT LOOKS STRUCTURAL.
+	return true;
+}
 
-	return false;
+export function hasVisibleTextContent(el: Element): boolean {
+	const tag = el.tagName.toLowerCase();
+	if (EXCLUDED_TAGS.has(tag)) return false;
+	if (tag === "html" || tag === "body") return false;
+	if (isHiddenElement(el)) return false;
+	return (el.textContent?.trim() || "").length > 0;
 }
 
 export function getAccessibleName(el: Element): string {

@@ -37,6 +37,7 @@ describe("PageActionResultSchema", () => {
 			tag: "button",
 			role: "button",
 			value: "clicked",
+			controlValue: "clicked",
 			checked: true,
 			key: "Enter",
 		});
@@ -47,6 +48,7 @@ describe("PageActionResultSchema", () => {
 			tag: "button",
 			role: "button",
 			value: "clicked",
+			controlValue: "clicked",
 			checked: true,
 			key: "Enter",
 		});
@@ -268,7 +270,7 @@ describe("invalid parameter shapes produce E_INVALID_PARAMS through real dispatc
 		if (!result.ok) {
 			expect(result.error.code).toBe("E_INVALID_PARAMS");
 			expect(result.error.message).toContain(
-				"Invalid parameters for page_fetch",
+				"Invalid parameters for page.fetch",
 			);
 		}
 	});

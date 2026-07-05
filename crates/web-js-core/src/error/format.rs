@@ -52,31 +52,82 @@ pub fn format_cell_error_text(err: &CellError) -> String {
             message,
             line,
         } => format_named_error(name.as_deref(), message, *line),
-        CellError::Runtime {
+        CellError::JsRuntime {
             name,
             message,
             line,
-            action,
+            stack,
+        } => {
+            let mut out = format_named_error(name.as_deref(), message, *line);
+            if message.is_empty() {
+                append_stack(&mut out, stack);
+            }
+            out
+        }
+        CellError::ApiError {
             code,
+            message,
+            public_name,
+            line,
+            param,
+            hint,
+            recovery,
             stack,
             ..
         } => {
-            if action.is_some() || code.is_some() {
-                let action = action.as_deref().unwrap_or("unknown");
-                let code = code.as_deref().unwrap_or("E_UNKNOWN");
-                let mut out = format!("[{}] ({}): {}", action, code, message);
-                if let Some(line) = line {
+            // `message` may already be the full_text from format_js_exception
+            // (i.e. "[action] (code): ..."), or just the raw message. Detect an
+            // existing bracket prefix to avoid double-wrapping.
+            let already_wrapped = message.starts_with('[');
+            let mut out = if already_wrapped {
+                let mut s = message.to_string();
+                // If a public_name is available and the existing bracket uses
+                // the internal action, swap the bracket label to public_name.
+                if let Some(close) = s.find(']') {
+                    s = format!("[{}]{}", public_name, &s[close + 1..]);
+                }
+                s
+            } else {
+                format!("[{}] ({}): {}", public_name, code, message)
+            };
+            // Append structured param detail only for nested paths where the
+            // message does not already include it. Root-branch messages
+            // already contain "expected X, received Y" — skip to avoid duplication.
+            if let Some(p) = param {
+                let has_param_detail = message.contains(&format!("'{}'", p.path));
+                let is_root = p.path == "root";
+                if !has_param_detail && !is_root {
+                    out.push_str(&format!(" at '{}'", p.path));
+                    if let Some(exp) = &p.expected {
+                        out.push_str(&format!(": expected {}", exp));
+                    }
+                    if let Some(rt) = &p.received_type {
+                        out.push_str(&format!(", received {}", rt));
+                    }
+                    if let Some(preview) = &p.received_preview {
+                        out.push_str(&format!(" ({})", preview));
+                    }
+                }
+            }
+            if let Some(line) = line {
+                if !out.contains(&format!("(line {})", line)) {
                     out.push_str(&format!(" (line {})", line));
                 }
-                append_stack(&mut out, stack);
-                out
-            } else {
-                let mut out = format_named_error(name.as_deref(), message, *line);
-                if message.is_empty() {
-                    append_stack(&mut out, stack);
-                }
-                out
             }
+            append_stack(&mut out, stack);
+            if let Some(h) = hint {
+                out.push_str("\n\nHint: ");
+                out.push_str(h);
+            }
+            if let Some(steps) = recovery {
+                if !steps.is_empty() {
+                    out.push_str("\n\nRecovery:");
+                    for (idx, step) in steps.iter().enumerate() {
+                        out.push_str(&format!("\n  {}. {}", idx + 1, step));
+                    }
+                }
+            }
+            out
         }
         CellError::FuelExhausted => "Execution stopped: time limit reached".to_string(),
         CellError::Internal { message } => format!("Internal error: {}", message),
@@ -125,7 +176,13 @@ mod tests {
                 "refresh the tab".into(),
             ]),
             details: None,
+            category: None,
             stack: None,
+            public_name: None,
+            param_path: None,
+            expected: None,
+            received_type: None,
+            received_preview: None,
         };
         let text = format_js_exception(&exc);
         assert!(text.contains("Hint: snapshot works"));
@@ -144,49 +201,48 @@ mod tests {
     }
 
     #[test]
-    fn format_runtime_error() {
-        let text = format_cell_error_text(&CellError::Runtime {
+    fn format_js_runtime_error() {
+        let text = format_cell_error_text(&CellError::JsRuntime {
             name: Some("TypeError".into()),
             message: "x is not defined".into(),
             line: None,
-            action: None,
-            code: None,
             stack: None,
-            hint: None,
-            recovery: None,
-            details: None,
         });
         assert_eq!(text, "TypeError: x is not defined");
     }
 
     #[test]
     fn format_api_error() {
-        let text = format_cell_error_text(&CellError::Runtime {
-            name: Some("Error".into()),
+        let text = format_cell_error_text(&CellError::ApiError {
+            code: "E_SCRIPTING".into(),
             message: "Cannot execute script".into(),
+            action: "tab_snapshot".into(),
+            public_name: "tab_snapshot".into(),
             line: None,
-            action: Some("tab_snapshot".into()),
-            code: Some("E_SCRIPTING".into()),
-            stack: None,
+            param: None,
+            category: None,
             hint: None,
             recovery: None,
             details: None,
+            stack: None,
         });
         assert_eq!(text, "[tab_snapshot] (E_SCRIPTING): Cannot execute script");
     }
 
     #[test]
     fn format_api_error_with_line() {
-        let text = format_cell_error_text(&CellError::Runtime {
-            name: None,
+        let text = format_cell_error_text(&CellError::ApiError {
+            code: "E_SCRIPTING".into(),
             message: "Cannot execute script".into(),
+            action: "tab_snapshot".into(),
+            public_name: "tab_snapshot".into(),
             line: Some(12),
-            action: Some("tab_snapshot".into()),
-            code: Some("E_SCRIPTING".into()),
-            stack: None,
+            param: None,
+            category: None,
             hint: None,
             recovery: None,
             details: None,
+            stack: None,
         });
         assert_eq!(
             text,
@@ -195,17 +251,12 @@ mod tests {
     }
 
     #[test]
-    fn format_runtime_error_empty_message_uses_stack() {
-        let text = format_cell_error_text(&CellError::Runtime {
+    fn format_js_runtime_error_empty_message_uses_stack() {
+        let text = format_cell_error_text(&CellError::JsRuntime {
             name: Some("TypeError".into()),
             message: String::new(),
             line: None,
-            action: None,
-            code: None,
             stack: Some("    at foo (eval:1:5)\n    at bar (eval:2:10)".into()),
-            hint: None,
-            recovery: None,
-            details: None,
         });
         assert!(text.contains("TypeError"));
         assert!(text.contains("Stack:"));

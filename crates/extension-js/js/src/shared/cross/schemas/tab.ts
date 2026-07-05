@@ -64,6 +64,34 @@ export const TabSetFilesParamsSchema = tabElementTargetParams({
 		.min(1)
 		.describe("Files to attach to the input"),
 });
+/** Schema for web.tab.url / web.tab.title — requires tabId, accepts positional. */
+const tabIdRequired = z.object({
+	tabId: z
+		.union([z.number(), bigintLike()])
+		.describe("Target tab ID (literal number)"),
+});
+export const TabUrlParamsSchema = tabIdRequired;
+export const TabTitleParamsSchema = tabIdRequired;
+/** Schema for web.tab.dom — tab-scoped DOM introspection. Includes tabId (ignored by dom handler). */
+export const TabDomParamsSchema = z.object({
+	tabId: z
+		.union([z.number(), bigintLike()])
+		.describe("Target tab ID (literal number)"),
+	selector: z
+		.string()
+		.describe("CSS selector for the root element(s) to introspect"),
+	depth: z
+		.number()
+		.int()
+		.min(0)
+		.max(10)
+		.default(2)
+		.describe("How many descendant levels to include (0 = root only)"),
+	includeHidden: z
+		.boolean()
+		.default(true)
+		.describe("Include hidden elements (default true)"),
+});
 export const TabResolvedSetFilesParamsSchema = tabElementTargetParams({
 	files: z
 		.array(ResolvedSetFileSchema)

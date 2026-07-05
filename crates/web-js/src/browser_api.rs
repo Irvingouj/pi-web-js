@@ -17,6 +17,14 @@ fn wasm_to_core(resp: WasmAsyncResponse) -> web_js_core::AsyncResponse {
             hint: e.hint,
             recovery: e.recovery,
             details: e.details,
+            action: e.action,
+            public_name: e.public_name,
+            param: e.param.map(|p| web_js_core::ParamDetail {
+                path: p.path,
+                expected: p.expected,
+                received_type: p.received_type,
+                received_preview: p.received_preview,
+            }),
         }),
     }
 }
@@ -3399,6 +3407,7 @@ pub async fn dispatch_command(
         action: cmd.action.clone(),
         params: cmd.params.clone(),
         run_id: cmd.run_id.clone(),
+        source_stack: None,
     };
 
     let core_resp = web_js_core::handler_registry::dispatch_command(&core_cmd).await?;

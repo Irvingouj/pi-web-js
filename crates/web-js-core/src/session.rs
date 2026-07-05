@@ -477,16 +477,11 @@ impl JsSession {
                     hs.stdout.clone(),
                     hs.stderr.clone(),
                     hs.commands.clone(),
-                    CellError::Runtime {
+                    CellError::JsRuntime {
                         name: None,
                         message: "Promise is still pending after execution".into(),
                         line: None,
-                        action: None,
-                        code: None,
                         stack: None,
-                        hint: None,
-                        recovery: None,
-                        details: None,
                     },
                     false,
                     exec_count,

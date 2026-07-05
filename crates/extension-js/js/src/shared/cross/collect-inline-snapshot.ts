@@ -6,6 +6,7 @@ import {
 	getAccessibleName,
 	getAccessibleRole,
 	getOwnVisibleText,
+	hasVisibleTextContent,
 	isProbablyClickable,
 	isReachableClickTarget,
 	isValidationProxyInput,
@@ -23,6 +24,7 @@ export type InlineSnapshotNode = {
 	tag: string;
 	controlType?: string;
 	actionable?: boolean;
+	mustKeep?: boolean;
 	forControl?: string;
 	recommendedAction?: string;
 	confidence?: "high" | "low";
@@ -202,12 +204,18 @@ const buildNode = (
 	_depth: number,
 	parentRefId: string,
 ): InlineSnapshotNode => {
+	const mustKeep = hasVisibleTextContent(el);
 	const node: InlineSnapshotNode = {
 		refId: allocateRefId(el),
 		role: getAccessibleRole(el),
 		tag: el.tagName.toLowerCase(),
 		text: getOwnVisibleText(el, 100),
 	};
+	if (mustKeep) {
+		// MUST_KEEP MEANS VISIBLE TEXT EXISTS. DO NOT DROP THIS NODE IN SNAPSHOT
+		// FILTERS, LIMITS, DEDUP, RENDERING, OR DOWNSTREAM DOM/SNAPSHOT PIPES.
+		node.mustKeep = true;
+	}
 	const name = getAccessibleName(el);
 	if (name) node.name = name;
 	if ((node.tag === "img" || node.tag === "a") && parentRefId)
@@ -342,7 +350,7 @@ const rejectNotIncluded: Guard = (frame) =>
 const rejectAtCapacity =
 	(count: number, maxNodes: number): Guard =>
 	(frame) =>
-		count >= maxNodes
+		count >= maxNodes && !hasVisibleTextContent(frame.el)
 			? { kind: "reject", el: frame.el, depth: frame.depth }
 			: frame;
 
@@ -405,7 +413,6 @@ const walkTree = (root: Element, maxNodes: number) => {
 		}
 
 		for (const child of outcome.children) {
-			if (nodes.length >= maxNodes) break;
 			walk(child, outcome.childDepth, outcome.childRefId);
 		}
 	};

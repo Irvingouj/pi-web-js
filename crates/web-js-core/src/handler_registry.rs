@@ -71,6 +71,7 @@ async fn dispatch_host_call(
         action: "host_call".to_string(),
         params,
         run_id: cmd.run_id.clone(),
+        source_stack: cmd.source_stack.clone(),
     };
     if let Some(fut) = crate::api_docs::dispatch_handler("host_call", host_cmd.clone()) {
         return fut.await;
@@ -129,6 +130,7 @@ mod tests {
             action: "test_action".to_string(),
             params: serde_json::json!({}),
             run_id: None,
+            source_stack: None,
         };
 
         let result = block_on(dispatch_command(&cmd));
@@ -149,6 +151,7 @@ mod tests {
             action: "unknown".to_string(),
             params: serde_json::json!({}),
             run_id: None,
+            source_stack: None,
         };
 
         let result = block_on(dispatch_command(&cmd));
@@ -215,6 +218,7 @@ mod tests {
             action: "dup_test".to_string(),
             params: serde_json::json!({}),
             run_id: None,
+            source_stack: None,
         };
         let result = block_on(dispatch_command(&cmd));
         // Original handler (value 1) should remain after duplicate rejection
@@ -252,6 +256,7 @@ mod tests {
             action: "host_greet".to_string(),
             params: serde_json::json!({"name": "Alice"}),
             run_id: None,
+            source_stack: None,
         };
 
         let result = block_on(dispatch_command(&cmd));
@@ -286,6 +291,7 @@ mod tests {
             action: "host_call".to_string(),
             params: serde_json::json!({}),
             run_id: None,
+            source_stack: None,
         };
 
         let result = block_on(dispatch_command(&cmd));
@@ -319,6 +325,7 @@ mod tests {
             action: "host_greet".to_string(),
             params: serde_json::json!(["alice"]),
             run_id: None,
+            source_stack: None,
         };
 
         let result = block_on(dispatch_command(&cmd));
@@ -336,6 +343,7 @@ mod tests {
             action: "host_greet".to_string(),
             params: serde_json::json!("alice"),
             run_id: None,
+            source_stack: None,
         };
 
         let result2 = block_on(dispatch_command(&cmd2));
@@ -384,6 +392,7 @@ mod tests {
             action: "test_sleep".to_string(),
             params: serde_json::json!({"duration": 100}),
             run_id: None,
+            source_stack: None,
         };
         let result = block_on(dispatch_command(&cmd));
         assert!(result.is_ok());

@@ -11,8 +11,14 @@ pub(crate) struct JsException {
     pub code: Option<String>,
     pub hint: Option<String>,
     pub recovery: Option<Vec<String>>,
+    pub category: Option<String>,
     pub details: Option<serde_json::Value>,
     pub stack: Option<String>,
+    pub public_name: Option<String>,
+    pub param_path: Option<String>,
+    pub expected: Option<String>,
+    pub received_type: Option<String>,
+    pub received_preview: Option<String>,
 }
 
 /// Extract a line number from an error message or stack trace.
@@ -33,7 +39,7 @@ pub(crate) fn extract_line_number(msg: &str) -> Option<u32> {
 
     for line in msg.lines().rev() {
         if let Some(last_colon) = line.rfind(':') {
-            let after_last = &line[last_colon + 1..];
+            let after_last = line[last_colon + 1..].trim_end_matches(|c: char| !c.is_ascii_digit());
             if after_last.parse::<u32>().is_ok() {
                 if let Some(prev_colon) = line[..last_colon].rfind(':') {
                     let between = &line[prev_colon + 1..last_colon];
@@ -157,8 +163,14 @@ pub(crate) fn parse_js_exception<'js>(value: &Value<'js>) -> JsException {
             code: None,
             hint: None,
             recovery: None,
+            category: None,
             details: None,
             stack: None,
+            public_name: None,
+            param_path: None,
+            expected: None,
+            received_type: None,
+            received_preview: None,
         };
     };
 
@@ -167,7 +179,13 @@ pub(crate) fn parse_js_exception<'js>(value: &Value<'js>) -> JsException {
     let stack = read_js_string_field(obj, "stack");
     let action = read_js_string_field(obj, "action");
     let code = read_js_string_field(obj, "code");
+    let public_name = read_js_string_field(obj, "publicName");
+    let param_path = read_js_string_field(obj, "paramPath");
+    let expected = read_js_string_field(obj, "expected");
+    let received_type = read_js_string_field(obj, "receivedType");
+    let received_preview = read_js_string_field(obj, "receivedPreview");
     let hint = read_js_string_field(obj, "hint");
+    let category = read_js_string_field(obj, "category");
     let recovery = obj
         .get::<_, rquickjs::Value>("recovery")
         .ok()
@@ -231,8 +249,14 @@ pub(crate) fn parse_js_exception<'js>(value: &Value<'js>) -> JsException {
         code,
         hint,
         recovery,
+        category,
         details,
         stack,
+        public_name,
+        param_path,
+        expected,
+        received_type,
+        received_preview,
     }
 }
 
@@ -264,10 +288,7 @@ mod tests {
 
     #[test]
     fn extract_line_number_stack_trace_colon_format() {
-        // The colon-based parser requires digits-only after the last colon.
-        // "script:10:5)" fails because "5)" is not a valid u32.
-        // "script:10:5" (no trailing paren) succeeds.
-        assert_eq!(extract_line_number("    at foo (script:10:5)"), None);
+        assert_eq!(extract_line_number("    at foo (script:10:5)"), Some(10));
         assert_eq!(extract_line_number("    at foo (script:10:5"), Some(10));
     }
 

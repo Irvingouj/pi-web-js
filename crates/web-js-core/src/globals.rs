@@ -115,6 +115,16 @@ pub(crate) fn register_host_globals<'js>(
                     .get(3)
                     .cloned()
                     .unwrap_or_else(|| Value::new_undefined(ctx.clone()));
+                let stack = args
+                    .0
+                    .get(4)
+                    .and_then(|v| v.as_string())
+                    .and_then(|s| s.to_string().ok())
+                    .or_else(|| {
+                        ctx.eval::<rquickjs::String, _>("(new Error()).stack")
+                            .ok()
+                            .and_then(|s| s.to_string().ok())
+                    });
 
                 let mut hs = hs.borrow_mut();
                 hs.async_call_counter += 1;
@@ -126,6 +136,7 @@ pub(crate) fn register_host_globals<'js>(
                     action: action_str.clone(),
                     params,
                     run_id: None,
+                    source_stack: stack.clone(),
                 };
                 hs.pending_async_commands.push(command);
 
@@ -135,6 +146,9 @@ pub(crate) fn register_host_globals<'js>(
                 entry.set("resolve", resolve)?;
                 entry.set("reject", reject)?;
                 entry.set("action", action_str)?;
+                if let Some(stack) = stack {
+                    entry.set("stack", stack)?;
+                }
                 pending.set(call_id.to_string(), entry)?;
 
                 Ok(())
@@ -245,6 +259,7 @@ pub(crate) fn register_host_globals<'js>(
                     action: "sleep".to_string(),
                     params: serde_json::json!({ "duration": ms }),
                     run_id: None,
+                    source_stack: None,
                 };
                 hs.pending_async_commands.push(command);
 
@@ -317,6 +332,7 @@ pub(crate) fn register_host_globals<'js>(
                     action: "sleep".to_string(),
                     params: duration_json.clone(),
                     run_id: None,
+                    source_stack: None,
                 };
                 hs.pending_async_commands.push(command);
 

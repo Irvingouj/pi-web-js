@@ -137,10 +137,45 @@ describe("filterNodes", () => {
 		expect(result.map((n) => n.refId)).toEqual(["e1", "e2", "e3", "e7", "e8"]);
 	});
 
+	it("interactiveOnly must still preserve mustKeep visible text nodes", () => {
+		const result = filterNodes(
+			[
+				node({ refId: "e1", role: "generic", tag: "div" }),
+				node({
+					refId: "e2",
+					role: "generic",
+					tag: "div",
+					text: "Visible structural text",
+					mustKeep: true,
+				}),
+			],
+			{ interactiveOnly: true },
+		);
+		expect(result.map((n) => n.refId)).toEqual(["e2"]);
+	});
+
 	it("applies limit after filtering", () => {
 		const result = filterNodes(allNodes, { role: "link", limit: 1 });
 		expect(result).toHaveLength(1);
 		expect(result[0].refId).toBe("e2");
+	});
+
+	it("limit caps non-mustKeep nodes but does not drop mustKeep text nodes", () => {
+		const result = filterNodes(
+			[
+				node({ refId: "e1", role: "generic", tag: "div" }),
+				node({ refId: "e2", role: "generic", tag: "div" }),
+				node({
+					refId: "e3",
+					role: "generic",
+					tag: "div",
+					text: "Visible text past the limit",
+					mustKeep: true,
+				}),
+			],
+			{ limit: 1 },
+		);
+		expect(result.map((n) => n.refId)).toEqual(["e1", "e3"]);
 	});
 
 	it("combines filters with AND logic", () => {

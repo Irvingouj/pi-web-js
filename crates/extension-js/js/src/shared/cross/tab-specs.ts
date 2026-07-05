@@ -361,6 +361,15 @@ export const TAB_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 			],
 			notes: [
 				"Explicit tabId required; same handlers as page.*",
+				[
+					"RULE: every dropdown (combobox/select/listbox) MUST use",
+					"web.tab.select_option({tabId, refId, value}). NEVER web.tab.fill,",
+					"web.tab.type, or web.tab.click on a dropdown control or its validation-proxy input.",
+				].join(" "),
+				[
+					"Use this for snapshot nodes printed as dropdown or nodes",
+					"with controlType='dropdown'; do not use fill/type on those controls",
+				].join(" "),
 				"Drives react-select and other ARIA combobox patterns: clicks the control to open, then clicks the matching [role='option']",
 			],
 			tags: ["mutation", "write"],
@@ -877,5 +886,58 @@ export const TAB_TOOL_SPECS: readonly ContentScriptToolSpec[] = [
 			tags: ["read"],
 		},
 		handlerKey: "evaluate",
+	},
+	{
+		action: "tab_dom",
+		namespace: "web.tab",
+		name: "dom",
+		description:
+			"Introspect raw DOM subtree of a specific tab by CSS selector. Read-only. Same semantics as page.dom but targets an explicit tabId. Use this when snapshot/find do not expose enough data: hidden inputs, validation shims, raw attributes, dropdown/listbox ownership, shadowed widgets, aria-hidden regions, or exact DOM structure.",
+		params: schemas.TabDomParamsSchema,
+		returns: schemas.PageDomResultSchema,
+		fields: ["tabId", "selector"],
+		paramTypes: [
+			{
+				name: "tabId",
+				type: "number",
+				required: true,
+				description: "Target tab ID (literal)",
+			},
+			{
+				name: "selector",
+				type: "string",
+				required: true,
+				description: "CSS selector for the root element(s) to introspect",
+			},
+			{
+				name: "depth",
+				type: "number",
+				required: false,
+				description: "Descendant levels (default 2, max 10)",
+			},
+			{
+				name: "includeHidden",
+				type: "boolean",
+				required: false,
+				description: "Include hidden elements (default true)",
+			},
+		],
+		returnDoc:
+			"{ nodes: [{ refId?, tag, role?, name?, attributes?, hidden?, hiddenReason?, accept?, filesCount?, children? }], url, title }",
+		errorCode: "E_NO_TAB",
+		example:
+			'web.tab.dom({ tabId: 123, selector: "input[type=file]", depth: 0 })',
+		agentMeta: {
+			prerequisites: ["Target tab exists with content script ready"],
+			notes: [
+				"Read-only: returns DOM structure, never executes code or mutates the page",
+				"Bypasses snapshot filtering and can include hidden nodes by default",
+				"Assigns refIds to returned elements; those refIds are immediately actionable by web.tab.click/fill in the same cell",
+				"Use web.tab.dom immediately when struggling to find data in snapshot output",
+			],
+			tags: ["read"],
+			relatedApis: ["page.dom", "web.tab.snapshot", "web.tab.find"],
+		},
+		handlerKey: "dom",
 	},
 ] as const;

@@ -230,13 +230,15 @@ function makeAsync(action, fields, parity) {
         else if (args.length === 1) params = args[0];
         else params = args;
       }
-      __webJsTriggerAsync(action, params, resolve, reject);
+      __webJsTriggerAsync(action, params, resolve, reject, (new Error()).stack);
     });
   };
   __makeAsyncCache[cacheKey] = fn;
   return fn;
 }
 function __webJsSetupAsyncBindings(specs) {
+  // Track registered member names per leaf namespace for missing-API detection.
+  var registeredByNamespace = {};
   for (const spec of specs) {
     var ns = globalThis;
     var parts = spec.namespace.split('.');
@@ -248,8 +250,66 @@ function __webJsSetupAsyncBindings(specs) {
     if (typeof ns[spec.name] === 'undefined') {
       ns[spec.name] = makeAsync(spec.action, spec.fields, spec.parity);
     }
+    var key = spec.namespace;
+    if (!registeredByNamespace[key]) registeredByNamespace[key] = [];
+    registeredByNamespace[key].push(spec.name);
+  }
+  // Install a Proxy on each leaf namespace that throws E_UNKNOWN_API when an
+  // unregistered member is *called* (not accessed). This catches
+  // `web.tab.nope()` with a precise error instead of a bare TypeError.
+  for (var nsPath in registeredByNamespace) {
+    var target = globalThis;
+    var nsParts = nsPath.split('.');
+    for (var j = 0; j < nsParts.length; j++) {
+      target = target[nsParts[j]];
+      if (!target) break;
+    }
+    if (!target || typeof target !== 'object') continue;
+    var registered = registeredByNamespace[nsPath];
+    var sortedSiblings = registered.slice().sort();
+    __installNamespaceProxy(target, nsPath, sortedSiblings);
   }
   if (typeof globalThis.fetch === 'undefined' && typeof web !== 'undefined' && typeof web.fetch === 'function') {
     globalThis.fetch = web.fetch;
   }
+}
+
+function __installNamespaceProxy(target, nsPath, siblings) {
+  // Truncate sibling list to 12 names for the error message.
+  var siblingHint = siblings.slice(0, 12).join(', ');
+  if (siblings.length > 12) siblingHint += ', ...';
+  var proxy = new Proxy(target, {
+    get: function (t, prop, receiver) {
+      // Symbols (e.g. Symbol.toPrimitive) and registered names: pass through.
+      if (typeof prop === 'symbol') return t[prop];
+      if (registeredHas(siblings, prop)) return t[prop];
+      var val = t[prop];
+      if (typeof val !== 'undefined') return val;
+      // Unknown member: return a function that throws only when called.
+      return function __unknownApi() {
+        var publicName = nsPath + '.' + String(prop);
+        var e = new Error(
+          'Unknown API: ' + publicName + '. Available: ' + siblingHint
+        );
+        e.code = 'E_UNKNOWN_API';
+        e.category = 'validation';
+        e.publicName = publicName;
+        e.action = publicName;
+        e.hint = 'Call get_doc to list every registered API and its exact signature.';
+        throw e;
+      };
+    },
+  });
+  // Replace the namespace object on globalThis with the proxy.
+  var parent = globalThis;
+  var parts = nsPath.split('.');
+  for (var k = 0; k < parts.length - 1; k++) parent = parent[parts[k]];
+  parent[parts[parts.length - 1]] = proxy;
+}
+
+function registeredHas(siblings, prop) {
+  for (var i = 0; i < siblings.length; i++) {
+    if (siblings[i] === prop) return true;
+  }
+  return false;
 }
