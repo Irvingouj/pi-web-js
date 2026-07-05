@@ -443,6 +443,7 @@ mod tests {
             action: "fs_exists".to_string(),
             params: serde_json::json!({"path": "/tmp"}),
             run_id: None,
+            source_stack: None,
         };
         let result = block_on(web_js_core::handler_registry::dispatch_command(&cmd));
         // fs_exists returns a boolean, so it should succeed
@@ -497,6 +498,7 @@ mod tests {
             action: "fetch".to_string(),
             params: serde_json::json!({}),
             run_id: None,
+            source_stack: None,
         };
         let result = block_on(web_js_core::handler_registry::dispatch_command(&cmd));
         assert!(
@@ -550,6 +552,7 @@ mod tests {
             action: "fs_exists".to_string(),
             params: serde_json::json!({"path": "/tmp"}),
             run_id: None,
+            source_stack: None,
         };
         let result = block_on(ExtensionSession::handle_command(&cmd));
         assert!(
@@ -565,6 +568,7 @@ mod tests {
             action: "chrome_tabs_query".to_string(),
             params: serde_json::json!({}),
             run_id: None,
+            source_stack: None,
         };
         let result = block_on(ExtensionSession::handle_command(&cmd));
         assert!(
@@ -584,6 +588,7 @@ mod tests {
             action: "unknown_action".to_string(),
             params: serde_json::json!({}),
             run_id: None,
+            source_stack: None,
         };
         let result = block_on(ExtensionSession::handle_command(&cmd));
         assert!(result.is_err(), "unknown action should return error");
@@ -789,6 +794,7 @@ mod tests {
             action: "totally_unknown_action_xyz".to_string(),
             params: serde_json::json!({}),
             run_id: None,
+            source_stack: None,
         };
         let result = block_on(web_js_core::handler_registry::dispatch_command(&cmd));
         assert!(
@@ -808,6 +814,7 @@ mod tests {
             action: "totally_unknown_action_xyz".to_string(),
             params: serde_json::json!({}),
             run_id: None,
+            source_stack: None,
         };
         let result = block_on(ExtensionSession::handle_command(&cmd));
         assert!(
@@ -1027,6 +1034,7 @@ mod tests {
             call_id: 1,
             action: "fs_exists".to_string(),
             run_id: None,
+            source_stack: None,
             params: serde_json::json!({"path": "/tmp"}),
         };
         let result = block_on(ExtensionSession::handle_command(&cmd));
