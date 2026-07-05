@@ -83,8 +83,7 @@ pub(crate) fn cell_error_from_js_exception(exc: JsException) -> CellError {
     } else if let (Some(code), Some(action)) = (exc.code, exc.action) {
         // Structured API error — code and action both present.
         let public_name = exc.public_name.unwrap_or_else(|| action.clone());
-        let message = if exc.hint.is_some()
-            || exc.recovery.as_ref().is_some_and(|r| !r.is_empty())
+        let message = if exc.hint.is_some() || exc.recovery.as_ref().is_some_and(|r| !r.is_empty())
         {
             full_text
         } else {
@@ -221,9 +220,7 @@ mod tests {
         let exc = js_exc(Some("TypeError"), "x is not a function");
         let err = cell_error_from_js_exception(exc);
         match err {
-            CellError::JsRuntime {
-                name, message, ..
-            } => {
+            CellError::JsRuntime { name, message, .. } => {
                 assert_eq!(name.as_deref(), Some("TypeError"));
                 assert_eq!(message, "x is not a function");
             }
@@ -410,9 +407,7 @@ mod tests {
     fn text_type_error() {
         let err = cell_error_from_text("TypeError: x is not a function");
         match err {
-            CellError::JsRuntime {
-                name, message, ..
-            } => {
+            CellError::JsRuntime { name, message, .. } => {
                 assert_eq!(name.as_deref(), Some("TypeError"));
                 assert_eq!(message, "x is not a function");
             }

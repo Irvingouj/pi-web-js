@@ -98,24 +98,29 @@ pub(crate) fn resume_async_pending<'js>(
                 .unwrap_or(&serde_json::Value::Null),
         )
         .map_err(|e| rquickjs::Error::new_from_js_message("json", "stringify", e.to_string()))?;
-        let public_name_json = serde_json::to_string(
-            err.and_then(|e| e.public_name.as_deref()).unwrap_or(""),
-        )
-        .map_err(|e| rquickjs::Error::new_from_js_message("json", "stringify", e.to_string()))?;
+        let public_name_json =
+            serde_json::to_string(err.and_then(|e| e.public_name.as_deref()).unwrap_or(""))
+                .map_err(|e| {
+                    rquickjs::Error::new_from_js_message("json", "stringify", e.to_string())
+                })?;
         let param_path_json = serde_json::to_string(
-            err.and_then(|e| e.param.as_ref().map(|p| p.path.as_str())).unwrap_or(""),
+            err.and_then(|e| e.param.as_ref().map(|p| p.path.as_str()))
+                .unwrap_or(""),
         )
         .map_err(|e| rquickjs::Error::new_from_js_message("json", "stringify", e.to_string()))?;
         let expected_json = serde_json::to_string(
-            err.and_then(|e| e.param.as_ref().and_then(|p| p.expected.as_deref())).unwrap_or(""),
+            err.and_then(|e| e.param.as_ref().and_then(|p| p.expected.as_deref()))
+                .unwrap_or(""),
         )
         .map_err(|e| rquickjs::Error::new_from_js_message("json", "stringify", e.to_string()))?;
         let received_type_json = serde_json::to_string(
-            err.and_then(|e| e.param.as_ref().and_then(|p| p.received_type.as_deref())).unwrap_or(""),
+            err.and_then(|e| e.param.as_ref().and_then(|p| p.received_type.as_deref()))
+                .unwrap_or(""),
         )
         .map_err(|e| rquickjs::Error::new_from_js_message("json", "stringify", e.to_string()))?;
         let received_preview_json = serde_json::to_string(
-            err.and_then(|e| e.param.as_ref().and_then(|p| p.received_preview.as_deref())).unwrap_or(""),
+            err.and_then(|e| e.param.as_ref().and_then(|p| p.received_preview.as_deref()))
+                .unwrap_or(""),
         )
         .map_err(|e| rquickjs::Error::new_from_js_message("json", "stringify", e.to_string()))?;
         let stack_json = serde_json::to_string(stack.as_deref().unwrap_or("")).map_err(|e| {
