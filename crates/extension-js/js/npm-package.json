@@ -1,7 +1,7 @@
 {
 	"name": "@pi-oxide/extension-js",
 	"type": "module",
-	"version": "0.15.2",
+	"version": "0.15.3",
 	"license": "MIT OR Apache-2.0",
 	"repository": {
 		"type": "git",
