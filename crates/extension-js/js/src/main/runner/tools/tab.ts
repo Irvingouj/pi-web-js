@@ -77,7 +77,11 @@ registerJsCall({
 		// session tracker resolver; the bare module-global queries `{active:true}`
 		// unscoped and could resolve a foreign window's tab. Fallback only when
 		// windowId is absent (bare dispatchTool / tests / demo).
-		if (!ctx.resolveActiveTab && ctx.windowId !== undefined && ctx.windowId !== null) {
+		if (
+			!ctx.resolveActiveTab &&
+			ctx.windowId !== undefined &&
+			ctx.windowId !== null
+		) {
 			throw new Error(
 				"tab.current: session-scoped call is missing ctx.resolveActiveTab (per-session TabTracker resolver); refusing to fall back to the unscoped module-global.",
 			);
@@ -138,7 +142,9 @@ registerJsCall({
 	owner: "main-thread",
 	handler: async (params, ctx) => {
 		const tabId = extractTabId(asRecord(params));
-		const tab = unwrapResult(await dispatchTool("chrome_tabs_get", [tabId], ctx));
+		const tab = unwrapResult(
+			await dispatchTool("chrome_tabs_get", [tabId], ctx),
+		);
 		return (tab as { url?: string }).url ?? "";
 	},
 	paramTypes: [
@@ -167,7 +173,9 @@ registerJsCall({
 	owner: "main-thread",
 	handler: async (params, ctx) => {
 		const tabId = extractTabId(asRecord(params));
-		const tab = unwrapResult(await dispatchTool("chrome_tabs_get", [tabId], ctx));
+		const tab = unwrapResult(
+			await dispatchTool("chrome_tabs_get", [tabId], ctx),
+		);
 		return (tab as { title?: string }).title ?? "";
 	},
 	paramTypes: [

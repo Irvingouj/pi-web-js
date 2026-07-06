@@ -192,7 +192,11 @@ function throwStale(refId: string, reason: string): never {
 		"Read error.details.snapshot.nodes, find the element by role/name, and retry with the new refId",
 		"No separate snapshot_data call needed — the attached snapshot already refreshes the lease",
 	];
-	err.details = { staleRefId: refId, reason, ...(snapshot ? { snapshot } : {}) };
+	err.details = {
+		staleRefId: refId,
+		reason,
+		...(snapshot ? { snapshot } : {}),
+	};
 	throw err;
 }
 
@@ -261,9 +265,7 @@ export interface RefreshSnapshot {
  * without dom-utils depending on this module's internals.
  */
 function elementByRefId(refId: string): Element | null {
-	return document.querySelector(
-		`[data-ref-id='${CSS.escape(refId)}']`,
-	);
+	return document.querySelector(`[data-ref-id='${CSS.escape(refId)}']`);
 }
 
 /**
@@ -280,9 +282,7 @@ export function grantFromInlineSnapshot(
 			const el = elementByRefId(n.refId);
 			return el ? { refId: n.refId, element: el } : null;
 		})
-		.filter(
-			(x): x is { refId: string; element: Element } => x !== null,
-		);
+		.filter((x): x is { refId: string; element: Element } => x !== null);
 	const observationId = grantObservation(observed);
 	return { ...r, observationId };
 }

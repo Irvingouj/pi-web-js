@@ -17,8 +17,8 @@ import {
 	requireArgumentArray,
 	resolveChromeMethod,
 } from "../../chrome/native.js";
-import { makeError } from "../../lib/types.js";
 import { assertTabOwnership } from "../../chrome/tab-ownership.js";
+import { makeError } from "../../lib/types.js";
 import { checkPermission, manifestPermissionForApiPath } from "./capability.js";
 import { zChromeAny } from "./register-helpers.js";
 

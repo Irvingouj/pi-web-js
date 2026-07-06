@@ -1,8 +1,7 @@
 // @vitest-environment jsdom
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { InlineSnapshotNode } from "../src/shared/cross/collect-inline-snapshot.js";
-import { collectInlineSnapshot } from "../src/shared/cross/collect-inline-snapshot.js";
+import type { DomNode } from "../src/content-script/dom-tree.js";
 import { handlers } from "../src/content-script/handlers.js";
 import {
 	grantFromInlineSnapshot,
@@ -13,7 +12,8 @@ import {
 	registerContentScriptSpec,
 } from "../src/content-script/registry.js";
 import { buildContentScriptSpecs } from "../src/content-script/schemas.js";
-import type { DomNode } from "../src/content-script/dom-tree.js";
+import type { InlineSnapshotNode } from "../src/shared/cross/collect-inline-snapshot.js";
+import { collectInlineSnapshot } from "../src/shared/cross/collect-inline-snapshot.js";
 
 // ---- test-only type for find output ----
 interface FindNode {
@@ -298,7 +298,12 @@ describe("pipeline preserves child traversal when parent is skipped", () => {
 			await domNodes("#root > *", { depth: 0, includeHidden: true }),
 		);
 		const reasonFor = (id: string): string | undefined =>
-		nodes.find((n) => (n.tag === id || `#` + (n.attributes?.id ?? "") === id) || n.text?.includes(id.replace(",", "")))?.hiddenReason;
+			nodes.find(
+				(n) =>
+					n.tag === id ||
+					`#` + (n.attributes?.id ?? "") === id ||
+					n.text?.includes(id.replace(",", "")),
+			)?.hiddenReason;
 		// More precise lookup by element + attribute id.
 		const byAttrId = (id: string): DomNode | undefined =>
 			nodes.find((n) => n.attributes?.id === id);
@@ -675,9 +680,7 @@ describe("clickability and dedupe behavior stays stable", () => {
 			true,
 		);
 		expect(snap.nodes.find((n) => n.name === "More")?.actionable).toBe(true);
-		expect(snap.nodes.find((n) => n.name === "Action")?.actionable).toBe(
-			true,
-		);
+		expect(snap.nodes.find((n) => n.name === "Action")?.actionable).toBe(true);
 	});
 
 	it("dedupe removes low-confidence wrapper actionable but keeps node emitted", () => {
@@ -792,7 +795,9 @@ describe("URL and media metadata parity", () => {
 			<a href="/ok/path" data-ref-id="e42">OK_LINK</a>
 		`;
 		const snap = snapshotNodes(100);
-		const dom = flattenDom(await domNodes("a", { depth: 0, includeHidden: false }));
+		const dom = flattenDom(
+			await domNodes("a", { depth: 0, includeHidden: false }),
+		);
 		const find = await findNodes("a");
 
 		const snapJs = snap.find((n) => n.refId === "e40");
@@ -967,7 +972,7 @@ describe("mutation guard remains snapshot-only", () => {
 		};
 
 		try {
-			let thrown: Error & { code?: string } | null = null;
+			let thrown: (Error & { code?: string }) | null = null;
 			try {
 				collectInlineSnapshot(100);
 			} catch (e) {

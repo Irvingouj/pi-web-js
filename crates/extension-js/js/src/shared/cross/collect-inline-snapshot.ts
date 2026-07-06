@@ -1,10 +1,10 @@
-import { syncRefIdCounterFromDom } from "../cs/ref-id.js";
-import { deduplicateWrappers } from "./clickability.js";
-import type { ClickabilityConfidence } from "./clickability.js";
-import { resolveFieldLabel } from "../cs/snapshot-dom.js";
-import { throwStructuredAgentError } from "./agent-errors.js";
-import { runSnapshotWalk } from "../cs/snapshot-walker.js";
 import type { PipelineNode } from "../cs/dom-pipeline.js";
+import { syncRefIdCounterFromDom } from "../cs/ref-id.js";
+import { resolveFieldLabel } from "../cs/snapshot-dom.js";
+import { runSnapshotWalk } from "../cs/snapshot-walker.js";
+import { throwStructuredAgentError } from "./agent-errors.js";
+import type { ClickabilityConfidence } from "./clickability.js";
+import { deduplicateWrappers } from "./clickability.js";
 
 export type InlineSnapshotNode = PipelineNode;
 

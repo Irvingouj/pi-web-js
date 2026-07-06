@@ -31,9 +31,9 @@ import {
 } from "../shared/cross/normalize-agent-error.js";
 import type { SnapshotFilter } from "../shared/cross/snapshot-filter.js";
 import { filterNodes } from "../shared/cross/snapshot-filter.js";
+import { buildFindNode } from "../shared/cs/dom-pipeline.js";
 import { syncRefIdCounterFromDom } from "../shared/cs/ref-id.js";
 import { isSelfOrAncestorHidden } from "../shared/cs/snapshot-dom.js";
-import { buildFindNode } from "../shared/cs/dom-pipeline.js";
 import { assertFillEffect, makeActionResult } from "./action-result.js";
 import type { DomNode } from "./dom-tree.js";
 import { buildDomNode } from "./dom-tree.js";
@@ -929,4 +929,7 @@ export const handlers = {
 			signal?.removeEventListener("abort", onRelayAbort);
 		}
 	},
-} as Record<string, (params: unknown, signal?: AbortSignal) => unknown | Promise<unknown>>;
+} as Record<
+	string,
+	(params: unknown, signal?: AbortSignal) => unknown | Promise<unknown>
+>;

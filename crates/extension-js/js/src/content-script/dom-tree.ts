@@ -6,8 +6,9 @@
  * preserves the nested `children` shape that `page.dom` returns and re-exports
  * the `DomNode` type alias for backward compatibility.
  */
-import { buildDomTree } from "../shared/cs/dom-pipeline.js";
+
 import type { PipelineNode } from "../shared/cs/dom-pipeline.js";
+import { buildDomTree } from "../shared/cs/dom-pipeline.js";
 
 export type DomNode = PipelineNode;
 

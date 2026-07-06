@@ -53,8 +53,7 @@ function hasClickJsAction(el: Element): boolean {
 		if (!rule) continue;
 		const parts = rule.split(":");
 		const eventName = parts.length === 1 ? "click" : parts[0]?.trim();
-		const actionName =
-			(parts.length === 1 ? parts[0] : parts[1])?.trim() ?? "";
+		const actionName = (parts.length === 1 ? parts[0] : parts[1])?.trim() ?? "";
 		if (eventName !== "click") continue;
 		if (
 			!actionName ||
@@ -110,7 +109,8 @@ function hasNonNegativeTabIndex(el: Element): boolean {
 
 export function assessClickability(el: Element): ClickabilityAssessment {
 	// Short-circuit: hidden or aria-disabled elements are never clickable.
-	if (isSelfOrAncestorHidden(el)) return { clickable: false, confidence: "low" };
+	if (isSelfOrAncestorHidden(el))
+		return { clickable: false, confidence: "low" };
 	if (el.getAttribute("aria-disabled") === "true") {
 		return { clickable: false, confidence: "low" };
 	}

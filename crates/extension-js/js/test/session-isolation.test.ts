@@ -1097,7 +1097,9 @@ async function initOwnedSession(
 ): Promise<[ExtensionSession, Phase2Worker]> {
 	const p = ExtensionSession.init();
 	setTimeout(() => {
-		bucket[bucket.length - 1]?.onmessage?.({ data: { type: "ready" } } as MessageEvent);
+		bucket[bucket.length - 1]?.onmessage?.({
+			data: { type: "ready" },
+		} as MessageEvent);
 	}, 0);
 	const [session] = await p;
 	sessions.push(session);
@@ -1116,33 +1118,51 @@ async function initOwnedSession(
 
 describe("isolation guard: resolveActiveTab fallback is forbidden when windowId is bound", () => {
 	it("page_url with windowId set but no resolveActiveTab throws (no silent fallback)", async () => {
-		const { dispatchTool } = await import("../src/shared/main/tool-registry.js");
-		const r = await dispatchTool("page_url", {}, {
-			action: "page_url",
-			windowId: 7,
-		});
+		const { dispatchTool } = await import(
+			"../src/shared/main/tool-registry.js"
+		);
+		const r = await dispatchTool(
+			"page_url",
+			{},
+			{
+				action: "page_url",
+				windowId: 7,
+			},
+		);
 		expect(r.ok).toBe(false);
 		if (!r.ok) expect(r.error.code).toBe("E_NO_RESOLVER");
 	});
 
 	it("tab.current with windowId set but no resolveActiveTab throws", async () => {
-		const { dispatchTool } = await import("../src/shared/main/tool-registry.js");
-		const r = await dispatchTool("tab_current", {}, {
-			action: "tab_current",
-			windowId: 7,
-		});
+		const { dispatchTool } = await import(
+			"../src/shared/main/tool-registry.js"
+		);
+		const r = await dispatchTool(
+			"tab_current",
+			{},
+			{
+				action: "tab_current",
+				windowId: 7,
+			},
+		);
 		expect(r.ok).toBe(false);
 		if (!r.ok) expect(r.error.code ?? "E_HANDLER").toBeTruthy();
 	});
 
 	it("page_url with windowId set AND resolveActiveTab provided uses the resolver", async () => {
-		const { dispatchTool } = await import("../src/shared/main/tool-registry.js");
+		const { dispatchTool } = await import(
+			"../src/shared/main/tool-registry.js"
+		);
 		const resolve = async () => 42;
-		const r = await dispatchTool("page_url", {}, {
-			action: "page_url",
-			windowId: 7,
-			resolveActiveTab: resolve,
-		});
+		const r = await dispatchTool(
+			"page_url",
+			{},
+			{
+				action: "page_url",
+				windowId: 7,
+				resolveActiveTab: resolve,
+			},
+		);
 		// reaches the content-script relay path which (without a real CS) returns
 		// a relay error — but NOT E_NO_RESOLVER. Proves the resolver was used.
 		if (!r.ok) expect(r.error.code).not.toBe("E_NO_RESOLVER");
@@ -1151,7 +1171,9 @@ describe("isolation guard: resolveActiveTab fallback is forbidden when windowId 
 	it("bare call with NO windowId still uses the module-global fallback (not guarded)", async () => {
 		// Set the module-global active tab, no windowId in ctx → fallback is合法.
 		const { setActiveTabId } = await import("../src/main/tab-context.js");
-		const { dispatchTool } = await import("../src/shared/main/tool-registry.js");
+		const { dispatchTool } = await import(
+			"../src/shared/main/tool-registry.js"
+		);
 		setActiveTabId(1);
 		const r = await dispatchTool("page_url", {}, { action: "page_url" });
 		// reaches the relay (no chrome runtime → E_NO_EXTENSION), NOT E_NO_RESOLVER.

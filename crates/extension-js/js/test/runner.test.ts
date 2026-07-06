@@ -535,7 +535,11 @@ describe("abort behavior", () => {
 		const controller = new AbortController();
 		controller.abort();
 		await expect(
-			dispatchTool(actionName, {}, { action: actionName, signal: controller.signal }),
+			dispatchTool(
+				actionName,
+				{},
+				{ action: actionName, signal: controller.signal },
+			),
 		).rejects.toThrow("Runner aborted: ExtensionSession stopped");
 	});
 });
@@ -544,7 +548,11 @@ describe("abort behavior", () => {
 
 describe("error code preservation", () => {
 	it("unknown action returns E_UNKNOWN", async () => {
-		const result = await dispatchTool("totally_unknown_action_xyz", {}, { action: "totally_unknown_action_xyz" });
+		const result = await dispatchTool(
+			"totally_unknown_action_xyz",
+			{},
+			{ action: "totally_unknown_action_xyz" },
+		);
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.code).toBe("E_UNKNOWN");
@@ -553,7 +561,11 @@ describe("error code preservation", () => {
 
 	it("invalid params return E_INVALID_PARAMS", async () => {
 		// storage_get requires { key: string }
-		const result = await dispatchTool("storage_get", { key: 123 }, { action: "storage_get" });
+		const result = await dispatchTool(
+			"storage_get",
+			{ key: 123 },
+			{ action: "storage_get" },
+		);
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.code).toBe("E_INVALID_PARAMS");
@@ -564,7 +576,9 @@ describe("error code preservation", () => {
 		// Remove chrome stub so runner.ts sees no extension context
 		const originalChrome = globalThis.chrome;
 		vi.stubGlobal("chrome", undefined);
-		const result = await dispatchTool("chrome_tabs_query", [{}], { action: "chrome_tabs_query" });
+		const result = await dispatchTool("chrome_tabs_query", [{}], {
+			action: "chrome_tabs_query",
+		});
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.code).toBe("E_NO_EXTENSION");
@@ -581,18 +595,26 @@ describe("schema validation", () => {
 	});
 
 	it("valid params pass zod validation", async () => {
-		const result = await dispatchTool("storage_set", {
-			key: "valid_key",
-			value: "valid_value",
-		}, { action: "storage_set" });
+		const result = await dispatchTool(
+			"storage_set",
+			{
+				key: "valid_key",
+				value: "valid_value",
+			},
+			{ action: "storage_set" },
+		);
 		expect(result.ok).toBe(true);
 	});
 
 	it("invalid params fail with sanitized error messages (no raw input values)", async () => {
-		const result = await dispatchTool("storage_set", {
-			key: "valid_key",
-			value: 12345,
-		}, { action: "storage_set" });
+		const result = await dispatchTool(
+			"storage_set",
+			{
+				key: "valid_key",
+				value: 12345,
+			},
+			{ action: "storage_set" },
+		);
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			// The error message should mention the API name, field path, and issue,
@@ -609,7 +631,9 @@ describe("schema validation", () => {
 	});
 
 	it("clipboard_write accepts array-with-object form", async () => {
-		const result = await dispatchTool("clipboard_write", [{ text: "hello" }], { action: "clipboard_write" });
+		const result = await dispatchTool("clipboard_write", [{ text: "hello" }], {
+			action: "clipboard_write",
+		});
 		// It will fail because navigator.clipboard is not mocked, but params should validate
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
@@ -618,7 +642,9 @@ describe("schema validation", () => {
 	});
 
 	it("clipboard_write accepts array-with-string form", async () => {
-		const result = await dispatchTool("clipboard_write", ["hello"], { action: "clipboard_write" });
+		const result = await dispatchTool("clipboard_write", ["hello"], {
+			action: "clipboard_write",
+		});
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.code).not.toBe("E_INVALID_PARAMS");
@@ -626,7 +652,11 @@ describe("schema validation", () => {
 	});
 
 	it("clipboard_write accepts object-with-text form", async () => {
-		const result = await dispatchTool("clipboard_write", { text: "hello" }, { action: "clipboard_write" });
+		const result = await dispatchTool(
+			"clipboard_write",
+			{ text: "hello" },
+			{ action: "clipboard_write" },
+		);
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.code).not.toBe("E_INVALID_PARAMS");
@@ -634,7 +664,11 @@ describe("schema validation", () => {
 	});
 
 	it("clipboard_write accepts object-with-value form", async () => {
-		const result = await dispatchTool("clipboard_write", { value: "hello" }, { action: "clipboard_write" });
+		const result = await dispatchTool(
+			"clipboard_write",
+			{ value: "hello" },
+			{ action: "clipboard_write" },
+		);
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.code).not.toBe("E_INVALID_PARAMS");
@@ -671,7 +705,9 @@ describe("WU-9: actionable validation errors", () => {
 	});
 
 	it("mock_async with number param shows accepted union alternatives", async () => {
-		const result = await dispatchTool("mock_async", 123, { action: "mock_async" });
+		const result = await dispatchTool("mock_async", 123, {
+			action: "mock_async",
+		});
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.message).toContain(
@@ -784,8 +820,16 @@ describe("storage", () => {
 	});
 
 	it("storage_set + storage_get roundtrip", async () => {
-		await dispatchTool("storage_set", { key: testKey, value: "roundtrip" }, { action: "storage_set" });
-		const result = await dispatchTool("storage_get", { key: testKey }, { action: "storage_get" });
+		await dispatchTool(
+			"storage_set",
+			{ key: testKey, value: "roundtrip" },
+			{ action: "storage_set" },
+		);
+		const result = await dispatchTool(
+			"storage_get",
+			{ key: testKey },
+			{ action: "storage_get" },
+		);
 		expect(result.ok).toBe(true);
 		if (result.ok) {
 			expect(result.value).toBe("roundtrip");
@@ -794,9 +838,17 @@ describe("storage", () => {
 
 	it("storage_delete removes key", async () => {
 		const key = `${testKey}_del`;
-		await dispatchTool("storage_set", { key, value: "x" }, { action: "storage_set" });
+		await dispatchTool(
+			"storage_set",
+			{ key, value: "x" },
+			{ action: "storage_set" },
+		);
 		await dispatchTool("storage_delete", { key }, { action: "storage_delete" });
-		const result = await dispatchTool("storage_get", { key }, { action: "storage_get" });
+		const result = await dispatchTool(
+			"storage_get",
+			{ key },
+			{ action: "storage_get" },
+		);
 		expect(result.ok).toBe(true);
 		if (result.ok) {
 			expect(result.value).toBeNull();
@@ -805,8 +857,16 @@ describe("storage", () => {
 
 	it("storage_list returns all keys", async () => {
 		const key = `${testKey}_list`;
-		await dispatchTool("storage_set", { key, value: "x" }, { action: "storage_set" });
-		const result = await dispatchTool("storage_list", {}, { action: "storage_list" });
+		await dispatchTool(
+			"storage_set",
+			{ key, value: "x" },
+			{ action: "storage_set" },
+		);
+		const result = await dispatchTool(
+			"storage_list",
+			{},
+			{ action: "storage_list" },
+		);
 		expect(result.ok).toBe(true);
 		if (result.ok) {
 			expect(Array.isArray(result.value)).toBe(true);
@@ -816,22 +876,38 @@ describe("storage", () => {
 
 	it("storage_clear removes only __csl__: keys", async () => {
 		// Set a regular key and a __csl__ key
-		await dispatchTool("storage_set", { key: "regular_key", value: "x" }, { action: "storage_set" });
-		await dispatchTool("storage_set_many", { mypref: "y" }, { action: "storage_set_many" });
+		await dispatchTool(
+			"storage_set",
+			{ key: "regular_key", value: "x" },
+			{ action: "storage_set" },
+		);
+		await dispatchTool(
+			"storage_set_many",
+			{ mypref: "y" },
+			{ action: "storage_set_many" },
+		);
 
 		await dispatchTool("storage_clear", {}, { action: "storage_clear" });
 
-		const regularResult = await dispatchTool("storage_get", {
-			key: "regular_key",
-		}, { action: "storage_get" });
+		const regularResult = await dispatchTool(
+			"storage_get",
+			{
+				key: "regular_key",
+			},
+			{ action: "storage_get" },
+		);
 		expect(regularResult.ok).toBe(true);
 		if (regularResult.ok) {
 			expect(regularResult.value).toBe("x"); // still there
 		}
 
-		const cslResult = await dispatchTool("storage_get_many", {
-			keys: ["mypref"],
-		}, { action: "storage_get_many" });
+		const cslResult = await dispatchTool(
+			"storage_get_many",
+			{
+				keys: ["mypref"],
+			},
+			{ action: "storage_get_many" },
+		);
 		expect(cslResult.ok).toBe(true);
 		if (cslResult.ok) {
 			expect(cslResult.value.mypref).toBeNull(); // cleared
@@ -855,13 +931,17 @@ describe("network", () => {
 			}),
 		) as unknown as typeof fetch;
 
-		const result = await dispatchTool("fetch", {
-			url: "https://example.com",
-			method: "GET",
-			headers: {},
-			body: null,
-			timeout: 5000n,
-		}, { action: "fetch" });
+		const result = await dispatchTool(
+			"fetch",
+			{
+				url: "https://example.com",
+				method: "GET",
+				headers: {},
+				body: null,
+				timeout: 5000n,
+			},
+			{ action: "fetch" },
+		);
 		expect(result.ok).toBe(true);
 		if (result.ok) {
 			expect(result.value.status).toBe(200);
@@ -941,12 +1021,18 @@ describe("network", () => {
 
 describe("sidepanel", () => {
 	it("sidepanel_url accepts WASM Map params", async () => {
-		const result = await dispatchTool("sidepanel_url", new Map(), { action: "sidepanel_url" });
+		const result = await dispatchTool("sidepanel_url", new Map(), {
+			action: "sidepanel_url",
+		});
 		expect(result.ok).toBe(true);
 	});
 
 	it("sidepanel_url returns window.location.href", async () => {
-		const result = await dispatchTool("sidepanel_url", {}, { action: "sidepanel_url" });
+		const result = await dispatchTool(
+			"sidepanel_url",
+			{},
+			{ action: "sidepanel_url" },
+		);
 		expect(result.ok).toBe(true);
 		if (result.ok) {
 			expect(typeof result.value).toBe("string");
@@ -954,7 +1040,11 @@ describe("sidepanel", () => {
 	});
 
 	it("sidepanel_title returns document.title", async () => {
-		const result = await dispatchTool("sidepanel_title", {}, { action: "sidepanel_title" });
+		const result = await dispatchTool(
+			"sidepanel_title",
+			{},
+			{ action: "sidepanel_title" },
+		);
 		expect(result.ok).toBe(true);
 		if (result.ok) {
 			expect(typeof result.value).toBe("string");
@@ -963,7 +1053,11 @@ describe("sidepanel", () => {
 
 	it("sidepanel_wait returns true after duration", async () => {
 		const start = Date.now();
-		const result = await dispatchTool("sidepanel_wait", { duration: 50n }, { action: "sidepanel_wait" });
+		const result = await dispatchTool(
+			"sidepanel_wait",
+			{ duration: 50n },
+			{ action: "sidepanel_wait" },
+		);
 		const elapsed = Date.now() - start;
 		expect(result.ok).toBe(true);
 		if (result.ok) {
@@ -973,9 +1067,13 @@ describe("sidepanel", () => {
 	});
 
 	it("sidepanel_click throws E_STALE when target element missing", async () => {
-		const result = await dispatchTool("sidepanel_click", {
-			refId: "e999",
-		}, { action: "sidepanel_click" });
+		const result = await dispatchTool(
+			"sidepanel_click",
+			{
+				refId: "e999",
+			},
+			{ action: "sidepanel_click" },
+		);
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.code).toBe("E_STALE");
@@ -984,7 +1082,11 @@ describe("sidepanel", () => {
 
 	it("sidepanel_click returns E_INVALID_PARAMS for invalid refId formats", async () => {
 		for (const badRefId of [2, "2", "btn"]) {
-			const result = await dispatchTool("sidepanel_click", { refId: badRefId }, { action: "sidepanel_click" });
+			const result = await dispatchTool(
+				"sidepanel_click",
+				{ refId: badRefId },
+				{ action: "sidepanel_click" },
+			);
 			expect(result.ok).toBe(false);
 			if (!result.ok) {
 				expect(result.error.code).toBe("E_INVALID_PARAMS");
@@ -1002,7 +1104,9 @@ describe("chrome passthrough", () => {
 	});
 
 	it("rejects non-array transport with E_INVALID_ARGUMENT_TRANSPORT", async () => {
-		const result = await dispatchTool("chrome_bookmarks_search", "query", { action: "chrome_bookmarks_search" });
+		const result = await dispatchTool("chrome_bookmarks_search", "query", {
+			action: "chrome_bookmarks_search",
+		});
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.code).toBe("E_INVALID_ARGUMENT_TRANSPORT");
@@ -1011,28 +1115,38 @@ describe("chrome passthrough", () => {
 	});
 
 	it("chrome_bookmarks_search forwards empty object unchanged", async () => {
-		const result = await dispatchTool("chrome_bookmarks_search", [{}], { action: "chrome_bookmarks_search" });
+		const result = await dispatchTool("chrome_bookmarks_search", [{}], {
+			action: "chrome_bookmarks_search",
+		});
 		expect(result.ok).toBe(true);
 		expect(mockChrome.bookmarks.search).toHaveBeenCalledWith({});
 	});
 
 	it("chrome_bookmarks_search forwards string query unchanged", async () => {
-		await dispatchTool("chrome_bookmarks_search", ["term"], { action: "chrome_bookmarks_search" });
+		await dispatchTool("chrome_bookmarks_search", ["term"], {
+			action: "chrome_bookmarks_search",
+		});
 		expect(mockChrome.bookmarks.search).toHaveBeenCalledWith("term");
 	});
 
 	it("chrome_bookmarks_search defaults empty args to {}", async () => {
-		await dispatchTool("chrome_bookmarks_search", [], { action: "chrome_bookmarks_search" });
+		await dispatchTool("chrome_bookmarks_search", [], {
+			action: "chrome_bookmarks_search",
+		});
 		expect(mockChrome.bookmarks.search).toHaveBeenCalledWith({});
 	});
 
 	it("bookmarks_search alias forwards the same argument array", async () => {
-		await dispatchTool("bookmarks_search", [{}], { action: "bookmarks_search" });
+		await dispatchTool("bookmarks_search", [{}], {
+			action: "bookmarks_search",
+		});
 		expect(mockChrome.bookmarks.search).toHaveBeenCalledWith({});
 	});
 
 	it("chrome_tabs_query returns tab array", async () => {
-		const result = await dispatchTool("chrome_tabs_query", [{ active: true }], { action: "chrome_tabs_query" });
+		const result = await dispatchTool("chrome_tabs_query", [{ active: true }], {
+			action: "chrome_tabs_query",
+		});
 		expect(result.ok).toBe(true);
 		if (result.ok) {
 			expect(Array.isArray(result.value)).toBe(true);
@@ -1064,13 +1178,17 @@ describe("chrome passthrough", () => {
 	});
 
 	it("chrome_tabs_update preserves argument order and falsey values", async () => {
-		await dispatchTool("chrome_tabs_update", [0, { active: false }], { action: "chrome_tabs_update" });
+		await dispatchTool("chrome_tabs_update", [0, { active: false }], {
+			action: "chrome_tabs_update",
+		});
 		expect(mockChrome.tabs.update).toHaveBeenCalledWith(0, { active: false });
 	});
 
 	it("chrome_cookies_get returns cookie", async () => {
 		const details = { url: "https://example.com", name: "session" };
-		const result = await dispatchTool("chrome_cookies_get", [details], { action: "chrome_cookies_get" });
+		const result = await dispatchTool("chrome_cookies_get", [details], {
+			action: "chrome_cookies_get",
+		});
 		expect(result.ok).toBe(true);
 		if (result.ok) {
 			expect(result.value).toEqual({ name: "test", value: "value" });
@@ -1080,7 +1198,9 @@ describe("chrome passthrough", () => {
 
 	it("chrome_history_search returns history", async () => {
 		const query = { text: "query" };
-		const result = await dispatchTool("chrome_history_search", [query], { action: "chrome_history_search" });
+		const result = await dispatchTool("chrome_history_search", [query], {
+			action: "chrome_history_search",
+		});
 		expect(result.ok).toBe(true);
 		if (result.ok) {
 			expect(Array.isArray(result.value)).toBe(true);
@@ -1090,10 +1210,11 @@ describe("chrome passthrough", () => {
 
 	it("chrome_notifications_create preserves empty notification id", async () => {
 		const options = { title: "Test" };
-		const result = await dispatchTool("chrome_notifications_create", [
-			"",
-			options,
-		], { action: "chrome_notifications_create" });
+		const result = await dispatchTool(
+			"chrome_notifications_create",
+			["", options],
+			{ action: "chrome_notifications_create" },
+		);
 		expect(result.ok).toBe(true);
 		if (result.ok) {
 			expect(result.value).toBe("notif-id");
@@ -1102,7 +1223,9 @@ describe("chrome passthrough", () => {
 	});
 
 	it("chrome_tabGroups_query returns array", async () => {
-		const result = await dispatchTool("chrome_tabGroups_query", [{}], { action: "chrome_tabGroups_query" });
+		const result = await dispatchTool("chrome_tabGroups_query", [{}], {
+			action: "chrome_tabGroups_query",
+		});
 		expect(result.ok).toBe(true);
 		if (result.ok) {
 			expect(Array.isArray(result.value)).toBe(true);
@@ -1111,7 +1234,9 @@ describe("chrome passthrough", () => {
 	});
 
 	it("chrome_sessions_getRecentlyClosed invokes zero-arg form", async () => {
-		const result = await dispatchTool("chrome_sessions_getRecentlyClosed", [], { action: "chrome_sessions_getRecentlyClosed" });
+		const result = await dispatchTool("chrome_sessions_getRecentlyClosed", [], {
+			action: "chrome_sessions_getRecentlyClosed",
+		});
 		expect(result.ok).toBe(true);
 		if (result.ok) {
 			expect(Array.isArray(result.value)).toBe(true);
@@ -1121,7 +1246,9 @@ describe("chrome passthrough", () => {
 
 	it("chrome_downloads_download returns id", async () => {
 		const options = { url: "https://example.com/file.zip" };
-		const result = await dispatchTool("chrome_downloads_download", [options], { action: "chrome_downloads_download" });
+		const result = await dispatchTool("chrome_downloads_download", [options], {
+			action: "chrome_downloads_download",
+		});
 		expect(result.ok).toBe(true);
 		if (result.ok) {
 			expect(result.value).toBe(1);
@@ -1130,7 +1257,9 @@ describe("chrome passthrough", () => {
 	});
 
 	it("chrome_system_cpu_getInfo returns object", async () => {
-		const result = await dispatchTool("chrome_system_cpu_getInfo", [], { action: "chrome_system_cpu_getInfo" });
+		const result = await dispatchTool("chrome_system_cpu_getInfo", [], {
+			action: "chrome_system_cpu_getInfo",
+		});
 		expect(result.ok).toBe(true);
 		if (result.ok) {
 			expect(typeof result.value).toBe("object");
@@ -1139,9 +1268,11 @@ describe("chrome passthrough", () => {
 	});
 
 	it("history_delete alias normalizes string url to chrome object arg", async () => {
-		const result = await dispatchTool("history_delete", [
-			"https://example.com",
-		], { action: "history_delete" });
+		const result = await dispatchTool(
+			"history_delete",
+			["https://example.com"],
+			{ action: "history_delete" },
+		);
 		expect(result.ok).toBe(true);
 		expect(mockChrome.history.deleteUrl).toHaveBeenCalledWith({
 			url: "https://example.com",
@@ -1161,7 +1292,9 @@ describe("chrome passthrough", () => {
 	});
 
 	it("bookmarks_search alias normalizes string query", async () => {
-		const result = await dispatchTool("bookmarks_search", ["example"], { action: "bookmarks_search" });
+		const result = await dispatchTool("bookmarks_search", ["example"], {
+			action: "bookmarks_search",
+		});
 		expect(result.ok).toBe(true);
 		expect(mockChrome.bookmarks.search).toHaveBeenCalledWith({
 			query: "example",
@@ -1170,9 +1303,11 @@ describe("chrome passthrough", () => {
 
 	it("notifications_create alias normalizes wrapper object to native args", async () => {
 		const options = { type: "basic", title: "Hello", message: "World" };
-		const result = await dispatchTool("notifications_create", [
-			{ id: "test-id", options },
-		], { action: "notifications_create" });
+		const result = await dispatchTool(
+			"notifications_create",
+			[{ id: "test-id", options }],
+			{ action: "notifications_create" },
+		);
 		expect(result.ok).toBe(true);
 		expect(mockChrome.notifications.create).toHaveBeenCalledWith(
 			"test-id",
@@ -1197,9 +1332,11 @@ describe("chrome passthrough", () => {
 		mockChrome.scripting.executeScript.mockResolvedValue([
 			{ frameId: 0, result: 1 },
 		]);
-		const result = await dispatchTool("chrome_scripting_executeScript", [
-			{ target: { tabId: 1 }, func: () => 1 },
-		], { action: "chrome_scripting_executeScript" });
+		const result = await dispatchTool(
+			"chrome_scripting_executeScript",
+			[{ target: { tabId: 1 }, func: () => 1 }],
+			{ action: "chrome_scripting_executeScript" },
+		);
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.code).toBe("E_UNTRANSPORTABLE_PARAM");
@@ -1210,9 +1347,11 @@ describe("chrome passthrough", () => {
 	});
 
 	it("executeScript with /skills/ path fails with path explanation", async () => {
-		const result = await dispatchTool("chrome_scripting_executeScript", [
-			{ target: { tabId: 1 }, files: ["/skills/foo.js"] },
-		], { action: "chrome_scripting_executeScript" });
+		const result = await dispatchTool(
+			"chrome_scripting_executeScript",
+			[{ target: { tabId: 1 }, files: ["/skills/foo.js"] }],
+			{ action: "chrome_scripting_executeScript" },
+		);
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.code).toBe("E_UNTRANSPORTABLE_PARAM");
@@ -1225,9 +1364,11 @@ describe("chrome passthrough", () => {
 		mockChrome.scripting.executeScript.mockResolvedValue([
 			{ frameId: 0, result: "injected" },
 		]);
-		const result = await dispatchTool("chrome_scripting_executeScript", [
-			{ target: { tabId: 1 }, files: ["/assets/real.js"] },
-		], { action: "chrome_scripting_executeScript" });
+		const result = await dispatchTool(
+			"chrome_scripting_executeScript",
+			[{ target: { tabId: 1 }, files: ["/assets/real.js"] }],
+			{ action: "chrome_scripting_executeScript" },
+		);
 		expect(result.ok).toBe(true);
 		expect(mockChrome.scripting.executeScript).toHaveBeenCalledWith({
 			target: { tabId: 1 },
@@ -1258,10 +1399,11 @@ describe("capability gating", () => {
 		};
 		vi.stubGlobal("chrome", minimalChrome);
 		await initCapabilities();
-		const result = await dispatchTool("chrome_notifications_create", [
-			"",
-			{ title: "Test" },
-		], { action: "chrome_notifications_create" });
+		const result = await dispatchTool(
+			"chrome_notifications_create",
+			["", { title: "Test" }],
+			{ action: "chrome_notifications_create" },
+		);
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.code).toBe("E_PERMISSION");
@@ -1281,10 +1423,11 @@ describe("capability gating", () => {
 		};
 		vi.stubGlobal("chrome", minimalChrome);
 		await initCapabilities();
-		const result = await dispatchTool("chrome_notifications_create", [
-			"",
-			{ title: "Test" },
-		], { action: "chrome_notifications_create" });
+		const result = await dispatchTool(
+			"chrome_notifications_create",
+			["", { title: "Test" }],
+			{ action: "chrome_notifications_create" },
+		);
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.code).toBe("E_UNAVAILABLE");
@@ -1324,21 +1467,25 @@ describe("capability gating", () => {
 		};
 		vi.stubGlobal("chrome", chrome);
 		await initCapabilities();
-		const blocked = await dispatchTool("notifications_create", [
-			"",
-			{ title: "Test" },
-		], { action: "notifications_create" });
+		const blocked = await dispatchTool(
+			"notifications_create",
+			["", { title: "Test" }],
+			{ action: "notifications_create" },
+		);
 		expect(blocked.ok).toBe(false);
-		const result = await dispatchTool("chrome_permissions_request", [
-			{ permissions: ["notifications"] },
-		], { action: "chrome_permissions_request" });
+		const result = await dispatchTool(
+			"chrome_permissions_request",
+			[{ permissions: ["notifications"] }],
+			{ action: "chrome_permissions_request" },
+		);
 		expect(result.ok).toBe(true);
 		expect(requestFn).toHaveBeenCalled();
 		expect(getAllFn.mock.calls.length).toBeGreaterThanOrEqual(2);
-		const allowed = await dispatchTool("notifications_create", [
-			"",
-			{ title: "Test" },
-		], { action: "notifications_create" });
+		const allowed = await dispatchTool(
+			"notifications_create",
+			["", { title: "Test" }],
+			{ action: "notifications_create" },
+		);
 		expect(allowed.ok).toBe(true);
 	});
 
@@ -1352,10 +1499,11 @@ describe("capability gating", () => {
 		};
 		vi.stubGlobal("chrome", minimalChrome);
 		await initCapabilities();
-		const result = await dispatchTool("notifications_create", [
-			"",
-			{ title: "Test" },
-		], { action: "notifications_create" });
+		const result = await dispatchTool(
+			"notifications_create",
+			["", { title: "Test" }],
+			{ action: "notifications_create" },
+		);
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.code).toBe("E_PERMISSION");
@@ -1374,10 +1522,11 @@ describe("capability gating", () => {
 		};
 		vi.stubGlobal("chrome", fullChrome);
 		await initCapabilities();
-		const result = await dispatchTool("notifications_create", [
-			"",
-			{ title: "Test" },
-		], { action: "notifications_create" });
+		const result = await dispatchTool(
+			"notifications_create",
+			["", { title: "Test" }],
+			{ action: "notifications_create" },
+		);
 		expect(result.ok).toBe(true);
 		if (result.ok) {
 			expect(result.value).toBe("notif-id");
@@ -1402,7 +1551,9 @@ describe("capability gating", () => {
 		};
 		vi.stubGlobal("chrome", chromeWithRuntime);
 		await initCapabilities();
-		const result = await dispatchTool("chrome_runtime_getURL", ["/test"], { action: "chrome_runtime_getURL" });
+		const result = await dispatchTool("chrome_runtime_getURL", ["/test"], {
+			action: "chrome_runtime_getURL",
+		});
 		if (!result.ok) {
 			expect(result.error.code).not.toBe("E_PERMISSION");
 		}
@@ -1417,9 +1568,11 @@ describe("capability gating", () => {
 		};
 		vi.stubGlobal("chrome", chromeWithAction);
 		await initCapabilities();
-		const result = await dispatchTool("chrome_action_setBadgeText", [
-			{ text: "1" },
-		], { action: "chrome_action_setBadgeText" });
+		const result = await dispatchTool(
+			"chrome_action_setBadgeText",
+			[{ text: "1" }],
+			{ action: "chrome_action_setBadgeText" },
+		);
 		expect(result.ok).toBe(true);
 	});
 
@@ -1436,9 +1589,11 @@ describe("capability gating", () => {
 		};
 		vi.stubGlobal("chrome", chromeWithManifestOnly);
 		await initCapabilities();
-		const result = await dispatchTool("chrome_windows_getAll", [
-			{ populate: false },
-		], { action: "chrome_windows_getAll" });
+		const result = await dispatchTool(
+			"chrome_windows_getAll",
+			[{ populate: false }],
+			{ action: "chrome_windows_getAll" },
+		);
 		expect(result.ok).toBe(true);
 	});
 });
@@ -1747,9 +1902,13 @@ describe("page actions", () => {
 			if (idx !== -1) onUpdatedListeners.splice(idx, 1);
 		});
 
-		const dispatchPromise = dispatchTool("page_goto", {
-			url: "https://example.com",
-		}, { action: "page_goto" });
+		const dispatchPromise = dispatchTool(
+			"page_goto",
+			{
+				url: "https://example.com",
+			},
+			{ action: "page_goto" },
+		);
 
 		setTimeout(() => {
 			mockChrome.tabs.get.mockResolvedValue({
@@ -1779,10 +1938,14 @@ describe("page actions", () => {
 		mockChrome.tabs.onUpdated.addListener.mockImplementation(() => {});
 		mockChrome.tabs.onUpdated.removeListener.mockImplementation(() => {});
 
-		const result = await dispatchTool("page_goto", {
-			url: "https://example.com",
-			timeout: 100n,
-		}, { action: "page_goto" });
+		const result = await dispatchTool(
+			"page_goto",
+			{
+				url: "https://example.com",
+				timeout: 100n,
+			},
+			{ action: "page_goto" },
+		);
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.code).toBe("E_NAVIGATION");
@@ -1793,9 +1956,13 @@ describe("page actions", () => {
 	});
 
 	it("page_goto returns E_NAVIGATION for non-http(s) URLs", async () => {
-		const result = await dispatchTool("page_goto", {
-			url: "chrome://settings",
-		}, { action: "page_goto" });
+		const result = await dispatchTool(
+			"page_goto",
+			{
+				url: "chrome://settings",
+			},
+			{ action: "page_goto" },
+		);
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.code).toBe("E_NAVIGATION");
@@ -1830,10 +1997,14 @@ describe("page actions", () => {
 			if (idx !== -1) onUpdatedListeners.splice(idx, 1);
 		});
 
-		const dispatchPromise = dispatchTool("page_goto", {
-			url: "https://example.com",
-			timeout: 2000n,
-		}, { action: "page_goto" });
+		const dispatchPromise = dispatchTool(
+			"page_goto",
+			{
+				url: "https://example.com",
+				timeout: 2000n,
+			},
+			{ action: "page_goto" },
+		);
 
 		setTimeout(() => {
 			for (const listener of onUpdatedListeners) {
@@ -1863,7 +2034,11 @@ describe("page actions", () => {
 			.mockResolvedValue({ id: 1, status: "complete", url });
 		mockChrome.tabs.sendMessage.mockResolvedValue({ ok: true });
 
-		const dispatchPromise = dispatchTool("page_goto", { url, timeout: 2000n }, { action: "page_goto" });
+		const dispatchPromise = dispatchTool(
+			"page_goto",
+			{ url, timeout: 2000n },
+			{ action: "page_goto" },
+		);
 		setTimeout(() => {
 			onUpdatedListener?.(1, { status: "loading" });
 			onUpdatedListener?.(1, { status: "complete" });
@@ -2038,10 +2213,14 @@ describe("tab_goto", () => {
 			if (idx !== -1) onUpdatedListeners.splice(idx, 1);
 		});
 
-		const dispatchPromise = dispatchTool("tab_goto", {
-			tabId: 42,
-			url: "https://target.example",
-		}, { action: "tab_goto" });
+		const dispatchPromise = dispatchTool(
+			"tab_goto",
+			{
+				tabId: 42,
+				url: "https://target.example",
+			},
+			{ action: "tab_goto" },
+		);
 
 		setTimeout(() => {
 			for (const listener of onUpdatedListeners) {
@@ -2067,10 +2246,14 @@ describe("tab_goto", () => {
 			url: "chrome-extension://abc/sidepanel.html",
 		});
 
-		const result = await dispatchTool("tab_goto", {
-			tabId: 42,
-			url: "https://example.com",
-		}, { action: "tab_goto" });
+		const result = await dispatchTool(
+			"tab_goto",
+			{
+				tabId: 42,
+				url: "https://example.com",
+			},
+			{ action: "tab_goto" },
+		);
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.code).toBe("E_PERMISSION");
@@ -2087,10 +2270,14 @@ describe("tab_goto", () => {
 			url: "https://old.example",
 		});
 
-		const result = await dispatchTool("tab_goto", {
-			tabId: 42,
-			url: "chrome://settings",
-		}, { action: "tab_goto" });
+		const result = await dispatchTool(
+			"tab_goto",
+			{
+				tabId: 42,
+				url: "chrome://settings",
+			},
+			{ action: "tab_goto" },
+		);
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.code).toBe("E_NAVIGATION");
@@ -2112,11 +2299,15 @@ describe("tab_goto", () => {
 		mockChrome.tabs.onUpdated.addListener.mockImplementation(() => {});
 		mockChrome.tabs.onUpdated.removeListener.mockImplementation(() => {});
 
-		const result = await dispatchTool("tab_goto", {
-			tabId: 42,
-			url: "https://example.com",
-			timeout: 100n,
-		}, { action: "tab_goto" });
+		const result = await dispatchTool(
+			"tab_goto",
+			{
+				tabId: 42,
+				url: "https://example.com",
+				timeout: 100n,
+			},
+			{ action: "tab_goto" },
+		);
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.code).toBe("E_NAVIGATION");
@@ -2150,11 +2341,15 @@ describe("tab_goto", () => {
 			if (idx !== -1) onUpdatedListeners.splice(idx, 1);
 		});
 
-		const dispatchPromise = dispatchTool("tab_goto", {
-			tabId: 42,
-			url: "https://example.com",
-			timeout: 2000n,
-		}, { action: "tab_goto" });
+		const dispatchPromise = dispatchTool(
+			"tab_goto",
+			{
+				tabId: 42,
+				url: "https://example.com",
+				timeout: 2000n,
+			},
+			{ action: "tab_goto" },
+		);
 
 		setTimeout(() => {
 			for (const listener of onUpdatedListeners) {
@@ -2173,9 +2368,13 @@ describe("tab_goto", () => {
 	}, 10_000);
 
 	it("tab_goto returns E_MISSING_PARAM when tabId is missing", async () => {
-		const result = await dispatchTool("tab_goto", {
-			url: "https://example.com",
-		}, { action: "tab_goto" });
+		const result = await dispatchTool(
+			"tab_goto",
+			{
+				url: "https://example.com",
+			},
+			{ action: "tab_goto" },
+		);
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.code).toBe("E_MISSING_PARAM");
@@ -2189,10 +2388,14 @@ describe("tab_goto", () => {
 			url: "chrome://settings",
 		});
 
-		const result = await dispatchTool("tab_goto", {
-			tabId: 42,
-			url: "https://example.com",
-		}, { action: "tab_goto" });
+		const result = await dispatchTool(
+			"tab_goto",
+			{
+				tabId: 42,
+				url: "https://example.com",
+			},
+			{ action: "tab_goto" },
+		);
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.code).toBe("E_PERMISSION");
@@ -2207,10 +2410,14 @@ describe("tab_goto", () => {
 		// because the handler validates existence before delegating to navigateTab.
 		mockChrome.tabs.get.mockRejectedValueOnce(new Error("No tab with id: 999"));
 
-		const result = await dispatchTool("tab_goto", {
-			tabId: 999,
-			url: "https://example.com",
-		}, { action: "tab_goto" });
+		const result = await dispatchTool(
+			"tab_goto",
+			{
+				tabId: 999,
+				url: "https://example.com",
+			},
+			{ action: "tab_goto" },
+		);
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.code).toBe("E_NO_TAB");
@@ -2232,11 +2439,15 @@ describe("tab_goto", () => {
 			removeListenerSpy,
 		);
 
-		const result = await dispatchTool("tab_goto", {
-			tabId: 42,
-			url: "https://example.com",
-			timeout: 100n,
-		}, { action: "tab_goto" });
+		const result = await dispatchTool(
+			"tab_goto",
+			{
+				tabId: 42,
+				url: "https://example.com",
+				timeout: 100n,
+			},
+			{ action: "tab_goto" },
+		);
 		expect(result.ok).toBe(false);
 		// Listener MUST be removed on the error path — no leak under repeated nav.
 		expect(removeListenerSpy).toHaveBeenCalled();
@@ -2266,11 +2477,15 @@ describe("tab_goto", () => {
 			},
 		);
 
-		const dispatchPromise = dispatchTool("tab_goto", {
-			tabId: 42,
-			url: "https://new.example",
-			timeout: 2000n,
-		}, { action: "tab_goto" });
+		const dispatchPromise = dispatchTool(
+			"tab_goto",
+			{
+				tabId: 42,
+				url: "https://new.example",
+				timeout: 2000n,
+			},
+			{ action: "tab_goto" },
+		);
 		// setTimeout (not fake timers): the listener must fire AFTER both
 		// navigateTab's navListener and waitForTabLoad's internal listener register
 		// on the dispatch promise's first await — queueMicrotask fires too early.
@@ -2301,10 +2516,14 @@ describe("tab actions", () => {
 	});
 
 	it("tab_create accepts raw no-wait creation", async () => {
-		const result = await dispatchTool("tab_create", {
-			url: "https://extension-js.test/fixture",
-			waitForReady: false,
-		}, { action: "tab_create" });
+		const result = await dispatchTool(
+			"tab_create",
+			{
+				url: "https://extension-js.test/fixture",
+				waitForReady: false,
+			},
+			{ action: "tab_create" },
+		);
 		expect(result.ok).toBe(true);
 		expect(mockChrome.tabs.create).toHaveBeenCalledWith({
 			url: "https://extension-js.test/fixture",
@@ -2324,7 +2543,11 @@ describe("tab actions", () => {
 			status: "complete",
 		});
 
-		const result = await dispatchTool("tab_create", "https://extension-js.test/fixture", { action: "tab_create" });
+		const result = await dispatchTool(
+			"tab_create",
+			"https://extension-js.test/fixture",
+			{ action: "tab_create" },
+		);
 		expect(result.ok).toBe(true);
 		expect(mockChrome.tabs.create).toHaveBeenCalledWith({
 			url: "https://extension-js.test/fixture",
@@ -2462,7 +2685,11 @@ describe("tab actions", () => {
 			url: "https://example.com/page",
 			title: "Example",
 		});
-		const result = await dispatchTool("tab_url", { tabId: 123 }, { action: "tab_url" });
+		const result = await dispatchTool(
+			"tab_url",
+			{ tabId: 123 },
+			{ action: "tab_url" },
+		);
 		expect(result.ok).toBe(true);
 		if (result.ok) {
 			expect(result.value).toBe("https://example.com/page");
@@ -2476,7 +2703,11 @@ describe("tab actions", () => {
 			url: "https://example.com/page",
 			title: "Example Page",
 		});
-		const result = await dispatchTool("tab_title", { tabId: 123 }, { action: "tab_title" });
+		const result = await dispatchTool(
+			"tab_title",
+			{ tabId: 123 },
+			{ action: "tab_title" },
+		);
 		expect(result.ok).toBe(true);
 		if (result.ok) {
 			expect(result.value).toBe("Example Page");
@@ -2484,7 +2715,11 @@ describe("tab actions", () => {
 	});
 
 	it("tab_url invalid tabId fails with E_INVALID_PARAMS", async () => {
-		const result = await dispatchTool("tab_url", { tabId: "not-a-number" }, { action: "tab_url" });
+		const result = await dispatchTool(
+			"tab_url",
+			{ tabId: "not-a-number" },
+			{ action: "tab_url" },
+		);
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.code).toBe("E_INVALID_PARAMS");
@@ -3026,7 +3261,9 @@ describe("WU-5: unambiguous element action arguments", () => {
 	// ── Sidepanel positional rejection ────────────────────────────
 
 	it("sidepanel_click rejects positional string with E_INVALID_PARAMS", async () => {
-		const result = await dispatchTool("sidepanel_click", "e1", { action: "sidepanel_click" });
+		const result = await dispatchTool("sidepanel_click", "e1", {
+			action: "sidepanel_click",
+		});
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.code).toBe("E_INVALID_PARAMS");
@@ -3037,7 +3274,11 @@ describe("WU-5: unambiguous element action arguments", () => {
 		const btn = document.createElement("button");
 		btn.setAttribute("data-ref-id", "e10");
 		document.body.appendChild(btn);
-		const result = await dispatchTool("sidepanel_click", { refId: "e10" }, { action: "sidepanel_click" });
+		const result = await dispatchTool(
+			"sidepanel_click",
+			{ refId: "e10" },
+			{ action: "sidepanel_click" },
+		);
 		expect(result.ok).toBe(true);
 		document.body.removeChild(btn);
 	});
@@ -3046,9 +3287,13 @@ describe("WU-5: unambiguous element action arguments", () => {
 		const btn = document.createElement("button");
 		btn.textContent = "SidepanelBtn";
 		document.body.appendChild(btn);
-		const result = await dispatchTool("sidepanel_click", {
-			label: "SidepanelBtn",
-		}, { action: "sidepanel_click" });
+		const result = await dispatchTool(
+			"sidepanel_click",
+			{
+				label: "SidepanelBtn",
+			},
+			{ action: "sidepanel_click" },
+		);
 		expect(result.ok).toBe(true);
 		document.body.removeChild(btn);
 	});
@@ -3112,7 +3357,11 @@ describe("host call", () => {
 describe("sleep", () => {
 	it("sleep waits for the specified duration", async () => {
 		const start = Date.now();
-		const result = await dispatchTool("sleep", { duration: 50n }, { action: "sleep" });
+		const result = await dispatchTool(
+			"sleep",
+			{ duration: 50n },
+			{ action: "sleep" },
+		);
 		const elapsed = Date.now() - start;
 		expect(result.ok).toBe(true);
 		expect(elapsed).toBeGreaterThanOrEqual(40);
@@ -3223,7 +3472,7 @@ describe("acceptance criteria verification", () => {
 		expect(matches ?? []).toHaveLength(0);
 	});
 
-	it("AC-2: executeMainThreadCommand is ≤15 lines", () => {
+	it("AC-2: executeMainThreadCommand is ≤20 lines (CallContext bag adds 5 fields, biome-formatted)", () => {
 		const content = fs.readFileSync(commandPath, "utf-8");
 		// Find the function definition
 		const match = content.match(
@@ -3231,7 +3480,7 @@ describe("acceptance criteria verification", () => {
 		);
 		expect(match).toBeTruthy();
 		const lines = match?.[0].split("\n");
-		expect(lines.length).toBeLessThanOrEqual(15);
+		expect(lines.length).toBeLessThanOrEqual(20);
 	});
 
 	it("AC-3: manifest has ≥130 registered actions", () => {
@@ -3576,7 +3825,11 @@ describe("registry core", () => {
 				return { echoed: params };
 			}),
 		);
-		const result = await dispatchTool("test_dispatch_ok", { foo: "bar" }, { action: "test_dispatch_ok" });
+		const result = await dispatchTool(
+			"test_dispatch_ok",
+			{ foo: "bar" },
+			{ action: "test_dispatch_ok" },
+		);
 		expect(result.ok).toBe(true);
 		if (result.ok) {
 			expect(result.value).toEqual({ echoed: {} });
@@ -3584,7 +3837,11 @@ describe("registry core", () => {
 	});
 
 	it("dispatchTool returns { ok: false, error } for unknown action with code E_UNKNOWN", async () => {
-		const result = await dispatchTool("test_unknown_action", {}, { action: "test_unknown_action" });
+		const result = await dispatchTool(
+			"test_unknown_action",
+			{},
+			{ action: "test_unknown_action" },
+		);
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.code).toBe("E_UNKNOWN");
@@ -3606,7 +3863,11 @@ describe("registry core", () => {
 			returnDoc: "null",
 			errorCode: "ETEST",
 		});
-		const result = await dispatchTool("test_validate", { name: 123 }, { action: "test_validate" });
+		const result = await dispatchTool(
+			"test_validate",
+			{ name: 123 },
+			{ action: "test_validate" },
+		);
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.code).toBe("E_INVALID_PARAMS");

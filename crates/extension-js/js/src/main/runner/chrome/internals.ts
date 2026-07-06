@@ -8,7 +8,6 @@ import {
 	type ToolDocParam,
 } from "../../../shared/main/tool-registry.js";
 import { makeError } from "../lib/types.js";
-import { assertTabOwnership } from "./tab-ownership.js";
 import {
 	checkPermission,
 	manifestPermissionForApiPath,
@@ -19,6 +18,7 @@ import {
 	requireArgumentArray,
 	resolveChromeMethod,
 } from "./native.js";
+import { assertTabOwnership } from "./tab-ownership.js";
 
 export {
 	invokeNative,

@@ -1,7 +1,7 @@
 /** Shared DOM helpers for inline snapshots (content script + MAIN-world injection). */
 
-import { allocateRefId } from "./ref-id.js";
 import { assessClickability } from "../cross/clickability.js";
+import { allocateRefId } from "./ref-id.js";
 
 export {
 	allocateRefId,
@@ -12,7 +12,12 @@ export {
 export const INTERACTIVE_SELECTOR =
 	'input, textarea, select, button, a, [role="button"], [role="link"]';
 
-export const EXCLUDED_TAGS = new Set(["script", "style", "noscript", "template"]);
+export const EXCLUDED_TAGS = new Set([
+	"script",
+	"style",
+	"noscript",
+	"template",
+]);
 
 const MARKDOWN_TEXT_TAGS = new Set([
 	"p",
@@ -418,7 +423,10 @@ export function isReachableClickTarget(el: Element): boolean {
 			[rect.right - 0.1, rect.bottom - 0.1],
 		];
 		for (const [x, y] of points) {
-			if (win && (x < 0 || y < 0 || x > win.innerWidth || y > win.innerHeight)) {
+			if (
+				win &&
+				(x < 0 || y < 0 || x > win.innerWidth || y > win.innerHeight)
+			) {
 				continue;
 			}
 			hadOnScreenPoint = true;
@@ -429,7 +437,6 @@ export function isReachableClickTarget(el: Element): boolean {
 	if (!hadOnScreenPoint) return true;
 	return false;
 }
-
 
 function isInvalidFormControl(el: Element): boolean {
 	if (

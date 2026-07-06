@@ -363,9 +363,7 @@ describe("manifest documentation export", () => {
 		const tabSelectOption = manifest.find(
 			(e) => e.action === "tab_select_option",
 		);
-		expect(tabSelectOption?.notes?.join(" ")).toContain(
-			"NEVER web.tab.fill",
-		);
+		expect(tabSelectOption?.notes?.join(" ")).toContain("NEVER web.tab.fill");
 		expect(tabSelectOption?.notes?.join(" ")).toContain(
 			"controlType='dropdown'",
 		);

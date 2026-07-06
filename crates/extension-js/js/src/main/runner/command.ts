@@ -1,14 +1,12 @@
 /// <reference types="chrome" />
 
+import type { CallContext } from "../../shared/cross/manifest.js";
 import { logger as logModule } from "../../shared/main/logger.js";
 import type {
 	AsyncResponse,
 	Command,
 } from "../../shared/main/tool-registry.js";
-import {
-	dispatchTool,
-} from "../../shared/main/tool-registry.js";
-import type { CallContext } from "../../shared/cross/manifest.js";
+import { dispatchTool } from "../../shared/main/tool-registry.js";
 import { resolveActiveTabId } from "../tab-context.js";
 import { isNativeParityAction, normalizeParityArgs } from "./chrome/native.js";
 import { handleHostCallAction } from "./host.js";
@@ -71,8 +69,14 @@ export async function executeMainThreadCommand(
 	resolveActiveTab?: () => Promise<number | null>,
 ): Promise<AsyncResponse> {
 	const finish = startCommandTimer(command);
-	const ctx: CallContext = { action: command.action, callId: command.call_id, runId: command.runId,
-		signal: resolveSignal(relaySignal), windowId, resolveActiveTab: resolveActiveTab ?? resolveActiveTabId };
+	const ctx: CallContext = {
+		action: command.action,
+		callId: command.call_id,
+		runId: command.runId,
+		signal: resolveSignal(relaySignal),
+		windowId,
+		resolveActiveTab: resolveActiveTab ?? resolveActiveTabId,
+	};
 	const { response, handler } = await dispatchCommand(command, ctx);
 	finish({ ok: response.ok, ...(handler ? { handler } : {}) });
 	return response;

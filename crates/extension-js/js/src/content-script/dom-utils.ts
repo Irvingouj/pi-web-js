@@ -4,7 +4,6 @@ import {
 	staleRefError,
 	throwStructuredAgentError,
 } from "../shared/cross/normalize-agent-error.js";
-import { grantFromInlineSnapshot } from "./observation-lease.js";
 import {
 	enrichFormNode,
 	getAccessibleName,
@@ -13,6 +12,7 @@ import {
 	isSelfOrAncestorHidden,
 	shouldInclude,
 } from "../shared/cs/snapshot-dom.js";
+import { grantFromInlineSnapshot } from "./observation-lease.js";
 
 export { enrichFormNode, getAccessibleName, getAccessibleRole, shouldInclude };
 
@@ -208,9 +208,7 @@ export function throwElementNotFound(
 	const snapshot = safeRefreshSnapshot();
 	if (refId) {
 		const candidates = includeCandidates ? findCandidatesByRefId(refId) : [];
-		throwStructuredAgentError(
-			staleRefError(refId, { candidates, snapshot }),
-		);
+		throwStructuredAgentError(staleRefError(refId, { candidates, snapshot }));
 	}
 	if (label) {
 		const candidates = includeCandidates ? findSemanticCandidates(label) : [];

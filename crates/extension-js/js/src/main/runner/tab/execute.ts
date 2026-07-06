@@ -1,9 +1,8 @@
 /// <reference types="chrome" />
 import type { z } from "zod";
-
+import type { CallContext } from "../../../shared/cross/manifest.js";
 import { contentScriptMissingError } from "../../../shared/cross/normalize-agent-error.js";
 import * as schemas from "../../../shared/cross/schemas.js";
-import type { CallContext } from "../../../shared/cross/manifest.js";
 import { unwrapContentScriptMessage } from "../../../shared/main/content-script-response.js";
 import { logger } from "../../../shared/main/logger.js";
 import {
@@ -409,10 +408,11 @@ export async function navigateTab(
 	};
 	chromeApi?.tabs?.onUpdated?.addListener(navListener);
 	try {
-		const updateResult = await dispatchTool("chrome_tabs_update", [
-			tabId,
-			{ url },
-		], innerCtx);
+		const updateResult = await dispatchTool(
+			"chrome_tabs_update",
+			[tabId, { url }],
+			innerCtx,
+		);
 		if (!updateResult.ok) {
 			return unwrapResult(updateResult);
 		}
@@ -485,7 +485,11 @@ export async function navigateTab(
 		}
 	}
 
-	const pingResult = await pingTabContentScript(tabId, timeoutMs, options.signal);
+	const pingResult = await pingTabContentScript(
+		tabId,
+		timeoutMs,
+		options.signal,
+	);
 	if (!pingResult.ok) {
 		return unwrapResult(pingResult);
 	}

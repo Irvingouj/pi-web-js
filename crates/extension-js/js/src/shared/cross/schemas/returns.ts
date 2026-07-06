@@ -421,7 +421,10 @@ export const DomNodeSchema: z.ZodType<DomNode> = z.object({
 		.string()
 		.optional()
 		.describe("ID(s) of controlled popup/listbox elements, when exposed"),
-	expanded: z.boolean().optional().describe("Expanded state for popup controls"),
+	expanded: z
+		.boolean()
+		.optional()
+		.describe("Expanded state for popup controls"),
 	forControl: z
 		.string()
 		.optional()
@@ -481,7 +484,10 @@ export const FindNodeSchema = z.object({
 		.string()
 		.optional()
 		.describe("Stable permalink URL from anchor element"),
-	imageUrls: z.array(z.string()).optional().describe("Image URLs contained within this element"),
+	imageUrls: z
+		.array(z.string())
+		.optional()
+		.describe("Image URLs contained within this element"),
 	accept: z
 		.string()
 		.optional()
@@ -493,15 +499,29 @@ export const FindNodeSchema = z.object({
 	controlType: z
 		.string()
 		.optional()
-		.describe('Plain-language control type, e.g. "dropdown" for combobox/select'),
-	actionable: z.boolean().optional().describe("Whether this node can be acted on directly"),
+		.describe(
+			'Plain-language control type, e.g. "dropdown" for combobox/select',
+		),
+	actionable: z
+		.boolean()
+		.optional()
+		.describe("Whether this node can be acted on directly"),
 	recommendedAction: z
 		.string()
 		.optional()
 		.describe("Recommended page.* action for this control"),
-	confidence: z.enum(["high", "low"]).optional().describe("Clickability confidence"),
-	controls: z.string().optional().describe("ID(s) of controlled popup/listbox elements"),
-	expanded: z.boolean().optional().describe("Expanded state for popup controls"),
+	confidence: z
+		.enum(["high", "low"])
+		.optional()
+		.describe("Clickability confidence"),
+	controls: z
+		.string()
+		.optional()
+		.describe("ID(s) of controlled popup/listbox elements"),
+	expanded: z
+		.boolean()
+		.optional()
+		.describe("Expanded state for popup controls"),
 	forControl: z
 		.string()
 		.optional()

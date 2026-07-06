@@ -1996,12 +1996,10 @@ describe("dispatchActivationClick: native activation", () => {
 	it("click on submit button fires form submit", async () => {
 		document.body.innerHTML = `<form data-ref-id="f"><button type="submit" data-ref-id="e1">Go</button></form>`;
 		let submitted = false;
-		document
-			.querySelector("form")!
-			.addEventListener("submit", (e) => {
-				e.preventDefault();
-				submitted = true;
-			});
+		document.querySelector("form")!.addEventListener("submit", (e) => {
+			e.preventDefault();
+			submitted = true;
+		});
 		grantFromDom();
 		await dispatchContentScriptCall("page_click", "click", handlers.click, {
 			refId: "e1",

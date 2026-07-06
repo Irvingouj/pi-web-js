@@ -13,6 +13,7 @@
  */
 
 import { assessClickability } from "../cross/clickability.js";
+import type { PipelineNode } from "./dom-pipeline.js";
 import {
 	enrichFormNode,
 	isProbablyClickable,
@@ -22,7 +23,6 @@ import {
 	resolveContainerRefId,
 	resolvePermalinkLink,
 } from "./snapshot-dom.js";
-import type { PipelineNode } from "./dom-pipeline.js";
 
 // ---------------------------------------------------------------------------
 // Public entry — applied to a base node for all three surfaces.

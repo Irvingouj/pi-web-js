@@ -1,18 +1,23 @@
 /// <reference types="chrome" />
 import { z } from "zod";
 import { CONTENT_SCRIPT_TOOL_SPECS } from "../../../shared/cross/content-script-tools.js";
+import type { CallContext } from "../../../shared/cross/manifest.js";
 import {
 	contentScriptMissingError,
 	noTabError,
 } from "../../../shared/cross/normalize-agent-error.js";
 import * as schemas from "../../../shared/cross/schemas.js";
-import type { CallContext } from "../../../shared/cross/manifest.js";
 import { defineContentScriptTool } from "../../../shared/main/define-content-script-tool.js";
 import { logger } from "../../../shared/main/logger.js";
 import {
 	dispatchTool,
 	registerJsCall,
 } from "../../../shared/main/tool-registry.js";
+import {
+	clearNetworkEntries,
+	getNetworkEntry,
+	listNetworkEntries,
+} from "../lib/network-log-store.js";
 import {
 	CS_FAST_PING_MS,
 	DEFAULT_TIMEOUT_MS,
@@ -25,11 +30,6 @@ import {
 	throwAgentError,
 	unwrapResult,
 } from "../runtime.js";
-import {
-	clearNetworkEntries,
-	getNetworkEntry,
-	listNetworkEntries,
-} from "../lib/network-log-store.js";
 
 async function requireActiveTab(
 	action: string,
@@ -46,7 +46,11 @@ async function requireActiveTab(
 	// refuse it whenever windowId is known. The fallback is only合法 when
 	// windowId is absent — direct dispatchTool calls with no session (tests,
 	// low-level API, web-js demo with no Chrome window).
-	if (!ctx.resolveActiveTab && ctx.windowId !== undefined && ctx.windowId !== null) {
+	if (
+		!ctx.resolveActiveTab &&
+		ctx.windowId !== undefined &&
+		ctx.windowId !== null
+	) {
 		throwAgentError(
 			makeError(
 				`${action}: session-scoped call (windowId=${ctx.windowId}) is missing ctx.resolveActiveTab — the per-session TabTracker must inject the active-tab resolver. Falling back to the unscoped module-global would risk resolving a foreign window's tab.`,
@@ -138,7 +142,11 @@ registerJsCall({
 				"navigation",
 			);
 		}
-		const preNavResult = await dispatchTool("chrome_tabs_get", [activeTab], ctx);
+		const preNavResult = await dispatchTool(
+			"chrome_tabs_get",
+			[activeTab],
+			ctx,
+		);
 		const preNavTab =
 			preNavResult.ok && preNavResult.value
 				? schemas.ChromeTabSchema.safeParse(preNavResult.value)
@@ -211,7 +219,11 @@ registerJsCall({
 		const title = tab.title ?? "";
 		const urlPreflight = await preflightDomTab(tabId, ctx.signal);
 		const domApis = urlPreflight && !urlPreflight.ok ? "blocked" : "ok";
-		const pingResult = await pingTabContentScript(tabId, CS_FAST_PING_MS, ctx.signal);
+		const pingResult = await pingTabContentScript(
+			tabId,
+			CS_FAST_PING_MS,
+			ctx.signal,
+		);
 		const contentScript = pingResult.ok ? "connected" : "missing";
 		const mutationsReady = domApis === "ok" && contentScript === "connected";
 		const health: z.infer<typeof schemas.PageHealthResultSchema> = {
@@ -354,7 +366,9 @@ registerJsCall({
 	owner: "main-thread",
 	handler: async (_params, ctx) => {
 		const activeTab = await requireActiveTab("page.reload()", ctx);
-		return unwrapResult(await dispatchTool("chrome_tabs_reload", [activeTab], ctx));
+		return unwrapResult(
+			await dispatchTool("chrome_tabs_reload", [activeTab], ctx),
+		);
 	},
 	paramTypes: [],
 	returnDoc: "null",
@@ -491,7 +505,9 @@ registerJsCall({
 	fields: ["url"],
 	owner: "main-thread",
 	handler: async (params, ctx) => {
-		return unwrapResult(await dispatchTool("chrome_tabs_create", [params], ctx));
+		return unwrapResult(
+			await dispatchTool("chrome_tabs_create", [params], ctx),
+		);
 	},
 	paramTypes: [
 		{

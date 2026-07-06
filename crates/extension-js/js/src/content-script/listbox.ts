@@ -165,7 +165,9 @@ const waitForRoots = async (
 	return resolved;
 };
 
-export async function activateAndResolveListboxRoots(control: HTMLElement): Promise<{
+export async function activateAndResolveListboxRoots(
+	control: HTMLElement,
+): Promise<{
 	roots: HTMLElement[];
 	searchedIds: string[];
 	allListboxes: HTMLElement[];

@@ -1,9 +1,7 @@
 /// <reference types="chrome" />
 // Main-thread runner entry.
 
-export {
-	type Command,
-} from "../../shared/main/tool-registry.js";
+export type { Command } from "../../shared/main/tool-registry.js";
 export {
 	executeMainThreadCommand,
 	getActiveTabId,

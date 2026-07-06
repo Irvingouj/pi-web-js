@@ -153,9 +153,15 @@ export class ExtensionSession {
 			try {
 				const w = await chromeApi.windows.getCurrent();
 				if (typeof w.id === "number") this.windowId = w.id;
-				else logger.warn("bindTabContext: windows.getCurrent returned no id; tab ownership disabled");
+				else
+					logger.warn(
+						"bindTabContext: windows.getCurrent returned no id; tab ownership disabled",
+					);
 			} catch (err) {
-				logger.warn("bindTabContext: windows.getCurrent failed; tab ownership disabled", err);
+				logger.warn(
+					"bindTabContext: windows.getCurrent failed; tab ownership disabled",
+					err,
+				);
 			}
 		}
 		this.tabTracker = new TabTracker(chromeApi, this.windowId);
@@ -642,7 +648,11 @@ export class ExtensionSession {
 		const urlPreflight = await preflightDomTab(tabId, signal);
 		if (urlPreflight && !urlPreflight.ok) return urlPreflight;
 
-		const pingResult = await pingTabContentScript(tabId, CS_FAST_PING_MS, signal);
+		const pingResult = await pingTabContentScript(
+			tabId,
+			CS_FAST_PING_MS,
+			signal,
+		);
 		if (!pingResult.ok) return pingResult;
 
 		// --- Iframe: multi-frame snapshot fanout ---

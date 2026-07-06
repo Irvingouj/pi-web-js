@@ -16,16 +16,16 @@
  *   snapshot-walker.ts — snapshot traversal (walker + passes + emitter)
  */
 
+import { enrichNode } from "./dom-enrichers.js";
 import { allocateRefId } from "./ref-id.js";
 import {
+	EXCLUDED_TAGS,
 	getAccessibleName,
 	getAccessibleRole,
 	getOwnVisibleText,
 	hasVisibleTextContent,
 	isSelfOrAncestorHidden,
-	EXCLUDED_TAGS,
 } from "./snapshot-dom.js";
-import { enrichNode } from "./dom-enrichers.js";
 
 // Re-exported so all three surfaces (and snapshot-walker.ts) share one source
 // of truth. Canonical definition lives in snapshot-dom.ts alongside the

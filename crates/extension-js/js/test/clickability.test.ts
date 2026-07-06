@@ -1,25 +1,25 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import type { ClickabilityConfidence } from "../src/shared/cross/clickability.js";
 import {
 	assessClickability,
 	deduplicateWrappers,
 } from "../src/shared/cross/clickability.js";
-import type { ClickabilityConfidence } from "../src/shared/cross/clickability.js";
 
 describe("assessClickability", () => {
 	beforeEach(() => {
 		document.body.innerHTML = "";
 	});
 
-	it.each(["click:ns.action", "ns.action"])(
-		"jsaction %s is high-confidence clickable",
-		(v) => {
-			document.body.innerHTML = `<div jsaction="${v}">x</div>`;
-			const a = assessClickability(document.querySelector("div")!);
-			expect(a.clickable).toBe(true);
-			expect(a.confidence).toBe("high");
-			expect(a.reason).toBe("jsaction");
-		},
-	);
+	it.each([
+		"click:ns.action",
+		"ns.action",
+	])("jsaction %s is high-confidence clickable", (v) => {
+		document.body.innerHTML = `<div jsaction="${v}">x</div>`;
+		const a = assessClickability(document.querySelector("div")!);
+		expect(a.clickable).toBe(true);
+		expect(a.confidence).toBe("high");
+		expect(a.reason).toBe("jsaction");
+	});
 
 	it.each([
 		"mousedown:ns.action",
@@ -28,21 +28,23 @@ describe("assessClickability", () => {
 		"ns:_",
 	])("jsaction %s is NOT clickable", (v) => {
 		document.body.innerHTML = `<div jsaction="${v}">x</div>`;
-		expect(
-			assessClickability(document.querySelector("div")!).clickable,
-		).toBe(false);
+		expect(assessClickability(document.querySelector("div")!).clickable).toBe(
+			false,
+		);
 	});
 
-	it.each(["my-button", "primary-btn", "btn", "button"])(
-		"class containing %s is low-confidence clickable",
-		(cls) => {
-			document.body.innerHTML = `<div class="${cls}">x</div>`;
-			const a = assessClickability(document.querySelector("div")!);
-			expect(a.clickable).toBe(true);
-			expect(a.confidence).toBe("low");
-			expect(a.reason).toBe("buttonClass");
-		},
-	);
+	it.each([
+		"my-button",
+		"primary-btn",
+		"btn",
+		"button",
+	])("class containing %s is low-confidence clickable", (cls) => {
+		document.body.innerHTML = `<div class="${cls}">x</div>`;
+		const a = assessClickability(document.querySelector("div")!);
+		expect(a.clickable).toBe(true);
+		expect(a.confidence).toBe("low");
+		expect(a.reason).toBe("buttonClass");
+	});
 
 	it("span with onclick is low-confidence", () => {
 		document.body.innerHTML = `<span onclick="x">click</span>`;
@@ -52,16 +54,19 @@ describe("assessClickability", () => {
 		expect(a.reason).toBe("span");
 	});
 
-	it.each(["button", "link", "tab", "menuitem", "checkbox"])(
-		"role=%s is high-confidence",
-		(role) => {
-			document.body.innerHTML = `<div role="${role}">x</div>`;
-			const a = assessClickability(document.querySelector("div")!);
-			expect(a.clickable).toBe(true);
-			expect(a.confidence).toBe("high");
-			expect(a.reason).toBe("role");
-		},
-	);
+	it.each([
+		"button",
+		"link",
+		"tab",
+		"menuitem",
+		"checkbox",
+	])("role=%s is high-confidence", (role) => {
+		document.body.innerHTML = `<div role="${role}">x</div>`;
+		const a = assessClickability(document.querySelector("div")!);
+		expect(a.clickable).toBe(true);
+		expect(a.confidence).toBe("high");
+		expect(a.reason).toBe("role");
+	});
 
 	it("onclick attr is high-confidence", () => {
 		document.body.innerHTML = `<div onclick="x">x</div>`;
@@ -86,9 +91,9 @@ describe("assessClickability", () => {
 	});
 	it("anchor without href is not clickable", () => {
 		document.body.innerHTML = `<a name="anchor">x</a>`;
-		expect(
-			assessClickability(document.querySelector("a")!).clickable,
-		).toBe(false);
+		expect(assessClickability(document.querySelector("a")!).clickable).toBe(
+			false,
+		);
 	});
 	it("anchor with href is high-confidence native", () => {
 		document.body.innerHTML = `<a href="/x">x</a>`;
@@ -142,9 +147,9 @@ describe("assessClickability", () => {
 	});
 	it("tabindex=-1 is not clickable", () => {
 		document.body.innerHTML = `<div tabindex="-1">x</div>`;
-		expect(
-			assessClickability(document.querySelector("div")!).clickable,
-		).toBe(false);
+		expect(assessClickability(document.querySelector("div")!).clickable).toBe(
+			false,
+		);
 	});
 });
 

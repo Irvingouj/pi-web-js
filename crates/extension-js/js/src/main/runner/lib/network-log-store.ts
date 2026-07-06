@@ -99,7 +99,10 @@ function trimTab(tabId: number): void {
 function removeEntryId(id: string): void {
 	const entry = byId.get(id);
 	byId.delete(id);
-	if (entry && activeByRequest.get(requestKey(entry.tabId, entry.requestId)) === id) {
+	if (
+		entry &&
+		activeByRequest.get(requestKey(entry.tabId, entry.requestId)) === id
+	) {
 		activeByRequest.delete(requestKey(entry.tabId, entry.requestId));
 	}
 	const idx = globalOrder.indexOf(id);
@@ -157,15 +160,26 @@ function decodeRaw(bytes: ArrayBuffer): NetworkRequestBody {
 	};
 }
 
-function decodeRawParts(parts: Array<{ bytes?: ArrayBuffer }>): NetworkRequestBody | undefined {
-	const byteParts = parts.map((part) => part.bytes).filter((bytes): bytes is ArrayBuffer => Boolean(bytes));
+function decodeRawParts(
+	parts: Array<{ bytes?: ArrayBuffer }>,
+): NetworkRequestBody | undefined {
+	const byteParts = parts
+		.map((part) => part.bytes)
+		.filter((bytes): bytes is ArrayBuffer => Boolean(bytes));
 	if (byteParts.length === 0) return undefined;
-	const originalBytesKnown = byteParts.reduce((sum, bytes) => sum + bytes.byteLength, 0);
+	const originalBytesKnown = byteParts.reduce(
+		(sum, bytes) => sum + bytes.byteLength,
+		0,
+	);
 	const out = new Uint8Array(Math.min(originalBytesKnown, MAX_BODY_CHARS));
 	let offset = 0;
 	for (const bytes of byteParts) {
 		if (offset >= out.length) break;
-		const chunk = new Uint8Array(bytes, 0, Math.min(bytes.byteLength, out.length - offset));
+		const chunk = new Uint8Array(
+			bytes,
+			0,
+			Math.min(bytes.byteLength, out.length - offset),
+		);
 		out.set(chunk, offset);
 		offset += chunk.length;
 	}

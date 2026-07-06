@@ -18,6 +18,9 @@
  * semantics) so all three surfaces share one source of truth.
  */
 
+import { enrichNode } from "./dom-enrichers.js";
+import type { PipelineNode } from "./dom-pipeline.js";
+import { EXCLUDED_TAGS } from "./dom-pipeline.js";
 import { allocateRefId } from "./ref-id.js";
 import {
 	getAccessibleName,
@@ -26,9 +29,6 @@ import {
 	hasVisibleTextContent,
 	shouldInclude,
 } from "./snapshot-dom.js";
-import { enrichNode } from "./dom-enrichers.js";
-import type { PipelineNode } from "./dom-pipeline.js";
-import { EXCLUDED_TAGS } from "./dom-pipeline.js";
 
 // ---------------------------------------------------------------------------
 // Walker types (private — only snapshot traversal uses them)
@@ -191,10 +191,7 @@ function createSnapshotEmitter(maxNodes: number): {
  * originating element and depth. Capacity-gated by `maxNodes`; mustKeep nodes
  * bypass the capacity check (the snapshot caller's invariant).
  */
-export function runSnapshotWalk(
-	root: Element,
-	maxNodes: number,
-): WalkResult[] {
+export function runSnapshotWalk(root: Element, maxNodes: number): WalkResult[] {
 	const { emit } = createSnapshotEmitter(maxNodes);
 	return walkElements({ root, maxNodes, passes: snapshotPasses, emit });
 }

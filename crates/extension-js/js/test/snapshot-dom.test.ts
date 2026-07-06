@@ -3,8 +3,8 @@ import { collectInlineSnapshot } from "../src/shared/cross/collect-inline-snapsh
 import {
 	getAccessibleRole,
 	getOwnVisibleText,
-	hasVisibleTextContent,
 	hasDirectTextContent,
+	hasVisibleTextContent,
 	isMarkdownVisible,
 	isReachableClickTarget,
 	shouldInclude,
@@ -479,7 +479,9 @@ describe("enrichClickAction confidence and dropdown (WU5)", () => {
 		expect(wrapper!.actionable).toBe(false);
 		expect(wrapper!.recommendedAction).toBeUndefined();
 		// Rendered line must not carry use="click" alongside actionable=false
-		const wrapperLine = snap.text.split("\n").find((l) => l.includes(wrapper!.refId));
+		const wrapperLine = snap.text
+			.split("\n")
+			.find((l) => l.includes(wrapper!.refId));
 		expect(wrapperLine).toBeDefined();
 		expect(wrapperLine!).not.toContain("use=");
 		expect(wrapperLine!).toContain("actionable=false");
@@ -517,10 +519,20 @@ describe("isReachableClickTarget (WU7)", () => {
 			<button data-ref-id="e1" style="position:absolute;left:10px;top:10px;width:20px;height:20px;">x</button>
 			<div style="position:absolute;left:0;top:0;width:100px;height:100px;z-index:9;">cover</div>`;
 		const btn = document.querySelector("button")!;
-		btn.getClientRects = () => [{left:10,top:10,width:20,height:20,right:30,bottom:30} as DOMRect];
+		btn.getClientRects = () => [
+			{
+				left: 10,
+				top: 10,
+				width: 20,
+				height: 20,
+				right: 30,
+				bottom: 30,
+			} as DOMRect,
+		];
 		const cover = document.querySelector("div")!;
 		const orig = document.elementFromPoint;
-		document.elementFromPoint = (() => cover) as typeof document.elementFromPoint;
+		document.elementFromPoint = (() =>
+			cover) as typeof document.elementFromPoint;
 		try {
 			expect(isReachableClickTarget(btn)).toBe(false);
 		} finally {

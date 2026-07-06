@@ -135,7 +135,10 @@ export type DomSnapshotParams = {
 	max_nodes: bigint;
 };
 
-export type DomFormatParams = { snapshot: TreeSnapshot; format?: SnapshotFormat };
+export type DomFormatParams = {
+	snapshot: TreeSnapshot;
+	format?: SnapshotFormat;
+};
 
 export type FetchParams = {
 	url: string;

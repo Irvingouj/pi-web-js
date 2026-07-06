@@ -105,7 +105,10 @@ describe("network log store", () => {
 		const full = getNetworkEntry(7, rows[0].id);
 		expect(full?.requestHeaders?.[0]?.value).toBe("Bearer secret");
 		expect(full?.responseHeaders?.[0]?.value).toBe("sid=secret");
-		expect(full?.requestBody).toMatchObject({ kind: "raw", text: "hello=world" });
+		expect(full?.requestBody).toMatchObject({
+			kind: "raw",
+			text: "hello=world",
+		});
 	});
 
 	it("defaults list() to backend-looking requests but keeps all captured traffic", () => {
@@ -127,10 +130,9 @@ describe("network log store", () => {
 		});
 
 		expect(listNetworkEntries(7).map((e) => e.requestId)).toEqual(["api"]);
-		expect(listNetworkEntries(7, { all: true }).map((e) => e.requestId)).toEqual([
-			"doc",
-			"api",
-		]);
+		expect(
+			listNetworkEntries(7, { all: true }).map((e) => e.requestId),
+		).toEqual(["doc", "api"]);
 	});
 
 	it("keeps every raw request body part up to the body cap", () => {

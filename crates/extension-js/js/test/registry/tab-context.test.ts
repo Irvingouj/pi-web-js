@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
 
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { TabTracker } from "../../src/main/session/tab-tracker.js";
 import {
 	resolveActiveTabId,
 	resolveTabId,
 	setActiveTabId,
 } from "../../src/main/tab-context.js";
-import { TabTracker } from "../../src/main/session/tab-tracker.js";
 
 describe("resolveTabId (bare-call fallback path)", () => {
 	it("accepts safe bigint tabId", () => {
