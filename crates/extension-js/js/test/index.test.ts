@@ -2,7 +2,6 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ExtensionSession } from "../src/main/index.js";
-import { setActiveTabId } from "../src/main/tab-context.js";
 
 interface MockWorker {
 	postMessage: ReturnType<typeof vi.fn>;
@@ -512,7 +511,6 @@ describe("ExtensionSession fs namespace e2e", () => {
 			scripting: { executeScript: vi.fn() },
 		};
 		const [, , worker] = await initSession();
-		setActiveTabId(1);
 
 		sendWorkerAsyncRelay(worker, "relay-err", "page_click", "content-script", {
 			params: { refId: "e1" },
@@ -551,7 +549,6 @@ describe("ExtensionSession fs namespace e2e", () => {
 			scripting: { executeScript: vi.fn() },
 		};
 		const [, , worker] = await initSession();
-		setActiveTabId(1);
 
 		sendWorkerAsyncRelay(
 			worker,
@@ -620,7 +617,6 @@ describe("ExtensionSession fs namespace e2e", () => {
 			scripting: { executeScript: vi.fn() },
 		};
 		const [, , worker] = await initSession();
-		setActiveTabId(1);
 		await new Promise((resolve) => setTimeout(resolve, 0));
 
 		sendWorkerAsyncRelay(worker, "relay-1", "page_click", "content-script");
@@ -713,7 +709,6 @@ describe("ExtensionSession fs namespace e2e", () => {
 			scripting: { executeScript: vi.fn() },
 		};
 		const [, , worker] = await initSession();
-		setActiveTabId(1);
 		await new Promise((resolve) => setTimeout(resolve, 0));
 
 		sendWorkerAsyncRelay(
@@ -774,7 +769,6 @@ describe("ExtensionSession fs namespace e2e", () => {
 			scripting: { executeScript: vi.fn() },
 		};
 		const [, , worker] = await initSession();
-		setActiveTabId(1);
 		await new Promise((resolve) => setTimeout(resolve, 0));
 
 		sendWorkerAsyncRelay(

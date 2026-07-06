@@ -1103,3 +1103,58 @@ async function initOwnedSession(
 	sessions.push(session);
 	return [session, bucket[bucket.length - 1]];
 }
+
+// ─── Isolation guard: session-scoped calls must NOT fall back to the unscoped module-global ──
+//
+// The bare module-global resolveActiveTabId queries {active:true} with NO
+// windowId filter, so if a session-scoped call (windowId bound) ever reached
+// it, it could resolve a FOREIGN window's active tab and silently break
+// per-window isolation. requireActiveTab (page.*) and tab.current refuse the
+// fallback whenever ctx.windowId is known — turning a silent isolation break
+// into a loud E_NO_RESOLVER. The fallback is only合法 when windowId is absent
+// (bare dispatchTool calls: tests, low-level API, web-js demo).
+
+describe("isolation guard: resolveActiveTab fallback is forbidden when windowId is bound", () => {
+	it("page_url with windowId set but no resolveActiveTab throws (no silent fallback)", async () => {
+		const { dispatchTool } = await import("../src/shared/main/tool-registry.js");
+		const r = await dispatchTool("page_url", {}, {
+			action: "page_url",
+			windowId: 7,
+		});
+		expect(r.ok).toBe(false);
+		if (!r.ok) expect(r.error.code).toBe("E_NO_RESOLVER");
+	});
+
+	it("tab.current with windowId set but no resolveActiveTab throws", async () => {
+		const { dispatchTool } = await import("../src/shared/main/tool-registry.js");
+		const r = await dispatchTool("tab_current", {}, {
+			action: "tab_current",
+			windowId: 7,
+		});
+		expect(r.ok).toBe(false);
+		if (!r.ok) expect(r.error.code ?? "E_HANDLER").toBeTruthy();
+	});
+
+	it("page_url with windowId set AND resolveActiveTab provided uses the resolver", async () => {
+		const { dispatchTool } = await import("../src/shared/main/tool-registry.js");
+		const resolve = async () => 42;
+		const r = await dispatchTool("page_url", {}, {
+			action: "page_url",
+			windowId: 7,
+			resolveActiveTab: resolve,
+		});
+		// reaches the content-script relay path which (without a real CS) returns
+		// a relay error — but NOT E_NO_RESOLVER. Proves the resolver was used.
+		if (!r.ok) expect(r.error.code).not.toBe("E_NO_RESOLVER");
+	});
+
+	it("bare call with NO windowId still uses the module-global fallback (not guarded)", async () => {
+		// Set the module-global active tab, no windowId in ctx → fallback is合法.
+		const { setActiveTabId } = await import("../src/main/tab-context.js");
+		const { dispatchTool } = await import("../src/shared/main/tool-registry.js");
+		setActiveTabId(1);
+		const r = await dispatchTool("page_url", {}, { action: "page_url" });
+		// reaches the relay (no chrome runtime → E_NO_EXTENSION), NOT E_NO_RESOLVER.
+		if (!r.ok) expect(r.error.code).not.toBe("E_NO_RESOLVER");
+	});
+});

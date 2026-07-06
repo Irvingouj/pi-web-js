@@ -36,10 +36,25 @@ async function requireActiveTab(
 	ctx: CallContext,
 ): Promise<number> {
 	// Per-session resolver (Plan B): the owning ExtensionSession's TabTracker,
-	// injected via ctx. Falls back to the bare module-global resolveActiveTabId
-	// only for direct dispatchTool calls that bypass a session (tests / low-level
-	// API). In the extension product path a session is always bound, so the
-	// tracker is the single source of truth.
+	// injected via ctx as `resolveActiveTab`.
+	//
+	// Isolation safety: when `ctx.windowId` is bound (i.e. this call IS
+	// session-scoped — ownership is in scope), the resolver MUST come from the
+	// session tracker. The bare module-global `resolveActiveTabId` queries
+	// `{active:true}` with no windowId filter, so it could resolve a tab in a
+	// DIFFERENT window and silently break per-window isolation. We therefore
+	// refuse it whenever windowId is known. The fallback is only合法 when
+	// windowId is absent — direct dispatchTool calls with no session (tests,
+	// low-level API, web-js demo with no Chrome window).
+	if (!ctx.resolveActiveTab && ctx.windowId !== undefined && ctx.windowId !== null) {
+		throwAgentError(
+			makeError(
+				`${action}: session-scoped call (windowId=${ctx.windowId}) is missing ctx.resolveActiveTab — the per-session TabTracker must inject the active-tab resolver. Falling back to the unscoped module-global would risk resolving a foreign window's tab.`,
+				"E_NO_RESOLVER",
+				"unknown",
+			),
+		);
+	}
 	const resolve = ctx.resolveActiveTab ?? resolveActiveTabId;
 	const tabId = await resolve();
 	if (tabId === null) {

@@ -73,6 +73,15 @@ registerJsCall({
 	aliases: [{ namespace: "tab", name: "current" }],
 	owner: "main-thread",
 	handler: async (_params, ctx) => {
+		// Isolation safety: a session-scoped call (windowId bound) MUST use the
+		// session tracker resolver; the bare module-global queries `{active:true}`
+		// unscoped and could resolve a foreign window's tab. Fallback only when
+		// windowId is absent (bare dispatchTool / tests / demo).
+		if (!ctx.resolveActiveTab && ctx.windowId !== undefined && ctx.windowId !== null) {
+			throw new Error(
+				"tab.current: session-scoped call is missing ctx.resolveActiveTab (per-session TabTracker resolver); refusing to fall back to the unscoped module-global.",
+			);
+		}
 		const resolve = ctx.resolveActiveTab ?? resolveActiveTabId;
 		const tabId = await resolve();
 		if (tabId === null) {
