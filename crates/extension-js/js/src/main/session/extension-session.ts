@@ -44,17 +44,13 @@ import {
 	isValidMainThreadAction,
 	pingTabContentScript,
 	preflightDomTab,
-	setRunnerAbortController,
 } from "../runner/runtime.js";
 import {
 	executeMultiFrameSnapshot,
 	isSnapshotAction,
 } from "../runner/snapshot-merge.js";
-import {
-	initTabContext,
-	removeTabContextListeners,
-	resolveTabId,
-} from "../tab-context.js";
+import { TabTracker } from "./tab-tracker.js";
+import { resolveTabId } from "../tab-context.js";
 
 type WorkerRequest =
 	| { type: "runCell"; id: string; code: string; stdin: string; runId?: string }
@@ -113,10 +109,77 @@ export class ExtensionSession {
 	private inFlightRelays = new Map<string, AbortController>();
 	private disposed = false;
 	private onCleanupComplete: (() => void) | null = null;
-	private abortController: AbortController | null = null;
+	private abortController: AbortController = new AbortController();
 	private runQueue: Promise<void> = Promise.resolve();
+	/**
+	 * The Chrome window this session owns. Tabs in other windows are rejected
+	 * with E_TAB_NOT_OWNED (VSCode-style per-window isolation). null means
+	 * "unknown / not in extension context" — the ownership check is skipped,
+	 * preserving web-js demo compatibility. Mirrors the nullable style of
+	 * `worker`/`onCleanupComplete`.
+	 */
+	/**
+	 * The Chrome window this session owns. Tabs in other windows are rejected
+	 * with E_TAB_NOT_OWNED (VSCode-style per-window isolation). null means
+	 * "unknown / not in extension context" — the ownership check is skipped,
+	 * preserving web-js demo compatibility. Mirrors the nullable style of
+	 * `worker`/`onCleanupComplete`.
+	 */
+	private windowId: number | null = null;
+	/**
+	 * Per-session tab tracker: owns the active-tab pointer and all chrome.tabs.*
+	 * listeners, windowId-scoped (Plan B). null outside extension context.
+	 */
+	private tabTracker: TabTracker | null = null;
 
-	private constructor() {}
+	/**
+	 * Public so consumers may construct a session directly. `init()` remains
+	 * the recommended entry point (it wires up capabilities, manifest, worker).
+	 * Per-session state — including the AbortController — is owned by the
+	 * instance, so multiple sessions in one document are safe.
+	 */
+	constructor() {}
+
+	/**
+	 * Capture this session's owning Chrome window and start the per-session
+	 * tab tracker (active-tab pointer + windowId-scoped chrome.tabs.*
+	 * listeners). Always constructs a TabTracker — even outside extension
+	 * context (web-js demo), where the tracker's listener registration is a
+	 * no-op and resolveActiveTabId returns null. This keeps tab tracking in a
+	 * single source of truth (no module-global dual state).
+	 */
+	private async bindTabContext(): Promise<void> {
+		const chromeApi = window.chrome;
+		if (chromeApi?.runtime?.id && chromeApi.windows?.getCurrent) {
+			try {
+				const w = await chromeApi.windows.getCurrent();
+				if (typeof w.id === "number") this.windowId = w.id;
+				else logger.warn("bindTabContext: windows.getCurrent returned no id; tab ownership disabled");
+			} catch (err) {
+				logger.warn("bindTabContext: windows.getCurrent failed; tab ownership disabled", err);
+			}
+		}
+		this.tabTracker = new TabTracker(chromeApi, this.windowId);
+		await this.tabTracker.init();
+	}
+
+	/** Resolve this session's active tab id (cached, lazily re-queried).
+	 * Arrow field so it captures `this` and can be passed directly as
+	 * ctx.resolveActiveTab without `.bind`. */
+	resolveActiveTabId = async (): Promise<number | null> => {
+		if (this.tabTracker) return this.tabTracker.resolveActiveTabId();
+		return null;
+	};
+
+	/** Cached active-tab pointer (no re-query). Exposed for tests/inspection. */
+	getActiveTabId(): number | null {
+		return this.tabTracker?.getActiveTabId() ?? null;
+	}
+
+	/** Set the cached active-tab pointer (test helper / programmatic override). */
+	setActiveTabId(tabId: number | null): void {
+		this.tabTracker?.setActiveTabId(tabId);
+	}
 
 	/**
 	 * Initialize the extension-js runtime.
@@ -126,14 +189,13 @@ export class ExtensionSession {
 	 * The spawned Worker uses `new Worker(..., { type: "module" })`. Your bundler
 	 * must support emitting module Workers as separate chunks.
 	 *
-	 * AbortController is module-global: only one active session per extension
-	 * page is fully safe. Concurrent sessions race on the same abort signal.
+	 * Abort is per-session: each ExtensionSession owns its own AbortController,
+	 * so multiple sessions (e.g. one per Chrome window's sidepanel document)
+	 * never race on a shared abort signal.
 	 */
 	static async init(): Promise<[ExtensionSession, Promise<void>]> {
 		logger.trace("init_start");
-		setRunnerAbortController(new AbortController());
 		if (typeof chrome !== "undefined" && chrome.runtime?.id) {
-			initTabContext(chrome);
 			const { initCapabilities } = await import(
 				"../runner/tools/chrome/capability.js"
 			);
@@ -156,8 +218,9 @@ export class ExtensionSession {
 		);
 		const manifest = getSerializableJsManifest();
 
-		// 4. Create session and start worker with manifest
+		// 4. Create session, bind it to its Chrome window + tab tracker, start worker
 		const session = new ExtensionSession();
+		await session.bindTabContext();
 		const [ready, runner] = session.startWorker(manifest);
 		await ready;
 		logger.trace("init_ready");
@@ -443,7 +506,12 @@ export class ExtensionSession {
 				});
 			}
 			return this.withMainThreadTimeout(
-				executeMainThreadCommand(cmd, signal),
+				executeMainThreadCommand(
+					cmd,
+					signal,
+					this.windowId,
+					this.resolveActiveTabId,
+				),
 				cmd.action,
 			);
 		}
@@ -532,7 +600,11 @@ export class ExtensionSession {
 
 		let tabId: number;
 		try {
-			tabId = resolveTabId(tabPolicy, params);
+			// tracker is always constructed by bindTabContext (even in demo);
+			// `!` asserts the post-init invariant.
+			// tracker is always constructed by bindTabContext (even in demo);
+			// `!` asserts the post-init invariant.
+			tabId = await this.tabTracker!.resolveTabId(tabPolicy, params);
 		} catch (err: unknown) {
 			return {
 				ok: false,
@@ -548,14 +620,32 @@ export class ExtensionSession {
 		try {
 			const tab = await chromeApi.tabs.get(tabId);
 			tabUrl = tab.url ?? "";
+			// Per-window isolation: a session may only operate on tabs in its own
+			// window. Reject before any content-script traffic so window A's agent
+			// can never touch window B's tabs. Skipped when windowId is null
+			// (web-js demo, or captureWindowId failed).
+			if (
+				this.windowId !== null &&
+				typeof tab.windowId === "number" &&
+				tab.windowId !== this.windowId
+			) {
+				return {
+					ok: false,
+					error: {
+						message: `Tab ${tabId} is not accessible from this session`,
+						code: "E_TAB_NOT_OWNED",
+						category: "permission",
+					},
+				};
+			}
 		} catch {
 			/* ignore */
 		}
 
-		const urlPreflight = await preflightDomTab(tabId);
+		const urlPreflight = await preflightDomTab(tabId, signal);
 		if (urlPreflight && !urlPreflight.ok) return urlPreflight;
 
-		const pingResult = await pingTabContentScript(tabId, CS_FAST_PING_MS);
+		const pingResult = await pingTabContentScript(tabId, CS_FAST_PING_MS, signal);
 		if (!pingResult.ok) return pingResult;
 
 		// --- Iframe: multi-frame snapshot fanout ---
@@ -909,9 +999,10 @@ export class ExtensionSession {
 		this.disposed = true;
 
 		// Signal abort to interrupt in-flight runner operations
-		this.abortController = new AbortController();
-		setRunnerAbortController(this.abortController);
+		// Abort in-flight runner operations on this session's own controller.
 		this.abortController.abort();
+		// Fresh controller so post-stop state is clean if the session is reused.
+		this.abortController = new AbortController();
 
 		for (const [, relayAbort] of this.inFlightRelays) {
 			relayAbort.abort();
@@ -923,7 +1014,7 @@ export class ExtensionSession {
 			this.worker.postMessage({ type: "stop", id: this.generateId() });
 		}
 
-		removeTabContextListeners();
+		this.tabTracker?.dispose();
 
 		// Terminate worker after a brief grace period for reset to process
 		await new Promise((resolve) => setTimeout(resolve, 50));

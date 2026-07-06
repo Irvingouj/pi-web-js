@@ -3,6 +3,7 @@ import type { z } from "zod";
 
 import { contentScriptMissingError } from "../../../shared/cross/normalize-agent-error.js";
 import * as schemas from "../../../shared/cross/schemas.js";
+import type { CallContext } from "../../../shared/cross/manifest.js";
 import { unwrapContentScriptMessage } from "../../../shared/main/content-script-response.js";
 import { logger } from "../../../shared/main/logger.js";
 import {
@@ -27,11 +28,28 @@ function sleep(ms: number): Promise<void> {
 
 // ─── Tab script execution ──────────────────────────────────────
 
+// ─── Tab script execution ──────────────────────────────────────
+//
+// Signal-threading convention: `preflightDomTab`, `pingTabContentScript`,
+// and `handleFetch` take `signal` as a trailing positional arg (single-shot
+// checks, few params). `waitForTabLoad` and `navigateTab` take it via their
+// options bag (they already carry rich configuration). Both read the SAME
+// per-session AbortController threaded down from ExtensionSession.
+
+// ─── Tab script execution ──────────────────────────────────────
+//
+// Signal-threading convention: `preflightDomTab`, `pingTabContentScript`,
+// and `handleFetch` take `signal` as a trailing positional arg (single-shot
+// checks, few params). `waitForTabLoad` and `navigateTab` take it via their
+// options bag (they already carry rich configuration). Both read the SAME
+// per-session AbortController threaded down from ExtensionSession.
+
 /** Fail fast when a tab URL cannot host content-script DOM APIs (non-http(s)). */
 export async function preflightDomTab(
 	tabId: number,
+	signal?: AbortSignal,
 ): Promise<AsyncResponse | null> {
-	throwIfAborted();
+	throwIfAborted(signal);
 	const chrome = window.chrome;
 	if (!chrome?.tabs?.get) return null;
 	try {
@@ -58,8 +76,9 @@ export async function preflightDomTab(
 export async function pingTabContentScript(
 	tabId: number,
 	timeoutMs: number = 3_000,
+	signal?: AbortSignal,
 ): Promise<AsyncResponse<{ ok: true }>> {
-	throwIfAborted();
+	throwIfAborted(signal);
 	const log = logger.child("runner");
 	log.debug("pingTabContentScript_start", { tabId, timeout: timeoutMs });
 	const chrome = window.chrome;
@@ -76,7 +95,7 @@ export async function pingTabContentScript(
 	const deadline = Date.now() + timeoutMs;
 	let lastRaceMsg = "";
 	while (Date.now() < deadline) {
-		throwIfAborted();
+		throwIfAborted(signal);
 		const remaining = deadline - Date.now();
 		if (remaining <= 0) break;
 		try {
@@ -146,6 +165,8 @@ export type WaitForTabLoadOptions = {
 	 * is unknown (can't prove navigation).
 	 */
 	loadGraceMs?: number;
+	/** Per-session abort signal, threaded from the originating ExtensionSession. */
+	signal?: AbortSignal;
 };
 
 export async function waitForTabLoad(
@@ -153,7 +174,7 @@ export async function waitForTabLoad(
 	timeoutMs: number = 30_000,
 	options?: WaitForTabLoadOptions,
 ): Promise<AsyncResponse<boolean>> {
-	throwIfAborted();
+	throwIfAborted(options?.signal);
 	const log = logger.child("runner");
 	const targetTab = typeof tabId === "number" ? tabId : null;
 	const preNavigationUrl = options?.preNavigationUrl;
@@ -358,6 +379,10 @@ export interface NavigateTabOptions {
 	timeoutMs?: number;
 	traceId?: string;
 	logPrefix: string;
+	/** Per-session abort signal, threaded from the originating ExtensionSession. */
+	signal?: AbortSignal;
+	/** Call context for inner dispatchTool calls (ownership gate). */
+	ctx?: CallContext;
 }
 
 /**
@@ -376,7 +401,10 @@ export async function navigateTab(
 		timeoutMs = DEFAULT_TIMEOUT_MS,
 		traceId = "?",
 		logPrefix,
+		ctx,
 	} = options;
+
+	const innerCtx: CallContext = ctx ?? { action: "chrome_tabs_update" };
 
 	const chromeApi = window.chrome;
 	let navSawLoading = false;
@@ -394,7 +422,7 @@ export async function navigateTab(
 		const updateResult = await dispatchTool("chrome_tabs_update", [
 			tabId,
 			{ url },
-		]);
+		], innerCtx);
 		if (!updateResult.ok) {
 			return unwrapResult(updateResult);
 		}
@@ -402,6 +430,7 @@ export async function navigateTab(
 			preNavigationUrl,
 			getNavSawLoading: () => navSawLoading,
 			runId: traceId,
+			signal: options.signal,
 		});
 		if (!loadResult.ok) {
 			return unwrapResult(loadResult);
@@ -411,7 +440,7 @@ export async function navigateTab(
 		chromeApi?.tabs?.onUpdated?.removeListener(navListener);
 	}
 
-	const tabCheck = await dispatchTool("chrome_tabs_get", [tabId]);
+	const tabCheck = await dispatchTool("chrome_tabs_get", [tabId], innerCtx);
 	if (tabCheck.ok && tabCheck.value) {
 		const parsed = schemas.ChromeTabSchema.safeParse(tabCheck.value);
 		if (parsed.success) {
@@ -466,12 +495,12 @@ export async function navigateTab(
 		}
 	}
 
-	const pingResult = await pingTabContentScript(tabId, timeoutMs);
+	const pingResult = await pingTabContentScript(tabId, timeoutMs, options.signal);
 	if (!pingResult.ok) {
 		return unwrapResult(pingResult);
 	}
 	await new Promise((resolve) => setTimeout(resolve, CONTENT_SCRIPT_GRACE_MS));
-	const freshTab = await dispatchTool("chrome_tabs_get", [tabId]);
+	const freshTab = await dispatchTool("chrome_tabs_get", [tabId], innerCtx);
 	const parsed = schemas.ChromeTabSchema.safeParse(unwrapResult(freshTab));
 	if (!parsed.success) {
 		throw makeError(

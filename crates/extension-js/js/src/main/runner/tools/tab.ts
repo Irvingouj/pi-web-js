@@ -35,9 +35,9 @@ registerJsCall({
 	params: schemas.TabQueryParamsSchema,
 	returns: schemas.ChromeTabArraySchema,
 	owner: "main-thread",
-	handler: async (params, _ctx) => {
+	handler: async (params, ctx) => {
 		const result = unwrapResult(
-			await dispatchTool("chrome_tabs_query", [params]),
+			await dispatchTool("chrome_tabs_query", [params], ctx),
 		);
 		if (result == null) return [];
 		if (!Array.isArray(result)) {
@@ -72,13 +72,14 @@ registerJsCall({
 	returns: schemas.ChromeTabSchema,
 	aliases: [{ namespace: "tab", name: "current" }],
 	owner: "main-thread",
-	handler: async (_params, _ctx) => {
-		const tabId = await resolveActiveTabId();
+	handler: async (_params, ctx) => {
+		const resolve = ctx.resolveActiveTab ?? resolveActiveTabId;
+		const tabId = await resolve();
 		if (tabId === null) {
 			throw new Error("No active tab available");
 		}
 		const tab = unwrapResult(
-			await dispatchTool("chrome_tabs_get", [tabId]),
+			await dispatchTool("chrome_tabs_get", [tabId], ctx),
 		) as Record<string, unknown>;
 		return { ...tab, tabId: typeof tab.id === "number" ? tab.id : tabId };
 	},
@@ -99,9 +100,9 @@ registerJsCall({
 	fields: ["tabId"],
 	aliases: [{ namespace: "tab", name: "get", fields: ["tabId"] }],
 	owner: "main-thread",
-	handler: async (params, _ctx) => {
+	handler: async (params, ctx) => {
 		const tabId = extractTabId(asRecord(params));
-		return unwrapResult(await dispatchTool("chrome_tabs_get", [tabId]));
+		return unwrapResult(await dispatchTool("chrome_tabs_get", [tabId], ctx));
 	},
 	paramTypes: [
 		{
@@ -126,9 +127,9 @@ registerJsCall({
 	fields: ["tabId"],
 	aliases: [{ namespace: "tab", name: "url", fields: ["tabId"] }],
 	owner: "main-thread",
-	handler: async (params, _ctx) => {
+	handler: async (params, ctx) => {
 		const tabId = extractTabId(asRecord(params));
-		const tab = unwrapResult(await dispatchTool("chrome_tabs_get", [tabId]));
+		const tab = unwrapResult(await dispatchTool("chrome_tabs_get", [tabId], ctx));
 		return (tab as { url?: string }).url ?? "";
 	},
 	paramTypes: [
@@ -155,9 +156,9 @@ registerJsCall({
 	fields: ["tabId"],
 	aliases: [{ namespace: "tab", name: "title", fields: ["tabId"] }],
 	owner: "main-thread",
-	handler: async (params, _ctx) => {
+	handler: async (params, ctx) => {
 		const tabId = extractTabId(asRecord(params));
-		const tab = unwrapResult(await dispatchTool("chrome_tabs_get", [tabId]));
+		const tab = unwrapResult(await dispatchTool("chrome_tabs_get", [tabId], ctx));
 		return (tab as { title?: string }).title ?? "";
 	},
 	paramTypes: [
@@ -183,8 +184,8 @@ registerJsCall({
 	returns: schemas.ChromeTabArraySchema,
 	aliases: [{ namespace: "tab", name: "find" }],
 	owner: "main-thread",
-	handler: async (params, _ctx) => {
-		return unwrapResult(await dispatchTool("chrome_tabs_query", [params]));
+	handler: async (params, ctx) => {
+		return unwrapResult(await dispatchTool("chrome_tabs_query", [params], ctx));
 	},
 	paramTypes: [
 		{
@@ -209,8 +210,8 @@ registerJsCall({
 	returns: schemas.ChromeTabArraySchema,
 	aliases: [{ namespace: "tab", name: "list" }],
 	owner: "main-thread",
-	handler: async (_params, _ctx) => {
-		return unwrapResult(await dispatchTool("chrome_tabs_query", [{}]));
+	handler: async (_params, ctx) => {
+		return unwrapResult(await dispatchTool("chrome_tabs_query", [{}], ctx));
 	},
 	paramTypes: [],
 	returnDoc: "All tabs",
@@ -235,7 +236,7 @@ registerJsCall({
 		>;
 		const { waitForReady: _waitForReady, ...chromeCreateParams } = createParams;
 		const created = unwrapResult(
-			await dispatchTool("chrome_tabs_create", [chromeCreateParams]),
+			await dispatchTool("chrome_tabs_create", [chromeCreateParams], ctx),
 		) as z.infer<typeof schemas.ChromeTabSchema>;
 		const tabId = created.tabId ?? created.id;
 		if (
@@ -252,6 +253,7 @@ registerJsCall({
 				timeoutMs: DEFAULT_TIMEOUT_MS,
 				traceId: ctx.runId ?? "?",
 				logPrefix: "tab_create",
+				signal: ctx.signal,
 			});
 		}
 		return created;
@@ -297,13 +299,13 @@ registerJsCall({
 	params: schemas.TabActivateParamsSchema,
 	returns: schemas.ChromeTabSchema,
 	owner: "main-thread",
-	handler: async (params, _ctx) => {
+	handler: async (params, ctx) => {
 		const tabId = typeof params === "number" ? params : extractTabId(params);
 		if (tabId === null) {
 			throw makeError("tab_activate requires a tabId", "E_MISSING_PARAM");
 		}
 		return unwrapResult(
-			await dispatchTool("chrome_tabs_update", [tabId, { active: true }]),
+			await dispatchTool("chrome_tabs_update", [tabId, { active: true }], ctx),
 		);
 	},
 	paramTypes: [
@@ -327,12 +329,12 @@ registerJsCall({
 	params: schemas.TabCloseParamsSchema,
 	returns: z.null(),
 	owner: "main-thread",
-	handler: async (params, _ctx) => {
+	handler: async (params, ctx) => {
 		const tabId = typeof params === "number" ? params : extractTabId(params);
 		if (tabId === null) {
 			throw makeError("tab_close requires a tabId", "E_MISSING_PARAM");
 		}
-		return unwrapResult(await dispatchTool("chrome_tabs_remove", [tabId]));
+		return unwrapResult(await dispatchTool("chrome_tabs_remove", [tabId], ctx));
 	},
 	paramTypes: [
 		{
@@ -361,15 +363,15 @@ registerJsCall({
 	params: schemas.TabWaitForLoadParamsSchema,
 	returns: z.boolean(),
 	owner: "main-thread",
-	handler: async (params, _ctx) => {
+	handler: async (params, ctx) => {
 		const obj = asRecord(params);
 		const tabId = extractTabId(params);
 		const timeout = typeof obj.timeout === "number" ? obj.timeout : 30000;
 		if (tabId === null) {
 			throw makeError("tab_wait_for_load requires a tabId", "E_MISSING_PARAM");
 		}
-		unwrapResult(await waitForTabLoad(tabId, timeout));
-		unwrapResult(await pingTabContentScript(tabId, timeout));
+		unwrapResult(await waitForTabLoad(tabId, timeout, { signal: ctx.signal }));
+		unwrapResult(await pingTabContentScript(tabId, timeout, ctx.signal));
 		return true;
 	},
 	paramTypes: [
@@ -449,7 +451,7 @@ registerJsCall({
 	returns: z.unknown(),
 	returnType: "NetworkEntry",
 	owner: "main-thread",
-	handler: async (params, _ctx) => {
+	handler: async (params, ctx) => {
 		const entry = getNetworkEntry(params.tabId, params.id);
 		if (!entry) {
 			throw makeError(
@@ -488,7 +490,7 @@ registerJsCall({
 	params: TabNetworkClearParamsSchema,
 	returns: z.null(),
 	owner: "main-thread",
-	handler: async (params, _ctx) => {
+	handler: async (params, ctx) => {
 		clearNetworkEntries(params.tabId);
 		return null;
 	},
@@ -537,7 +539,7 @@ registerJsCall({
 			);
 		}
 
-		const preNavResult = await dispatchTool("chrome_tabs_get", [tabId]);
+		const preNavResult = await dispatchTool("chrome_tabs_get", [tabId], ctx);
 		if (!preNavResult.ok || !preNavResult.value) {
 			throw makeError(
 				`tab_goto: tab ${tabId} not found`,
@@ -576,6 +578,7 @@ registerJsCall({
 			timeoutMs,
 			traceId,
 			logPrefix: "tab_goto",
+			signal: ctx.signal,
 		});
 	},
 	paramTypes: [

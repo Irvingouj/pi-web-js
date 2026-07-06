@@ -8,6 +8,7 @@ import {
 	type ToolDocParam,
 } from "../../../shared/main/tool-registry.js";
 import { makeError } from "../lib/types.js";
+import { assertTabOwnership } from "./tab-ownership.js";
 import {
 	checkPermission,
 	manifestPermissionForApiPath,
@@ -107,7 +108,7 @@ export function registerChromePassthrough(
 		owner: "main-thread",
 		permission: manifestPermission ?? undefined,
 		returnType: returnType ?? undefined,
-		handler: async (params: unknown, _ctx: CallContext) => {
+		handler: async (params: unknown, ctx: CallContext) => {
 			const log = logger.child("chrome");
 			const chrome = window.chrome;
 			if (!chrome?.runtime?.id) {
@@ -122,6 +123,9 @@ export function registerChromePassthrough(
 				action,
 				requireArgumentArray(params, action),
 			);
+			// Per-window isolation: reject before Chrome invocation if any target
+			// tab belongs to another window. No-op when windowId is unknown.
+			await assertTabOwnership(action, args, ctx.windowId, chrome);
 			const method = resolveChromeMethod(chrome, apiPath, name);
 			log.debug("chrome_passthrough", { action, argCount: args.length });
 

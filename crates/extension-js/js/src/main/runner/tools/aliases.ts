@@ -69,7 +69,7 @@ function registerAlias(
 		returns: returnsSchema,
 		owner: "main-thread",
 		permission: manifestPermission ?? undefined,
-		handler: async (params, _ctx) => {
+		handler: async (params, ctx) => {
 			const log = logger.child("alias");
 			checkPermission(action, manifestPermission);
 			const args = normalizeAliasArgs(
@@ -77,7 +77,7 @@ function registerAlias(
 				requireArgumentArray(params, action),
 			);
 			log.debug("alias_dispatch", { action, target, argCount: args.length });
-			return unwrapResult(await dispatchTool(target, args));
+			return unwrapResult(await dispatchTool(target, args, ctx));
 		},
 		paramTypes,
 		returnDoc: "Alias result",

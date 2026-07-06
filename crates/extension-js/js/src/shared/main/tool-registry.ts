@@ -40,19 +40,16 @@ const jsRegistry = new Map<string, JsCallSpec<unknown, unknown>>();
 let jsRegistryFrozen = false;
 
 // ─── Runner lifecycle abort signal ───────────────────────────────
+//
+// Abort is per-session: each ExtensionSession owns its own AbortController
+// (extension-session.ts) and threads `signal` down through dispatchTool /
+// dispatchCommand into tool handlers and the tab execution helpers. There is
+// NO module-global default — every check takes the signal explicitly so that
+// multiple sessions in one document (e.g. multi-window sidepanels in tests,
+// or future per-window sessions) never race on a shared signal.
 
-let runnerAbortController: AbortController | null = null;
-
-export function setRunnerAbortController(controller: AbortController | null) {
-	runnerAbortController = controller;
-}
-
-export function getRunnerSignal(): AbortSignal | undefined {
-	return runnerAbortController?.signal;
-}
-
-export function throwIfAborted(): void {
-	const signal = getRunnerSignal();
+/** Throw `Runner aborted` if the given signal has already been aborted. */
+export function throwIfAborted(signal?: AbortSignal): void {
 	if (signal?.aborted) {
 		throw new Error("Runner aborted: ExtensionSession stopped");
 	}

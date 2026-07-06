@@ -18,6 +18,7 @@ import {
 	resolveChromeMethod,
 } from "../../chrome/native.js";
 import { makeError } from "../../lib/types.js";
+import { assertTabOwnership } from "../../chrome/tab-ownership.js";
 import { checkPermission, manifestPermissionForApiPath } from "./capability.js";
 import { zChromeAny } from "./register-helpers.js";
 
@@ -120,7 +121,7 @@ registerJsCall({
 	params: z.unknown(),
 	returns: schemas.ChromeScriptResultSchema,
 	owner: "main-thread",
-	handler: async (params: unknown, _ctx: CallContext) => {
+	handler: async (params: unknown, ctx: CallContext) => {
 		const log = logger.child("chrome");
 		const action = "chrome_scripting_executeScript";
 		const apiPath = EXECUTE_SCRIPT_API_PATH;
@@ -142,6 +143,9 @@ registerJsCall({
 			action,
 			requireArgumentArray(params, action),
 		);
+		// Per-window isolation: reject before Chrome invocation if the target
+		// tab belongs to another window. No-op when windowId is unknown.
+		await assertTabOwnership(action, args, ctx.windowId, chrome);
 		const method = resolveChromeMethod(chrome, apiPath, name);
 		log.debug("chrome_passthrough", { action, argCount: args.length });
 

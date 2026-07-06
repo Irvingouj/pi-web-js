@@ -5,7 +5,6 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ExtensionSession } from "../src/main/index.js";
-import { setRunnerAbortController } from "../src/main/runner/index.js";
 import { executeMainThreadCommand } from "../src/main/runner/runtime.js";
 import {
 	initCapabilities,
@@ -145,7 +144,6 @@ describe("browsergent cold tab acceptance", () => {
 		postMessages = [];
 		workerInstances = [];
 		sessions = [];
-		setRunnerAbortController(null);
 		setActiveTabId(1);
 		resetCapabilities();
 

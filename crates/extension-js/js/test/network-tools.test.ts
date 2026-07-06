@@ -94,22 +94,22 @@ describe("network tools", () => {
 			timeStamp: 1010,
 		});
 
-		const listResult = await dispatchTool("page_network_list", {});
+		const listResult = await dispatchTool("page_network_list", {}, { action: "page_network_list" });
 		expect(listResult.ok).toBe(true);
 		const rows = (listResult as { ok: true; value: Array<{ id: string }> }).value;
 		expect(rows).toHaveLength(1);
 		expect(mockChrome.tabs.query).toHaveBeenCalledWith({ active: true });
 
-		const getResult = await dispatchTool("page_network_get", rows[0].id);
+		const getResult = await dispatchTool("page_network_get", rows[0].id, { action: "page_network_get" });
 		expect(getResult.ok).toBe(true);
 		expect((getResult as { ok: true; value: any }).value.requestBody).toMatchObject({
 			kind: "raw",
 			text: "hello=world",
 		});
 
-		const clearResult = await dispatchTool("page_network_clear", {});
+		const clearResult = await dispatchTool("page_network_clear", {}, { action: "page_network_clear" });
 		expect(clearResult.ok).toBe(true);
-		const emptyResult = await dispatchTool("page_network_list", { all: true });
+		const emptyResult = await dispatchTool("page_network_list", { all: true }, { action: "page_network_list" });
 		expect((emptyResult as { ok: true; value: unknown[] }).value).toEqual([]);
 	});
 
@@ -122,7 +122,7 @@ describe("network tools", () => {
 			type: "xmlhttprequest",
 		});
 
-		const listResult = await dispatchTool("tab_network_list", { tabId: 9 });
+		const listResult = await dispatchTool("tab_network_list", { tabId: 9 }, { action: "tab_network_list" });
 		expect(listResult.ok).toBe(true);
 		const rows = (listResult as { ok: true; value: Array<{ id: string }> }).value;
 		expect(rows).toHaveLength(1);
@@ -130,17 +130,17 @@ describe("network tools", () => {
 		const getResult = await dispatchTool("tab_network_get", {
 			tabId: 9,
 			id: rows[0].id,
-		});
+		}, { action: "tab_network_get" });
 		expect(getResult.ok).toBe(true);
 		expect((getResult as { ok: true; value: any }).value.url).toBe(
 			"https://example.com/api",
 		);
 		expect(mockChrome.tabs.query).not.toHaveBeenCalled();
 
-		const clearResult = await dispatchTool("tab_network_clear", { tabId: 9 });
+		const clearResult = await dispatchTool("tab_network_clear", { tabId: 9 }, { action: "tab_network_clear" });
 		expect(clearResult.ok).toBe(true);
 		expect(
-			(await dispatchTool("tab_network_list", { tabId: 9, all: true })) as {
+			(await dispatchTool("tab_network_list", { tabId: 9, all: true }, { action: "tab_network_list" })) as {
 				ok: true;
 				value: unknown[];
 			},

@@ -26,6 +26,10 @@ import {
 	isTabReceivingAction,
 } from "../src/main/runner/chrome/tab-ownership.js";
 import { pingTabContentScript } from "../src/main/runner/tab/execute.js";
+import {
+	getActiveTabId,
+	setActiveTabId,
+} from "../src/main/tab-context.js";
 import { TabTracker } from "../src/main/session/tab-tracker.js";
 
 declare global {
@@ -128,39 +132,6 @@ interface Phase2Worker {
 	onmessage: ((e: MessageEvent) => void) | null;
 	onerror: ((e: ErrorEvent) => void) | null;
 	onmessageerror: ((e: MessageEvent) => void) | null;
-}
-
-function makeWorkerMock2(
-	bucket: Phase2Worker[],
-	posts: unknown[],
-): typeof Worker {
-	return (() => {
-		const w: Phase2Worker = {
-			postMessage: vi.fn((m: unknown) => posts.push(m)),
-			terminate: vi.fn(),
-			onmessage: null,
-			onerror: null,
-			onmessageerror: null,
-		};
-		bucket.push(w);
-		return w;
-	}) as unknown as typeof Worker;
-}
-
-async function initOwnedSession(
-	bucket: Phase2Worker[],
-	posts: unknown[],
-	sessions: ExtensionSession[],
-): Promise<[ExtensionSession, Phase2Worker]> {
-	const p = ExtensionSession.init();
-	setTimeout(() => {
-		bucket[bucket.length - 1]?.onmessage?.({
-			data: { type: "ready" },
-		} as MessageEvent);
-	}, 0);
-	const [session] = await p;
-	sessions.push(session);
-	return [session, bucket[bucket.length - 1]];
 }
 
 describe("Phase 2: cross-window tab ownership", () => {
@@ -1089,3 +1060,50 @@ describe("bindTabContext: getCurrent failure/absence", () => {
 		expect(await session.resolveActiveTabId()).toBe(9);
 	});
 });
+
+// ─── Phase 2: cross-window tab ownership ─────────────────────────
+//
+// VSCode-style isolation: each session belongs to one Chrome window and may
+// only operate on tabs in THAT window. page.* (resolved active tab) and
+// web.tab.* (explicit tabId) must both be rejected with E_TAB_NOT_OWNED when
+// the target tab lives in another window, and chrome.tabs.sendMessage must
+// never fire for such tabs.
+
+interface Phase2Worker {
+	postMessage: ReturnType<typeof vi.fn>;
+	terminate: ReturnType<typeof vi.fn>;
+	onmessage: ((e: MessageEvent) => void) | null;
+	onerror: ((e: ErrorEvent) => void) | null;
+	onmessageerror: ((e: MessageEvent) => void) | null;
+}
+
+function makeWorkerMock2(
+	bucket: Phase2Worker[],
+	posts: unknown[],
+): typeof Worker {
+	return function () {
+		const w: Phase2Worker = {
+			postMessage: vi.fn((m: unknown) => posts.push(m)),
+			terminate: vi.fn(),
+			onmessage: null,
+			onerror: null,
+			onmessageerror: null,
+		};
+		bucket.push(w);
+		return w;
+	} as unknown as typeof Worker;
+}
+
+async function initOwnedSession(
+	bucket: Phase2Worker[],
+	posts: unknown[],
+	sessions: ExtensionSession[],
+): Promise<[ExtensionSession, Phase2Worker]> {
+	const p = ExtensionSession.init();
+	setTimeout(() => {
+		bucket[bucket.length - 1]?.onmessage?.({ data: { type: "ready" } } as MessageEvent);
+	}, 0);
+	const [session] = await p;
+	sessions.push(session);
+	return [session, bucket[bucket.length - 1]];
+}

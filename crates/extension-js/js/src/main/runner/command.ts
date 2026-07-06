@@ -7,8 +7,9 @@ import type {
 } from "../../shared/main/tool-registry.js";
 import {
 	dispatchTool,
-	getRunnerSignal,
 } from "../../shared/main/tool-registry.js";
+import type { CallContext } from "../../shared/cross/manifest.js";
+import { resolveActiveTabId } from "../tab-context.js";
 import { isNativeParityAction, normalizeParityArgs } from "./chrome/native.js";
 import { handleHostCallAction } from "./host.js";
 import { isValidMainThreadAction } from "./lib/host-registry.js";
@@ -28,15 +29,16 @@ function unknownActionResponse(action: string): AsyncResponse {
 }
 
 function resolveSignal(relaySignal?: AbortSignal): AbortSignal {
-	const signal = relaySignal ?? getRunnerSignal();
-	if (signal?.aborted)
+	if (relaySignal?.aborted)
 		throw new Error("Runner aborted: ExtensionSession stopped");
-	return signal ?? new AbortController().signal;
+	// No module-global fallback: callers must thread the session's signal.
+	// A never-aborting signal keeps legacy/no-signal call sites working.
+	return relaySignal ?? new AbortController().signal;
 }
 
 async function dispatchCommand(
 	command: Command,
-	signal: AbortSignal,
+	ctx: CallContext,
 ): Promise<{ response: AsyncResponse; handler?: string }> {
 	if (!isValidMainThreadAction(command.action))
 		return { response: unknownActionResponse(command.action) };
@@ -50,13 +52,7 @@ async function dispatchCommand(
 	const params = isNativeParityAction(command.action)
 		? parityParamsForDispatch(command.action, command.params)
 		: normalizeParams(command.action, command.params);
-	const r = await dispatchTool(
-		command.action,
-		params,
-		command.call_id,
-		command.runId,
-		signal,
-	);
+	const r = await dispatchTool(command.action, params, ctx);
 	return { response: r };
 }
 
@@ -71,12 +67,13 @@ function startCommandTimer(command: Command) {
 export async function executeMainThreadCommand(
 	command: Command,
 	relaySignal?: AbortSignal,
+	windowId?: number | null,
+	resolveActiveTab?: () => Promise<number | null>,
 ): Promise<AsyncResponse> {
 	const finish = startCommandTimer(command);
-	const { response, handler } = await dispatchCommand(
-		command,
-		resolveSignal(relaySignal),
-	);
+	const ctx: CallContext = { action: command.action, callId: command.call_id, runId: command.runId,
+		signal: resolveSignal(relaySignal), windowId, resolveActiveTab: resolveActiveTab ?? resolveActiveTabId };
+	const { response, handler } = await dispatchCommand(command, ctx);
 	finish({ ok: response.ok, ...(handler ? { handler } : {}) });
 	return response;
 }

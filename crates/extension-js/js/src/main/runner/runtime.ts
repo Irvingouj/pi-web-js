@@ -3,14 +3,11 @@
 
 export {
 	type Command,
-	setRunnerAbortController,
 	throwIfAborted,
 } from "../../shared/main/tool-registry.js";
 
 export {
 	getActiveTabId,
-	initExtensionListeners,
-	removeExtensionListeners,
 	resolveActiveTabId,
 } from "../tab-context.js";
 export { registerChromePassthrough } from "./chrome/internals.js";

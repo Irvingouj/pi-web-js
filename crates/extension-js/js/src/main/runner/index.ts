@@ -3,17 +3,14 @@
 
 export {
 	type Command,
-	setRunnerAbortController,
 } from "../../shared/main/tool-registry.js";
 export {
 	executeMainThreadCommand,
 	getActiveTabId,
-	initExtensionListeners,
 	isValidMainThreadAction,
 	normalizeParams,
 	registerHostHandler,
 	registerHostHandlers,
-	removeExtensionListeners,
 } from "./runtime.js";
 
 import "./tools/storage.js";

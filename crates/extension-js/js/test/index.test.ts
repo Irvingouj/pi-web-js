@@ -2,7 +2,6 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ExtensionSession } from "../src/main/index.js";
-import { setRunnerAbortController } from "../src/main/runner/index.js";
 import { setActiveTabId } from "../src/main/tab-context.js";
 
 interface MockWorker {
@@ -63,7 +62,6 @@ describe("ExtensionSession fs namespace e2e", () => {
 		postMessages = [];
 		workerInstances = [];
 		sessions = [];
-		setRunnerAbortController(null);
 
 		vi.stubGlobal("Worker", function () {
 			const instance = {
@@ -671,9 +669,9 @@ describe("ExtensionSession fs namespace e2e", () => {
 			},
 			scripting: { executeScript: vi.fn() },
 		};
-		const [, , worker] = await initSession();
-		setActiveTabId(1);
-		setActiveTabId(99);
+		const [session, , worker] = await initSession();
+		session.setActiveTabId(1);
+		session.setActiveTabId(99);
 		await new Promise((resolve) => setTimeout(resolve, 0));
 
 		sendWorkerAsyncRelay(worker, "relay-fill", "page_fill", "content-script", {
@@ -885,7 +883,6 @@ describe("session.snapshot.query()", () => {
 		postMessages = [];
 		workerInstances = [];
 		sessions = [];
-		setRunnerAbortController(null);
 
 		vi.stubGlobal("Worker", function () {
 			const instance: MockWorker = {

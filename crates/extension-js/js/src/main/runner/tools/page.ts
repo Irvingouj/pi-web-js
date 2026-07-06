@@ -6,6 +6,7 @@ import {
 	noTabError,
 } from "../../../shared/cross/normalize-agent-error.js";
 import * as schemas from "../../../shared/cross/schemas.js";
+import type { CallContext } from "../../../shared/cross/manifest.js";
 import { defineContentScriptTool } from "../../../shared/main/define-content-script-tool.js";
 import { logger } from "../../../shared/main/logger.js";
 import {
@@ -30,8 +31,17 @@ import {
 	listNetworkEntries,
 } from "../lib/network-log-store.js";
 
-async function requireActiveTab(action: string): Promise<number> {
-	const tabId = await resolveActiveTabId();
+async function requireActiveTab(
+	action: string,
+	ctx: CallContext,
+): Promise<number> {
+	// Per-session resolver (Plan B): the owning ExtensionSession's TabTracker,
+	// injected via ctx. Falls back to the bare module-global resolveActiveTabId
+	// only for direct dispatchTool calls that bypass a session (tests / low-level
+	// API). In the extension product path a session is always bound, so the
+	// tracker is the single source of truth.
+	const resolve = ctx.resolveActiveTab ?? resolveActiveTabId;
+	const tabId = await resolve();
 	if (tabId === null) {
 		throwAgentError(noTabError(action));
 	}
@@ -48,10 +58,10 @@ registerJsCall({
 	params: schemas.PageUrlParamsSchema,
 	returns: z.string(),
 	owner: "main-thread",
-	handler: async (_params, _ctx) => {
-		const activeTab = await requireActiveTab("page.url()");
+	handler: async (_params, ctx) => {
+		const activeTab = await requireActiveTab("page.url()", ctx);
 		const tab = unwrapResult(
-			await dispatchTool("chrome_tabs_get", [activeTab]),
+			await dispatchTool("chrome_tabs_get", [activeTab], ctx),
 		) as { url?: string };
 		return tab.url ?? "";
 	},
@@ -69,10 +79,10 @@ registerJsCall({
 	params: schemas.PageTitleParamsSchema,
 	returns: z.string(),
 	owner: "main-thread",
-	handler: async (_params, _ctx) => {
-		const activeTab = await requireActiveTab("page.title()");
+	handler: async (_params, ctx) => {
+		const activeTab = await requireActiveTab("page.title()", ctx);
 		const tab = unwrapResult(
-			await dispatchTool("chrome_tabs_get", [activeTab]),
+			await dispatchTool("chrome_tabs_get", [activeTab], ctx),
 		) as { title?: string };
 		return tab.title ?? "";
 	},
@@ -98,7 +108,7 @@ registerJsCall({
 	fields: ["url"],
 	owner: "main-thread",
 	handler: async (params, ctx) => {
-		const activeTab = await requireActiveTab("page.goto()");
+		const activeTab = await requireActiveTab("page.goto()", ctx);
 		const traceId = ctx.runId ?? "?";
 		logger.debug("page_goto_start", {
 			traceId,
@@ -113,7 +123,7 @@ registerJsCall({
 				"navigation",
 			);
 		}
-		const preNavResult = await dispatchTool("chrome_tabs_get", [activeTab]);
+		const preNavResult = await dispatchTool("chrome_tabs_get", [activeTab], ctx);
 		const preNavTab =
 			preNavResult.ok && preNavResult.value
 				? schemas.ChromeTabSchema.safeParse(preNavResult.value)
@@ -145,6 +155,7 @@ registerJsCall({
 			timeoutMs,
 			traceId,
 			logPrefix: "page_goto",
+			signal: ctx.signal,
 		});
 	},
 	paramTypes: [
@@ -176,16 +187,16 @@ registerJsCall({
 	params: schemas.PageHealthParamsSchema,
 	returns: schemas.PageHealthResultSchema,
 	owner: "main-thread",
-	handler: async (_params, _ctx) => {
-		const tabId = await requireActiveTab("page.health()");
+	handler: async (_params, ctx) => {
+		const tabId = await requireActiveTab("page.health()", ctx);
 		const tab = unwrapResult(
-			await dispatchTool("chrome_tabs_get", [tabId]),
+			await dispatchTool("chrome_tabs_get", [tabId], ctx),
 		) as { url?: string; title?: string };
 		const url = tab.url ?? "";
 		const title = tab.title ?? "";
-		const urlPreflight = await preflightDomTab(tabId);
+		const urlPreflight = await preflightDomTab(tabId, ctx.signal);
 		const domApis = urlPreflight && !urlPreflight.ok ? "blocked" : "ok";
-		const pingResult = await pingTabContentScript(tabId, CS_FAST_PING_MS);
+		const pingResult = await pingTabContentScript(tabId, CS_FAST_PING_MS, ctx.signal);
 		const contentScript = pingResult.ok ? "connected" : "missing";
 		const mutationsReady = domApis === "ok" && contentScript === "connected";
 		const health: z.infer<typeof schemas.PageHealthResultSchema> = {
@@ -245,8 +256,8 @@ registerJsCall({
 	returns: z.array(z.record(z.unknown())),
 	returnType: "NetworkSummary[]",
 	owner: "main-thread",
-	handler: async (params, _ctx) => {
-		const activeTab = await requireActiveTab("page.network.list()");
+	handler: async (params, ctx) => {
+		const activeTab = await requireActiveTab("page.network.list()", ctx);
 		return listNetworkEntries(activeTab, params);
 	},
 	paramTypes: [
@@ -272,8 +283,8 @@ registerJsCall({
 	returnType: "NetworkEntry",
 	fields: ["id"],
 	owner: "main-thread",
-	handler: async (params, _ctx) => {
-		const activeTab = await requireActiveTab("page.network.get()");
+	handler: async (params, ctx) => {
+		const activeTab = await requireActiveTab("page.network.get()", ctx);
 		const { id } = params as { id: string };
 		const entry = getNetworkEntry(activeTab, id);
 		if (!entry) {
@@ -307,8 +318,8 @@ registerJsCall({
 	params: z.object({}),
 	returns: z.null(),
 	owner: "main-thread",
-	handler: async (_params, _ctx) => {
-		const activeTab = await requireActiveTab("page.network.clear()");
+	handler: async (_params, ctx) => {
+		const activeTab = await requireActiveTab("page.network.clear()", ctx);
 		clearNetworkEntries(activeTab);
 		return null;
 	},
@@ -326,9 +337,9 @@ registerJsCall({
 	params: schemas.PageReloadParamsSchema,
 	returns: z.null(),
 	owner: "main-thread",
-	handler: async (_params, _ctx) => {
-		const activeTab = await requireActiveTab("page.reload()");
-		return unwrapResult(await dispatchTool("chrome_tabs_reload", [activeTab]));
+	handler: async (_params, ctx) => {
+		const activeTab = await requireActiveTab("page.reload()", ctx);
+		return unwrapResult(await dispatchTool("chrome_tabs_reload", [activeTab], ctx));
 	},
 	paramTypes: [],
 	returnDoc: "null",
@@ -345,7 +356,7 @@ registerJsCall({
 	returns: z.boolean(),
 	fields: ["duration"],
 	owner: "main-thread",
-	handler: async (params, _ctx) => {
+	handler: async (params, ctx) => {
 		await new Promise((resolve) =>
 			setTimeout(resolve, Number(params.duration)),
 		);
@@ -372,12 +383,12 @@ registerJsCall({
 	params: schemas.PageCloseParamsSchema,
 	returns: z.null(),
 	owner: "main-thread",
-	handler: async (params, _ctx) => {
+	handler: async (params, ctx) => {
 		const tabId = typeof params === "number" ? params : extractTabId(params);
 		if (tabId === null) {
 			throw makeError("page_close requires a tabId", "E_MISSING_PARAM");
 		}
-		return unwrapResult(await dispatchTool("chrome_tabs_remove", [tabId]));
+		return unwrapResult(await dispatchTool("chrome_tabs_remove", [tabId], ctx));
 	},
 	paramTypes: [
 		{
@@ -400,9 +411,9 @@ registerJsCall({
 	params: schemas.TabQueryParamsSchema,
 	returns: schemas.ChromeTabArraySchema,
 	owner: "main-thread",
-	handler: async (params, _ctx) => {
+	handler: async (params, ctx) => {
 		const tabs = unwrapResult(
-			await dispatchTool("chrome_tabs_query", [params]),
+			await dispatchTool("chrome_tabs_query", [params], ctx),
 		);
 		return (Array.isArray(tabs) ? tabs : []).map((t) => ({
 			...t,
@@ -432,13 +443,13 @@ registerJsCall({
 	params: schemas.TabActivateParamsSchema,
 	returns: schemas.ChromeTabSchema,
 	owner: "main-thread",
-	handler: async (params, _ctx) => {
+	handler: async (params, ctx) => {
 		const tabId = typeof params === "number" ? params : extractTabId(params);
 		if (tabId === null) {
 			throw makeError("page_switch requires a tabId", "E_MISSING_PARAM");
 		}
 		return unwrapResult(
-			await dispatchTool("chrome_tabs_update", [tabId, { active: true }]),
+			await dispatchTool("chrome_tabs_update", [tabId, { active: true }], ctx),
 		);
 	},
 	paramTypes: [
@@ -464,8 +475,8 @@ registerJsCall({
 	returns: schemas.ChromeTabSchema,
 	fields: ["url"],
 	owner: "main-thread",
-	handler: async (params, _ctx) => {
-		return unwrapResult(await dispatchTool("chrome_tabs_create", [params]));
+	handler: async (params, ctx) => {
+		return unwrapResult(await dispatchTool("chrome_tabs_create", [params], ctx));
 	},
 	paramTypes: [
 		{
@@ -495,10 +506,10 @@ registerJsCall({
 	params: schemas.PageActiveTabParamsSchema,
 	returns: schemas.ChromeTabSchema,
 	owner: "main-thread",
-	handler: async (_params, _ctx) => {
-		const tabId = await requireActiveTab("page.active_tab()");
+	handler: async (_params, ctx) => {
+		const tabId = await requireActiveTab("page.active_tab()", ctx);
 		const tab = unwrapResult(
-			await dispatchTool("chrome_tabs_get", [tabId]),
+			await dispatchTool("chrome_tabs_get", [tabId], ctx),
 		) as Record<string, unknown>;
 		return { ...tab, tabId: typeof tab.id === "number" ? tab.id : tabId };
 	},

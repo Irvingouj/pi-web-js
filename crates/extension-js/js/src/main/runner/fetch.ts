@@ -10,8 +10,9 @@ import type { FetchParams, FetchValue } from "./lib/types.js";
 
 export async function handleFetch(
 	params: FetchParams,
+	signal?: AbortSignal,
 ): Promise<AsyncResponse<FetchValue>> {
-	throwIfAborted();
+	throwIfAborted(signal);
 	const { url, method, headers, body, timeout } = params;
 
 	try {

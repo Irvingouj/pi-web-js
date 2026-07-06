@@ -2,7 +2,6 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ExtensionSession } from "../src/main/index.js";
-import { setRunnerAbortController } from "../src/main/runner/index.js";
 import {
 	initCapabilities,
 	resetCapabilities,
@@ -39,7 +38,6 @@ describe("snapshot dispatch", () => {
 		_registrySnapshotQueryCalls = 0;
 		workerInstances = [];
 		postMessages = [];
-		setRunnerAbortController(null);
 		setActiveTabId(1);
 		resetCapabilities();
 

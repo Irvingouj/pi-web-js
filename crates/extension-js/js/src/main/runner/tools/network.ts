@@ -18,7 +18,7 @@ registerJsCall({
 	aliases: [{ namespace: "web", name: "fetch", fields: ["url"] }],
 	owner: "main-thread",
 	handler: async (params, _ctx) => {
-		const result = await handleFetch(params as FetchParams);
+		const result = await handleFetch(params as FetchParams, _ctx.signal);
 		return unwrapResult(result);
 	},
 	paramTypes: [
