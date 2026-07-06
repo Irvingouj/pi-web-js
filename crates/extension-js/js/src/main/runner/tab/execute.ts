@@ -27,16 +27,6 @@ function sleep(ms: number): Promise<void> {
 }
 
 // ─── Tab script execution ──────────────────────────────────────
-
-// ─── Tab script execution ──────────────────────────────────────
-//
-// Signal-threading convention: `preflightDomTab`, `pingTabContentScript`,
-// and `handleFetch` take `signal` as a trailing positional arg (single-shot
-// checks, few params). `waitForTabLoad` and `navigateTab` take it via their
-// options bag (they already carry rich configuration). Both read the SAME
-// per-session AbortController threaded down from ExtensionSession.
-
-// ─── Tab script execution ──────────────────────────────────────
 //
 // Signal-threading convention: `preflightDomTab`, `pingTabContentScript`,
 // and `handleFetch` take `signal` as a trailing positional arg (single-shot

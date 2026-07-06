@@ -8,9 +8,12 @@
 // tab event for every window. So this tracker filters every listener by the
 // session's `windowId` — only events involving OUR window mutate our pointer.
 //
-// This replaces the former module-global `activeTabId` in tab-context.ts,
-// giving each session an independent, window-scoped tab pointer. It correctly
-// handles tabs dragged between windows:
+// This is the PRIMARY source of active-tab state in the extension product
+// path (each session gets its own window-scoped pointer). tab-context.ts
+// keeps a listener-less module-global as a FALLBACK for bare dispatchTool /
+// executeMainThreadCommand calls that bypass a session (tests, web-js demo);
+// the two never diverge in product use because handlers prefer ctx.resolveActiveTab.
+// It correctly handles tabs dragged between windows:
 //   - drag OUT (onDetached oldWindowId===ours, tab===active) → drop pointer
 //   - drag IN  (onAttached newWindowId===ours)              → no auto-grab
 //     (don't interrupt the agent; it re-resolves lazily on next page.*)

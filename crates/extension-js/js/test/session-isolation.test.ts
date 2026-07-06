@@ -26,10 +26,6 @@ import {
 	isTabReceivingAction,
 } from "../src/main/runner/chrome/tab-ownership.js";
 import { pingTabContentScript } from "../src/main/runner/tab/execute.js";
-import {
-	getActiveTabId,
-	setActiveTabId,
-} from "../src/main/tab-context.js";
 import { TabTracker } from "../src/main/session/tab-tracker.js";
 
 declare global {

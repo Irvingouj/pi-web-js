@@ -1,23 +1,21 @@
 import type { TabPolicy } from "../shared/cross/types.js";
 import { logger } from "../shared/main/logger.js";
 
+//
+// Demo / bare-call fallback for active-tab state.
+//
+// Per-session tab tracking lives in `session/tab-tracker.ts` (Plan B): each
+// ExtensionSession owns its active-tab pointer + windowId-scoped chrome.tabs.*
+// listeners. In the extension product path, handlers resolve the active tab via
+// `ctx.resolveActiveTab` (the session's tracker). The functions here are the
+// FALLBACK for direct `executeMainThreadCommand`/`dispatchTool` calls that
+// bypass a session (tests, low-level API, web-js demo with no Chrome window).
+// They keep a small, listener-less module-global pointer + lazy re-query — no
+// chrome.tabs.* listeners (those belong to TabTracker, to avoid a second
+// listener owner and a divergent second source of truth).
+//
+
 let activeTabId: number | null = null;
-let listenersAttached = false;
-
-const onActivatedListener = ({ tabId }: { tabId: number }) => {
-	activeTabId = tabId;
-};
-
-const onUpdatedListener = (tabId: number, changeInfo: { status?: string }) => {
-	const chromeApi = window.chrome;
-	if (!chromeApi?.runtime?.id) return;
-	if (changeInfo.status === "complete") {
-		activeTabId = tabId;
-		chromeApi.tabs.sendMessage(tabId, { action: "ping" }).catch(() => {
-			// Content script not present; injection happens via manifest matches.
-		});
-	}
-};
 
 export function getActiveTabId(): number | null {
 	return activeTabId;
@@ -27,47 +25,7 @@ export function setActiveTabId(tabId: number | null): void {
 	activeTabId = tabId;
 }
 
-export function initTabContext(chromeApi: typeof chrome): void {
-	if (listenersAttached) return;
-	if (!chromeApi?.runtime?.id) return;
-	listenersAttached = true;
-
-	chromeApi.tabs.onActivated.addListener(onActivatedListener);
-	chromeApi.tabs.onUpdated.addListener(onUpdatedListener);
-
-	void chromeApi.tabs
-		.query({ active: true, lastFocusedWindow: true })
-		.then((tabs) => {
-			const first = tabs[0];
-			if (first?.id !== undefined) {
-				activeTabId = first.id;
-			}
-		})
-		.catch(() => {
-			// ignore query errors
-		});
-}
-
-export function removeTabContextListeners(): void {
-	const chromeApi = window.chrome;
-	if (!chromeApi?.runtime?.id || !listenersAttached) return;
-	chromeApi.tabs.onActivated.removeListener(onActivatedListener);
-	chromeApi.tabs.onUpdated.removeListener(onUpdatedListener);
-	listenersAttached = false;
-}
-
-/** @deprecated Use initTabContext — kept for runner API compatibility */
-export function initExtensionListeners(): void {
-	if (typeof chrome !== "undefined" && chrome.runtime?.id) {
-		initTabContext(chrome);
-	}
-}
-
-/** @deprecated Use removeTabContextListeners — kept for runner API compatibility */
-export function removeExtensionListeners(): void {
-	removeTabContextListeners();
-}
-
+/** Resolve the active tab id for the bare-call fallback path (no session tracker). */
 export async function resolveActiveTabId(): Promise<number | null> {
 	const log = logger.child("tab-context");
 	log.debug("resolveActiveTabId_start", { activeTabId });
@@ -109,6 +67,11 @@ function toTabId(value: unknown): number | null {
 	return null;
 }
 
+/**
+ * Resolve a tab id from params (bare-call fallback). Session-bound relays go
+ * through `TabTracker.resolveTabId` (async, lazy re-query); this sync version
+ * is only reached when no session tracker is available.
+ */
 export function resolveTabId(
 	tabPolicy: TabPolicy,
 	params: Record<string, unknown>,

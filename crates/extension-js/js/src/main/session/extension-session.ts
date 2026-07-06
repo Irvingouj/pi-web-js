@@ -50,7 +50,6 @@ import {
 	isSnapshotAction,
 } from "../runner/snapshot-merge.js";
 import { TabTracker } from "./tab-tracker.js";
-import { resolveTabId } from "../tab-context.js";
 
 type WorkerRequest =
 	| { type: "runCell"; id: string; code: string; stdin: string; runId?: string }
@@ -602,8 +601,6 @@ export class ExtensionSession {
 		try {
 			// tracker is always constructed by bindTabContext (even in demo);
 			// `!` asserts the post-init invariant.
-			// tracker is always constructed by bindTabContext (even in demo);
-			// `!` asserts the post-init invariant.
 			tabId = await this.tabTracker!.resolveTabId(tabPolicy, params);
 		} catch (err: unknown) {
 			return {
@@ -997,12 +994,6 @@ export class ExtensionSession {
 	async stopWith(runner: Promise<void>): Promise<void> {
 		if (this.disposed) return;
 		this.disposed = true;
-
-		// Signal abort to interrupt in-flight runner operations
-		// Abort in-flight runner operations on this session's own controller.
-		this.abortController.abort();
-		// Fresh controller so post-stop state is clean if the session is reused.
-		this.abortController = new AbortController();
 
 		for (const [, relayAbort] of this.inFlightRelays) {
 			relayAbort.abort();

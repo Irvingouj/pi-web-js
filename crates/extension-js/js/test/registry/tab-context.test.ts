@@ -2,14 +2,13 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-	initTabContext,
-	removeTabContextListeners,
 	resolveActiveTabId,
 	resolveTabId,
 	setActiveTabId,
 } from "../../src/main/tab-context.js";
+import { TabTracker } from "../../src/main/session/tab-tracker.js";
 
-describe("resolveTabId", () => {
+describe("resolveTabId (bare-call fallback path)", () => {
 	it("accepts safe bigint tabId", () => {
 		expect(resolveTabId("required", { tabId: 1n })).toBe(1);
 	});
@@ -29,23 +28,6 @@ describe("resolveTabId", () => {
 		expect(resolveTabId("active", {})).toBe(7);
 	});
 
-	it("initTabContext is idempotent", () => {
-		const chromeApi = {
-			runtime: { id: "ext-1" },
-			tabs: {
-				onActivated: { addListener: vi.fn(), removeListener: vi.fn() },
-				onUpdated: { addListener: vi.fn(), removeListener: vi.fn() },
-				query: vi.fn(() => Promise.resolve([{ id: 3 }])),
-				sendMessage: vi.fn(() => Promise.resolve()),
-			},
-		};
-		vi.stubGlobal("chrome", chromeApi);
-		initTabContext(chromeApi as unknown as typeof chrome);
-		initTabContext(chromeApi as unknown as typeof chrome);
-		expect(chromeApi.tabs.onActivated.addListener).toHaveBeenCalledTimes(1);
-		removeTabContextListeners();
-	});
-
 	it("resolveActiveTabId queries chrome when cache is empty", async () => {
 		setActiveTabId(null);
 		const chromeApi = {
@@ -59,7 +41,31 @@ describe("resolveTabId", () => {
 	});
 });
 
+describe("TabTracker init is idempotent", () => {
+	it("registers listeners only once", async () => {
+		const addActivated = vi.fn();
+		const chromeApi = {
+			runtime: { id: "ext-1" },
+			tabs: {
+				onActivated: { addListener: addActivated, removeListener: vi.fn() },
+				onUpdated: { addListener: vi.fn(), removeListener: vi.fn() },
+				onRemoved: { addListener: vi.fn(), removeListener: vi.fn() },
+				onAttached: { addListener: vi.fn(), removeListener: vi.fn() },
+				onDetached: { addListener: vi.fn(), removeListener: vi.fn() },
+				query: vi.fn(() => Promise.resolve([{ id: 3, windowId: 1 }])),
+				sendMessage: vi.fn(() => Promise.resolve()),
+			},
+		};
+		vi.stubGlobal("chrome", chromeApi);
+		const t = new TabTracker(chromeApi as unknown as typeof chrome, 1);
+		await t.init();
+		await t.init();
+		expect(addActivated).toHaveBeenCalledTimes(1);
+		t.dispose();
+	});
+});
+
 afterEach(() => {
-	removeTabContextListeners();
 	vi.unstubAllGlobals();
+	vi.restoreAllMocks();
 });
