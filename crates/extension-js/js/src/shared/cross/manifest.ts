@@ -71,12 +71,14 @@ export interface ToolDefinition<P, R> {
 	description: string;
 	params: z.ZodSchema<P>;
 	returns: z.ZodSchema<R>;
-	handler: (
-		params: P,
-		callId?: number,
-		runId?: string,
-		signal?: AbortSignal,
-	) => Promise<R>;
+	/**
+	 * Main-thread handler. Receives the validated params plus a CallContext
+	 * bag (action/callId/runId/signal/windowId/resolveActiveTab). Same shape as
+	 * JsCallSpec.handler — the registry no longer splits these into trailing
+	 * positionals, so cross-cutting concerns are added by extending CallContext,
+	 * not by growing the parameter list.
+	 */
+	handler: (params: P, ctx: CallContext) => Promise<R>;
 	paramTypes: ToolDocParam[];
 	returnType?: string;
 	returnDoc: string;
@@ -92,6 +94,21 @@ export type CallContext = {
 	callId?: number;
 	runId?: string;
 	signal?: AbortSignal;
+	/**
+	 * The Chrome window this call belongs to, for per-window tab isolation.
+	 * Native-parity tools that take a tabId read this to reject cross-window
+	 * access with E_TAB_NOT_OWNED. null/undefined means "unknown — skip the
+	 * ownership check" (web-js demo, or session not yet bound).
+	 */
+	windowId?: number | null;
+	/**
+	 * Resolve this session's active tab id (the owning ExtensionSession's
+	 * cached + lazily-requeried pointer). Project-owned page.* handlers call
+	 * this instead of the legacy module-global resolveActiveTabId, so active-tab
+	 * state is owned per-session (Plan B). Returns null when no session is
+	 * bound (web-js demo falls back to the module-global).
+	 */
+	resolveActiveTab?: () => Promise<number | null>;
 };
 
 export type JsCallSpec<P, R> = {

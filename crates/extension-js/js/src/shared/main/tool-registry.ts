@@ -122,18 +122,7 @@ export function registerJsCall<P, R>(spec: JsCallSpec<P, R>): void {
 		description: spec.description,
 		params: spec.params as z.ZodSchema<unknown>,
 		returns: spec.returns as z.ZodSchema<unknown>,
-		handler: async (
-			params: unknown,
-			callId?: number,
-			runId?: string,
-			signal?: AbortSignal,
-		) => {
-			const ctx: CallContext = {
-				action: storedSpec.action,
-				callId,
-				runId,
-				signal,
-			};
+		handler: async (params: unknown, ctx: CallContext) => {
 			return storedSpec.handler(params, ctx);
 		},
 		paramTypes: spec.paramTypes ?? [],
@@ -252,11 +241,9 @@ export function getSerializableJsManifest(): SerializableJsCallManifestEntry[] {
 export async function dispatchTool(
 	action: string,
 	params: unknown,
-	callId?: number,
-	runId?: string,
-	signal?: AbortSignal,
+	ctx: CallContext,
 ): Promise<AsyncResponse> {
-	log.debug("dispatch_start", { action, callId, runId });
+	log.debug("dispatch_start", { action, callId: ctx.callId, runId: ctx.runId });
 	const tool = toolRegistry.get(action);
 	if (!tool) {
 		return {
@@ -269,12 +256,12 @@ export async function dispatchTool(
 		};
 	}
 
-	throwIfAborted();
+	throwIfAborted(ctx.signal);
 
 	const result = await dispatchValidated(
 		tool.params,
 		tool.returns,
-		async (validated) => tool.handler(validated, callId, runId, signal),
+		async (validated) => tool.handler(validated, ctx),
 		params,
 		action,
 		`${tool.namespace}.${tool.name}`,
