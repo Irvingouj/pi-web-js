@@ -71,9 +71,9 @@ jobs:
         working-directory: crates/extension-js/js
         run: npm ci
       - name: Build extension WASM
-        run: node scripts/build.js extension
+        run: node scripts/build.js extension --release
       - name: extension-js unit tests
         working-directory: crates/extension-js/js
         run: |
           npm run build
-          npm test
+          npx vitest run

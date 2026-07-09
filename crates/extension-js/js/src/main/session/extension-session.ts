@@ -963,31 +963,53 @@ export class ExtensionSession {
 	}
 
 	get snapshot() {
+		const call = async <T>(
+			action: "page_snapshot" | "page_snapshot_data" | "page_snapshot_query",
+			params: Record<string, unknown>,
+			options?: { tabId?: number },
+		): Promise<T> => {
+			const result = await this.executeContentScriptCommand(
+				{ action, params },
+				options?.tabId ? "required" : "active",
+			);
+			if (
+				typeof result === "object" &&
+				result !== null &&
+				"ok" in result &&
+				!(result as { ok: boolean }).ok
+			) {
+				const err = (
+					result as { error?: { message?: string; code?: string } }
+				).error;
+				throw new Error(err?.message ?? `${action} failed`);
+			}
+			return result as T;
+		};
+
 		return {
+			text: (options?: { maxNodes?: number; tabId?: number }): Promise<string> =>
+				call<string>(
+					"page_snapshot",
+					{ max_nodes: options?.maxNodes },
+					options,
+				),
+			data: (
+				options?: { maxNodes?: number; tabId?: number },
+			): Promise<InlineSnapshotResult> =>
+				call<InlineSnapshotResult>(
+					"page_snapshot_data",
+					{ max_nodes: options?.maxNodes },
+					options,
+				),
 			query: async (
 				filter?: SnapshotFilter,
 				options?: { maxNodes?: number; tabId?: number },
-			): Promise<InlineSnapshotResult> => {
-				const result = await this.executeContentScriptCommand(
-					{
-						action: "page_snapshot_query",
-						params: { filter: filter ?? {}, max_nodes: options?.maxNodes },
-					},
-					options?.tabId ? "required" : "active",
-				);
-				if (
-					typeof result === "object" &&
-					result !== null &&
-					"ok" in result &&
-					!(result as { ok: boolean }).ok
-				) {
-					const err = (
-						result as { error?: { message?: string; code?: string } }
-					).error;
-					throw new Error(err?.message ?? "snapshot_query failed");
-				}
-				return result as InlineSnapshotResult;
-			},
+			): Promise<InlineSnapshotResult> =>
+				call<InlineSnapshotResult>(
+					"page_snapshot_query",
+					{ filter: filter ?? {}, max_nodes: options?.maxNodes },
+					options,
+				),
 		};
 	}
 

@@ -964,7 +964,51 @@ describe("session.snapshot.query()", () => {
 		return [session, worker];
 	}
 
-	it("calls executeContentScriptCommand with correct action and default params", async () => {
+	it("snapshot.text calls page_snapshot with default active tab", async () => {
+		const [session] = await initSnapshotSession();
+		const spy = vi.spyOn(session as any, "executeContentScriptCommand");
+		spy.mockResolvedValueOnce("snapshot text");
+
+		const result = await session.snapshot.text();
+
+		expect(spy).toHaveBeenCalledWith(
+			expect.objectContaining({
+				action: "page_snapshot",
+				params: { max_nodes: undefined },
+			}),
+			"active",
+		);
+		expect(result).toBe("snapshot text");
+
+		spy.mockRestore();
+	});
+
+	it("snapshot.data calls page_snapshot_data with maxNodes and tabId", async () => {
+		const [session] = await initSnapshotSession();
+		const spy = vi.spyOn(session as any, "executeContentScriptCommand");
+		spy.mockResolvedValueOnce({
+			text: "",
+			nodes: [],
+			url: "https://example.com/",
+			title: "Example",
+			viewport: { width: 800, height: 600 },
+		});
+
+		const result = await session.snapshot.data({ maxNodes: 25, tabId: 42 });
+
+		expect(spy).toHaveBeenCalledWith(
+			expect.objectContaining({
+				action: "page_snapshot_data",
+				params: { max_nodes: 25 },
+			}),
+			"required",
+		);
+		expect(result).toMatchObject({ title: "Example" });
+
+		spy.mockRestore();
+	});
+
+	it("snapshot.query calls executeContentScriptCommand with correct action and default params", async () => {
 		const [session] = await initSnapshotSession();
 		const spy = vi.spyOn(session as any, "executeContentScriptCommand");
 		spy.mockResolvedValueOnce({
