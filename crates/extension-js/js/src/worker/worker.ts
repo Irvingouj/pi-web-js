@@ -193,7 +193,10 @@ self.addEventListener("error", (event) => {
 		(event.error instanceof Error
 			? event.error.message
 			: "Worker uncaught error");
-	logger.error("worker_uncaught_error", { error: message });
+	logger.error("worker_uncaught_error", {
+		code: "E_EXTJS_WORKER_UNCAUGHT",
+		error: message,
+	});
 	reportActiveRunFailure(message);
 });
 
@@ -203,7 +206,10 @@ self.addEventListener("unhandledrejection", (event) => {
 		reason instanceof Error
 			? reason.message
 			: String(reason ?? "Unhandled rejection");
-	logger.error("worker_unhandled_rejection", { error: message });
+	logger.error("worker_unhandled_rejection", {
+		code: "E_EXTJS_WORKER_UNHANDLED",
+		error: message,
+	});
 	reportActiveRunFailure(message);
 });
 

@@ -588,6 +588,15 @@ describe("TabTracker: init + lifecycle", () => {
 		expect(tracker.getActiveTabId()).toBe(7); // untouched
 	});
 
+	it("rebindWindow scopes subsequent queries to the survivor window", async () => {
+		await tracker.init();
+		tracker.rebindWindow(9);
+		(
+			globalThis.chrome.tabs.query as ReturnType<typeof vi.fn>
+		).mockResolvedValue([{ id: 88, windowId: 9 }]);
+		expect(await tracker.resolveActiveTabId()).toBe(88);
+	});
+
 	// ─── B2: onUpdated listener ──────────────────────────────────
 	it("onUpdated re-points on status:complete (our window) and pings the tab", async () => {
 		await tracker.init();

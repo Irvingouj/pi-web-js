@@ -147,9 +147,21 @@ export class ExtensionSession {
 	 * no-op and resolveActiveTabId returns null. This keeps tab tracking in a
 	 * single source of truth (no module-global dual state).
 	 */
-	private async bindTabContext(): Promise<void> {
+	getWindowId(): number | null {
+		return this.windowId;
+	}
+
+	/** Rebind session tab ownership after window merge/survivor change. */
+	rebindWindow(newWindowId: number): void {
+		this.windowId = newWindowId;
+		this.tabTracker?.rebindWindow(newWindowId);
+	}
+
+	private async bindTabContext(forcedWindowId?: number): Promise<void> {
 		const chromeApi = window.chrome;
-		if (chromeApi?.runtime?.id && chromeApi.windows?.getCurrent) {
+		if (typeof forcedWindowId === "number") {
+			this.windowId = forcedWindowId;
+		} else if (chromeApi?.runtime?.id && chromeApi.windows?.getCurrent) {
 			try {
 				const w = await chromeApi.windows.getCurrent();
 				if (typeof w.id === "number") this.windowId = w.id;
@@ -158,10 +170,10 @@ export class ExtensionSession {
 						"bindTabContext: windows.getCurrent returned no id; tab ownership disabled",
 					);
 			} catch (err) {
-				logger.warn(
-					"bindTabContext: windows.getCurrent failed; tab ownership disabled",
-					err,
-				);
+				logger.warn("bindTabContext_failed", {
+					code: "E_WINDOW_BIND",
+					error: err instanceof Error ? err.message : String(err),
+				});
 			}
 		}
 		this.tabTracker = new TabTracker(chromeApi, this.windowId);
@@ -198,38 +210,54 @@ export class ExtensionSession {
 	 * so multiple sessions (e.g. one per Chrome window's sidepanel document)
 	 * never race on a shared abort signal.
 	 */
-	static async init(): Promise<[ExtensionSession, Promise<void>]> {
+	static async init(options?: {
+		windowId?: number;
+	}): Promise<[ExtensionSession, Promise<void>]> {
 		logger.trace("init_start");
-		if (typeof chrome !== "undefined" && chrome.runtime?.id) {
-			const { initCapabilities } = await import(
-				"../runner/tools/chrome/capability.js"
+		try {
+			if (typeof chrome !== "undefined" && chrome.runtime?.id) {
+				const { initCapabilities } = await import(
+					"../runner/tools/chrome/capability.js"
+				);
+				await initCapabilities();
+				const { initNetworkLogSession } = await import(
+					"../runner/lib/network-log-store.js"
+				);
+				initNetworkLogSession();
+			}
+
+			// 2. Freeze registry
+			const { freezeJsRegistry } = await import(
+				"../../shared/main/tool-registry.js"
 			);
-			await initCapabilities();
-			const { initNetworkLogSession } = await import(
-				"../runner/lib/network-log-store.js"
+			freezeJsRegistry();
+
+			// 3. Get manifest
+			const { getSerializableJsManifest } = await import(
+				"../../shared/main/tool-registry.js"
 			);
-			initNetworkLogSession();
+			const manifest = getSerializableJsManifest();
+
+			// 4. Create session, bind it to its Chrome window + tab tracker, start worker
+			const session = new ExtensionSession();
+			await session.bindTabContext(options?.windowId);
+			const [ready, runner] = session.startWorker(manifest);
+			await ready;
+			logger.trace("init_ready", {
+				code: "E_EXTJS_INIT_OK",
+				windowId: session.getWindowId(),
+			});
+			return [session, runner];
+		} catch (err) {
+			const message = err instanceof Error ? err.message : String(err);
+			logger.error("init_failed", {
+				code: "E_EXTJS_INIT",
+				error: message,
+				windowId:
+					typeof options?.windowId === "number" ? options.windowId : null,
+			});
+			throw err;
 		}
-
-		// 2. Freeze registry
-		const { freezeJsRegistry } = await import(
-			"../../shared/main/tool-registry.js"
-		);
-		freezeJsRegistry();
-
-		// 3. Get manifest
-		const { getSerializableJsManifest } = await import(
-			"../../shared/main/tool-registry.js"
-		);
-		const manifest = getSerializableJsManifest();
-
-		// 4. Create session, bind it to its Chrome window + tab tracker, start worker
-		const session = new ExtensionSession();
-		await session.bindTabContext();
-		const [ready, runner] = session.startWorker(manifest);
-		await ready;
-		logger.trace("init_ready");
-		return [session, runner];
 	}
 
 	private startWorker(

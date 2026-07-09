@@ -73,8 +73,12 @@ export class TabTracker {
 					this.activeTabId = first.id;
 				}
 			}
-		} catch {
-			// ignore query errors — resolveActiveTabId retries lazily
+		} catch (err) {
+			logger.warn("tab_tracker_init_query_failed", {
+				code: "E_TAB_QUERY",
+				error: err instanceof Error ? err.message : String(err),
+				windowId: this.windowId,
+			});
 		}
 	}
 
@@ -98,6 +102,13 @@ export class TabTracker {
 		this.activeTabId = tabId;
 	}
 
+	/** Rebind tab ownership to a different Chrome window (e.g. after merge). */
+	rebindWindow(newWindowId: number): void {
+		this.windowId = newWindowId;
+		// Cached tab may belong to the removed window — force lazy re-query.
+		this.activeTabId = null;
+	}
+
 	/** Resolve the active tab id, querying Chrome lazily when the cached
 	 * pointer is null. Returns null when no tab is available. */
 	async resolveActiveTabId(): Promise<number | null> {
@@ -116,8 +127,12 @@ export class TabTracker {
 				this.activeTabId = first.id;
 				return first.id;
 			}
-		} catch {
-			// ignore
+		} catch (err) {
+			logger.warn("tab_tracker_resolve_query_failed", {
+				code: "E_TAB_QUERY",
+				error: err instanceof Error ? err.message : String(err),
+				windowId: this.windowId,
+			});
 		}
 		return null;
 	}
