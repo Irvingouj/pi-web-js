@@ -1,5 +1,6 @@
 import { test as base } from "@playwright/test";
 import {
+	clearHarnessErrors,
 	createFixture,
 	executeCell,
 	launchExtension,
@@ -39,6 +40,17 @@ export const test = base.extend<object, WorkerFixtures>({
 			await use(fixture);
 		},
 		{ scope: "worker" },
+	],
+	// Auto: isolate console/SW error buffers per test. The harness is worker-scoped
+	// and otherwise accumulates pageerrors across the whole file/worker, causing
+	// flaky afterEach failures unrelated to the current test.
+	// biome-ignore lint/correctness/noEmptyPattern: Playwright fixture API
+	_clearHarnessErrors: [
+		async ({ harness }, use) => {
+			clearHarnessErrors(harness);
+			await use(undefined);
+		},
+		{ auto: true },
 	],
 });
 

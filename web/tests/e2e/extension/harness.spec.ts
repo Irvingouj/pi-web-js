@@ -62,10 +62,18 @@ print(RESULT_PREFIX + JSON.stringify({ ok: true, value: sum + __probe }));
 		test("validation errors show function, parameter, and source line", async ({
 			harness,
 		}) => {
+			// Ensure fixture tab still exists (other tests may close stray tabs).
+			await harness.fixtureTab.goto("https://extension-js.test/fixture", {
+				waitUntil: "domcontentloaded",
+			}).catch(() => {});
 			const exec = await executeCell(
 				harness.sidepanel,
 				`
-const tabs = await chrome.tabs.query({ url: "https://extension-js.test/*" });
+let tabs = await chrome.tabs.query({ url: "https://extension-js.test/*" });
+if (tabs.length === 0) {
+  const created = await chrome.tabs.create({ url: "https://extension-js.test/fixture", active: true });
+  tabs = [created];
+}
 const tabId = tabs[0].id;
 await web.tab.fetch({ tabId, url: 123 });
 `,

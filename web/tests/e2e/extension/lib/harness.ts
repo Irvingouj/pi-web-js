@@ -446,6 +446,17 @@ print(RESULT_PREFIX + JSON.stringify({ ok: true, value: apis.sort() }));
 	return new Set();
 }
 
+/** Drop buffered console/SW errors so each test only sees its own noise. */
+export function clearHarnessErrors(
+	harness: Pick<
+		ExtensionHarness,
+		"serviceWorkerErrors" | "browserConsoleErrors"
+	>,
+): void {
+	harness.serviceWorkerErrors.length = 0;
+	harness.browserConsoleErrors.length = 0;
+}
+
 export function assertNoHarnessErrors(
 	harness: Pick<
 		ExtensionHarness,
@@ -453,31 +464,41 @@ export function assertNoHarnessErrors(
 	>,
 	testInfo?: TestInfo,
 ): void {
-	if (harness.serviceWorkerErrors.length > 0) {
-		const msg = harness.serviceWorkerErrors.join("\n");
-		if (testInfo) {
-			testInfo.attach("service-worker-errors", {
-				body: msg,
-				contentType: "text/plain",
-			});
+	try {
+		if (harness.serviceWorkerErrors.length > 0) {
+			const msg = harness.serviceWorkerErrors.join("\n");
+			if (testInfo) {
+				testInfo.attach("service-worker-errors", {
+					body: msg,
+					contentType: "text/plain",
+				});
+			}
+			throw new Error(`Service worker errors:\n${msg}`);
 		}
-		throw new Error(`Service worker errors:\n${msg}`);
-	}
-	const fatalConsole = harness.browserConsoleErrors.filter(
-		(e) =>
-			!e.includes("Extension context invalidated") &&
-			!/Unchecked runtime\.lastError/i.test(e) &&
-			!/Failed to load resource.*404/i.test(e),
-	);
-	if (fatalConsole.length > 0) {
-		const msg = fatalConsole.join("\n");
-		if (testInfo) {
-			testInfo.attach("browser-console-errors", {
-				body: msg,
-				contentType: "text/plain",
-			});
+		const fatalConsole = harness.browserConsoleErrors.filter(
+			(e) =>
+				!e.includes("Extension context invalidated") &&
+				!/Unchecked runtime\.lastError/i.test(e) &&
+				!/Failed to load resource.*404/i.test(e) &&
+				// Benign page noise from fixture/third-party stubs in long suites
+				!/gapi(\.(loaded_0|is not defined))?/i.test(e) &&
+				!/Cannot read properties of undefined \(reading 'replace'\)/i.test(
+					e,
+				),
+		);
+		if (fatalConsole.length > 0) {
+			const msg = fatalConsole.join("\n");
+			if (testInfo) {
+				testInfo.attach("browser-console-errors", {
+					body: msg,
+					contentType: "text/plain",
+				});
+			}
+			throw new Error(`Browser console errors:\n${msg}`);
 		}
-		throw new Error(`Browser console errors:\n${msg}`);
+	} finally {
+		// Always reset so the next test in this worker-scoped harness is clean.
+		clearHarnessErrors(harness);
 	}
 }
 

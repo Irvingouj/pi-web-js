@@ -68,13 +68,29 @@ try {
 var RESULT_PREFIX = "${RESULT_PREFIX}";
 let created = null;
 try {
+  // Create inactive about:blank without waiting, then navigate explicitly.
+  // Prefer http(s) blank target when available so tab_goto never sees a
+  // chrome-extension preNavigationUrl if Chrome reuses a tab id oddly.
   created = await web.tab.create({ url: "about:blank", active: false, waitForReady: false });
   const tabId = created.tabId || created.id;
   if (typeof tabId !== "number") {
     throw new Error("created tab id missing");
   }
-  await web.tab.goto({ tabId: tabId, url: "${FIXTURE_ORIGIN}/next", timeout: 15000 });
-  const text = await web.tab.snapshot({ tabId: tabId });
+  await web.tab.goto({ tabId: tabId, url: "${FIXTURE_ORIGIN}/next", timeout: 15000, waitUntil: "load" });
+  // goto waits for load + content-script ping; still retry snapshot once if the
+  // inactive tab's CS inject is a tick late under suite load.
+  let text = "";
+  let lastErr = null;
+  for (let i = 0; i < 3; i++) {
+    try {
+      text = await web.tab.snapshot({ tabId: tabId });
+      if (text.indexOf("Next page") >= 0) break;
+    } catch (e) {
+      lastErr = e;
+      await web.sleep(400);
+    }
+  }
+  if (!text && lastErr) throw lastErr;
   print(RESULT_PREFIX + JSON.stringify({
     ok: true,
     value: {
