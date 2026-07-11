@@ -3,7 +3,34 @@
 All notable changes to this project are documented in this file. The format
 is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.16.0] — 2026-07-11
 
+### Added — capability registration (content-script tools)
+
+- **`register({ name, surfaces, params, returns, handlerParams? })`.** Single deep interface for content-script capabilities. One registration expands to `page.*` and/or `web.tab.*` via an explicit `surfaces` list; docs/param docs come from Zod (not hand-written `paramTypes`).
+- **`CONTENT_SCRIPT_CAPABILITIES` table** replaces dual `page-specs` / `tab-specs` catalogs. Action stem + `handlerKey` support shared handlers (e.g. `snapshot` vs `snapshot_text`).
+- **Opt-in `handlerParams`** for transport rewrites (`set_files` resolved files) while declared params stay agent-facing.
+- Domain glossary + ADR: `CONTEXT.md`, `docs/adr/0001-register-at-capability.md`.
+
+### Fixed — product errors and web.tab transport
+
+- **`web.tab.*` positional `tabId`:** surface expand always prefixes `fields` with `tabId` so `web.tab.snapshot(tabId)` works after the dual-spec removal.
+- **`chrome.scripting.executeScript({ func })`:** QuickJS JSON drops functions; host often saw only `{ target }` and fell through to Chrome’s opaque `ECHROME`. Missing both `func` and `files` now returns **`E_UNTRANSPORTABLE_PARAM`** with `web.tab.evaluate` / packaged-`files` guidance (same as a live `func`).
+- **Sidepanel error display:** `formatCellError` handles `api_error`, maps `tab_*` / `chrome_*` wire actions to public names, never returns `undefined` (was crashing CellOutput on `replace`).
+
+### Fixed — extension E2E stability
+
+- **Worker-scoped harness console buffers** cleared per test so `afterEach` does not fail on earlier tests’ pageerrors.
+- Hardened fixture-tab / inactive-tab setup for long suite runs.
+
+### Removed
+
+- `page-specs.ts`, `tab-specs.ts`, `content-script-tools.ts` aggregator, `defineContentScriptTool`.
+
+### Tests
+
+- Unit: capability register, stripped-func executeScript, full extension-js suite green.
+- E2E: extension Playwright suite green (including executeScript untransportable + tab snippet paths).
 
 ## [0.14.0] — 2026-06-30
 

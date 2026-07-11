@@ -283,7 +283,7 @@ dependencies = [
 
 [[package]]
 name = "dom-semantic-tree"
-version = "0.15.3"
+version = "0.16.0"
 dependencies = [
  "js-sys",
  "serde",
@@ -319,7 +319,7 @@ checksum = "877a4ace8713b0bcf2a4e7eec82529c029f1d0619886d18145fea96c3ffe5c0f"
 
 [[package]]
 name = "extension-js"
-version = "0.15.3"
+version = "0.16.0"
 dependencies = [
  "data-encoding",
  "js-sys",
@@ -1595,7 +1595,7 @@ checksum = "c31d56021e873866c968588ed85ccdf56db5c426e44afdb4618c39895104b920"
 
 [[package]]
 name = "web-fs"
-version = "0.15.3"
+version = "0.16.0"
 dependencies = [
  "calamine",
  "csv",
@@ -1616,7 +1616,7 @@ dependencies = [
 
 [[package]]
 name = "web-js"
-version = "0.15.3"
+version = "0.16.0"
 dependencies = [
  "console_error_panic_hook",
  "data-encoding",
@@ -1640,7 +1640,7 @@ dependencies = [
 
 [[package]]
 name = "web-js-base"
-version = "0.15.3"
+version = "0.16.0"
 dependencies = [
  "futures-util",
  "js-sys",
@@ -1656,7 +1656,7 @@ dependencies = [
 
 [[package]]
 name = "web-js-core"
-version = "0.15.3"
+version = "0.16.0"
 dependencies = [
  "dom-semantic-tree",
  "futures-util",
