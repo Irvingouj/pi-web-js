@@ -2,10 +2,19 @@ import type { CellError } from "../types/generated";
 
 /** Mirror extension-js displayActionName — wire action → agent public name. */
 function displayActionName(action: string): string {
+	if (action.includes(".")) return action; // already public (page.click, chrome.scripting…)
 	const [head, ...tail] = action.split("_");
 	if (head === "page") return `page.${tail.join("_")}`;
 	if (head === "tab") return `web.tab.${tail.join("_")}`;
 	if (head === "sidepanel") return `sidepanel.${tail.join("_")}`;
+	if (head === "chrome" && tail.length > 0) {
+		// chrome_scripting_executeScript → chrome.scripting.executeScript
+		// Last segment is method; earlier segments are dotted API path.
+		const method = tail[tail.length - 1] ?? "";
+		const apiPath = tail.slice(0, -1);
+		if (apiPath.length === 0) return `chrome.${method}`;
+		return `chrome.${apiPath.join(".")}.${method}`;
+	}
 	return action;
 }
 

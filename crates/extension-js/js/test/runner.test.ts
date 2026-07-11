@@ -1346,6 +1346,26 @@ describe("chrome passthrough", () => {
 		expect(mockChrome.scripting.executeScript).not.toHaveBeenCalled();
 	});
 
+	it("executeScript with func stripped by transport still fails with E_UNTRANSPORTABLE_PARAM", async () => {
+		// QuickJS → host JSON drops function values, so the host often sees only
+		// `{ target }` — must not fall through to Chrome's opaque func/files error.
+		mockChrome.scripting.executeScript.mockResolvedValue([
+			{ frameId: 0, result: 1 },
+		]);
+		const result = await dispatchTool(
+			"chrome_scripting_executeScript",
+			[{ target: { tabId: 1 } }],
+			{ action: "chrome_scripting_executeScript" },
+		);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe("E_UNTRANSPORTABLE_PARAM");
+			expect(result.error.message).toContain("web.tab.evaluate");
+			expect(result.error.param?.path).toBe("func");
+		}
+		expect(mockChrome.scripting.executeScript).not.toHaveBeenCalled();
+	});
+
 	it("executeScript with /skills/ path fails with path explanation", async () => {
 		const result = await dispatchTool(
 			"chrome_scripting_executeScript",

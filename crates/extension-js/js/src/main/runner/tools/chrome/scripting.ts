@@ -49,6 +49,26 @@ function withParam(
 	(err as Error & { param?: ParamDetail }).param = { path };
 	return err;
 }
+
+const FUNC_TRANSPORT_MESSAGE =
+	'Functions cannot be transported from run_js (QuickJS cannot serialize function values across the native bridge). For MAIN-world injection use files: ["/path/in/extension/pkg.js"] with an extension-packaged path. For isolated-world DOM inspection use web.tab.evaluate(tabId, script). For active-tab snapshot data use page.snapshot_data().';
+
+function rejectUntransportableFunc(): ExecuteScriptGuardResult {
+	const err = makeError(
+		FUNC_TRANSPORT_MESSAGE,
+		"E_UNTRANSPORTABLE_PARAM",
+		"transport",
+		{
+			hint: "Use web.tab.evaluate(tabId, scriptString) for isolated DOM reads, or chrome.scripting.executeScript with files: [...] referencing a file bundled in the extension package.",
+			recovery: [
+				"Call get_doc for web.tab.evaluate",
+				'Package the function as a .js file under the extension web/dist/ and pass its path via files:',
+			],
+		},
+	);
+	return { ok: false, error: withParam(err, "func") };
+}
+
 function parseExecuteScriptSpec(
 	args: readonly unknown[],
 ): ExecuteScriptGuardResult {
@@ -58,20 +78,9 @@ function parseExecuteScriptSpec(
 	}
 	const obj = spec as ExecuteScriptSpec;
 
+	// Live function (in-process unit tests) or any residual `func` key.
 	if ("func" in obj) {
-		const err = makeError(
-			'Functions cannot be transported from run_js (QuickJS cannot serialize function values across the native bridge). For MAIN-world injection use files: ["/path/in/extension/pkg.js"] with an extension-packaged path. For isolated-world DOM inspection use web.tab.evaluate(tabId, script). For active-tab snapshot data use page.snapshot_data().',
-			"E_UNTRANSPORTABLE_PARAM",
-			"transport",
-			{
-				hint: "Use web.tab.evaluate(tabId, scriptString) for isolated DOM reads, or chrome.scripting.executeScript with files: [...] referencing a file bundled in the extension package.",
-				recovery: [
-					"Call get_doc for web.tab.evaluate",
-					"Package the function as a .js file under the extension web/dist/ and pass its path via files:",
-				],
-			},
-		);
-		return { ok: false, error: withParam(err, "func") };
+		return rejectUntransportableFunc();
 	}
 
 	if ("files" in obj) {
@@ -85,7 +94,7 @@ function parseExecuteScriptSpec(
 		});
 		if (!Array.isArray(files) || files.length === 0) {
 			return filesError(
-				"param 'files' must be a non-empty array of extension-packaged file paths (e.g. [\"/assets/injected.js\"]).",
+				'param \'files\' must be a non-empty array of extension-packaged file paths (e.g. ["/assets/injected.js"]).',
 			);
 		}
 		for (const f of files) {
@@ -98,9 +107,13 @@ function parseExecuteScriptSpec(
 				);
 			}
 		}
+		return { ok: true, spec: obj };
 	}
 
-	return { ok: true, spec: obj };
+	// QuickJS JSON transport drops function values, so `{ target, func: () => … }`
+	// often arrives as `{ target }` only. Do not fall through to Chrome's opaque
+	// "Exactly one of 'func' and 'files' must be specified" — that hides the fix.
+	return rejectUntransportableFunc();
 }
 
 /** Impure wrapper: parse then throw if the guard rejects. */
@@ -159,7 +172,8 @@ registerJsCall({
 				typeof err === "object" &&
 				err !== null &&
 				"code" in err &&
-				err.code === "E_INVALID_ARGUMENT_TRANSPORT"
+				(err.code === "E_INVALID_ARGUMENT_TRANSPORT" ||
+					err.code === "E_UNTRANSPORTABLE_PARAM")
 			) {
 				throw err;
 			}
