@@ -1,14 +1,13 @@
 /// <reference types="chrome" />
 import { z } from "zod";
-import { CONTENT_SCRIPT_TOOL_SPECS } from "../../../shared/cross/content-script-tools.js";
 import type { CallContext } from "../../../shared/cross/manifest.js";
 import {
 	contentScriptMissingError,
 	noTabError,
 } from "../../../shared/cross/normalize-agent-error.js";
 import * as schemas from "../../../shared/cross/schemas.js";
-import { defineContentScriptTool } from "../../../shared/main/define-content-script-tool.js";
 import { logger } from "../../../shared/main/logger.js";
+import { registerAllContentScriptCapabilities } from "../../../shared/main/register-all-content-script-capabilities.js";
 import {
 	dispatchTool,
 	registerJsCall,
@@ -111,11 +110,8 @@ registerJsCall({
 	example: "page.title()",
 });
 
-for (const spec of CONTENT_SCRIPT_TOOL_SPECS.filter(
-	(s) => s.namespace === "page",
-)) {
-	defineContentScriptTool(spec);
-}
+// Content-script page.* / web.tab.* capabilities (one register per handlerKey).
+registerAllContentScriptCapabilities();
 
 registerJsCall({
 	action: "page_goto",

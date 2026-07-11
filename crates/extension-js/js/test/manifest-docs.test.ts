@@ -156,7 +156,12 @@ describe("manifest documentation export", () => {
 			'page.goto("https://example.com", { waitUntil: "networkidle" })',
 		);
 		expect(pageClick?.owner).toBe("content-script");
-		expect(pageClick?.paramsDoc[0]?.description).toContain("(refId)");
+		// Docs come from Zod declared params (register-at-capability), not hand paramTypes.
+		expect(
+			pageClick?.paramsDoc?.some(
+				(p) => p.name === "refId" || p.description?.toLowerCase().includes("ref"),
+			),
+		).toBe(true);
 		expect(pageFind?.description).toContain("CSS selector");
 		expect(pageFind?.fields).toEqual(["selector"]);
 		expect(chromeTabsQuery?.fields).toBeNull();

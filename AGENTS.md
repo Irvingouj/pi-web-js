@@ -116,3 +116,17 @@ a batch of speculative tests before the first implementation proves the path.
 4. Rebuild WASM (`npm run wasm`)
 5. Test in extension build
 6. Web-js compatibility is a nice-to-have, not required
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in this repo's GitHub Issues (via `gh`). See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Uses the default five-role vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: root `CONTEXT.md` + `docs/adr/`. See `docs/agents/domain.md`.

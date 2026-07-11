@@ -1,8 +1,7 @@
 /// <reference types="chrome" />
 import { z } from "zod";
-import { CONTENT_SCRIPT_TOOL_SPECS } from "../../../shared/cross/content-script-tools.js";
+
 import * as schemas from "../../../shared/cross/schemas.js";
-import { defineContentScriptTool } from "../../../shared/main/define-content-script-tool.js";
 import { logger } from "../../../shared/main/logger.js";
 import {
 	dispatchTool,
@@ -366,11 +365,8 @@ registerJsCall({
 	example: "web.tab.close(123)",
 });
 
-for (const spec of CONTENT_SCRIPT_TOOL_SPECS.filter(
-	(s) => s.namespace === "web.tab",
-)) {
-	defineContentScriptTool(spec);
-}
+// Content-script web.tab.* tools are registered via registerAllContentScriptCapabilities()
+// in page.ts (one capability per handlerKey, surfaces expand to page + web.tab).
 
 registerJsCall({
 	action: "tab_wait_for_load",
