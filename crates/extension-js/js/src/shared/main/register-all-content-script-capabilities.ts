@@ -1,6 +1,6 @@
 /**
  * Register every content-script capability on the main-thread pipeline once.
- * Import from page/tab tool modules instead of dual defineContentScriptTool loops.
+ * Source: CONTENT_SCRIPT_CAPABILITIES (single table, surfaces expand).
  */
 import { CONTENT_SCRIPT_CAPABILITIES } from "../cross/content-script-capabilities.js";
 import { register } from "./register-capability.js";

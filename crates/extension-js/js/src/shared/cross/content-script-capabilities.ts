@@ -1,93 +1,437 @@
 /**
- * Content-script capabilities — one entry per action stem, surfaces expand to
- * page.* and/or web.tab.*. Built by merging the legacy page/tab spec tables
- * until those tables are fully inlined as register() calls.
+ * Content-script capabilities — single source of truth.
+ * One entry per action stem; surfaces expand to page.* and/or web.tab.*.
+ *
+ * Edit this file directly. (Generated once from legacy page/tab specs.)
  */
 import { z } from "zod";
 import type { CapabilitySpec } from "./capability.js";
-import type { ContentScriptToolSpec } from "./page-specs.js";
-import { PAGE_TOOL_SPECS } from "./page-specs.js";
 import * as schemas from "./schemas.js";
-import { TAB_TOOL_SPECS } from "./tab-specs.js";
 
-type SpecBundle = {
-	page?: ContentScriptToolSpec;
-	tab?: ContentScriptToolSpec;
-};
+export const AWAIT_PROMISE_NOTE =
+	"Returns a Promise; await before reading the result. For a cell's last line, use `page.snapshot()` without a leading await so the cell returns the settled value.";
 
-/** `page_click` → `click`, `tab_set_files` → `set_files`. */
-export function actionStemFromAction(action: string): string {
-	if (action.startsWith("page_")) return action.slice("page_".length);
-	if (action.startsWith("tab_")) return action.slice("tab_".length);
-	return action;
-}
-
-function handlerParamsFor(actionStem: string): z.ZodType | undefined {
-	if (actionStem === "set_files") {
-		return schemas.ResolvedSetFilesParamsSchema;
+export const CONTENT_SCRIPT_CAPABILITIES: readonly CapabilitySpec[] = [
+	{
+		name: "back",
+		actionStem: "back",
+		handlerKey: "back",
+		description: "Go back in the active tab",
+		tabDescription: "Go back in a tab",
+		surfaces: ["page", "web.tab"] as const,
+		params: schemas.PageBackParamsSchema,
+		returns: schemas.PageActionResultSchema,
+		errorCode: "E_NO_TAB",
+		example: "page.back()",
+		returnDoc: "Navigation result",
+	},
+	{
+		name: "click",
+		actionStem: "click",
+		handlerKey: "click",
+		description: "Click an element in the active tab",
+		tabDescription: "Click in a tab",
+		surfaces: ["page", "web.tab"] as const,
+		params: schemas.PageClickParamsSchema,
+		returns: schemas.PageActionResultSchema,
+		errorCode: "E_MISSING_PARAM",
+		example: "page.click({ refId: \"e2\" })",
+		returnDoc: "{ ok: true, action: 'click', refId? }",
+		agentMeta: {"prerequisites":["Ensure the target tab is active and the content script is ready before mutating"],"notes":["Returns a Promise; await before reading the result. For a cell's last line, use `page.snapshot()` without a leading await so the cell returns the settled value.","Same content-script path as web.tab.*","Always operates on the active tab; use web.tab.* if you need to target a specific tabId"],"tags":["mutation","write"],"relatedApis":["web.tab.click"]},
+		tabAgentMeta: {"prerequisites":["Ensure the target tab exists and the content script is ready before mutating"],"notes":["Explicit tabId required; same handlers as page.*"],"tags":["mutation","write"],"relatedApis":["page.click"]},
+	},
+	{
+		name: "fill",
+		actionStem: "fill",
+		handlerKey: "fill",
+		description: "Fill an element in the active tab",
+		tabDescription: "Fill in a tab",
+		surfaces: ["page", "web.tab"] as const,
+		params: schemas.PageFillParamsSchema,
+		returns: schemas.PageActionResultSchema,
+		errorCode: "E_MISSING_PARAM",
+		example: "page.fill({ refId: \"e2\", value: \"hello\" })",
+		returnDoc: "{ ok: true, action: 'fill', refId?, value? }",
+		agentMeta: {"prerequisites":["Ensure the target tab is active and the content script is ready before mutating"],"notes":["Returns a Promise; await before reading the result. For a cell's last line, use `page.snapshot()` without a leading await so the cell returns the settled value.","Same content-script path as web.tab.*","Always operates on the active tab; use web.tab.* if you need to target a specific tabId"],"tags":["mutation","write"],"relatedApis":["web.tab.fill"]},
+		tabAgentMeta: {"prerequisites":["Ensure the target tab exists and the content script is ready before mutating"],"notes":["Explicit tabId required; same handlers as page.*"],"tags":["mutation","write"],"relatedApis":["page.fill"]},
+	},
+	{
+		name: "setFiles",
+		actionStem: "set_files",
+		handlerKey: "set_files",
+		description: "Attach files to a file input in the active tab",
+		tabDescription: "Attach files to a file input in a tab",
+		surfaces: ["page", "web.tab"] as const,
+		params: schemas.PageSetFilesParamsSchema,
+		returns: schemas.PageActionResultSchema,
+		handlerParams: schemas.ResolvedSetFilesParamsSchema,
+		errorCode: "E_MISSING_PARAM",
+		example: "page.setFiles({ refId: \"e3\", files: [{ url: \"https://example.com/photo.jpg\", name: \"photo.jpg\" }] })",
+		returnDoc: "{ ok: true, action: 'setFiles', refId?, fileCount?, fileNames? }",
+		agentMeta: {"prerequisites":["Ensure the target tab is active and the content script is ready before mutating"],"notes":["Returns a Promise; await before reading the result. For a cell's last line, use `page.snapshot()` without a leading await so the cell returns the settled value.","Target must be input[type=file]; prefer url, vfs path, or fetch handle — bytes are not passed through QuickJS","Use page.fetch({ url, store: true }) then setFiles({ files: [{ handle }] }) for downloaded binaries","Same content-script path as web.tab.*","Always operates on the active tab; use web.tab.* if you need to target a specific tabId"],"tags":["mutation","write"],"relatedApis":["web.tab.setFiles","page.fetch","fs.writeBase64"]},
+		tabAgentMeta: {"prerequisites":["Ensure the target tab exists and the content script is ready before mutating"],"notes":["Explicit tabId required; same handlers as page.*"],"tags":["mutation","write"],"relatedApis":["page.setFiles"]},
+	},
+	{
+		name: "type",
+		actionStem: "type",
+		handlerKey: "type",
+		description: "Type into an element in the active tab",
+		tabDescription: "Type in a tab",
+		surfaces: ["page", "web.tab"] as const,
+		params: schemas.PageTypeParamsSchema,
+		returns: schemas.PageActionResultSchema,
+		errorCode: "E_MISSING_PARAM",
+		example: "page.type({ refId: \"e2\", text: \"hello\" })",
+		returnDoc: "{ ok: true, action: 'type', refId?, value? }",
+		agentMeta: {"prerequisites":["Ensure the target tab is active and the content script is ready before mutating"],"notes":["Returns a Promise; await before reading the result. For a cell's last line, use `page.snapshot()` without a leading await so the cell returns the settled value.","Same content-script path as web.tab.*","Always operates on the active tab; use web.tab.* if you need to target a specific tabId"],"tags":["mutation","write"],"relatedApis":["web.tab.type"]},
+		tabAgentMeta: {"prerequisites":["Ensure the target tab exists and the content script is ready before mutating"],"notes":["Explicit tabId required; same handlers as page.*"],"tags":["mutation","write"],"relatedApis":["page.type"]},
+	},
+	{
+		name: "append",
+		actionStem: "append",
+		handlerKey: "append",
+		description: "Append text to an element in the active tab",
+		surfaces: ["page"] as const,
+		params: schemas.PageAppendParamsSchema,
+		returns: schemas.PageActionResultSchema,
+		errorCode: "E_MISSING_PARAM",
+		example: "page.append({ refId: \"e2\", text: \" world\" })",
+		returnDoc: "{ ok: true, action: 'append', refId?, value? }",
+		agentMeta: {"prerequisites":["Ensure the target tab is active and the content script is ready before mutating"],"notes":["Same content-script path as web.tab.*","Always operates on the active tab; use web.tab.* if you need to target a specific tabId"],"tags":["mutation","write"]},
+	},
+	{
+		name: "press",
+		actionStem: "press",
+		handlerKey: "press",
+		description: "Press a key in the active tab",
+		tabDescription: "Press a key in a tab",
+		surfaces: ["page", "web.tab"] as const,
+		params: schemas.PagePressParamsSchema,
+		returns: schemas.PageActionResultSchema,
+		errorCode: "E_NO_TAB",
+		example: "page.press(\"Enter\")",
+		returnDoc: "{ ok: true, action: 'press', key? }",
+		fields: ["key"],
+		agentMeta: {"prerequisites":["Ensure the target tab is active and the content script is ready before mutating"],"notes":["Same content-script path as web.tab.*","Always operates on the active tab; use web.tab.* if you need to target a specific tabId"],"tags":["mutation","write"],"relatedApis":["web.tab.press"]},
+		tabAgentMeta: {"prerequisites":["Ensure the target tab exists and the content script is ready before mutating"],"notes":["Explicit tabId required; same handlers as page.*"],"tags":["mutation","write"],"relatedApis":["page.press"]},
+	},
+	{
+		name: "select",
+		actionStem: "select",
+		handlerKey: "select",
+		description: "Select an option in the active tab",
+		tabDescription: "Select an option in a tab",
+		surfaces: ["page", "web.tab"] as const,
+		params: schemas.PageSelectParamsSchema,
+		returns: schemas.PageActionResultSchema,
+		errorCode: "E_MISSING_PARAM",
+		example: "page.select({ refId: \"e2\", value: \"option1\" })",
+		returnDoc: "{ ok: true, action: 'select', refId?, value? }",
+		agentMeta: {"prerequisites":["Ensure the target tab is active and the content script is ready before mutating"],"notes":["Same content-script path as web.tab.*","Always operates on the active tab; use web.tab.* if you need to target a specific tabId"],"tags":["mutation","write"],"relatedApis":["web.tab.select"]},
+		tabAgentMeta: {"prerequisites":["Ensure the target tab exists and the content script is ready before mutating"],"notes":["Explicit tabId required; same handlers as page.*"],"tags":["mutation","write"],"relatedApis":["page.select"]},
+	},
+	{
+		name: "select_option",
+		actionStem: "select_option",
+		handlerKey: "select_option",
+		description: "Select a value from a dropdown/combobox (native select, react-select, ARIA listbox) by clicking the option whose visible text matches value",
+		tabDescription: "Open a combobox (react-select/listbox) in a tab and click the option whose text matches value",
+		surfaces: ["page", "web.tab"] as const,
+		params: schemas.PageSelectOptionParamsSchema,
+		returns: schemas.PageActionResultSchema,
+		errorCode: "E_NOT_FOUND",
+		example: "page.select_option({ refId: degree.refId, value: \"Bachelor's Degree\" })",
+		returnDoc: "{ ok: true, action: 'select_option', refId?, value? }",
+		agentMeta: {"prerequisites":["Ensure the target tab is active and the content script is ready before mutating"],"notes":["Same content-script path as web.tab.*","Always operates on the active tab; use web.tab.* if you need to target a specific tabId","RULE: every dropdown (combobox/select/listbox) MUST use page.select_option({refId, value}). NEVER page.fill, page.type, or page.click on a dropdown control or its validation-proxy input.","Use this for snapshot nodes printed as dropdown or nodes with controlType='dropdown'; do not use page.fill/type on those controls","Drives react-select and other ARIA combobox patterns: clicks the control to open, follows the controlled listbox where available, then clicks the matching [role='option']"],"tags":["mutation","write"],"relatedApis":["web.tab.select_option"]},
+		tabAgentMeta: {"prerequisites":["Ensure the target tab exists and the content script is ready before mutating"],"notes":["Explicit tabId required; same handlers as page.*","RULE: every dropdown (combobox/select/listbox) MUST use web.tab.select_option({tabId, refId, value}). NEVER web.tab.fill, web.tab.type, or web.tab.click on a dropdown control or its validation-proxy input.","Use this for snapshot nodes printed as dropdown or nodes with controlType='dropdown'; do not use fill/type on those controls","Drives react-select and other ARIA combobox patterns: clicks the control to open, then clicks the matching [role='option']"],"tags":["mutation","write"],"relatedApis":["page.select_option"]},
+	},
+	{
+		name: "check",
+		actionStem: "check",
+		handlerKey: "check",
+		description: "Check/uncheck an element in the active tab",
+		tabDescription: "Check/uncheck in a tab",
+		surfaces: ["page", "web.tab"] as const,
+		params: schemas.PageCheckParamsSchema,
+		returns: schemas.PageActionResultSchema,
+		errorCode: "E_MISSING_PARAM",
+		example: "page.check({ refId: \"e2\", checked: true })",
+		returnDoc: "{ ok: true, action: 'check', refId?, checked? }",
+		agentMeta: {"prerequisites":["Ensure the target tab is active and the content script is ready before mutating"],"notes":["Same content-script path as web.tab.*","Always operates on the active tab; use web.tab.* if you need to target a specific tabId"],"tags":["mutation","write"],"relatedApis":["web.tab.check"]},
+		tabAgentMeta: {"prerequisites":["Ensure the target tab exists and the content script is ready before mutating"],"notes":["Explicit tabId required; same handlers as page.*"],"tags":["mutation","write"],"relatedApis":["page.check"]},
+	},
+	{
+		name: "hover",
+		actionStem: "hover",
+		handlerKey: "hover",
+		description: "Hover over an element in the active tab",
+		tabDescription: "Hover in a tab",
+		surfaces: ["page", "web.tab"] as const,
+		params: schemas.PageHoverParamsSchema,
+		returns: schemas.PageActionResultSchema,
+		errorCode: "E_MISSING_PARAM",
+		example: "page.hover({ refId: \"e2\" })",
+		returnDoc: "{ ok: true, action: 'hover', refId? }",
+		agentMeta: {"prerequisites":["Ensure the target tab is active and the content script is ready before mutating"],"notes":["Same content-script path as web.tab.*","Always operates on the active tab; use web.tab.* if you need to target a specific tabId"],"tags":["mutation","write"],"relatedApis":["web.tab.hover"]},
+		tabAgentMeta: {"prerequisites":["Ensure the target tab exists and the content script is ready before mutating"],"notes":["Explicit tabId required; same handlers as page.*"],"tags":["mutation","write"],"relatedApis":["page.hover"]},
+	},
+	{
+		name: "unhover",
+		actionStem: "unhover",
+		handlerKey: "unhover",
+		description: "Unhover in the active tab",
+		tabDescription: "Unhover in a tab",
+		surfaces: ["page", "web.tab"] as const,
+		params: schemas.PageUnhoverParamsSchema,
+		returns: schemas.PageActionResultSchema,
+		errorCode: "E_NO_TAB",
+		example: "page.unhover()",
+		returnDoc: "{ ok: true, action: 'unhover' }",
+		agentMeta: {"prerequisites":["Ensure the target tab is active and the content script is ready before mutating"],"notes":["Same content-script path as web.tab.*","Always operates on the active tab; use web.tab.* if you need to target a specific tabId"],"tags":["mutation","write"],"relatedApis":["web.tab.unhover"]},
+		tabAgentMeta: {"prerequisites":["Ensure the target tab exists and the content script is ready before mutating"],"notes":["Explicit tabId required; same handlers as page.*"],"tags":["mutation","write"],"relatedApis":["page.unhover"]},
+	},
+	{
+		name: "submit",
+		actionStem: "submit",
+		handlerKey: "submit",
+		description: "Submit a form in the active tab (calls form.requestSubmit())",
+		tabDescription: "Submit a form in a tab (calls form.requestSubmit())",
+		surfaces: ["page", "web.tab"] as const,
+		params: schemas.PageSubmitParamsSchema,
+		returns: schemas.PageActionResultSchema,
+		errorCode: "E_MISSING_PARAM",
+		example: "page.submit({ refId: \"e2\" })",
+		returnDoc: "{ ok: true, action: 'submit', refId?, dispatched: true }",
+		agentMeta: {"prerequisites":["Ensure the target tab is active and the content script is ready before mutating"],"notes":["Target a <form> element or any descendant; resolves to the owning form","Uses form.requestSubmit() so submit event listeners fire and validation runs","Same content-script path as web.tab.*"],"tags":["mutation","write"],"relatedApis":["web.tab.submit","page.click"]},
+		tabAgentMeta: {"prerequisites":["Ensure the target tab exists and the content script is ready before mutating"],"notes":["Explicit tabId required; same handler as page.submit"],"tags":["mutation","write"],"relatedApis":["page.submit"]},
+	},
+	{
+		name: "checkRadio",
+		actionStem: "check_radio",
+		handlerKey: "check_radio",
+		description: "Check a radio option by group name and value in the active tab",
+		tabDescription: "Check a radio option by group name and value in a tab",
+		surfaces: ["page", "web.tab"] as const,
+		params: schemas.PageCheckRadioParamsSchema,
+		returns: schemas.PageActionResultSchema,
+		errorCode: "E_MISSING_PARAM",
+		example: "page.checkRadio({ name: \"radio-grp\", value: \"opt2\" })",
+		returnDoc: "{ ok: true, action: 'check_radio', refId?, checked: true, value }",
+		agentMeta: {"prerequisites":["Ensure the target tab is active and the content script is ready before mutating"],"notes":["Picks a radio by group name + value — no refId needed","Use page.snapshot_data to discover radio values from the DOM","Same content-script path as web.tab.*"],"tags":["mutation","write"],"relatedApis":["web.tab.checkRadio","page.check","page.snapshot_data"]},
+		tabAgentMeta: {"prerequisites":["Ensure the target tab exists and the content script is ready before mutating"],"notes":["Explicit tabId required; same handler as page.checkRadio"],"tags":["mutation","write"],"relatedApis":["page.checkRadio"]},
+	},
+	{
+		name: "scroll",
+		actionStem: "scroll",
+		handlerKey: "scroll",
+		description: "Scroll the active tab",
+		tabDescription: "Scroll in a tab",
+		surfaces: ["page", "web.tab"] as const,
+		params: schemas.PageScrollParamsSchema,
+		returns: schemas.PageActionResultSchema,
+		errorCode: "E_NO_TAB",
+		example: "page.scroll(\"down\", 500)",
+		returnDoc: "Scroll result",
+		fields: ["direction","amount"],
+	},
+	{
+		name: "scroll_to",
+		actionStem: "scroll_to",
+		handlerKey: "scroll_to",
+		description: "Scroll to an element in the active tab",
+		tabDescription: "Scroll to position in a tab",
+		surfaces: ["page", "web.tab"] as const,
+		params: schemas.PageScrollToParamsSchema,
+		returns: schemas.PageActionResultSchema,
+		errorCode: "E_MISSING_PARAM",
+		example: "page.scroll_to({ refId: \"e2\" })",
+		returnDoc: "Scroll to result",
+	},
+	{
+		name: "dblclick",
+		actionStem: "dblclick",
+		handlerKey: "dblclick",
+		description: "Double-click an element in the active tab",
+		tabDescription: "Double-click in a tab",
+		surfaces: ["page", "web.tab"] as const,
+		params: schemas.PageDblClickParamsSchema,
+		returns: schemas.PageActionResultSchema,
+		errorCode: "E_MISSING_PARAM",
+		example: "page.dblclick({ refId: \"e2\" })",
+		returnDoc: "{ ok: true, action: 'dblclick', refId? }",
+		agentMeta: {"prerequisites":["Ensure the target tab is active and the content script is ready before mutating"],"notes":["Same content-script path as web.tab.*","Always operates on the active tab; use web.tab.* if you need to target a specific tabId"],"tags":["mutation","write"],"relatedApis":["web.tab.dblclick"]},
+		tabAgentMeta: {"prerequisites":["Ensure the target tab exists and the content script is ready before mutating"],"notes":["Explicit tabId required; same handlers as page.*"],"tags":["mutation","write"],"relatedApis":["page.dblclick"]},
+	},
+	{
+		name: "forward",
+		actionStem: "forward",
+		handlerKey: "forward",
+		description: "Go forward in the active tab",
+		tabDescription: "Go forward in a tab",
+		surfaces: ["page", "web.tab"] as const,
+		params: schemas.PageForwardParamsSchema,
+		returns: schemas.PageActionResultSchema,
+		errorCode: "E_NO_TAB",
+		example: "page.forward()",
+		returnDoc: "Navigation result",
+	},
+	{
+		name: "snapshot",
+		actionStem: "snapshot",
+		handlerKey: "snapshot_text",
+		description: "Capture a broad, text-first page snapshot. Default behavior is intentionally generous: visible text, form values, required/invalid state, and linked field error text are included with actionable refIds where possible.",
+		tabDescription: "Get a broad, text-first tab snapshot. Includes visible text, form values, validation/error text, and actionable refIds where possible.",
+		surfaces: ["page", "web.tab"] as const,
+		params: schemas.PageSnapshotParamsSchema,
+		returns: z.string(),
+		errorCode: "E_SNAPSHOT",
+		example: "page.snapshot()",
+		returnDoc: "Snapshot text",
+		agentMeta: {"notes":["Returns a Promise; await before reading the result. For a cell's last line, use `page.snapshot()` without a leading await so the cell returns the settled value.","Content-script path; same refIds as mutations","Do not assume accessibility-only output: snapshot includes visible text and validation/error text even when it is not interactive","If the needed data, options, hidden input, or attributes are still missing, call page.dom({ selector, depth, includeHidden: true }) directly"],"tags":["snapshot","read"],"relatedApis":["page.snapshot_data","page.dom","web.tab.snapshot"]},
+		tabAgentMeta: {"notes":["Returns a Promise; await before reading the result. For a cell's last line, use `page.snapshot()` without a leading await so the cell returns the settled value.","Use web.tab.dom or page.dom if raw attributes, hidden nodes, or exact dropdown ownership are missing"],"tags":["snapshot","read"],"relatedApis":["web.tab.snapshot_data","page.dom"]},
+	},
+	{
+		name: "snapshot_text",
+		actionStem: "snapshot_text",
+		handlerKey: "snapshot_text",
+		description: "Capture a broad text-first DOM snapshot and return only its text representation",
+		tabDescription: "Get broad, text-first tab snapshot text",
+		surfaces: ["page", "web.tab"] as const,
+		params: schemas.PageSnapshotTextParamsSchema,
+		returns: z.string(),
+		errorCode: "E_SNAPSHOT",
+		example: "page.snapshot_text()",
+		returnDoc: "Snapshot text",
+	},
+	{
+		name: "snapshot_data",
+		actionStem: "snapshot_data",
+		handlerKey: "snapshot",
+		description: "Get broad page snapshot data. Includes visible text, form values, required/invalid state, linked error text, and actionable refIds where possible.",
+		tabDescription: "Get broad tab snapshot data. Includes visible text, form values, validation/error text, and actionable refIds where possible.",
+		surfaces: ["page", "web.tab"] as const,
+		params: schemas.PageSnapshotDataParamsSchema,
+		returns: schemas.SnapshotResultSchema,
+		errorCode: "E_SNAPSHOT",
+		example: "page.snapshot_data()",
+		returnDoc: "{ text, nodes, url, title, viewport }",
+		agentMeta: {"notes":["Returns a Promise; await before reading the result. For a cell's last line, use `page.snapshot()` without a leading await so the cell returns the settled value.","Content-script path; nodes include refId for targeting when an element can be acted on","Snapshot is text-first and broad by default; filtering/limiting is opt-in via snapshot_query or max_nodes","After mutations, call snapshot_data() again to verify state","If a widget's raw attributes or hidden nodes matter, inspect them with page.dom({ selector, depth, includeHidden: true })"],"tags":["snapshot","read"],"relatedApis":["page.click","page.dom","web.tab.snapshot_data"]},
+		tabAgentMeta: {"notes":["Returns a Promise; await before reading the result. For a cell's last line, use `page.snapshot()` without a leading await so the cell returns the settled value.","Filtering/limiting is opt-in; this broad snapshot is the default","Use page.dom({ selector, depth, includeHidden: true }) when raw DOM attributes or hidden nodes matter"],"tags":["snapshot","read"],"relatedApis":["web.tab.snapshot","page.dom"]},
+	},
+	{
+		name: "snapshot_query",
+		actionStem: "snapshot_query",
+		handlerKey: "snapshot_query",
+		description: "Opt-in filtered snapshot query by role, tag, text, name, etc. Use this only when you intentionally want less than the default broad snapshot.",
+		tabDescription: "Query tab snapshot with semantic filtering by role, tag, text, name, etc.",
+		surfaces: ["page", "web.tab"] as const,
+		params: schemas.PageSnapshotQueryParamsSchema,
+		returns: schemas.SnapshotResultSchema,
+		errorCode: "E_SNAPSHOT",
+		example: "page.snapshot_query({ filter: { role: \"button\" } })",
+		returnDoc: "{ text, nodes (filtered), url, title, viewport }",
+		agentMeta: {"notes":["Returns a Promise; await before reading the result. For a cell's last line, use `page.snapshot()` without a leading await so the cell returns the settled value.","Content-script path; filters nodes by role, tag, text, name, interactiveOnly, href, src","More efficient than page.snapshot_data() when only specific elements are needed, but it can hide useful text by design","If filtering hides the data you need, use page.snapshot_data() or page.dom({ selector, depth, includeHidden: true })"],"tags":["snapshot","read"],"relatedApis":["page.snapshot_data","page.dom","page.find"]},
+		tabAgentMeta: {"notes":["Explicit tabId required; same handler as page.snapshot_query","Filters nodes by role, tag, text, name, interactiveOnly, href, src"],"tags":["snapshot","read"],"relatedApis":["page.snapshot_query"]},
+	},
+	{
+		name: "find",
+		actionStem: "find",
+		handlerKey: "find",
+		description: "Find elements in the active tab using a CSS selector",
+		surfaces: ["page"] as const,
+		params: schemas.PageFindParamsSchema,
+		returns: z.array(schemas.FindNodeSchema),
+		errorCode: "E_NO_TAB",
+		example: "page.find(\"h1\")",
+		returnDoc: "Array of elements enriched via the shared DOM pipeline: refId, tag, role, name, text, form state (value/checked/disabled/readOnly/required/valid/invalid), href/src/alt, parentRefId, postId, accept/filesCount for file inputs, controlType/recommendedAction/actionable for interactive controls",
+		fields: ["selector"],
+		aliases: [{"namespace":"page","name":"query"}],
+		agentMeta: {"notes":["Assigns data-ref-id on matched elements when missing so results include actionable refIds","Returned refIds are immediately actionable — call page.click/fill/select_option on them without an intermediate snapshot_data","For dropdowns found via find, use page.select_option — not fill/type","Find uses the same shared DOM pipeline as page.snapshot_data and page.dom, so form state, link/image URLs, postId, and clickability metadata stay in parity across surfaces"],"tags":["read"]},
+	},
+	{
+		name: "dom",
+		actionStem: "dom",
+		handlerKey: "dom",
+		description: "Introspect raw DOM subtree by CSS selector. Read-only. Use this whenever snapshot/find do not expose enough data: hidden inputs, validation shims, raw attributes, dropdown/listbox ownership, shadowed widgets, aria-hidden regions, or exact DOM structure.",
+		tabDescription: "Introspect raw DOM subtree of a specific tab by CSS selector. Read-only. Same semantics as page.dom but targets an explicit tabId. Use this when snapshot/find do not expose enough data: hidden inputs, validation shims, raw attributes, dropdown/listbox ownership, shadowed widgets, aria-hidden regions, or exact DOM structure.",
+		surfaces: ["page", "web.tab"] as const,
+		params: schemas.PageDomParamsSchema,
+		returns: schemas.PageDomResultSchema,
+		errorCode: "E_NO_TAB",
+		example: "page.dom({ selector: \"input[type=file]\", depth: 0 })",
+		returnDoc: "{ nodes: [{ refId?, tag, role?, name?, attributes?, hidden?, hiddenReason?, accept?, filesCount?, children? }], url, title }",
+		agentMeta: {"prerequisites":["Active tab with content script ready"],"notes":["Returns a Promise; await before reading the result. For a cell's last line, use `page.snapshot()` without a leading await so the cell returns the settled value.","Read-only: returns DOM structure, never executes code or mutates the page","Bypasses snapshot filtering and can include hidden nodes by default","Assigns refIds to returned elements; those refIds are immediately actionable by page.click/fill/select_option/setFiles in the same cell — no intermediate snapshot_data needed","Use page.dom immediately when struggling to find data in snapshot output; do not keep guessing selectors from the accessibility tree","If a dom node is a dropdown (role=combobox/tag=select/controlType=dropdown), use page.select_option on its refId"],"tags":["read"],"relatedApis":["page.find","page.snapshot_data","page.setFiles"]},
+		tabAgentMeta: {"prerequisites":["Target tab exists with content script ready"],"notes":["Read-only: returns DOM structure, never executes code or mutates the page","Bypasses snapshot filtering and can include hidden nodes by default","Assigns refIds to returned elements; those refIds are immediately actionable by web.tab.click/fill in the same cell","Use web.tab.dom immediately when struggling to find data in snapshot output"],"tags":["read"],"relatedApis":["page.dom","web.tab.snapshot","web.tab.find"]},
+	},
+	{
+		name: "wait_for",
+		actionStem: "wait_for",
+		handlerKey: "wait_for",
+		description: "Wait for a selector in the active tab",
+		surfaces: ["page"] as const,
+		params: schemas.PageWaitForParamsSchema,
+		returns: z.boolean(),
+		errorCode: "E_TIMEOUT",
+		errorCategory: "timeout",
+		example: "page.wait_for(\"#submit\", 5000)",
+		returnDoc: "true",
+		fields: ["selector","timeout"],
+		agentMeta: {"notes":["Returns a Promise; await before reading the result. For a cell's last line, use `page.snapshot()` without a leading await so the cell returns the settled value."],"tags":["read"]},
+	},
+	{
+		name: "extract",
+		actionStem: "extract",
+		handlerKey: "extract",
+		description: "Extract data from the active tab",
+		surfaces: ["page"] as const,
+		params: schemas.PageExtractParamsSchema,
+		returns: z
+			.object({
+				title: z.string().optional(),
+				url: z.string().optional(),
+				headings: z
+					.array(z.object({ tag: z.string(), text: z.string() }))
+					.optional(),
+				links: z
+					.array(z.object({ href: z.string().nullable(), text: z.string() }))
+					.optional(),
+				text: z.string().optional(),
+			})
+			.passthrough(),
+		errorCode: "E_NO_TAB",
+		example: "page.extract([\"title\", \"url\"])",
+		returnDoc: "Extracted data",
+		fields: ["fields"],
+		agentMeta: {"notes":["Returns a Promise; await before reading the result. For a cell's last line, use `page.snapshot()` without a leading await so the cell returns the settled value."],"tags":["read"]},
+	},
+	{
+		name: "fetch",
+		actionStem: "fetch",
+		handlerKey: "fetch",
+		description: "Fetch in the active tab",
+		tabDescription: "Fetch in a tab",
+		surfaces: ["page", "web.tab"] as const,
+		params: schemas.FetchParamsSchema,
+		returns: schemas.FetchValueSchema,
+		errorCode: "E_NO_TAB",
+		example: "page.fetch({ url: \"https://api.example.com/data\" })",
+		returnDoc: "DTO with `{ body, headers, ok, status }`",
+		fields: ["url","options"],
+		agentMeta: {"notes":["Returns a Promise; await before reading the result. For a cell's last line, use `page.snapshot()` without a leading await so the cell returns the settled value.","Runtime binary globals available: Uint8Array, ArrayBuffer, TextEncoder, TextDecoder, atob, btoa","For binary responses bodyEncoding is 'base64'; use atob() or fs.writeBase64 to handle bytes","Only fetchable URLs can be saved this way. chrome.downloads entries do not expose bytes, and blob: URLs are only fetchable in the document context that created them."],"tags":["read"]},
+		tabAgentMeta: {"notes":["Only fetchable URLs can be saved to OPFS via fetch + fs.writeBase64. chrome.downloads entries do not expose bytes, and blob: URLs are only fetchable in the document context that created them."],"tags":["read"],"relatedApis":["page.fetch","fs.writeBase64","chrome.downloads"]},
+	},
+	{
+		name: "evaluate",
+		actionStem: "evaluate",
+		handlerKey: "evaluate",
+		description: "Evaluate script in a tab (content-script context)",
+		surfaces: ["web.tab"] as const,
+		params: schemas.TabEvaluateParamsSchema,
+		returns: schemas.TabEvaluateResultSchema,
+		errorCode: "E_NO_TAB",
+		example: "web.tab.evaluate({ tabId: 123, script: \"document.title\" })",
+		returnDoc: "Evaluation result",
+		fields: ["tabId","script"],
+		agentMeta: {"notes":["Runs in content-script isolated world, not MAIN-world injection","For MAIN-world access use chrome.scripting.executeScript from a cell"],"tags":["read"]},
 	}
-	return undefined;
-}
-
-/**
- * Merge page + tab tool specs by action stem (not handlerKey — several agent
- * methods can share one handler, e.g. snapshot + snapshot_text).
- */
-export function buildContentScriptCapabilities(): CapabilitySpec[] {
-	const byStem = new Map<string, SpecBundle>();
-
-	for (const spec of PAGE_TOOL_SPECS) {
-		const stem = actionStemFromAction(spec.action);
-		const cur = byStem.get(stem) ?? {};
-		cur.page = spec;
-		byStem.set(stem, cur);
-	}
-	for (const spec of TAB_TOOL_SPECS) {
-		const stem = actionStemFromAction(spec.action);
-		const cur = byStem.get(stem) ?? {};
-		cur.tab = spec;
-		byStem.set(stem, cur);
-	}
-
-	const capabilities: CapabilitySpec[] = [];
-
-	for (const [actionStem, bundle] of byStem) {
-		const surfaces: Array<"page" | "web.tab"> = [];
-		if (bundle.page) surfaces.push("page");
-		if (bundle.tab) surfaces.push("web.tab");
-
-		const primary = bundle.page ?? bundle.tab;
-		if (!primary) continue;
-
-		// Prefer page meta when both exist; for dual-surface tools, tab-specific
-		// agentMeta (prerequisites wording) is lost — preserve tab meta when only tab.
-		const metaSource = bundle.page ?? bundle.tab ?? primary;
-		const params = bundle.page ? bundle.page.params : bundle.tab!.params;
-
-		capabilities.push({
-			name: primary.name,
-			actionStem,
-			handlerKey: primary.handlerKey,
-			description: (bundle.page ?? primary).description,
-			tabDescription: bundle.tab?.description,
-			surfaces,
-			params: params as z.ZodType,
-			returns: primary.returns as z.ZodType,
-			handlerParams: handlerParamsFor(actionStem),
-			errorCode: metaSource.errorCode,
-			errorCategory: metaSource.errorCategory,
-			example: metaSource.example,
-			returnDoc: metaSource.returnDoc,
-			fields: primary.fields,
-			aliases: primary.aliases,
-			agentMeta: bundle.page?.agentMeta ?? bundle.tab?.agentMeta,
-			tabAgentMeta: bundle.tab?.agentMeta,
-		});
-	}
-
-	return capabilities;
-}
-
-/** Singleton list for main + CS registration. */
-export const CONTENT_SCRIPT_CAPABILITIES: readonly CapabilitySpec[] =
-	buildContentScriptCapabilities();
+];

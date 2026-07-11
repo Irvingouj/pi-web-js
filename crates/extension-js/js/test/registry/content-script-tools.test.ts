@@ -2,18 +2,19 @@
 
 import { beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
-import { getContentScriptSpec } from "../../src/content-script/registry.js";
 import {
 	addContentScriptAction,
 	clearContentScriptActions,
 	getContentScriptActions,
 	isContentScriptAction,
 } from "../../src/shared/cross/content-script-actions.js";
-import { defineContentScriptTool } from "../../src/shared/main/define-content-script-tool.js";
+import { CONTENT_SCRIPT_CAPABILITIES } from "../../src/shared/cross/content-script-capabilities.js";
+import { register } from "../../src/shared/main/register-capability.js";
 import {
 	clearJsRegistry,
 	freezeJsRegistry,
 	getSerializableJsManifest,
+	getTool,
 } from "../../src/shared/main/tool-registry.js";
 
 describe("content-script action set", () => {
@@ -44,89 +45,53 @@ describe("content-script action set", () => {
 	});
 });
 
-describe("defineContentScriptTool", () => {
+describe("register capability on main pipeline", () => {
 	beforeEach(() => {
 		clearJsRegistry();
 		clearContentScriptActions();
 	});
 
-	it("calls registerContentScriptJsCall (manifest entry created)", () => {
-		defineContentScriptTool({
-			action: "cs_test_manifest",
-			namespace: "test",
+	it("creates content-script owner manifest entry without main-thread tool", () => {
+		register({
 			name: "manifest",
 			description: "Test manifest entry",
+			surfaces: ["page"],
 			params: z.object({}),
 			returns: z.null(),
-			handlerKey: "test_handler",
+			errorCode: "E_TEST",
 		});
 
-		const manifest = getSerializableJsManifest();
-		const entry = manifest.find((m) => m.action === "cs_test_manifest");
+		const entry = getSerializableJsManifest().find(
+			(m) => m.action === "page_manifest",
+		);
 		expect(entry).toBeDefined();
 		expect(entry?.owner).toBe("content-script");
+		expect(getTool("page_manifest")).toBeUndefined();
+		expect(isContentScriptAction("page_manifest")).toBe(true);
 	});
 
-	it("calls addContentScriptAction (action appears in dynamic set)", () => {
-		defineContentScriptTool({
-			action: "cs_test_action",
-			namespace: "test",
-			name: "action",
-			description: "Test action",
-			params: z.object({}),
-			returns: z.null(),
-			handlerKey: "test_handler",
-		});
-
-		expect(isContentScriptAction("cs_test_action")).toBe(true);
-		expect(getContentScriptActions()).toContain("cs_test_action");
-	});
-
-	it("does NOT call registerContentScriptSpec (no CS spec registered)", () => {
-		defineContentScriptTool({
-			action: "cs_test_no_spec",
-			namespace: "test",
-			name: "no_spec",
-			description: "Test no spec",
-			params: z.object({}),
-			returns: z.null(),
-			handlerKey: "test_handler",
-		});
-
-		expect(getContentScriptSpec("cs_test_no_spec")).toBeUndefined();
-	});
-
-	it("freezes without orphans when used with real specs", () => {
-		defineContentScriptTool({
-			action: "cs_test_freeze",
-			namespace: "test",
+	it("freezes without orphans", () => {
+		register({
 			name: "freeze",
 			description: "Test freeze",
+			surfaces: ["page"],
 			params: z.object({}),
 			returns: z.null(),
-			handlerKey: "test_handler",
+			errorCode: "E_TEST",
 		});
-
 		expect(() => freezeJsRegistry()).not.toThrow();
 	});
 });
 
 describe("dropdown rule in agent docs", () => {
-	beforeEach(() => {
-		clearContentScriptActions();
-	});
-
-	it("select_option agentMeta enforces dropdown rule and uses degree example", async () => {
-		const { CONTENT_SCRIPT_TOOL_SPECS } = await import(
-			"../../src/shared/cross/content-script-tools.js"
+	it("select_option agentMeta enforces dropdown rule and uses degree example", () => {
+		const cap = CONTENT_SCRIPT_CAPABILITIES.find(
+			(c) => c.actionStem === "select_option" || c.name === "select_option",
 		);
-		const spec = CONTENT_SCRIPT_TOOL_SPECS.find(
-			(s) => s.action === "page_select_option",
-		);
-		expect(spec).toBeDefined();
-		if (!spec) return;
-		const notes = (spec.agentMeta?.notes || []).join(" ");
+		expect(cap).toBeDefined();
+		if (!cap) return;
+		const notes = (cap.agentMeta?.notes || []).join(" ");
 		expect(notes).toMatch(/NEVER page\.fill.*dropdown/i);
-		expect(spec.example).toContain("select_option({ refId: degree.refId");
+		expect(cap.example).toContain("select_option({ refId: degree.refId");
 	});
 });
