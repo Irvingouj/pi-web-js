@@ -7,7 +7,10 @@ interface Props {
 }
 
 function escapeHtml(s: string): string {
-	return s
+	// Guard undefined/null — formatCellError must never return non-string, but
+	// a missing switch arm previously crashed the sidepanel on api_error.
+	const text = s ?? "";
+	return text
 		.replace(/&/g, "&amp;")
 		.replace(/</g, "&lt;")
 		.replace(/>/g, "&gt;")

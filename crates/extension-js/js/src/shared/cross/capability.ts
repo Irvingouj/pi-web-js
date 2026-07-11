@@ -97,6 +97,17 @@ export function withTabId(schema: z.ZodTypeAny): z.ZodTypeAny {
 	return schema.and(z.object({ tabId: tabIdField }));
 }
 
+/**
+ * Prelude `fields` map positional args → named params.
+ * web.tab.* always needs tabId first so `web.tab.snapshot(123)` becomes
+ * `{ tabId: 123 }` (legacy tab-specs behavior).
+ */
+export function fieldsForWebTab(fields?: string[]): string[] {
+	if (!fields || fields.length === 0) return ["tabId"];
+	if (fields[0] === "tabId") return fields;
+	return ["tabId", ...fields.filter((f) => f !== "tabId")];
+}
+
 export function expandCapability<P, R>(
 	spec: CapabilitySpec<P, R>,
 ): ExpandedSurface[] {
@@ -141,7 +152,7 @@ export function expandCapability<P, R>(
 				errorCategory: spec.errorCategory,
 				example: spec.example,
 				returnDoc: spec.returnDoc,
-				fields: spec.fields,
+				fields: fieldsForWebTab(spec.fields),
 				aliases: spec.aliases,
 				agentMeta: spec.tabAgentMeta ?? spec.agentMeta,
 			});

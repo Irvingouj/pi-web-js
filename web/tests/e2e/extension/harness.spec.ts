@@ -82,6 +82,7 @@ await web.tab.fetch({ tabId, url: 123 });
 			const exec = await executeCell(
 				harness.sidepanel,
 				`
+var RESULT_PREFIX = "${RESULT_PREFIX}";
 const tabs = await chrome.tabs.query({ url: "https://extension-js.test/*" });
 const tabId = tabs[0].id;
 const url = await web.tab.url(tabId);

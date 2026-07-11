@@ -187,4 +187,37 @@ describe("register capability", () => {
 		expect(actions).toContain("page_find");
 		expect(actions).not.toContain("tab_find");
 	});
+
+	it("web.tab surface puts tabId first in fields for positional tabId", () => {
+		register({
+			name: "snapshot",
+			description: "Snapshot",
+			surfaces: ["page", "web.tab"],
+			params: z.object({
+				max_nodes: z.number().optional(),
+			}),
+			returns: z.string(),
+			errorCode: "E_SNAPSHOT",
+			// page has no fields; web.tab must still get ["tabId"]
+		});
+
+		const tab = getSerializableJsManifest().find(
+			(m) => m.action === "tab_snapshot",
+		);
+		expect(tab?.fields).toEqual(["tabId"]);
+
+		register({
+			name: "fetch",
+			description: "Fetch",
+			surfaces: ["web.tab"],
+			params: z.object({ url: z.string() }),
+			returns: z.object({}),
+			errorCode: "E_NO_TAB",
+			fields: ["url", "options"],
+		});
+		const fetch = getSerializableJsManifest().find(
+			(m) => m.action === "tab_fetch",
+		);
+		expect(fetch?.fields).toEqual(["tabId", "url", "options"]);
+	});
 });
